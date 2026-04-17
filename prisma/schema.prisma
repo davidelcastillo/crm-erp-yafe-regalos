@@ -1,0 +1,121 @@
+// Schema for Stark Commerce OS
+// Following AGENTS.md requirements
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// Product model - products in inventory
+model Product {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?
+  stock       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  purchaseItems PurchaseItem[]
+  saleItems     SaleItem[]
+}
+
+// Purchase model - purchase header (cabecera)
+model Purchase {
+  id          Int      @id @default(autoincrement())
+  date        DateTime @default(now())
+  totalAmount Decimal  @default(0) @db.Decimal(10, 2)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  items PurchaseItem[]
+}
+
+// PurchaseItem model - purchase detail (detalle)
+model PurchaseItem {
+  id         Int     @id @default(autoincrement())
+  purchaseId Int
+  productId  Int
+  price      Decimal @db.Decimal(10, 2)
+  quantity   Int
+  subtotal   Decimal @db.Decimal(10, 2)
+
+  // Relations
+  purchase Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  product  Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  // Indexes for faster relational queries
+  @@index([purchaseId])
+  @@index([productId])
+}
+
+// Sale model - sale header (cabecera)
+model Sale {
+  id             Int      @id @default(autoincrement())
+  date           DateTime @default(now())
+  totalAmount    Decimal  @default(0) @db.Decimal(10, 2)
+  amountPaid     Decimal  @default(0) @db.Decimal(10, 2)
+  pendingBalance Decimal  @default(0) @db.Decimal(10, 2)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relations
+  customerId Int?
+  customer   Customer?  @relation(fields: [customerId], references: [id])
+  items      SaleItem[]
+
+  // Index for customer debt queries
+  @@index([customerId])
+}
+
+// SaleItem model - sale detail (detalle)
+model SaleItem {
+  id        Int     @id @default(autoincrement())
+  saleId    Int
+  productId Int
+  price     Decimal @db.Decimal(10, 2)
+  quantity  Int
+  subtotal  Decimal @db.Decimal(10, 2)
+
+  // Relations
+  sale    Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  // Indexes for faster relational queries
+  @@index([saleId])
+  @@index([productId])
+}
+
+// Customer model - clients with debt tracking
+model Customer {
+  id           Int      @id @default(autoincrement())
+  name         String
+  surname      String
+  totalBalance Decimal  @default(0) @db.Decimal(10, 2)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  sales    Sale[]
+  payments Payment[]
+}
+
+// Payment model - customer payments towards debt
+model Payment {
+  id         Int      @id @default(autoincrement())
+  customerId Int
+  amount     Decimal  @db.Decimal(10, 2)
+  date       DateTime @default(now())
+
+  // Relations
+  customer Customer @relation(fields: [customerId], references: [id])
+
+  // Index for customer payment history queries
+  @@index([customerId])
+}
