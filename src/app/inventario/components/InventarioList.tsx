@@ -1,19 +1,43 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { Product } from "@prisma/client";
 import { InventarioCard } from "./InventarioCard";
+import { ProductSearch, ProductSearchResult } from "@/components/ProductSearch";
 
 interface InventarioListProps {
   products: Product[];
+  onViewMovements?: (product: Product) => void;
 }
 
 type SortOption = "name" | "stock-asc" | "stock-desc" | "recent";
 
-export function InventarioList({ products }: InventarioListProps) {
+export function InventarioList({ products, onViewMovements }: InventarioListProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [sortBy, setSortBy] = useState<SortOption>("recent");
   const [showOnlyLowStock, setShowOnlyLowStock] = useState(false);
+  const [highlightedProductId, setHighlightedProductId] = useState<number | null>(null);
+  const cardsRef = useRef<HTMLDivElement>(null);
+
+  // Scroll to highlighted product
+  useEffect(() => {
+    if (highlightedProductId && cardsRef.current) {
+      const highlightedCard = cardsRef.current.querySelector(
+        `[data-product-id="${highlightedProductId}"]`
+      );
+      if (highlightedCard) {
+        highlightedCard.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+        // Add temporary highlight effect
+        highlightedCard.classList.add("ring-2", "ring-[#3b82f6]", "ring-offset-2");
+        setTimeout(() => {
+          highlightedCard.classList.remove("ring-2", "ring-[#3b82f6]", "ring-offset-2");
+        }, 2000);
+      }
+    }
+  }, [highlightedProductId]);
 
   // Filter and sort products
   const filteredProducts = useMemo(() => {
@@ -78,6 +102,15 @@ export function InventarioList({ products }: InventarioListProps) {
           className="w-full px-4 py-3 bg-[#f8f8f8] rounded-xl text-base text-[#222222] placeholder-[#999] focus:outline-none focus:ring-2 focus:ring-[#3b82f6]/20"
         />
 
+        {/* Inline Product Search */}
+        <div className="mt-3">
+          <ProductSearch
+            mode="inline"
+            onSelect={(product) => setHighlightedProductId(product.id)}
+            placeholder="Buscar producto por código o nombre..."
+          />
+        </div>
+
         <div className="flex gap-2 mt-3 overflow-x-auto pb-1">
           <select
             value={sortBy}
@@ -120,18 +153,24 @@ export function InventarioList({ products }: InventarioListProps) {
       </div>
 
       {/* Products List */}
-      <div className="flex flex-col gap-3">
-        {filteredProducts.length === 0 ? (
-          <div className="text-center py-8 text-[#6a6a6a]">
-            {searchTerm || showOnlyLowStock
-              ? "No se encontraron productos"
-              : "No hay productos en el inventario"}
-          </div>
-        ) : (
-          filteredProducts.map((product) => (
-            <InventarioCard key={product.id} product={product} />
-          ))
-        )}
+      <div ref={cardsRef} className="flex flex-col gap-3">
+{filteredProducts.length === 0 ? (
+         <div className="text-center py-8 text-[#6a6a6a]">
+           {searchTerm || showOnlyLowStock
+             ? "No se encontraron productos"
+             : "No hay productos en el inventario"}
+         </div>
+       ) : (
+         filteredProducts.map((product) => (
+           <InventarioCard 
+             key={product.id} 
+             product={product} 
+             data-product-id={product.id}
+             isHighlighted={highlightedProductId === product.id}
+             onViewMovements={onViewMovements}
+           />
+         ))
+       )}
       </div>
     </div>
   );

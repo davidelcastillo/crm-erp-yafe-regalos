@@ -19,6 +19,7 @@ interface Sale {
   date: string;
   totalAmount: number;
   items: SaleItem[];
+  paymentMethod?: "EFECTIVO" | "TRANSFERENCIA" | "MIXTO";
 }
 
 interface SaleCardProps {
@@ -39,6 +40,14 @@ export function SaleCard({ sale, onExpand, expanded }: SaleCardProps) {
   const itemCount = sale.items.length;
   const total = sale.totalAmount;
 
+  const paymentMethodColors: Record<string, string> = {
+    EFECTIVO: "bg-green-100 text-green-800",
+    TRANSFERENCIA: "bg-blue-100 text-blue-800",
+    MIXTO: "bg-purple-100 text-purple-800",
+  };
+
+  const paymentMethod = sale.paymentMethod ?? "EFECTIVO";
+
   return (
     <div className="bg-white rounded-2xl shadow-[rgba(0,0,0,0.02)_0px_0px_0px_1px,rgba(0,0,0,0.04)_0px_2px_6px,rgba(0,0,0,0.1)_0px_4px_8px]">
       <div className="p-4 cursor-pointer" onClick={onExpand}>
@@ -51,6 +60,9 @@ export function SaleCard({ sale, onExpand, expanded }: SaleCardProps) {
           </div>
           <div className="flex flex-col items-end gap-2">
             <span className="text-lg font-bold text-green-700">+ ${total.toFixed(2)}</span>
+            <span className={`px-2 py-0.5 rounded text-xs font-medium ${paymentMethodColors[paymentMethod] || "bg-gray-100 text-gray-800"}`}>
+              {paymentMethod}
+            </span>
             <svg className={`w-5 h-5 text-[#6a6a6a] transition-transform ${expanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
             </svg>

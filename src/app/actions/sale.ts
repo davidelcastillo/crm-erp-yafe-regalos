@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { parseArray, parseObject } from "@/lib/parse-prisma";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { PaymentMethod, computePayment } from "@/lib/utils/payment";
 
 // Schema para un item de venta
 const saleItemSchema = z.object({
@@ -17,7 +18,19 @@ const registerSaleSchema = z.object({
   items: z.array(saleItemSchema).min(1),
   customerId: z.number().int().positive().optional(),
   amountPaid: z.number().min(0).default(0),
-});
+  paymentMethod: z.nativeEnum(PaymentMethod).optional(),
+  // MIXTO manual inputs
+  cashAmount: z.number().min(0).optional(),
+  transferAmount: z.number().min(0).optional(),
+}).refine(
+  (data) =>
+    data.paymentMethod !== PaymentMethod.MIXTO ||
+    ((data.cashAmount ?? 0) + (data.transferAmount ?? 0) > 0),
+  {
+    message: "MIXTO requiere cashAmount o transferAmount mayor a 0",
+    path: ["cashAmount"],
+  }
+);
 
 export async function registerSale(data: unknown) {
   try {
@@ -49,10 +62,27 @@ export async function registerSale(data: unknown) {
       return sum + item.price * item.quantity;
     }, 0);
 
-    // Calcular pending balance
-    const amountPaid = validatedData.amountPaid || 0;
-    const pendingBalance = Math.max(0, totalAmount - amountPaid);
+    // Calcular payment allocation
+    // If paymentMethod provided, use computePayment (overrides amountPaid)
+    // Otherwise, use legacy amountPaid logic for backward compatibility
+    let amountPaid: number;
+    let pendingBalance: number;
+    const paymentMethod = validatedData.paymentMethod ?? PaymentMethod.EFECTIVO;
     const customerId = validatedData.customerId;
+
+    if (validatedData.paymentMethod) {
+      // New logic: compute from payment method
+      const paymentResult = computePayment(paymentMethod, totalAmount, {
+        cash: validatedData.cashAmount,
+        transfer: validatedData.transferAmount,
+      });
+      amountPaid = paymentResult.amountPaid;
+      pendingBalance = paymentResult.pendingBalance;
+    } else {
+      // Legacy logic: backward compatibility
+      amountPaid = validatedData.amountPaid || 0;
+      pendingBalance = Math.max(0, totalAmount - amountPaid);
+    }
 
     // Paso 2: Transacción atómica
     const result = await prisma.$transaction(async (tx) => {
@@ -62,6 +92,7 @@ export async function registerSale(data: unknown) {
           totalAmount,
           amountPaid,
           pendingBalance,
+          paymentMethod,
           customerId: customerId || null,
         },
       });

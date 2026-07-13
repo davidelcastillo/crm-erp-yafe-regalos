@@ -6,87 +6,204 @@
 
 # Architecture & Modules
 
-El agente debe estructurar la aplicación obligatoriamente en los siguientes 5 módulos principales:
+El agente debe estructurar la aplicación obligatoriamente en los siguientes **6 módulos principales**:
 
-1.  **Módulo de Productos (Alta):** Pantalla para registrar nuevos items en el sistema. Los datos requeridos son: `Nombre`, `Descripción` (Opcional) y `Cantidad` (Stock inicial).
-2.  **Módulo de Compras (Ingresos):** Historial de compras presentadas en formato de tabla (adaptativa para móviles).
-    - _Filtros:_ Por producto específico, ordenamiento ascendente/descendente y fechas.
-    - _Acción Principal:_ Botón superior "Registrar Nueva Compra" que lanza un modal. El modal debe solicitar: selección de producto (dropdown de items existentes), precio de compra y cantidad.
-3.  **Módulo de Ventas (Egresos):** Historial de ventas en formato de tabla sencilla.
-    - _Filtros:_ Búsqueda, ordenamiento y fechas.
-    - _Acción Principal:_ Botón superior "Registrar Nueva Venta" que lanza un modal. El modal debe solicitar: selección de producto, precio de venta y cantidad.
-4.  **Módulo de Inventario:** Pantalla de gestión de stock en tiempo real.
-    - Muestra un listado de productos junto al stock actual de cada uno, con barra de búsqueda y filtros.
-    - _Acciones por producto:_ Botón "Editar" (lanza modal para modificar datos básicos) y botón "Eliminar" (con prompt de confirmación de seguridad).
-5.  **Dashboard Interactivo:** Panel analítico y estadístico.
-    - Muestra tarjetas resumen de datos globales de productos, ventas y compras.
-    - _Tabla de Rendimiento:_ Componente interactivo donde el usuario selecciona un producto y la interfaz despliega su historial de compras, ventas y el cálculo automático de ganancias o pérdidas asociadas.
+1.  **Módulo de Productos (Alta):** Pantalla para registrar nuevos items.
+    - Datos: `Nombre`, `Descripción` (Opcional), `Stock inicial`, **`Precio base`**, **`Prefijo código (2-4 letras)`**
+    - **Código auto-generado**: formato `AAA000` (prefijo + secuencial 3 dígitos, inicia en 000)
+    - Acciones: Crear, Editar (precio/descripción), Eliminar, Lista con código + precio
+
+2.  **Módulo de Compras (Ingresos):** Historial de compras (tabla adaptativa móvil).
+    - Filtros: Por producto, ordenamiento, fechas
+    - Acción: "Registrar Nueva Compra" → Modal con: selector producto (busca por código/nombre), precio compra, cantidad
+    - **Crear producto inline**: Botón "➕ Nuevo producto" abre modal anidado con formulario Producto
+
+3.  **Módulo de Ventas (Egresos):** Historial de ventas (tabla sencilla).
+    - Filtros: Búsqueda por **código o nombre**, ordenamiento, fechas
+    - Acción: "Registrar Nueva Venta" → Modal con: **búsqueda producto (código/nombre)**, precio venta (pre-fill desde producto, editable), cantidad
+    - **Método de pago**: Selector `EFECTIVO` | `TRANSFERENCIA` | `MIXTO`
+      - `EFECTIVO`: amountPaid = total, pendingBalance = 0
+      - `TRANSFERENCIA`: amountPaid = 0, pendingBalance = total
+      - `MIXTO`: inputs manuales efectivo + transferencia
+
+4.  **Módulo de Inventario:** Gestión de stock tiempo real.
+    - Lista productos con stock actual, **búsqueda por código o nombre**
+    - Acciones: Editar (modal datos básicos), Eliminar (confirmación)
+
+5.  **Módulo de Clientes:** Gestión y seguimiento de deudas.
+    - Lista clientes con saldo pendiente
+    - Acciones: Registrar pago, Ver historial ventas/deudas
+
+6.  **Dashboard Interactivo:** Panel analítico.
+    - Tarjetas resumen: productos, ventas, compras, totales por método pago
+    - Tabla Rendimiento: selecciona producto → historial compras/ventas + ganancias/pérdidas (precio venta - precio base)
 
 # Tech Stack
 
 - **Framework:** Next.js 16 (App Router).
-- **Base de Datos:** PostgreSQL (alojada en Supabase).
+- **Base de Datos:** PostgreSQL (Supabase).
 - **ORM:** Prisma.
 - **Despliegue:** Vercel.
 - **Lenguaje:** TypeScript.
-- **Estilos:** Tailwind CSS.
+- **Estilos:** Tailwind CSS v4.
+- **Charts:** Recharts.
+- **Validación:** Zod v4.
+- **Alertas:** SweetAlert2.
 
 # Skills (Mapas de Conocimiento)
 
-El agente debe consultar obligatoriamente los archivos en estas rutas antes de implementar la funcionalidad correspondiente:
+El agente debe consultar obligatoriamente estos archivos antes de implementar:
 
-- **Next.js & App Router:** `skills/next-best-practices/app-router.md` (Para Server Components y Server Actions).
+- **Next.js & App Router:** `skills/next-best-practices/app-router.md`
 - **Prisma ORM Best Practices:** `skills/prisma-best-practices/schema-and-migrations.md`
 - **Supabase PostgreSQL:** `agents/skills/supabase-postgres-best-practices/`
-- **Mobile-First UI Design:** `skills/frontend-design/android-mobile-first.md` (Crucial para adaptar modales y tablas complejas a pantallas pequeñas sin perder usabilidad).
+- **Mobile-First UI Design:** `skills/frontend-design/android-mobile-first.md`
 - **Vercel Deployment:** `skills/vercel-react-best-practices/`
 - **Frontend Design:** `skills/frontend-design/`
-- ui/ux design: `skills/ui-ux-design/`
-- web development: `skills/web-development/`
-- mobile design: `.agents/skills/mobile-design/`
+- **UI/UX Design:** `skills/ui-ux-pro-max/`
+- **Web Development:** `skills/web-development/`
+- **Mobile Design:** `.agents/skills/mobile-design/`
 
 # Data Structure Requirements (Prisma Schema)
 
-El esquema de Prisma (`schema.prisma`) debe modelarse en base a estas tres entidades principales:
+Esquema actual en `prisma/schema.prisma`:
 
-- **Product:** `id`, `name`, `description` (String opcional), `stock` (Int), `createdAt`, `updatedAt`.
-- **Purchase:** `id`, `productId` (Relación a Product), `price` (Float/Decimal), `quantity` (Int), `date`.
-- **Sale:** `id`, `productId` (Relación a Product), `price` (Float/Decimal), `quantity` (Int), `date`.
+```prisma
+// Product - Items en inventario
+model Product {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?
+  stock       Int      @default(0)
+  price       Decimal  @default(0) @db.Decimal(10, 2)  // Precio base venta
+  code        String   @unique                        // Código AAA000
+  codePrefix  String?                                 // Prefijo para queries
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-> **Directiva Crítica para Jarvis:** Toda inserción en la tabla `Purchase` debe aumentar el `stock` del `Product` correspondiente. Toda inserción en la tabla `Sale` debe disminuir dicho `stock`. Estas operaciones deben ejecutarse estrictamente utilizando Transacciones de Prisma (`prisma.$transaction`) para garantizar la consistencia de la base de datos en caso de fallos.
+  purchaseItems PurchaseItem[]
+  saleItems     SaleItem[]
+  @@index([codePrefix])
+  @@index([code, name])
+}
+
+// Purchase - Cabecera de compra
+model Purchase {
+  id          Int      @id @default(autoincrement())
+  date        DateTime @default(now())
+  totalAmount Decimal  @default(0) @db.Decimal(10, 2)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  items       PurchaseItem[]
+}
+
+// PurchaseItem - Detalle de compra
+model PurchaseItem {
+  id         Int     @id @default(autoincrement())
+  purchaseId Int
+  productId  Int
+  price      Decimal @db.Decimal(10, 2)   // Precio compra
+  quantity   Int
+  subtotal   Decimal @db.Decimal(10, 2)
+  purchase   Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  @@index([purchaseId])
+  @@index([productId])
+}
+
+// Sale - Cabecera de venta
+model Sale {
+  id             Int      @id @default(autoincrement())
+  date           DateTime @default(now())
+  totalAmount    Decimal  @default(0) @db.Decimal(10, 2)
+  amountPaid     Decimal  @default(0) @db.Decimal(10, 2)
+  pendingBalance Decimal  @default(0) @db.Decimal(10, 2)
+  paymentMethod  PaymentMethod @default(EFECTIVO)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  customerId     Int?
+  customer       Customer? @relation(fields: [customerId], references: [id])
+  items          SaleItem[]
+  @@index([customerId])
+}
+
+// SaleItem - Detalle de venta
+model SaleItem {
+  id        Int     @id @default(autoincrement())
+  saleId    Int
+  productId Int
+  price     Decimal @db.Decimal(10, 2)   // Precio venta
+  quantity  Int
+  subtotal  Decimal @db.Decimal(10, 2)
+  sale      Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  @@index([saleId])
+  @@index([productId])
+}
+
+// Customer - Clientes con deuda
+model Customer {
+  id           Int      @id @default(autoincrement())
+  name         String
+  surname      String
+  totalBalance Decimal  @default(0) @db.Decimal(10, 2)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  sales        Sale[]
+  payments     Payment[]
+}
+
+// Payment - Pagos de clientes
+model Payment {
+  id         Int      @id @default(autoincrement())
+  customerId Int
+  amount     Decimal  @db.Decimal(10, 2)
+  date       DateTime @default(now())
+  customer   Customer @relation(fields: [customerId], references: [id])
+  @@index([customerId])
+}
+
+enum PaymentMethod {
+  EFECTIVO
+  TRANSFERENCIA
+  MIXTO
+}
+
+```
+
+## Directiva Crítica:
+ - Toda inserción en PurchaseItem debe aumentar stock del Product (transacción Prisma).
+ - Toda inserción en SaleItem debe disminuir stock del Product (transacción Prisma).
+ - amountPaid / pendingBalance se calculan automático según paymentMethod.
+ - Validar stock suficiente antes de registrar venta (evitar stock negativo).
 
 # Build and Test Commands
-
-- **Instalar:** `npm install`
-- **Configuración:** Crear archivo `.env` con las variables `DATABASE_URL` y `DIRECT_URL` de Supabase.
-- **Sincronizar BD:** `npx prisma db push`
-- **Generar Cliente:** `npx prisma generate`
-- **Desarrollo:** `npm run dev`
+ - **Instalar**: npm install
+ - **Configuración**: .env con DATABASE_URL, DIRECT_URL, NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, SUPABASE_SERVICE_ROLE_KEY
+ - **Sincronizar BD**: npx prisma db push
+ - **Generar Cliente**: npx prisma generate
+ - **Desarrollo**: npm run dev
+ - **Tests**: npm run test (Jest + React Testing Library)
+ - **Lint**: npm run lint
 
 # Code Style Guidelines
-
-- **Tipado Fuerte:** Usar TypeScript estricto aprovechando los tipos generados por `@prisma/client`.
-- **Enfoque Móvil:** Las tablas de datos deben transformarse visualmente en listas de tarjetas (Cards) en resoluciones menores a `md:` de Tailwind para asegurar una excelente experiencia en Android.
-- **Componentes Modales:** En dispositivos móviles, los modales de altas/compras/ventas deben renderizarse idealmente como _Bottom Sheets_ (Hojas inferiores) que ocupen el 90% de la pantalla para facilitar el alcance del pulgar.
-- **Diseño de Interfaces:** Revisar el archivo DESING.md para obtener pautas de diseño.
+ - **Tipado Fuerte**: TypeScript estricto con tipos @prisma/client.
+ - **Enfoque Móvil**: Tablas → Cards en < md:. Modales = Bottom Sheets 90vh mobile.
+ - **Componentes**: Reutilizables (ProductForm, ProductSearch, ProductCard).
+ - **Server Actions**: Validación Zod en todos los inputs.
+ - **Transacciones**: prisma.$transaction para operaciones multi-tabla.
+ - **Decimal**: Prisma Decimal → TS number (usar Number()).
 
 # Security Considerations
+ - **Validación Zod en todos los Server Actions.**
+ - **Stock: impedir venta si cantidad > stock actual.**
+ - **Rate limit en auth (futuro HU7).**
+ - **Passwords hasheados (bcrypt), cookies httpOnly.**
+ - **Service Role key solo backend, nunca NEXT_PUBLIC_.**
 
-- **Validación de Inputs:** Todo dato enviado desde los formularios a los Server Actions debe ser validado con bibliotecas como Zod.
-- **Integridad de Stock:** Prevenir mediante lógica de backend que una venta pueda procesarse si la `cantidad` solicitada es mayor al `stock` actual del producto (evitar stock negativo).
-
-# Testing Strategy & Guidelines
-
-El agente debe priorizar la calidad y estabilidad del software implementando pruebas automatizadas robustas. Seguiremos las mejores prácticas de la industria utilizando herramientas modernas compatibles con el entorno de Next.js:
-
-- **Unit Testing (Lógica de Negocio y UI):** \* Utilizar Jest (o Vitest) en combinación con React Testing Library.
-  - _Objetivo:_ Validar la correcta renderización de los componentes aislados (ej. asegurar que los modales de "Nueva Venta" muestran los campos correctos) y verificar que las funciones utilitarias (como los cálculos de ganancias/pérdidas del Dashboard) devuelvan los resultados matemáticos exactos.
-- **Integration Testing (Server Actions & BD):**
-  - Las Server Actions que interactúan con Supabase deben probarse rigurosamente.
-  - _Objetivo:_ Validar que las transacciones de Prisma funcionen como se espera. Por ejemplo, al ejecutar la acción de "Registrar Compra", verificar mediante un test de integración que el stock del producto efectivamente incremente. Se debe utilizar un entorno de base de datos de pruebas aislado (test database) o mockear el cliente de Prisma.
-- **End-to-End (E2E) Testing (Flujos Críticos):**
-  - Emplear Playwright (o Cypress) configurado para emular _viewports_ de dispositivos móviles Android.
-  - _Objetivo:_ Simular el viaje completo del usuario. Un flujo E2E obligatorio debe ser: "Acceder al sistema -> Crear un producto -> Registrar una venta -> Ir al Inventario y verificar que el stock disminuyó correctamente".
-- **Convención de Archivos:** Los archivos de prueba deben ubicarse junto al componente/acción que evalúan (ej. `[nombre-componente].test.tsx`) o en un directorio centralizado `__tests__/`.
-
-> **Directiva Crítica para Jarvis:** Todo nuevo módulo, componente interactivo complejo o Server Action debe ser entregado junto con su respectiva batería de pruebas. No se debe dar por finalizada ninguna característica ("feature") sin que los tests pasen exitosamente (`npm run test`).
+# Testing Strategy
+ - **Unit**: Jest + RTL — componentes aislados, utils (cálculos, código auto).
+ - **Integration**: Server Actions + Prisma (transacciones, stock, búsqueda).
+ - **E2E**: Playwright mobile — flujos: crear producto → compra → venta → inventario.
+ - **Convención** [componente].test.tsx junto al componente o __tests__/.
+ - **Obligatorio**: npm run test pasa en cada feature completa.

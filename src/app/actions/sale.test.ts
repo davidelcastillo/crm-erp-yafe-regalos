@@ -2,6 +2,7 @@
  * Integration test for registerSale Server Action - Stock validation
  */
 import { registerSale, getSales } from "../actions/sale";
+import { PaymentMethod } from "@/lib/utils/payment";
 
 // Mock prisma
 const mockProductFindUnique = jest.fn();
@@ -44,25 +45,20 @@ describe("registerSale Server Action - Stock Validation", () => {
   });
 
   it("should reject sale when product has insufficient stock", async () => {
-    // Product with only 5 units in stock
     mockProductFindUnique.mockResolvedValue({
       id: 1,
       name: "Producto test",
-      stock: 5, // Only 5 available
+      stock: 5,
     });
 
     const result = await registerSale({
-      items: [
-        { productId: 1, price: 100, quantity: 10 }, // Requesting 10 but only 5 available
-      ],
+      items: [{ productId: 1, price: 100, quantity: 10 }],
     });
 
     expect(result.success).toBe(false);
     expect(result.error).toContain("Stock insuficiente");
     expect(result.error).toContain("Disponible: 5");
     expect(result.error).toContain("Solicitado: 10");
-    
-    // Verify no transaction was started
     expect(mockSaleCreate).not.toHaveBeenCalled();
     expect(mockProductUpdate).not.toHaveBeenCalled();
   });
@@ -71,9 +67,7 @@ describe("registerSale Server Action - Stock Validation", () => {
     mockProductFindUnique.mockResolvedValue(null);
 
     const result = await registerSale({
-      items: [
-        { productId: 999, price: 100, quantity: 1 },
-      ],
+      items: [{ productId: 999, price: 100, quantity: 1 }],
     });
 
     expect(result.success).toBe(false);
@@ -83,21 +77,13 @@ describe("registerSale Server Action - Stock Validation", () => {
 
   it("should reject sale when one of multiple products has insufficient stock", async () => {
     mockProductFindUnique
-      .mockResolvedValueOnce({
-        id: 1,
-        name: "Producto A",
-        stock: 10, // Enough
-      })
-      .mockResolvedValueOnce({
-        id: 2,
-        name: "Producto B",
-        stock: 2, // Not enough
-      });
+      .mockResolvedValueOnce({ id: 1, name: "Producto A", stock: 10 })
+      .mockResolvedValueOnce({ id: 2, name: "Producto B", stock: 2 });
 
     const result = await registerSale({
       items: [
         { productId: 1, price: 50, quantity: 5 },
-        { productId: 2, price: 30, quantity: 10 }, // 10 requested but only 2 available
+        { productId: 2, price: 30, quantity: 10 },
       ],
     });
 
@@ -131,8 +117,6 @@ describe("registerSale Server Action - Stock Validation", () => {
 
     expect(result.success).toBe(true);
     expect(result.data?.totalAmount).toBe(150);
-    
-    // Verify stock was decremented
     expect(mockProductUpdate).toHaveBeenCalledTimes(2);
   });
 });
@@ -143,7 +127,6 @@ describe("getSales", () => {
   });
 
   it("should return sales with items", async () => {
-    // Mock returns raw Prisma data (with Date objects)
     const mockSalesFromDb = [
       {
         id: 1,
@@ -160,8 +143,158 @@ describe("getSales", () => {
     const result = await getSales();
 
     expect(result.success).toBe(true);
-    // getSales uses parseArray which converts Date to string
     expect(result.data?.[0]?.date).toBe("2026-04-16T17:19:02.275Z");
     expect(result.data?.[0]?.totalAmount).toBe(150);
+  });
+});
+
+describe("registerSale Server Action - Payment Method Logic", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  function setupSuccessfulSale() {
+    mockProductFindUnique.mockResolvedValue({ id: 1, name: "Producto Test", stock: 10 });
+    mockSaleCreate.mockResolvedValue({ id: 1, date: new Date(), totalAmount: 500, createdAt: new Date(), updatedAt: new Date() });
+    mockSaleItemCreateMany.mockResolvedValue({ count: 1 });
+    mockProductUpdate.mockResolvedValue({});
+    mockSaleItemFindMany.mockResolvedValue([{ id: 1, saleId: 1, productId: 1, price: 500, quantity: 1, subtotal: 500, product: { id: 1, name: "Producto Test" } }]);
+  }
+
+  it("should set amountPaid = total and pendingBalance = 0 for EFECTIVO", async () => {
+    setupSuccessfulSale();
+
+    const result = await registerSale({
+      items: [{ productId: 1, price: 500, quantity: 1 }],
+      paymentMethod: PaymentMethod.EFECTIVO,
+    });
+
+    expect(result.success).toBe(true);
+    expect(mockSaleCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          paymentMethod: PaymentMethod.EFECTIVO,
+          amountPaid: 500,
+          pendingBalance: 0,
+        }),
+      })
+    );
+  });
+
+  it("should set amountPaid = 0 and pendingBalance = total for TRANSFERENCIA", async () => {
+    setupSuccessfulSale();
+
+    const result = await registerSale({
+      items: [{ productId: 1, price: 500, quantity: 1 }],
+      paymentMethod: PaymentMethod.TRANSFERENCIA,
+    });
+
+    expect(result.success).toBe(true);
+    expect(mockSaleCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          paymentMethod: PaymentMethod.TRANSFERENCIA,
+          amountPaid: 0,
+          pendingBalance: 500,
+        }),
+      })
+    );
+  });
+
+  it("should sum cashAmount + transferAmount for MIXTO", async () => {
+    setupSuccessfulSale();
+
+    const result = await registerSale({
+      items: [{ productId: 1, price: 500, quantity: 1 }],
+      paymentMethod: PaymentMethod.MIXTO,
+      cashAmount: 200,
+      transferAmount: 300,
+    });
+
+    expect(result.success).toBe(true);
+    expect(mockSaleCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          paymentMethod: PaymentMethod.MIXTO,
+          amountPaid: 500,
+          pendingBalance: 0,
+        }),
+      })
+    );
+  });
+
+  it("should handle partial MIXTO payment (cash only)", async () => {
+    setupSuccessfulSale();
+
+    const result = await registerSale({
+      items: [{ productId: 1, price: 500, quantity: 1 }],
+      paymentMethod: PaymentMethod.MIXTO,
+      cashAmount: 100,
+    });
+
+    expect(result.success).toBe(true);
+    expect(mockSaleCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          paymentMethod: PaymentMethod.MIXTO,
+          amountPaid: 100,
+          pendingBalance: 400,
+        }),
+      })
+    );
+  });
+
+  it("should reject MIXTO with zero cash and transfer", async () => {
+    mockProductFindUnique.mockResolvedValue({ id: 1, name: "Producto Test", stock: 10 });
+
+    const result = await registerSale({
+      items: [{ productId: 1, price: 500, quantity: 1 }],
+      paymentMethod: PaymentMethod.MIXTO,
+      cashAmount: 0,
+      transferAmount: 0,
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("MIXTO requiere cashAmount o transferAmount mayor a 0");
+    expect(mockSaleCreate).not.toHaveBeenCalled();
+  });
+
+  it("should use legacy amountPaid when paymentMethod not provided (backward compat)", async () => {
+    setupSuccessfulSale();
+
+    const result = await registerSale({
+      items: [{ productId: 1, price: 500, quantity: 1 }],
+      amountPaid: 300,
+    });
+
+    expect(result.success).toBe(true);
+    expect(mockSaleCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          paymentMethod: PaymentMethod.EFECTIVO,
+          amountPaid: 300,
+          pendingBalance: 200,
+        }),
+      })
+    );
+  });
+
+  it("should use legacy amountPaid=0 when paymentMethod not provided (backward compat)", async () => {
+    setupSuccessfulSale();
+
+    const result = await registerSale({
+      items: [{ productId: 1, price: 500, quantity: 1 }],
+    });
+
+    expect(result.success).toBe(true);
+    expect(mockSaleCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          paymentMethod: PaymentMethod.EFECTIVO,
+          amountPaid: 0,
+          pendingBalance: 500,
+        }),
+      })
+    );
   });
 });

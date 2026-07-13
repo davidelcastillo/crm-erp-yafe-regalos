@@ -1,4 +1,5 @@
-"use client";
+// src/app/dashboard/components/DashboardChart.tsx
+'use client';
 
 import {
   BarChart,
@@ -26,7 +27,7 @@ export function DashboardChart({ data }: DashboardChartProps) {
     return (
       <div className="bg-white rounded-2xl p-4 shadow-sm">
         <h2 className="text-lg font-semibold text-[#222222] mb-4">
-          Ingresos vs Egresos (últimos 7 días)
+          Ingresos vs Egresos (�ltimos 7 d�as)
         </h2>
         <div className="h-64 flex items-center justify-center text-[#6a6a6a]">
           No hay datos disponibles
@@ -44,7 +45,7 @@ export function DashboardChart({ data }: DashboardChartProps) {
   return (
     <div className="bg-white rounded-2xl p-4 shadow-sm">
       <h2 className="text-lg font-semibold text-[#222222] mb-4">
-        Ingresos vs Egresos (últimos 7 días)
+        Ingresos vs Egresos (�ltimos 7 d�as)
       </h2>
       <div className="h-64">
         <ResponsiveContainer width="100%" height="100%">
@@ -53,21 +54,18 @@ export function DashboardChart({ data }: DashboardChartProps) {
             <XAxis
               dataKey="date"
               tick={{ fontSize: 10 }}
-              stroke="#9ca3af"
-            />
+              stroke="#9ca3af" />
             <YAxis
               tick={{ fontSize: 10 }}
               stroke="#9ca3af"
-              tickFormatter={(value) => `$${value}`}
-            />
+              tickFormatter={(value) => `$${value}`} />
             <Tooltip
               contentStyle={{
                 backgroundColor: "#fff",
                 border: "1px solid #e5e5e5",
                 borderRadius: "8px",
               }}
-              formatter={(value) => [`$${Number(value).toFixed(2)}`, ""]}
-            />
+              formatter={(value) => [`$${Number(value).toFixed(2)}`, ""]} />
             <Legend />
             <Bar dataKey="income" name="Ingresos" fill="#22c55e" radius={[4, 4, 0, 0]} />
             <Bar dataKey="expense" name="Egresos" fill="#ef4444" radius={[4, 4, 0, 0]} />

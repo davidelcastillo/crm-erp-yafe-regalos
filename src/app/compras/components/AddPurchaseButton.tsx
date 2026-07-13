@@ -1,10 +1,13 @@
 "use client";
 
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { registerPurchase } from "../../actions/purchase";
+import { getProducts } from "../../actions/product";
 import { useRouter } from "next/navigation";
 import { Product } from "@prisma/client";
 import Swal from "sweetalert2";
+import { ProductAutocomplete } from "./ProductAutocomplete";
+import { ProductForm } from "@/app/productos/components/ProductForm";
 
 interface AddPurchaseButtonProps {
   products: Product[];
@@ -17,107 +20,16 @@ interface PurchaseItem {
   quantity: string;
 }
 
-// Autocomplete Input - busca productos sin crear nuevos
-function ProductAutocomplete({
-  products,
-  value,
-  onChange,
-}: {
-  products: Product[];
-  value: string;
-  onChange: (productId: string) => void;
-}) {
-  const [search, setSearch] = useState("");
-  const [isOpen, setIsOpen] = useState(false);
-  const wrapperRef = useRef<HTMLDivElement>(null);
-
-  // Filter products based on search
-  const filteredProducts = useMemo(() => {
-    if (!search.trim()) return products.slice(0, 20); // Show max 20 initially
-    const lower = search.toLowerCase();
-    return products.filter((p) => p.name.toLowerCase().includes(lower)).slice(0, 20);
-  }, [products, search]);
-
-  // Find selected product
-  const selectedProduct = useMemo(() => {
-    return products.find((p) => p.id.toString() === value);
-  }, [products, value]);
-
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  const handleSelect = (product: Product) => {
-    onChange(product.id.toString());
-    setSearch(product.name);
-    setIsOpen(false);
-  };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newValue = e.target.value;
-    setSearch(newValue);
-    setIsOpen(true);
-    
-    // Auto-select if exact match
-    const match = products.find(p => p.name.toLowerCase() === newValue.toLowerCase());
-    if (match) {
-      onChange(match.id.toString());
-    } else {
-      // Clear selection if no match
-      onChange("");
-    }
-  };
-
-  return (
-    <div ref={wrapperRef} className="relative">
-      <input
-        type="text"
-        value={search}
-        onChange={handleInputChange}
-        onFocus={() => setIsOpen(true)}
-        placeholder="Buscar producto..."
-        className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-[#ff385c] focus:ring-2 focus:ring-[#ff385c]/20 outline-none transition-all bg-white"
-      />
-      
-      {isOpen && filteredProducts.length > 0 && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
-          {filteredProducts.map((product) => (
-            <button
-              key={product.id}
-              type="button"
-              onClick={() => handleSelect(product)}
-              className="w-full px-4 py-3 text-left hover:bg-[#f9f9f9] flex justify-between items-center transition-colors"
-            >
-              <span className="font-medium text-[#222222]">{product.name}</span>
-              <span className="text-sm text-[#6a6a6a]">Stock: {product.stock}</span>
-            </button>
-          ))}
-        </div>
-      )}
-
-      {selectedProduct && (
-        <p className="mt-1 text-xs text-[#6a6a6a]">
-          Stock actual: {selectedProduct.stock} unidades
-        </p>
-      )}
-    </div>
-  );
-}
-
-export function AddPurchaseButton({ products }: AddPurchaseButtonProps) {
+export function AddPurchaseButton({ products: initialProducts }: AddPurchaseButtonProps) {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<PurchaseItem[]>([
     { id: "1", productId: "", price: "", quantity: "" }
   ]);
+  const [products, setProducts] = useState<Product[]>(initialProducts);
+  const [showProductModal, setShowProductModal] = useState(false);
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
 
   const addItem = () => {
     setItems([...items, { 
@@ -202,6 +114,23 @@ export function AddPurchaseButton({ products }: AddPurchaseButtonProps) {
     setLoading(false);
   };
 
+  const handleProductCreated = async (product: Product) => {
+    // Refresh product list
+    const result = await getProducts();
+    if (result.success) {
+      setProducts(result.data as Product[]);
+    }
+    
+    // Update the item being edited with the new product ID
+    if (editingItemId) {
+      updateItem(editingItemId, "productId", product.id.toString());
+    }
+    
+    // Close product modal
+    setShowProductModal(false);
+    setEditingItemId(null);
+  };
+
   return (
     <>
       <button
@@ -214,8 +143,11 @@ export function AddPurchaseButton({ products }: AddPurchaseButtonProps) {
         </svg>
       </button>
 
-      {isOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-end justify-center">
+{isOpen && (
+          <div 
+            className={`fixed inset-0 ${showProductModal ? 'bg-black/20 backdrop-blur-md' : 'bg-black/30 backdrop-blur-md'} z-[60] flex items-end justify-center`}
+            onClick={() => setIsOpen(false)}
+          >
           <div 
             className="bg-white w-full max-w-lg rounded-t-3xl p-6 animate-slide-up max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
@@ -225,7 +157,8 @@ export function AddPurchaseButton({ products }: AddPurchaseButtonProps) {
               <button
                 type="button"
                 onClick={() => setIsOpen(false)}
-                className="p-2 rounded-full hover:bg-[#f2f2f2] transition-colors"
+                className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full hover:bg-[#f2f2f2] transition-colors touch-manipulation"
+                aria-label="Cerrar"
               >
                 <svg className="w-6 h-6 text-[#6a6a6a]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -248,45 +181,74 @@ export function AddPurchaseButton({ products }: AddPurchaseButtonProps) {
                       {items.length > 1 && (
                         <button
                           type="button"
-                          onClick={() => removeItem(item.id)}
-                          className="text-red-500 text-sm hover:text-red-700"
+                          onClick={() => {
+                            Swal.fire({
+                              title: '¿Eliminar item?',
+                              text: 'Esta acción no se puede deshacer',
+                              icon: 'warning',
+                              showCancelButton: true,
+                              confirmButtonColor: '#ff385c',
+                              cancelButtonColor: '#6a6a6a',
+                              confirmButtonText: 'Sí, eliminar',
+                              cancelButtonText: 'Cancelar',
+                              background: '#ffffff',
+                              color: '#222222',
+                            }).then((result) => {
+                              if (result.isConfirmed) {
+                                removeItem(item.id);
+                              }
+                            });
+                          }}
+                          className="min-w-[44px] min-h-[44px] px-4 py-2 text-red-500 text-sm font-medium rounded-lg hover:bg-red-50 active:bg-red-100 transition-colors touch-manipulation"
+                          aria-label={`Eliminar producto ${index + 1}`}
                         >
                           Eliminar
                         </button>
                       )}
-</div>
+                    </div>
                     
                     <ProductAutocomplete
                       products={products}
                       value={item.productId}
                       onChange={(productId) => updateItem(item.id, "productId", productId)}
+                      renderCreateButton={true}
+                      onCreateClick={() => {
+                        setEditingItemId(item.id);
+                        setShowProductModal(true);
+                      }}
                     />
                     
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="block text-xs text-[#6a6a6a] mb-1">Precio</label>
+                        <label htmlFor={`price-${item.id}`} className="block text-xs text-[#6a6a6a] mb-2">
+                          Precio
+                        </label>
                         <div className="relative">
                           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6a6a6a] text-sm">$</span>
                           <input
+                            id={`price-${item.id}`}
                             type="number"
                             step="0.01"
                             min="0"
                             value={item.price}
                             onChange={(e) => updateItem(item.id, "price", e.target.value)}
-                            className="w-full pl-7 pr-3 py-2 rounded-lg border border-gray-200 focus:border-[#ff385c] outline-none transition-all text-sm"
+                            className="w-full pl-7 pr-3 py-3 min-h-[48px] rounded-lg border border-gray-200 focus:border-[#ff385c] outline-none transition-all text-sm touch-manipulation"
                             placeholder="0.00"
                             required
                           />
                         </div>
                       </div>
                       <div>
-                        <label className="block text-xs text-[#6a6a6a] mb-1">Cantidad</label>
+                        <label htmlFor={`quantity-${item.id}`} className="block text-xs text-[#6a6a6a] mb-2">
+                          Cantidad
+                        </label>
                         <input
+                          id={`quantity-${item.id}`}
                           type="number"
                           min="1"
                           value={item.quantity}
                           onChange={(e) => updateItem(item.id, "quantity", e.target.value)}
-                          className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:border-[#ff385c] outline-none transition-all text-sm"
+                          className="w-full px-3 py-3 min-h-[48px] rounded-lg border border-gray-200 focus:border-[#ff385c] outline-none transition-all text-sm touch-manipulation"
                           placeholder="0"
                           required
                         />
@@ -333,6 +295,49 @@ export function AddPurchaseButton({ products }: AddPurchaseButtonProps) {
                 </button>
               </form>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Product Creation Modal */}
+      {showProductModal && (
+        <div 
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70] flex items-end justify-center"
+          onClick={() => {
+            setShowProductModal(false);
+            setEditingItemId(null);
+          }}
+        >
+          <div 
+            className="bg-white w-full max-w-lg rounded-t-3xl p-6 animate-slide-up max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-semibold text-[#222222]">
+                {editingItemId ? "Crear producto para edición" : "Nuevo Producto"}
+              </h2>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowProductModal(false);
+                  setEditingItemId(null);
+                }}
+                className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full hover:bg-[#f2f2f2] transition-colors touch-manipulation"
+                aria-label="Cerrar"
+              >
+                <svg className="w-6 h-6 text-[#6a6a6a]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <ProductForm 
+              onClose={() => {
+                setShowProductModal(false);
+                setEditingItemId(null);
+              }}
+              onSuccess={handleProductCreated}
+            />
           </div>
         </div>
       )}

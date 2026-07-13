@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Stark Commerce OS",
-  description: "Control de ingresos, egresos e inventario para tu comercio local",
+  title: "Feria Conexx",
+  description: "Control de ingresos, egresos e inventario para feria conexx",
 };
 
 export default function RootLayout({

@@ -121,7 +121,19 @@ export async function getPurchases(filters?: unknown) {
       orderBy: { date: "desc" },
     });
 
-    return { success: true, data: parseArray(purchases) };
+    // Add formatted date string to prevent hydration mismatch
+    const purchasesWithFormattedDate = purchases.map(p => ({
+      ...p,
+      formattedDate: new Date(p.date).toLocaleDateString("es-AR", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+    }));
+
+    return { success: true, data: parseArray(purchasesWithFormattedDate) };
   } catch (error) {
     if (error instanceof z.ZodError) {
       return {
