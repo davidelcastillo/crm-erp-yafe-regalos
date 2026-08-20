@@ -1,3 +1,4 @@
+// src/app/actions/sale.ts
 "use server";
 
 import { prisma } from "@/lib/prisma";
@@ -14,8 +15,10 @@ const saleItemSchema = z.object({
 });
 
 // Schema para registrar una venta con múltiples productos
+// branchId es obligatorio: el inventario se descuenta de esa sucursal
 const registerSaleSchema = z.object({
   items: z.array(saleItemSchema).min(1),
+  branchId: z.coerce.number().int().positive("La sucursal es requerida"),
   customerId: z.number().int().positive().optional(),
   amountPaid: z.number().min(0).default(0),
   paymentMethod: z.nativeEnum(PaymentMethod).optional(),
@@ -36,23 +39,25 @@ export async function registerSale(data: unknown) {
   try {
     const validatedData = registerSaleSchema.parse(data);
 
-    // Paso 1: Verificar stock disponible ANTES de iniciar la transacción
+    // Verify the branch exists and is active before processing
+    const branch = await prisma.branch.findFirst({
+      where: { id: validatedData.branchId, isActive: true },
+      select: { id: true },
+    });
+    if (!branch) {
+      return { success: false, error: "Sucursal inválida o inactiva" };
+    }
+
+    // Verify products exist (outside transaction, safe)
     for (const item of validatedData.items) {
       const product = await prisma.product.findUnique({
         where: { id: item.productId },
+        select: { id: true, name: true },
       });
-
       if (!product) {
         return {
           success: false,
           error: `Producto con ID ${item.productId} no encontrado`,
-        };
-      }
-
-      if (product.stock < item.quantity) {
-        return {
-          success: false,
-          error: `Stock insuficiente para "${product.name}". Disponible: ${product.stock}, Solicitado: ${item.quantity}`,
         };
       }
     }
@@ -84,9 +89,35 @@ export async function registerSale(data: unknown) {
       pendingBalance = Math.max(0, totalAmount - amountPaid);
     }
 
-    // Paso 2: Transacción atómica
+    // Paso: Transacción atómica con decremento condicional de stock
     const result = await prisma.$transaction(async (tx) => {
-      // 1. Crear el registro de venta (cabecera)
+      // 0. Validar y descontar stock ANTES de crear la cabecera (fail fast).
+      //    El updateMany condicional evita TOCTOU: solo descuenta si hay stock suficiente.
+      for (const item of validatedData.items) {
+        const updateResult = await tx.branchInventory.updateMany({
+          where: {
+            branchId: validatedData.branchId,
+            productId: item.productId,
+            stock: { gte: item.quantity }, // only if sufficient stock
+          },
+          data: {
+            stock: { decrement: item.quantity },
+          },
+        });
+
+        if (updateResult.count === 0) {
+          // Either no inventory row or stock < quantity
+          const product = await prisma.product.findUnique({
+            where: { id: item.productId },
+            select: { name: true },
+          });
+          throw new Error(
+            `Stock insuficiente para "${product?.name ?? item.productId}" en la sucursal seleccionada. Disponible: 0 o menos que solicitado.`
+          );
+        }
+      }
+
+      // 1. Crear el registro de venta (cabecera) con branchId
       const sale = await tx.sale.create({
         data: {
           totalAmount,
@@ -94,6 +125,7 @@ export async function registerSale(data: unknown) {
           pendingBalance,
           paymentMethod,
           customerId: customerId || null,
+          branchId: validatedData.branchId,
         },
       });
 
@@ -122,19 +154,7 @@ export async function registerSale(data: unknown) {
         data: itemsData,
       });
 
-      // 3. Disminuir el stock de cada producto
-      for (const item of validatedData.items) {
-        await tx.product.update({
-          where: { id: item.productId },
-          data: {
-            stock: {
-              decrement: item.quantity,
-            },
-          },
-        });
-      }
-
-      // Obtener los items creados para retornar
+      // 3. Obtener los items creados para retornar
       const createdItems = await tx.saleItem.findMany({
         where: { saleId: sale.id },
         include: { product: true },
@@ -156,15 +176,24 @@ export async function registerSale(data: unknown) {
         error: error.issues.map((e) => e.message).join(", "),
       };
     }
+    // Preserve business-logic error messages (e.g. insufficient stock)
+    if (error instanceof Error && error.message.includes("Stock insuficiente")) {
+      return { success: false, error: error.message };
+    }
     console.error("Error registering sale:", error);
     return { success: false, error: "Error al registrar la venta" };
   }
 }
 
-// Schema para obtener ventas
+// Schema para obtener ventas (opcionalmente filtradas por branch, fecha,
+// búsqueda de producto y paginación)
 const getSalesSchema = z.object({
   startDate: z.string().optional(),
   endDate: z.string().optional(),
+  branchId: z.coerce.number().int().positive().optional(),
+  search: z.string().optional(),
+  take: z.coerce.number().int().positive().optional(),
+  skip: z.coerce.number().int().nonnegative().optional(),
 });
 
 export async function getSales(filters?: unknown) {
@@ -172,6 +201,10 @@ export async function getSales(filters?: unknown) {
     const validatedFilters = filters ? getSalesSchema.parse(filters) : {};
     
     const where: Record<string, unknown> = {};
+    
+    if (validatedFilters.branchId) {
+      where.branchId = validatedFilters.branchId;
+    }
     
     if (validatedFilters.startDate || validatedFilters.endDate) {
       where.date = {};
@@ -183,19 +216,40 @@ export async function getSales(filters?: unknown) {
       }
     }
 
-    const sales = await prisma.sale.findMany({
-      where,
-      include: {
-        items: {
-          include: {
-            product: true,
-          },
+    if (validatedFilters.search) {
+      where.items = {
+        some: {
+          OR: [
+            { product: { name: { contains: validatedFilters.search, mode: "insensitive" } } },
+            { product: { code: { contains: validatedFilters.search, mode: "insensitive" } } },
+          ],
+        },
+      };
+    }
+
+    const include = {
+      items: {
+        include: {
+          product: true,
         },
       },
-      orderBy: { date: "desc" },
-    });
+      branch: {
+        select: { id: true, name: true },
+      },
+    };
 
-    return { success: true, data: parseArray(sales) };
+    const [sales, total] = await Promise.all([
+      prisma.sale.findMany({
+        where,
+        include,
+        orderBy: { date: "desc" },
+        take: validatedFilters.take ?? 20,
+        skip: validatedFilters.skip ?? 0,
+      }),
+      prisma.sale.count({ where }),
+    ]);
+
+    return { success: true, data: { items: parseArray(sales), total } };
   } catch (error) {
     if (error instanceof z.ZodError) {
       return {
@@ -216,15 +270,15 @@ export async function getSaleById(id: number) {
         items: {
           include: {
             product: true,
-          },
-        },
-      },
+          }
+        }
+      }
     });
-    
+
     if (!sale) {
       return { success: false, error: "Venta no encontrada" };
     }
-    
+
     return { success: true, data: parseObject(sale) };
   } catch (error) {
     console.error("Error fetching sale:", error);
