@@ -16,6 +16,7 @@ import {
   getProductsWithBranchStock,
   assignStockToBranch,
   moveStockBetweenBranches,
+  moveStockBatchBetweenBranches,
   getBranchMovements,
 } from "@/app/actions/inventory";
 
@@ -49,6 +50,7 @@ jest.mock("@/lib/prisma", () => ({
         branch: { findFirst: (...a: unknown[]) => mockBranchFindFirst(...a) },
         product: {
           findUnique: (...a: unknown[]) => mockProductFindUnique(...a),
+          findMany: (...a: unknown[]) => mockProductFindMany(...a),
         },
         branchInventory: {
           findUnique: (...a: unknown[]) => mockBranchInventoryFindUnique(...a),
@@ -97,6 +99,32 @@ describe("getProductsWithBranchStock (Fase 3)", () => {
     await getProductsWithBranchStock({ categoryId: 3 });
     expect(mockProductFindMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: expect.objectContaining({ categoryId: 3 }) })
+    );
+  });
+
+  it("filters by branchId at where root without a stock predicate", async () => {
+    mockProductFindMany.mockResolvedValue([]);
+    await getProductsWithBranchStock({ branchId: 1 });
+    expect(mockProductFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          inventory: { some: { branchId: 1 } },
+        }),
+      })
+    );
+  });
+
+  it("composes branchId and onlyWithStock at where root (AND)", async () => {
+    mockProductFindMany.mockResolvedValue([]);
+    await getProductsWithBranchStock({ branchId: 1, onlyWithStock: true });
+    expect(mockProductFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          inventory: {
+            some: { branchId: 1, stock: { gt: 0 } },
+          },
+        }),
+      })
     );
   });
 });
@@ -285,5 +313,152 @@ describe("getBranchMovements (Fase 3)", () => {
     expect(mockBranchMovementFindMany).toHaveBeenCalledWith(
       expect.objectContaining({ take: 200 })
     );
+  });
+});
+
+// ===========================================================================
+// moveStockBatchBetweenBranches — atomic multi-product transfer
+// ===========================================================================
+describe("moveStockBatchBetweenBranches (Fase 3) — atomic batch", () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it("moves a valid batch with distinct quantities in a single transaction", async () => {
+    // active branches (origen 1, destino 2)
+    mockBranchFindFirst.mockResolvedValueOnce({ id: 1 });
+    mockBranchFindFirst.mockResolvedValueOnce({ id: 2 });
+    // both products active
+    mockProductFindMany.mockResolvedValue([
+      { id: 1, name: "Jabón" },
+      { id: 2, name: "Shampoo" },
+    ]);
+    // origin stocks: A=10, B=15 ; dest stocks: A=0 (missing), B=3
+    mockBranchInventoryFindUnique
+      .mockResolvedValueOnce({ stock: 10 }) // origin A
+      .mockResolvedValueOnce({ stock: 15 }) // origin B
+      .mockResolvedValueOnce(null)           // dest A (no row)
+      .mockResolvedValueOnce({ stock: 3 });  // dest B
+    mockBranchInventoryUpsert.mockResolvedValue({ stock: 0 });
+
+    const result = await moveStockBatchBetweenBranches({
+      sourceBranchId: 1,
+      destBranchId: 2,
+      performedBy: "u1",
+      items: [
+        { productId: 1, quantity: 3 },
+        { productId: 2, quantity: 7 },
+      ],
+    });
+
+    expect(result.success).toBe(true);
+    // 4 upserts (2 per item: origin + dest) and 4 branchMovement.create
+    expect(mockBranchInventoryUpsert).toHaveBeenCalledTimes(4);
+    expect(mockBranchMovementCreate).toHaveBeenCalledTimes(4);
+
+    // origin decrement (A: 10-3=7), dest increment (A: 0+3=3)
+    expect(mockBranchInventoryUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { branchId_productId: { branchId: 1, productId: 1 } },
+        update: { stock: 7 },
+        create: expect.objectContaining({ stock: 7 }),
+      })
+    );
+    expect(mockBranchInventoryUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { branchId_productId: { branchId: 2, productId: 1 } },
+        update: { stock: 3 },
+        create: expect.objectContaining({ stock: 3 }),
+      })
+    );
+
+    // all 4 movements share the same reference and performedBy
+    const movements = mockBranchMovementCreate.mock.calls.map((c) => c[0].data);
+    expect(movements).toHaveLength(4);
+    const refs = new Set(movements.map((m) => m.reference));
+    expect(refs.size).toBe(1);
+    expect([...refs][0]).toMatch(/^MOVE-/);
+    for (const m of movements) expect(m.performedBy).toBe("u1");
+    // 2 TRANSFER_OUT (origen) + 2 TRANSFER_IN (destino)
+    const out = movements.filter((m) => m.movementType === "TRANSFER_OUT");
+    const inn = movements.filter((m) => m.movementType === "TRANSFER_IN");
+    expect(out).toHaveLength(2);
+    expect(inn).toHaveLength(2);
+  });
+
+  it("aborts with full rollback when a later item lacks origin stock", async () => {
+    mockBranchFindFirst.mockResolvedValueOnce({ id: 1 });
+    mockBranchFindFirst.mockResolvedValueOnce({ id: 2 });
+    mockProductFindMany.mockResolvedValue([
+      { id: 1, name: "Jabón" },
+      { id: 2, name: "Shampoo" },
+    ]);
+    // origin stocks: A=2 (insufficient for 5), B=10
+    mockBranchInventoryFindUnique
+      .mockResolvedValueOnce({ stock: 2 })  // origin A
+      .mockResolvedValueOnce({ stock: 10 }); // origin B
+    mockBranchInventoryUpsert.mockResolvedValue({ stock: 0 });
+
+    const result = await moveStockBatchBetweenBranches({
+      sourceBranchId: 1,
+      destBranchId: 2,
+      performedBy: "u1",
+      items: [
+        { productId: 1, quantity: 5 },
+        { productId: 2, quantity: 3 },
+      ],
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("Jabón");
+    expect(result.error).toContain("Disponible: 2, Requerido: 5");
+    // rollback total: no upserts, no movements
+    expect(mockBranchInventoryUpsert).not.toHaveBeenCalled();
+    expect(mockBranchMovementCreate).not.toHaveBeenCalled();
+  });
+
+  it("rejects sourceBranchId === destBranchId via zod without opening a transaction", async () => {
+    const result = await moveStockBatchBetweenBranches({
+      sourceBranchId: 1,
+      destBranchId: 1,
+      performedBy: "u1",
+      items: [{ productId: 1, quantity: 2 }],
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("distintas");
+    expect(mockBranchFindFirst).not.toHaveBeenCalled();
+  });
+
+  it("rejects empty/duplicate items or zero quantity via zod without opening a transaction", async () => {
+    const empty = await moveStockBatchBetweenBranches({
+      sourceBranchId: 1,
+      destBranchId: 2,
+      performedBy: "u1",
+      items: [],
+    });
+    expect(empty.success).toBe(false);
+    expect(empty.error).toContain("Seleccioná al menos un producto");
+
+    const dup = await moveStockBatchBetweenBranches({
+      sourceBranchId: 1,
+      destBranchId: 2,
+      performedBy: "u1",
+      items: [
+        { productId: 1, quantity: 2 },
+        { productId: 1, quantity: 3 },
+      ],
+    });
+    expect(dup.success).toBe(false);
+    expect(dup.error).toContain("duplicados");
+
+    const zero = await moveStockBatchBetweenBranches({
+      sourceBranchId: 1,
+      destBranchId: 2,
+      performedBy: "u1",
+      items: [{ productId: 1, quantity: 0 }],
+    });
+    expect(zero.success).toBe(false);
+    expect(zero.error).toContain("mayor a 0");
+
+    expect(mockBranchFindFirst).not.toHaveBeenCalled();
   });
 });

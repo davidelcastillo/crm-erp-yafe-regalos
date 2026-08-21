@@ -43,3 +43,33 @@ export const getMovementsFiltersSchema = z.object({
 export type MoveStockValues = z.infer<typeof moveStockSchema>;
 export type AssignStockValues = z.infer<typeof assignStockSchema>;
 export type GetMovementsFilters = z.infer<typeof getMovementsFiltersSchema>;
+
+/**
+ * Schema para mover un LOTE de productos (con cantidades distintas) entre dos
+ * sucursales en una única operación atómica. Aditivo: no modifica
+ * `moveStockSchema`/`assignStockSchema`.
+ */
+export const moveStockBatchSchema = z
+  .object({
+    sourceBranchId: z.number().int().positive("Sucursal origen requerida"),
+    destBranchId: z.number().int().positive("Sucursal destino requerida"),
+    items: z
+      .array(
+        z.object({
+          productId: z.number().int().positive("Producto inválido"),
+          quantity: z.number().int().positive("La cantidad debe ser mayor a 0"),
+        })
+      )
+      .min(1, "Seleccioná al menos un producto")
+      .refine(
+        (items) => new Set(items.map((i) => i.productId)).size === items.length,
+        { message: "No se permiten productos duplicados en el lote" }
+      ),
+    performedBy: z.string().min(1, "El responsable es requerido").max(100),
+  })
+  .refine((d) => d.sourceBranchId !== d.destBranchId, {
+    message: "Las sucursales de origen y destino deben ser distintas",
+    path: ["destBranchId"],
+  });
+
+export type MoveStockBatchValues = z.infer<typeof moveStockBatchSchema>;

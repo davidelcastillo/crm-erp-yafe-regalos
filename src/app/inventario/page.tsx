@@ -11,7 +11,7 @@ import { MoveStockModal } from "./components/MoveStockModal";
 import { ExportWizard } from "./components/ExportWizard";
 import { LabelSelector } from "@/components/ui/LabelSelector";
 import { MovementsModal } from "@/components/ui/MovementsModal";
-import { BranchSelector } from "@/components/ui/BranchSelector";
+import { BranchFilterDropdown } from "@/components/ui/BranchFilterDropdown";
 import { useEffect, useState, useCallback } from 'react';
 import { Product } from "@prisma/client";
 
@@ -140,8 +140,9 @@ export default function InventarioPage() {
         <div className="mb-4 flex items-center justify-between flex-wrap gap-3">
           <h1 className="text-2xl font-bold text-[#222222]">Inventario</h1>
           <div className="flex items-center gap-3 flex-wrap">
-            <BranchSelector
-              onChange={(id) => setBranchId(id)}
+            <BranchFilterDropdown
+              selectedId={branchId}
+              onValueChange={setBranchId}
               label="Stock por sucursal"
             />
             <button

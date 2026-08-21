@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import {
   moveStockSchema,
+  moveStockBatchSchema,
   assignStockSchema,
   getMovementsFiltersSchema,
 } from "@/lib/validations/branchMovement";
@@ -209,13 +210,19 @@ export async function getProductsWithBranchStock(filters?: unknown) {
     const where: Record<string, unknown> = {};
     if (opts.activeOnly !== false) where.active = true;
     if (opts.categoryId) where.categoryId = opts.categoryId;
-    if (opts.onlyWithStock) {
+    // Filtro de sucursal a nivel where, INDEPENDIENTE de onlyWithStock.
+    // El producto se devuelve si tiene al menos una fila BranchInventory en la
+    // sucursal (incluye filas con stock 0). onlyWithStock añade stock > 0 en AND.
+    if (opts.branchId) {
       where.inventory = {
         some: {
-          stock: { gt: 0 },
-          ...(opts.branchId ? { branchId: opts.branchId } : {}),
+          branchId: opts.branchId,
+          ...(opts.onlyWithStock ? { stock: { gt: 0 } } : {}),
         },
       };
+    } else if (opts.onlyWithStock) {
+      // Comportamiento previo sin branchId: solo productos con stock > 0
+      where.inventory = { some: { stock: { gt: 0 } } };
     }
     if (opts.search) {
       where.OR = [
@@ -462,6 +469,173 @@ export async function moveStockBetweenBranches(data: unknown) {
       return { success: false, error: error.message };
     }
     console.error("Error moving stock between branches:", error);
+    return { success: false, error: "Error al mover stock entre sucursales" };
+  }
+}
+
+/**
+ * Mueve un LOTE de productos (con cantidades distintas) entre dos sucursales
+ * en UNA operación atómica dentro de un único `$transaction`.
+ *
+ * Duplicación controlada del patrón de `moveStockBetweenBranches` (mismos
+ * mensajes, mismo formato `MOVE-<ts>`, mismo upsert) para NO tocar la action
+ * single-product existente. Verifica TODOS los ítems (sucursales activas,
+ * productos activos, stock origen) ANTES del primer upsert; cualquier throw
+ * aborta la transacción con rollback total.
+ */
+export async function moveStockBatchBetweenBranches(data: unknown) {
+  try {
+    const parsed = moveStockBatchSchema.parse(data);
+    const { sourceBranchId, destBranchId, items, performedBy } = parsed;
+
+    const result = await prisma.$transaction(async (tx) => {
+      // 1. Verificar sucursales activas
+      const [sourceBranch, destBranch] = await Promise.all([
+        tx.branch.findFirst({
+          where: { id: sourceBranchId, isActive: true },
+          select: { id: true },
+        }),
+        tx.branch.findFirst({
+          where: { id: destBranchId, isActive: true },
+          select: { id: true },
+        }),
+      ]);
+      if (!sourceBranch) {
+        throw new Error("Sucursal de origen inactiva o inexistente");
+      }
+      if (!destBranch) {
+        throw new Error("Sucursal de destino inactiva o inexistente");
+      }
+
+      // 2. Verificar productos activos (TODOS)
+      const productIds = items.map((i) => i.productId);
+      const products = await tx.product.findMany({
+        where: { id: { in: productIds }, active: true },
+        select: { id: true, name: true },
+      });
+      if (products.length !== items.length) {
+        const found = new Set(products.map((p) => p.id));
+        const missing = productIds.find((id) => !found.has(id));
+        throw new Error(`Producto no encontrado o inactivo: ID ${missing}`);
+      }
+      const nameByProductId = new Map(products.map((p) => [p.id, p.name]));
+
+      // 3. Leer stocks de TODOS los ítems en origen (sin escribir) + validar
+      const originRows = await Promise.all(
+        items.map((i) =>
+          tx.branchInventory.findUnique({
+            where: {
+              branchId_productId: { branchId: sourceBranchId, productId: i.productId },
+            },
+          })
+        )
+      );
+      items.forEach((i, idx) => {
+        const available = originRows[idx]?.stock ?? 0;
+        if (available < i.quantity) {
+          throw new Error(
+            `Stock insuficiente en origen para "${nameByProductId.get(i.productId)}". Disponible: ${available}, Requerido: ${i.quantity}`
+          );
+        }
+      });
+
+      // 4. Leer stocks de destino (para calcular nuevos valores, sin escribir)
+      const destRows = await Promise.all(
+        items.map((i) =>
+          tx.branchInventory.findUnique({
+            where: {
+              branchId_productId: { branchId: destBranchId, productId: i.productId },
+            },
+          })
+        )
+      );
+
+      // 5. reference común a TODO el lote
+      const reference = `MOVE-${Date.now()}`;
+
+      // 6. Por ítem: upsert origen (−qty), upsert destino (+qty), 2 movements
+      const itemResults: Array<{
+        productId: number;
+        quantity: number;
+        newSourceStock: number;
+        newDestStock: number;
+      }> = [];
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        const newSourceStock = (originRows[i]?.stock ?? 0) - item.quantity;
+        const newDestStock = (destRows[i]?.stock ?? 0) + item.quantity;
+
+        await tx.branchInventory.upsert({
+          where: {
+            branchId_productId: { branchId: sourceBranchId, productId: item.productId },
+          },
+          create: { branchId: sourceBranchId, productId: item.productId, stock: newSourceStock },
+          update: { stock: newSourceStock },
+        });
+        await tx.branchInventory.upsert({
+          where: {
+            branchId_productId: { branchId: destBranchId, productId: item.productId },
+          },
+          create: { branchId: destBranchId, productId: item.productId, stock: newDestStock },
+          update: { stock: newDestStock },
+        });
+        await tx.branchMovement.create({
+          data: {
+            productId: item.productId,
+            branchId: sourceBranchId,
+            movementType: "TRANSFER_OUT",
+            quantity: item.quantity,
+            reference,
+            performedBy,
+          },
+        });
+        await tx.branchMovement.create({
+          data: {
+            productId: item.productId,
+            branchId: destBranchId,
+            movementType: "TRANSFER_IN",
+            quantity: item.quantity,
+            reference,
+            performedBy,
+          },
+        });
+
+        itemResults.push({
+          productId: item.productId,
+          quantity: item.quantity,
+          newSourceStock,
+          newDestStock,
+        });
+      }
+
+      return {
+        reference,
+        sourceBranchId,
+        destBranchId,
+        items: itemResults,
+      };
+    });
+
+    revalidatePath("/inventario");
+    revalidatePath("/movimientos");
+    return { success: true, data: parseObject(result) };
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return {
+        success: false,
+        error: error.issues.map((e) => e.message).join(", "),
+      };
+    }
+    if (error instanceof Error && error.message.includes("Stock insuficiente")) {
+      return { success: false, error: error.message };
+    }
+    if (error instanceof Error && error.message.includes("inactiva")) {
+      return { success: false, error: error.message };
+    }
+    if (error instanceof Error && error.message.includes("no encontrado")) {
+      return { success: false, error: error.message };
+    }
+    console.error("Error moving stock batch between branches:", error);
     return { success: false, error: "Error al mover stock entre sucursales" };
   }
 }
