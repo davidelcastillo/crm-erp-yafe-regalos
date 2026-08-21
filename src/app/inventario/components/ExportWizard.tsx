@@ -165,7 +165,7 @@ export function ExportWizard({ open, onClose, branches }: ExportWizardProps) {
       aria-labelledby="export-wizard-title"
     >
       <div
-        className="bg-white w-full max-w-lg rounded-t-3xl p-6 animate-slide-up max-h-[90vh] overflow-y-auto"
+        className="bg-white w-full max-w-xl rounded-t-3xl p-6 animate-slide-up max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-between items-center mb-4">
