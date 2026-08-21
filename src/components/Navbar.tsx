@@ -1,14 +1,21 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { useState } from 'react';
 
 export default function Navbar() {
   const router = useRouter();
+  const pathname = usePathname();
   const { user, logout } = useAuth();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  // Hide the app chrome on auth-only/error pages: the login and unauthorized
+  // screens render standalone (same pattern as BottomNav on /sucursal/*).
+  if (pathname === '/login' || pathname === '/unauthorized') {
+    return null;
+  }
 
   const handleLogout = async () => {
     setIsLoggingOut(true);

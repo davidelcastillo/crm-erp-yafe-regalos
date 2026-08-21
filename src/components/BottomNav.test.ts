@@ -50,4 +50,20 @@ describe("BottomNav", () => {
     expect(screen.queryByRole("link")).toBeNull();
     expect(container).toBeEmptyDOMElement();
   });
+
+  it("renders nothing on the login page", () => {
+    (usePathname as jest.Mock).mockReturnValue("/login");
+    const { container } = render(React.createElement(BottomNav));
+
+    expect(screen.queryByRole("link")).toBeNull();
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it("renders nothing on the unauthorized page", () => {
+    (usePathname as jest.Mock).mockReturnValue("/unauthorized");
+    const { container } = render(React.createElement(BottomNav));
+
+    expect(screen.queryByRole("link")).toBeNull();
+    expect(container).toBeEmptyDOMElement();
+  });
 });

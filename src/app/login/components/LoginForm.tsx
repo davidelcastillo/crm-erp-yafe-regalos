@@ -55,7 +55,7 @@ export default function LoginForm() {
     <div className="w-full max-w-md">
       <form className="space-y-6" onSubmit={handleSubmit}>
         <div>
-          <label htmlFor="email" className="block mb-2 text-sm font-medium text-gray-900">
+          <label htmlFor="email" className="block mb-2 text-sm font-medium text-[#6a6a6a]">
             Correo electrónico
           </label>
           <input
@@ -64,14 +64,14 @@ export default function LoginForm() {
             type="email"
             autoComplete="email"
             required
-            className="block w-full rounded-md border-0 px-3 py-2 text-sm font-medium text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+            className="block w-full h-14 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-[#222222] placeholder:text-[#6a6a6a] focus:border-[#ff385c] focus:ring-2 focus:ring-[#ff385c]/20 focus:outline-none transition-all sm:text-sm sm:leading-6"
             value={formState.email}
             onChange={handleChange}
           />
         </div>
 
         <div>
-          <label htmlFor="password" className="block mb-2 text-sm font-medium text-gray-900">
+          <label htmlFor="password" className="block mb-2 text-sm font-medium text-[#6a6a6a]">
             Contraseña
           </label>
           <input
@@ -80,18 +80,18 @@ export default function LoginForm() {
             type="password"
             autoComplete="current-password"
             required
-            className="block w-full rounded-md border-0 px-3 py-2 text-sm font-medium text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+            className="block w-full h-14 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-[#222222] placeholder:text-[#6a6a6a] focus:border-[#ff385c] focus:ring-2 focus:ring-[#ff385c]/20 focus:outline-none transition-all sm:text-sm sm:leading-6"
             value={formState.password}
             onChange={handleChange}
           />
         </div>
 
         {error && (
-          <p className="mt-2 text-sm text-red-600">{error}</p>
+          <p role="alert" className="mt-2 text-sm text-[#c13515]">{error}</p>
         )}
 
         {success && (
-          <p className="mt-2 text-sm text-green-600">{success}</p>
+          <p role="status" className="mt-2 text-sm text-green-600">{success}</p>
         )}
 
         <div className="flex items-center justify-between">
@@ -101,11 +101,11 @@ export default function LoginForm() {
                 id="remember-me"
                 name="remember-me"
                 type="checkbox"
-                className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                className="h-5 w-5 text-[#ff385c] focus:ring-[#ff385c] border-gray-300 rounded"
               />
             </div>
             <div className="ml-3 text-sm">
-              <label htmlFor="remember-me" className="font-medium text-gray-900">
+              <label htmlFor="remember-me" className="font-medium text-[#222222]">
                 Recordarme
               </label>
             </div>
@@ -114,7 +114,7 @@ export default function LoginForm() {
           <div className="text-sm">
             <a
               href="#"
-              className="font-medium text-indigo-600 hover:text-indigo-500"
+              className="font-medium text-[#ff385c] hover:text-[#e00b41]"
             >
               Olvidé mi contraseña
             </a>
@@ -125,18 +125,18 @@ export default function LoginForm() {
           <button
             type="submit"
             disabled={pending}
-            className="w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 transition-colors"
+            className="w-full h-12 flex justify-center items-center border border-transparent text-sm font-medium rounded-xl shadow-sm text-white bg-[#ff385c] hover:bg-[#e00b41] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#ff385c]/50 disabled:bg-[#ffd1da] disabled:cursor-not-allowed disabled:opacity-100 transition-colors"
           >
             {pending ? 'Iniciando sesión...' : 'Iniciar sesión'}
           </button>
         </div>
       </form>
 
-<p className="mt-4 text-sm text-center">
+<p className="mt-4 text-sm text-center text-[#6a6a6a]">
          ¿No tienes una cuenta?
          <a
            href="/register"
-           className="font-medium text-indigo-600 hover:text-indigo-500"
+           className="font-medium text-[#ff385c] hover:text-[#e00b41]"
          >
            Regístrate aquí
          </a>

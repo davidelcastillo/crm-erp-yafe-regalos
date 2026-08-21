@@ -61,7 +61,11 @@ const navItems = [
 export default function BottomNav() {
   const pathname = usePathname();
 
-  if (pathname.startsWith("/sucursal/")) {
+  if (
+    pathname.startsWith("/sucursal/") ||
+    pathname === "/login" ||
+    pathname === "/unauthorized"
+  ) {
     return null;
   }
 

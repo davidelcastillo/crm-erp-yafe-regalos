@@ -32,8 +32,13 @@ export async function proxy(request: NextRequest) {
   // Note: /sucursal/ is NOT excluded here because we want to check branch
   // authorization. The exception is the portal login path (/sucursal/<id>/login)
   // which must be reachable WITHOUT a central session.
+  // /unauthorized is excluded so the error page can always render — an
+  // authenticated non-admin must NOT be redirected to /unauthorized again
+  // (that caused an infinite redirect loop), and unauthenticated visitors
+  // must be able to view it instead of being bounced to /login.
   const isExcluded =
     pathname === '/login' ||
+    pathname === '/unauthorized' ||
     isPortalLoginPath(pathname) ||
     pathname.startsWith('/_next/') ||
     pathname === '/favicon.ico' ||

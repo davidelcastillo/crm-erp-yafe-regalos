@@ -4,7 +4,6 @@ import "./globals.css";
 import BottomNav from "../components/BottomNav";
 import Navbar from "../components/Navbar";
 import { BranchProviderWrapper } from "@/lib/context/BranchProviderWrapper";
-import { getBranchOptions } from "@/app/actions/branch";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -21,27 +20,24 @@ export const metadata: Metadata = {
   description: "Control de ingresos, egresos e inventario para feria conexx",
 };
 
-export const dynamic = "force-dynamic";
-
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // Fetch initial branches server-side to hydrate the BranchContext.
-  // If the call fails (e.g., during build), fall back to empty list.
-  const branchesResult = await getBranchOptions();
-  const initialBranches = branchesResult.success && branchesResult.data
-    ? branchesResult.data
-    : [];
-
+  // NOTE: no force-dynamic here — forcing it made EVERY route (including
+  // /login) dynamic and re-run server-side work on each request. Route
+  // segments that need freshness declare their own `dynamic` config.
+  // Branch loading was also moved out of this server component: it now
+  // happens client-side (or via the provider self-heal) so /login and
+  // /unauthorized render without any Supabase/Prisma work.
   return (
     <html
       lang="es"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-[#ffffff]">
-        <BranchProviderWrapper initialBranches={initialBranches}>
+        <BranchProviderWrapper>
           <Navbar />
           <main className="flex-1 pb-20 mt-5">{children}</main>
           <BottomNav />
