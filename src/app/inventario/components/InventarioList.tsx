@@ -1,61 +1,38 @@
 "use client";
 
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo } from "react";
 import { Product } from "@prisma/client";
 import { InventarioCard } from "./InventarioCard";
-import { ProductSearch, ProductSearchResult } from "@/components/ProductSearch";
+import { sumStock, type StockSource } from "@/lib/inventory-stock";
 
 interface InventarioListProps {
   products: Product[];
   onViewMovements?: (product: Product) => void;
+  branchId?: number | null;
+  /** True when the unified (server-side) search is active, to tweak empty states. */
+  searchActive?: boolean;
+  /** Category options hoisted from the page (shared by all cards, avoids N+1). */
+  categories?: Array<{ id: number; name: string }>;
 }
 
 type SortOption = "name" | "stock-asc" | "stock-desc" | "recent";
 
-export function InventarioList({ products, onViewMovements }: InventarioListProps) {
-  const [searchTerm, setSearchTerm] = useState("");
+/** Sum stock across every branch row (inventory[0] alone is wrong for "Todas"). */
+function readStock(p: Product): number {
+  return sumStock(p as unknown as StockSource);
+}
+
+export function InventarioList({ products, onViewMovements, branchId, searchActive = false, categories = [] }: InventarioListProps) {
   const [sortBy, setSortBy] = useState<SortOption>("recent");
   const [showOnlyLowStock, setShowOnlyLowStock] = useState(false);
-  const [highlightedProductId, setHighlightedProductId] = useState<number | null>(null);
-  const cardsRef = useRef<HTMLDivElement>(null);
 
-  // Scroll to highlighted product
-  useEffect(() => {
-    if (highlightedProductId && cardsRef.current) {
-      const highlightedCard = cardsRef.current.querySelector(
-        `[data-product-id="${highlightedProductId}"]`
-      );
-      if (highlightedCard) {
-        highlightedCard.scrollIntoView({
-          behavior: "smooth",
-          block: "center",
-        });
-        // Add temporary highlight effect
-        highlightedCard.classList.add("ring-2", "ring-[#3b82f6]", "ring-offset-2");
-        setTimeout(() => {
-          highlightedCard.classList.remove("ring-2", "ring-[#3b82f6]", "ring-offset-2");
-        }, 2000);
-      }
-    }
-  }, [highlightedProductId]);
-
-  // Filter and sort products
+  // Filter (low stock only) and sort products. Search is handled server-side.
   const filteredProducts = useMemo(() => {
     let result = [...products];
 
-    // Filter by search term
-    if (searchTerm.trim()) {
-      const term = searchTerm.toLowerCase();
-      result = result.filter(
-        (p) =>
-          p.name.toLowerCase().includes(term) ||
-          (p.description && p.description.toLowerCase().includes(term))
-      );
-    }
-
-    // Filter by low stock
+    // Filter by low stock (uses branch stock when available)
     if (showOnlyLowStock) {
-      result = result.filter((p) => p.stock <= 5);
+      result = result.filter((p) => readStock(p) <= 5);
     }
 
     // Sort
@@ -64,10 +41,10 @@ export function InventarioList({ products, onViewMovements }: InventarioListProp
         result.sort((a, b) => a.name.localeCompare(b.name));
         break;
       case "stock-asc":
-        result.sort((a, b) => a.stock - b.stock);
+        result.sort((a, b) => readStock(a) - readStock(b));
         break;
       case "stock-desc":
-        result.sort((a, b) => b.stock - a.stock);
+        result.sort((a, b) => readStock(b) - readStock(a));
         break;
       case "recent":
       default:
@@ -79,38 +56,21 @@ export function InventarioList({ products, onViewMovements }: InventarioListProp
     }
 
     return result;
-  }, [products, searchTerm, sortBy, showOnlyLowStock]);
+  }, [products, sortBy, showOnlyLowStock]);
 
   // Summary stats
   const stats = useMemo(() => {
     const total = products.length;
-    const lowStock = products.filter((p) => p.stock <= 5).length;
-    const outOfStock = products.filter((p) => p.stock === 0).length;
-    const totalUnits = products.reduce((sum, p) => sum + p.stock, 0);
+    const lowStock = products.filter((p) => readStock(p) <= 5).length;
+    const outOfStock = products.filter((p) => readStock(p) === 0).length;
+    const totalUnits = products.reduce((sum, p) => sum + readStock(p), 0);
     return { total, lowStock, outOfStock, totalUnits };
   }, [products]);
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Search and Filters */}
+      {/* Sort and low-stock filters */}
       <div className="bg-white rounded-2xl p-4 shadow-sm">
-        <input
-          type="text"
-          placeholder="Buscar productos..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full px-4 py-3 bg-[#f8f8f8] rounded-xl text-base text-[#222222] placeholder-[#999] focus:outline-none focus:ring-2 focus:ring-[#3b82f6]/20"
-        />
-
-        {/* Inline Product Search */}
-        <div className="mt-3">
-          <ProductSearch
-            mode="inline"
-            onSelect={(product) => setHighlightedProductId(product.id)}
-            placeholder="Buscar producto por código o nombre..."
-          />
-        </div>
-
         <div className="flex gap-2 mt-3 overflow-x-auto pb-1">
           <select
             value={sortBy}
@@ -153,23 +113,24 @@ export function InventarioList({ products, onViewMovements }: InventarioListProp
       </div>
 
       {/* Products List */}
-      <div ref={cardsRef} className="flex flex-col gap-3">
+      <div className="flex flex-col gap-3">
 {filteredProducts.length === 0 ? (
          <div className="text-center py-8 text-[#6a6a6a]">
-           {searchTerm || showOnlyLowStock
+           {searchActive || showOnlyLowStock
              ? "No se encontraron productos"
              : "No hay productos en el inventario"}
          </div>
        ) : (
-         filteredProducts.map((product) => (
-           <InventarioCard 
-             key={product.id} 
-             product={product} 
-             data-product-id={product.id}
-             isHighlighted={highlightedProductId === product.id}
-             onViewMovements={onViewMovements}
-           />
-         ))
+          filteredProducts.map((product) => (
+            <InventarioCard 
+              key={product.id} 
+              product={product} 
+              data-product-id={product.id}
+              onViewMovements={onViewMovements}
+              branchId={branchId}
+              categories={categories}
+            />
+          ))
        )}
       </div>
     </div>

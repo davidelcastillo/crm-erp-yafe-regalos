@@ -3,14 +3,16 @@
 
 import { prisma } from "@/lib/prisma";
 import { parseArray, parseObject } from "@/lib/parse-prisma";
+import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getNextCode } from "@/lib/utils/product-code";
+import { updateProductExtendedSchema } from "@/lib/validations/product";
 
 // Schema de validación para crear producto
+// Note: stock is no longer on Product; it lives in BranchInventory per branch.
 const createProductSchema = z.object({
   name: z.string().min(1, "El nombre es requerido").max(255, "El nombre es muy largo"),
   description: z.string().max(500, "La descripción es muy larga").optional(),
-  stock: z.number().int().min(0, "El stock no puede ser negativo").default(0),
   prefix: z.string().regex(/^[A-Za-z]{2,4}$/, "Prefijo: 2-4 letras (A-Z)").transform(v => v.toUpperCase()),
   price: z.number().min(0, "El precio no puede ser negativo"),
 });
@@ -18,14 +20,14 @@ const createProductSchema = z.object({
 // Schema for searchProducts action
 const searchProductsSchema = z.object({
   query: z.string().trim().optional(),
+  branchId: z.coerce.number().int().positive().optional(),
 });
 
-// Schema para actualizar producto (code y codePrefix son READONLY)
+// Schema para actualizar producto (code y codePrefix son READONLY; stock removido)
 const updateProductSchema = z.object({
   id: z.number().int().positive("ID inválido"),
   name: z.string().min(1, "El nombre es requerido").max(255, "El nombre es muy largo").optional(),
   description: z.string().max(500, "La descripción es muy larga").optional().nullable(),
-  stock: z.number().int().min(0, "El stock no puede ser negativo").optional(),
   price: z.number().min(0, "El precio no puede ser negativo").optional(),
   // code y codePrefix NO están en el schema - son inmutables tras creación
 });
@@ -74,12 +76,11 @@ export async function createProduct(data: unknown) {
           const existingCodes = existingProducts.map(p => p.code).filter((c): c is string => c !== null);
           const code = getNextCode(validatedData.prefix, existingCodes);
 
-          // Create product with generated code
+          // Create product with generated code (stock lives in BranchInventory)
           return await tx.product.create({
             data: {
               name: validatedData.name,
               description: validatedData.description || "-",
-              stock: validatedData.stock,
               price: validatedData.price,
               code,
               codePrefix: validatedData.prefix,
@@ -115,10 +116,20 @@ export async function createProduct(data: unknown) {
   }
 }
 
-export async function getProducts() {
+export async function getProducts(branchId?: number) {
   try {
     const products = await prisma.product.findMany({
+      where: {
+        active: true,
+        ...(branchId ? { inventory: { some: { branchId } } } : {}),
+      },
       orderBy: { createdAt: "desc" },
+      include: {
+        inventory: {
+          where: { branchId },
+          select: { stock: true },
+        },
+      },
     });
     return { success: true, data: parseArray(products) };
   } catch (error) {
@@ -151,9 +162,8 @@ export async function updateProduct(data: unknown) {
       data: {
         ...(validatedData.name && { name: validatedData.name }),
         ...(validatedData.description !== undefined && { description: validatedData.description }),
-        ...(validatedData.stock !== undefined && { stock: validatedData.stock }),
         ...(validatedData.price !== undefined && { price: validatedData.price }),
-        // code y codePrefix NO se actualizan - son inmutables
+        // code, codePrefix y stock no se actualizan aquí
       },
     });
 
@@ -198,7 +208,7 @@ export async function deleteProduct(data: unknown) {
  */
 export async function searchProducts(data: unknown) {
   try {
-    const { query } = searchProductsSchema.parse(data);
+    const { query, branchId } = searchProductsSchema.parse(data);
 
     // Empty or whitespace-only query returns empty array (no DB call)
     if (!query || query.trim() === "") {
@@ -212,11 +222,29 @@ export async function searchProducts(data: unknown) {
           { name: { contains: query, mode: "insensitive" } },
         ],
       },
-      select: { id: true, code: true, name: true, price: true, stock: true },
+      select: {
+        id: true,
+        code: true,
+        name: true,
+        price: true,
+        inventory: {
+          where: { branchId: branchId ?? undefined },
+          select: { stock: true, branchId: true },
+        },
+      },
       take: 20,
     });
 
-    return { success: true, data: parseArray(products) };
+    // Flatten branch inventory into a single `stock` value per product for compatibility
+    const flattened = products.map((p) => ({
+      id: p.id,
+      code: p.code,
+      name: p.name,
+      price: p.price,
+      stock: p.inventory[0]?.stock ?? 0,
+    }));
+
+    return { success: true, data: parseArray(flattened) };
   } catch (error) {
     if (error instanceof z.ZodError) {
       return {
@@ -310,3 +338,165 @@ type Movement = {
   quantity: number;
   referenceId: number;
 };
+
+// ===========================================================================
+// Fase 3: Producto activo/inactivo + actualizar extendido (categoryId, active)
+// ===========================================================================
+
+const toggleProductActiveSchema = z.object({
+  id: z.number().int().positive("ID inválido"),
+  active: z.boolean(),
+});
+
+/**
+ * Activa/desactiva un producto (soft-delete vía `Product.active`).
+ * NO propaga `active` a `BranchInventory`: el stock persiste para historial.
+ * Solo afecta los selectores (`getActiveProducts`) y el listado de inactivos.
+ */
+export async function toggleProductActive(data: unknown) {
+  try {
+    const { id, active } = toggleProductActiveSchema.parse(data);
+
+    await prisma.product.update({
+      where: { id },
+      data: { active },
+    });
+
+    revalidatePath("/productos");
+    revalidatePath("/inventario");
+    revalidatePath("/inventario/inactivos");
+    return { success: true };
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return {
+        success: false,
+        error: error.issues.map((e) => e.message).join(", "),
+      };
+    }
+    console.error("Error toggling product active:", error);
+    return { success: false, error: "Error al actualizar el estado del producto" };
+  }
+}
+
+/**
+ * Productos activos (`active=true`) — para selectores y flujos de compra/venta.
+ */
+export async function getActiveProducts(branchId?: number) {
+  try {
+    const products = await prisma.product.findMany({
+      where: {
+        active: true,
+        ...(branchId ? { inventory: { some: { branchId } } } : {}),
+      },
+      orderBy: { createdAt: "desc" },
+      include: {
+        inventory: {
+          where: { branchId },
+          select: { stock: true },
+        },
+      },
+    });
+    return { success: true, data: parseArray(products) };
+  } catch (error) {
+    console.error("Error fetching active products:", error);
+    return { success: false, error: "Error al obtener los productos activos" };
+  }
+}
+
+/**
+ * Productos inactivos (`active=false`) — para la página de inactivos.
+ */
+export async function getInactiveProducts() {
+  try {
+    const products = await prisma.product.findMany({
+      where: { active: false },
+      orderBy: { updatedAt: "desc" },
+      include: { category: { select: { id: true, name: true } } },
+    });
+    return { success: true, data: parseArray(products) };
+  } catch (error) {
+    console.error("Error fetching inactive products:", error);
+    return { success: false, error: "Error al obtener los productos inactivos" };
+  }
+}
+
+/**
+ * Reactiva un producto previamente desactivado (`active=true`).
+ * Es un azúcar sintáctico de `toggleProductActive({id, active: true})`.
+ */
+export async function reactivateProduct(data: unknown) {
+  const reactivateSchema = z.object({ id: z.number().int().positive("ID inválido") });
+  try {
+    const { id } = reactivateSchema.parse(data);
+
+    await prisma.product.update({
+      where: { id },
+      data: { active: true },
+    });
+
+    revalidatePath("/productos");
+    revalidatePath("/inventario");
+    revalidatePath("/inventario/inactivos");
+    return { success: true };
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return {
+        success: false,
+        error: error.issues.map((e) => e.message).join(", "),
+      };
+    }
+    console.error("Error reactivating product:", error);
+    return { success: false, error: "Error al reactivar el producto" };
+  }
+}
+
+/**
+ * Actualización extendida del producto (Fase 3):
+ * añade `categoryId` (nullable) y `active` a los campos actualizables.
+ * No reemplaza `updateProduct` existente (que no incluye categoryId/active)
+ * para preservar callers de HU2. `code`/`codePrefix` siguen inmutables.
+ */
+export async function updateProductExtended(data: unknown) {
+  try {
+    const validatedData = updateProductExtendedSchema.parse(data);
+
+    const product = await prisma.product.update({
+      where: { id: validatedData.id },
+      data: {
+        ...(validatedData.name && { name: validatedData.name }),
+        ...(validatedData.description !== undefined && {
+          description: validatedData.description,
+        }),
+        ...(validatedData.price !== undefined && { price: validatedData.price }),
+        ...(validatedData.categoryId !== undefined && {
+          categoryId: validatedData.categoryId,
+        }),
+        ...(validatedData.active !== undefined && { active: validatedData.active }),
+      },
+    });
+
+    revalidatePath("/productos");
+    revalidatePath(`/productos/${validatedData.id}`);
+    revalidatePath("/inventario");
+    revalidatePath("/inventario/inactivos");
+    return { success: true, data: parseObject(product) };
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return {
+        success: false,
+        error: error.issues.map((e) => e.message).join(", "),
+      };
+    }
+    if (
+      error &&
+      typeof error === "object" &&
+      "code" in error &&
+      (error as { code: unknown }).code === "P2003"
+    ) {
+      // Foreign key constraint fail on categoryId
+      return { success: false, error: "La categoría seleccionada no existe" };
+    }
+    console.error("Error updating product extended:", error);
+    return { success: false, error: "Error al actualizar el producto" };
+  }
+}

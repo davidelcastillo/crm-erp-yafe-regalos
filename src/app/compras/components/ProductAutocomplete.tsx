@@ -106,7 +106,9 @@ const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
               className="w-full px-4 py-3 text-left hover:bg-[#f9f9f9] flex justify-between items-center transition-colors"
             >
               <span className="font-medium text-[#222222]">{product.name}</span>
-              <span className="text-sm text-[#6a6a6a]">Stock: {product.stock}</span>
+              {product.code && (
+                <span className="text-sm text-[#6a6a6a]">{product.code}</span>
+              )}
             </button>
           ))}
         </div>
@@ -114,7 +116,7 @@ const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       
       {selectedProduct && (
         <p className="mt-1 text-xs text-[#6a6a6a]">
-          Stock actual: {selectedProduct.stock} unidades
+          {selectedProduct.name}{selectedProduct.code ? ` (${selectedProduct.code})` : ""}
         </p>
       )}
     </div>

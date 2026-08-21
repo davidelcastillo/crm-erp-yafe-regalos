@@ -20,6 +20,7 @@ interface Sale {
   totalAmount: number;
   items: SaleItem[];
   paymentMethod?: "EFECTIVO" | "TRANSFERENCIA" | "MIXTO";
+  branch?: { id: number; name: string } | null;
 }
 
 interface SaleCardProps {
@@ -57,6 +58,11 @@ export function SaleCard({ sale, onExpand, expanded }: SaleCardProps) {
             <p className="text-sm text-[#6a6a6a] mt-1">
               {sale.items.map(item => item.product.name).join(', ')}
             </p>
+            {sale.branch && (
+              <span className="inline-block mt-1 px-2 py-0.5 bg-[#3b82f6]/10 text-[#3b82f6] rounded text-xs font-medium">
+                {sale.branch.name}
+              </span>
+            )}
           </div>
           <div className="flex flex-col items-end gap-2">
             <span className="text-lg font-bold text-green-700">+ ${total.toFixed(2)}</span>

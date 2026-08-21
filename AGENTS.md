@@ -1,209 +1,144 @@
-# Project Overview
+# AGENTS.md – Configuración del agente Gentle‑AI para el proyecto *Seguimientos‑compras*
 
-**Nombre:** Stark Commerce OS (Local Business Controller)
-**Descripción:** Aplicación web _mobile-first_ optimizada para Android, diseñada para controlar de forma intuitiva los ingresos, egresos y el inventario general de un comercio local.
-**Entorno:** Cloud (Next.js alojado en Vercel + Base de datos relacional en Supabase administrada a través de Prisma).
+Este archivo contiene la configuración central que debe ser consultada por el agente antes de ejecutar cualquier tarea.  
+Incluye referencias a los *skills* disponibles, la configuración de entornos, las reglas de trabajo y los enlaces a la documentación más reciente de las tecnologías usadas.
 
-# Architecture & Modules
+---
 
-El agente debe estructurar la aplicación obligatoriamente en los siguientes **6 módulos principales**:
+## 📋 1. Skills disponibles (actualizados)
 
-1.  **Módulo de Productos (Alta):** Pantalla para registrar nuevos items.
-    - Datos: `Nombre`, `Descripción` (Opcional), `Stock inicial`, **`Precio base`**, **`Prefijo código (2-4 letras)`**
-    - **Código auto-generado**: formato `AAA000` (prefijo + secuencial 3 dígitos, inicia en 000)
-    - Acciones: Crear, Editar (precio/descripción), Eliminar, Lista con código + precio
+| Skill | Descripción breve | Trigger / Uso recomendado |
+|-------|-------------------|---------------------------|
+| **_shared** | Referencias compartidas para todos los skills SDD. | - |
+| **branch‑pr** | Crear PRs con checks de issue‑first. | Al abrir o preparar PRs. |
+| **chained‑pr** | Dividir cambios grandes en PRs encadenados. | Cuando el forecast supere 400 líneas o se solicite explícitamente. |
+| **cognitive‑doc‑design** | Diseñar docs que reduzcan la carga cognitiva. | Al escribir guías, READMEs, RFCs, etc. |
+| **comment‑writer** | Escribir comentarios cálidos y directos. | En feedback de PR, issues, Slack, etc. |
+| **context7‑mcp** | Obtener documentación actualizada de libs/frameworks vía Context7. | Preguntas sobre Next.js, Prisma, Supabase, Tailwind, etc. |
+| **customize‑opencode** | Modificar únicamente la configuración de OpenCode. | Nunca para código de aplicación. |
+| **find‑skills** | Descubrir e instalar nuevos skills. | Cuando se busca funcionalidad extra. |
+| **go‑testing** | Patrón de testing para Go. | No aplicable al proyecto actual. |
+| **issue‑creation** | Crear issues con checks de issue‑first. | Al reportar bugs o nuevas funcionalidades. |
+| **judgment‑day** | Revisión adversarial doble (blind). | Cuando se requiere validación extrema. |
+| **mobile‑design** | Directrices mobile‑first, touch‑first y respeto de plataforma. | En cualquier trabajo de UI/UX. |
+| **next‑best‑practices** | Buenas prácticas de Next.js (App Router, RSC, etc.). | Desarrollo de páginas, layout, datos, etc. |
+| **nextjs** | Experto en Next.js App Router. | Cuando se trabaja con routing, server actions, etc. |
+| **prisma‑postgres** | Setup y operaciones de Prisma con Postgres. | Migraciones, seed, queries avanzadas. |
+| **sdd‑apply** | Implementar tareas desde specs y diseño. | Fase de aplicación SDD. |
+| **sdd‑archive** | Archivar cambios SDD completados. | Después de verify. |
+| **sdd‑design** | Crear diseño técnico desde propuesta. | Fase de diseño SDD. |
+| **sdd‑explore** | Explorar ideas antes de comprometerse. | Fase de exploración SDD. |
+| **sdd‑init** | Inicializar contexto SDD, testing capabilities, registry. | Primer paso de cualquier cambio SDD. |
+| **sdd‑onboard** | Onboarding guiado de SDD usando el código real. | Cuando se quiere aprender el flujo. |
+| **sdd‑propose** | Crear propuesta SDD (intent, scope, approach). | Fase de propuesta SDD. |
+| **sdd‑spec** | Escribir especificaciones delta desde propuesta. | Fase de spec SDD. |
+| **sdd‑tasks** | Desglosar spec y diseño en tareas implementables. | Fase de task‑planning SDD. |
+| **sdd‑verify** | Validar implementación contra spec, diseño y tareas. | Fase de verificación SDD. |
+| **skill‑creator** | Crear nuevos skills LLM‑first. | Cuando se necesita un skill a medida. |
+| **skill‑improver** | Mejorar y auditar skills existentes. | Mantenimiento de skills. |
+| **skill‑registry** | Mantener actualizado el registro de skills. | Cuando se añaden/eliminan skills. |
+| **supabase** | Cualquier tarea relacionada con Supabase (DB, Auth, Edge, Storage, etc.). | Configuración, migraciones, queries, auth, etc. |
+| **supabase‑postgres‑best‑practices** | Optimización y buenas prácticas de Postgres desde Supabase. | Tuning de índices, queries, vacuum, **vercel‑react‑best‑practices** | Guías de rendimiento de Vercel para React/Next.js. | Optimización de bundle, SSR, ISR, etc. |
+| **work‑unit‑commits** | Planificar commits como unidades de trabajo revisables. | Antes de aplicar cambios en SDD (para PRs chained o single‑PR). |
 
-2.  **Módulo de Compras (Ingresos):** Historial de compras (tabla adaptativa móvil).
-    - Filtros: Por producto, ordenamiento, fechas
-    - Acción: "Registrar Nueva Compra" → Modal con: selector producto (busca por código/nombre), precio compra, cantidad
-    - **Crear producto inline**: Botón "➕ Nuevo producto" abre modal anidado con formulario Producto
+> **Nota:** Los skills marcados con *mobile‑design* y *next‑best‑practices* son especialmente relevantes para las nuevas funcionalidades de la v3 (gestionar sucursales, categorías, filtrado, dashboard personalizable, portal externo de solo‑lectura, etc.).
 
-3.  **Módulo de Ventas (Egresos):** Historial de ventas (tabla sencilla).
-    - Filtros: Búsqueda por **código o nombre**, ordenamiento, fechas
-    - Acción: "Registrar Nueva Venta" → Modal con: **búsqueda producto (código/nombre)**, precio venta (pre-fill desde producto, editable), cantidad
-    - **Método de pago**: Selector `EFECTIVO` | `TRANSFERENCIA` | `MIXTO`
-      - `EFECTIVO`: amountPaid = total, pendingBalance = 0
-      - `TRANSFERENCIA`: amountPaid = 0, pendingBalance = total
-      - `MIXTO`: inputs manuales efectivo + transferencia
+---
 
-4.  **Módulo de Inventario:** Gestión de stock tiempo real.
-    - Lista productos con stock actual, **búsqueda por código o nombre**
-    - Acciones: Editar (modal datos básicos), Eliminar (confirmación)
+## 🛠️ 2. Configuración de entorno (variables requeridas)
 
-5.  **Módulo de Clientes:** Gestión y seguimiento de deudas.
-    - Lista clientes con saldo pendiente
-    - Acciones: Registrar pago, Ver historial ventas/deudas
+Asegúrate de que las siguientes variables estén definidas en el archivo `.env` (o en la configuración de Supabase/Vercel) antes de iniciar cualquier trabajo:
 
-6.  **Dashboard Interactivo:** Panel analítico.
-    - Tarjetas resumen: productos, ventas, compras, totales por método pago
-    - Tabla Rendimiento: selecciona producto → historial compras/ventas + ganancias/pérdidas (precio venta - precio base)
+| Variable | Descripción |
+|----------|-------------|
+| `DATABASE_URL` | URL de conexión a la base de datos PostgreSQL de Supabase. |
+| `DIRECT_URL` | URL directa (usada por Prisma en entornos de CI). |
+| `NEXT_PUBLIC_SUPABASE_URL` | URL pública del proyecto Supabase. |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Key publishable (anon) para el cliente. |
+| `SUPABASE_SERVICE_ROLE_KEY` | Key de servicio para operaciones de admin (seed, migraciones, etc.). |
+| `NEXT_PUBLIC_APP_ENV` | `development`, `staging` o `production` (afecta comportamiento de middlewares y feature flags). |
+| `NEXT_PUBLIC_FEATURE_BRANCHES` | `true` si se quiere habilitar la gestión de sucursales (Fase 2/3). |
+| `NEXT_PUBLIC_FEATURE_CATEGORIES` | `true` si se quiere habilitar categorías de productos (Fase 2). |
+| `NEXT_PUBLIC_FEATURE_SOFT_DELETE` | `true` si se quiere habilitar el soft‑delete de productos (Fase 2). |
+| `NEXT_PUBLIC_FEATURE_EXTERNAL_BRANCH_VIEW` | `true` si se quiere habilitar la vista externa de inventario por sucursal (HU05). |
+| `BRANCH_EMAIL_DOMAIN` | Dominio usado para generar el email del usuario de sucursal (`sucursal-<code>@<domain>`). Default `feriaconexx.com`. |
 
-# Tech Stack
+---
 
-- **Framework:** Next.js 16 (App Router).
-- **Base de Datos:** PostgreSQL (Supabase).
-- **ORM:** Prisma.
-- **Despliegue:** Vercel.
-- **Lenguaje:** TypeScript.
-- **Estilos:** Tailwind CSS v4.
-- **Charts:** Recharts.
-- **Validación:** Zod v4.
-- **Alertas:** SweetAlert2.
+## 📐 3. Reglas de trabajo (actualizadas)
 
-# Skills (Mapas de Conocimiento)
+1. **Siempre usar SDD** para cualquier cambio que implique más de un archivo o que afecte la lógica de negocio.  
+   - Flujo: `explore → propose → spec → design → tasks → apply → verify → archive`.  
+   - En modo **interactivo** (predeterminado) revisa el resumen de cada fase antes de continuar; en modo **automático** el orchestrator actúa como gatekeeper entre fases.
 
-El agente debe consultar obligatoriamente estos archivos antes de implementar:
+2. **Delegar todo el trabajo pesado** a los sub‑agentes `sdd‑*`.  
+   - Nunca edites archivos directamente salvo para lecturas de 1‑3 archivos o comandos de estado (git, npm, etc.).  
+   - Usa la herramienta `task` con `subagent_type` adecuado (ver tabla de skills) para cada fase.
 
-- **Next.js & App Router:** `skills/next-best-practices/app-router.md`
-- **Prisma ORM Best Practices:** `skills/prisma-best-practices/schema-and-migrations.md`
-- **Supabase PostgreSQL:** `agents/skills/supabase-postgres-best-practices/`
-- **Mobile-First UI Design:** `skills/frontend-design/android-mobile-first.md`
-- **Vercel Deployment:** `skills/vercel-react-best-practices/`
-- **Frontend Design:** `skills/frontend-design/`
-- **UI/UX Design:** `skills/ui-ux-pro-max/`
-- **Web Development:** `skills/web-development/`
-- **Mobile Design:** `.agents/skills/mobile-design/`
+3. **Respetar el presupuesto de líneas de cambio** (review burden).  
+   - Después de `sdd‑tasks`, el orchestrator consulta el *Review Workload Forecast*.  
+   - Si el forecast indica > 400 líneas cambiadas o se necesita decisión, aplicar la **delivery strategy** configurada en la pre‑flight (ask‑on‑risk, auto‑chain, single‑pr, exception‑ok).  
+   - En caso de `ask‑on‑risk`, el orchestrator preguntará al usuario si quiere dividir en PRs encadenados o aceptar un `size:exception`.
 
-# Data Structure Requirements (Prisma Schema)
+4. **Mantener actualizado el registro de skills** antes de cada delegación.  
+   - Al inicio de la sesión (o antes de la primera delegación) ejecuta:  
+     ```bash
+     opencode skill run skill-registry
+     ```  
+   - Luego, cada sub‑agente recibirá la lista de skills a cargar mediante el campo `skill_resolution` del prompt.
 
-Esquema actual en `prisma/schema.prisma`:
+5. **Usar Context7 para documentación de libs**.  
+   - Antes de escribir código que implique Next.js, Prisma, Supabase, Tailwind, Recharts, Zod, SweetAlert2, etc., llama a `context7_resolve-library-id` + `context7_query-docs` para obtener la versión más reciente y ejemplos de uso.
 
-```prisma
-// Product - Items en inventario
-model Product {
-  id          Int      @id @default(autoincrement())
-  name        String
-  description String?
-  stock       Int      @default(0)
-  price       Decimal  @default(0) @db.Decimal(10, 2)  // Precio base venta
-  code        String   @unique                        // Código AAA000
-  codePrefix  String?                                 // Prefijo para queries
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+6. **Aplicar las buenas prácticas de Vercel y Next.js** (skill `vercel-react-best-practices` y `next-best-practices`).  
+   - Prioriza **Server Actions** para mutaciones, **React Server Components** para UI estática, y **Edge Functions** solo cuando sea estrictamente necesario.
 
-  purchaseItems PurchaseItem[]
-  saleItems     SaleItem[]
-  @@index([codePrefix])
-  @@index([code, name])
-}
+7. **Seguridad y autenticación** (Fase 1 ya implementada).  
+   - Todas las rutas internas (excepto `/login` y las rutas externas de sucursal) deben estar protegidas por el middleware que verifica la sesión de Supabase y el rol `admin`.  
+   - Las rutas externas `/sucursal/[branchId]/inventory` usan un middleware separado que solo permite rol `branch_user` y verbos `GET`.  
 
-// Purchase - Cabecera de compra
-model Purchase {
-  id          Int      @id @default(autoincrement())
-  date        DateTime @default(now())
-  totalAmount Decimal  @default(0) @db.Decimal(10, 2)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  items       PurchaseItem[]
-}
+8. **Testing**  
+   - **Unit tests**: Jest + React Testing Library para componentes y lógica pura.  
+   - **Integration tests**: Prisma + Supabase (usar entorno de test de Supabase o Docker) para flujos completos (crear sucursal → asignar stock → compra → venta → movimiento).  
+   - **E2E**: Playwright con configuración móvil (emular Android) para validar flujos de usuario críticos (login, compra con distribución, venta por sucursal, movimiento de stock, acceso al portal externo).  
+   - El agente debe ejecutar `npm test` antes de cada `sdd‑apply` y `npm run test:e2e` antes de `sdd‑verify` si existen tests E2E.
 
-// PurchaseItem - Detalle de compra
-model PurchaseItem {
-  id         Int     @id @default(autoincrement())
-  purchaseId Int
-  productId  Int
-  price      Decimal @db.Decimal(10, 2)   // Precio compra
-  quantity   Int
-  subtotal   Decimal @db.Decimal(10, 2)
-  purchase   Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
-  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  @@index([purchaseId])
-  @@index([productId])
-}
+9. **Documentación**  
+   - Cada nuevo feature debe contar con su propio archivo markdown en `docs/` siguiendo la plantilla de `cognitive-doc-design`.  
+   - Actualizar `README.md` con un resumen de las funcionalidades de la v3 y enlaces a los documentos detallados.
 
-// Sale - Cabecera de venta
-model Sale {
-  id             Int      @id @default(autoincrement())
-  date           DateTime @default(now())
-  totalAmount    Decimal  @default(0) @db.Decimal(10, 2)
-  amountPaid     Decimal  @default(0) @db.Decimal(10, 2)
-  pendingBalance Decimal  @default(0) @db.Decimal(10, 2)
-  paymentMethod  PaymentMethod @default(EFECTIVO)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-  customerId     Int?
-  customer       Customer? @relation(fields: [customerId], references: [id])
-  items          SaleItem[]
-  @@index([customerId])
-}
+10. **Versionado y releases**  
+    - Usa **Conventional Commits** (`feat`, `fix`, `docs`, `refactor`, `perf`, `test`, `chore`).  
+    - Para releases en `main`, valida que el *receipt* de revisión exista y que no haya cambios pendientes (ver sección *Trigger Rules* del documento de SDD).  
+    - Si el release es *major* o sigue a un incidente de seguridad, requiere una revisión extraordinaria (Judgment Day o revisión de 4R) antes de publicar.
 
-// SaleItem - Detalle de venta
-model SaleItem {
-  id        Int     @id @default(autoincrement())
-  saleId    Int
-  productId Int
-  price     Decimal @db.Decimal(10, 2)   // Precio venta
-  quantity  Int
-  subtotal  Decimal @db.Decimal(10, 2)
-  sale      Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
-  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
-  @@index([saleId])
-  @@index([productId])
-}
+11. **Estilo visual - CSS / Tailwind**
+   - Leer el archivo STYLE.MD en la raíz del proyecto.
+---
 
-// Customer - Clientes con deuda
-model Customer {
-  id           Int      @id @default(autoincrement())
-  name         String
-  surname      String
-  totalBalance Decimal  @default(0) @db.Decimal(10, 2)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  sales        Sale[]
-  payments     Payment[]
-}
+## 📚 4. Enlaces a documentación crítica (actualizados vía Context7)
 
-// Payment - Pagos de clientes
-model Payment {
-  id         Int      @id @default(autoincrement())
-  customerId Int
-  amount     Decimal  @db.Decimal(10, 2)
-  date       DateTime @default(now())
-  customer   Customer @relation(fields: [customerId], references: [id])
-  @@index([customerId])
-}
+- **Next.js 16 (App Router)** – <https://nextjs.org/docs/app>  
+- **Prisma ORM** – <https://pris.ly/d/prisma-doc>  
+- **Supabase (DB, Auth, Edge, Storage)** – <https://supabase.com/docs>  
+- **Tailwind CSS v4** – <https://tailwindcss.com/docs>  
+- **Recharts** – <https://recharts.org/en-US>  
+- **Zod v4** – <https://zod.dev/>  
+- **SweetAlert2** – <https://sweetalert2.github.io/>  
+- **Playwright** – <https://playwright.dev/docs/intro>  
 
-enum PaymentMethod {
-  EFECTIVO
-  TRANSFERENCIA
-  MIXTO
-}
+*(El agente debe usar la herramienta `context7` para obtener la versión exacta y ejemplos de uso antes de escribir código.)*
 
-```
+---
 
-## Directiva Crítica:
- - Toda inserción en PurchaseItem debe aumentar stock del Product (transacción Prisma).
- - Toda inserción en SaleItem debe disminuir stock del Product (transacción Prisma).
- - amountPaid / pendingBalance se calculan automático según paymentMethod.
- - Validar stock suficiente antes de registrar venta (evitar stock negativo).
+## ✅ 5. Checklist rápido antes de iniciar una nueva tarea SDD
 
-# Build and Test Commands
- - **Instalar**: npm install
- - **Configuración**: .env con DATABASE_URL, DIRECT_URL, NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, SUPABASE_SERVICE_ROLE_KEY
- - **Sincronizar BD**: npx prisma db push
- - **Generar Cliente**: npx prisma generate
- - **Desarrollo**: npm run dev
- - **Tests**: npm run test (Jest + React Testing Library)
- - **Lint**: npm run lint
-
-# Code Style Guidelines
- - **Tipado Fuerte**: TypeScript estricto con tipos @prisma/client.
- - **Enfoque Móvil**: Tablas → Cards en < md:. Modales = Bottom Sheets 90vh mobile.
- - **Componentes**: Reutilizables (ProductForm, ProductSearch, ProductCard).
- - **Server Actions**: Validación Zod en todos los inputs.
- - **Transacciones**: prisma.$transaction para operaciones multi-tabla.
- - **Decimal**: Prisma Decimal → TS number (usar Number()).
-
-# Security Considerations
- - **Validación Zod en todos los Server Actions.**
- - **Stock: impedir venta si cantidad > stock actual.**
- - **Rate limit en auth (futuro HU7).**
- - **Passwords hasheados (bcrypt), cookies httpOnly.**
- - **Service Role key solo backend, nunca NEXT_PUBLIC_.**
-
-# Testing Strategy
- - **Unit**: Jest + RTL — componentes aislados, utils (cálculos, código auto).
- - **Integration**: Server Actions + Prisma (transacciones, stock, búsqueda).
- - **E2E**: Playwright mobile — flujos: crear producto → compra → venta → inventario.
- - **Convención** [componente].test.tsx junto al componente o __tests__/.
- - **Obligatorio**: npm run test pasa en cada feature completa.
+- [ ] Verificar que `.env` tenga todas las variables requeridas.  
+- [ ] Ejecutar `opencode skill run skill-registry` para tener el registro actualizado.  
+- [ ] Confirmar la **pre‑flight de SDD** (modo, artifact store, delivery strategy, review budget).  
+- [ ] Si la tarea implica cambios de esquema, asegurarse de que Prisma esté instalado y que el comando `prisma migrate dev` pueda ejecutarse.  
+- [ ] Si la tarea incluye nuevas rutas o componentes, revisar que los archivos de `src/app/` sigan la convención de **route groups** (`(routes)`, `(auth)`, etc.) según el proyecto actual.  
+- [ ] Antes de escribir cualquier línea de código, consultar Context7 para la documentación más reciente de la librería involucrada.  
+- [ ] Después de escribir código, ejecutar los tests unitarios y de integración correspondientes.  
+- [ ] Antes de hacer commit, asegurarse de que el *receipt* de revisión esté disponible (o crear uno mediante `review/start` si no existe).  
+- [ ] Al finalizar, archivar el cambio con `sdd‑archive` y actualizar el changelog/READEME si corresponde.   

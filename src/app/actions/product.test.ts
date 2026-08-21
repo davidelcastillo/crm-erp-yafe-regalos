@@ -8,7 +8,7 @@ jest.mock("@/lib/prisma", () => {
   const mockFindMany = jest.fn();
   const mockProductCreate = jest.fn();
   const mockExecuteRawUnsafe = jest.fn().mockResolvedValue(undefined);
-  const mockTransaction = jest.fn(async (callback: (tx: any) => Promise<any>) => {
+  const mockTransaction = jest.fn(async (callback: (tx: unknown) => Promise<unknown>) => {
     const tx = {
       product: {
         findMany: mockFindMany,
@@ -46,7 +46,6 @@ describe("createProduct Server Action - Integration", () => {
       id: 1,
       name: "Jabón de Avena y Arroz",
       description: "Jabón artesanal exfoliante",
-      stock: 50,
       price: 1500,
       code: "AA000",
       codePrefix: "AA",
@@ -56,8 +55,8 @@ describe("createProduct Server Action - Integration", () => {
 
     // Access mocks from the mocked module
     const { product } = prisma;
-    product.findMany.mockResolvedValue([]);
-    product.create.mockResolvedValue(mockProduct);
+    (product.findMany as jest.Mock).mockResolvedValue([]);
+    (product.create as jest.Mock).mockResolvedValue(mockProduct);
 
     const result = await createProduct({
       name: "Jabón de Avena y Arroz",
@@ -79,7 +78,6 @@ describe("createProduct Server Action - Integration", () => {
       id: 2,
       name: "Simple Product",
       description: "-",
-      stock: 0,
       price: 100,
       code: "SP000",
       codePrefix: "SP",
@@ -88,8 +86,8 @@ describe("createProduct Server Action - Integration", () => {
     };
 
     const { product } = prisma;
-    product.findMany.mockResolvedValue([]);
-    product.create.mockResolvedValue(mockProduct);
+    (product.findMany as jest.Mock).mockResolvedValue([]);
+    (product.create as jest.Mock).mockResolvedValue(mockProduct);
 
     const result = await createProduct({
       name: "Simple Product",
@@ -99,7 +97,6 @@ describe("createProduct Server Action - Integration", () => {
 
     expect(result.success).toBe(true);
     expect(result.data?.name).toBe("Simple Product");
-    expect(result.data?.stock).toBe(0);
     expect(result.data?.code).toBe("SP000");
     expect(result.data?.price).toBe(100);
   });
@@ -113,18 +110,6 @@ describe("createProduct Server Action - Integration", () => {
 
     expect(result.success).toBe(false);
     expect(result.error).toContain("nombre");
-  });
-
-  it("should return error when stock is negative", async () => {
-    const result = await createProduct({
-      name: "Test Product",
-      prefix: "AA",
-      price: 100,
-      stock: -5,
-    });
-
-    expect(result.success).toBe(false);
-    expect(result.error).toContain("negativo");
   });
 
   it("should return error when prefix is invalid", async () => {
@@ -150,8 +135,7 @@ describe("createProduct Server Action - Integration", () => {
   });
 
   it("should handle database errors gracefully", async () => {
-    const { prisma: mockPrisma } = require("@/lib/prisma");
-    mockPrisma.$transaction.mockRejectedValueOnce(new Error("Database error"));
+    (prisma.$transaction as jest.Mock).mockRejectedValueOnce(new Error("Database error"));
 
     const result = await createProduct({
       name: "Test Product",
@@ -185,7 +169,7 @@ describe("getProducts Server Action", () => {
     ];
 
     const { product } = prisma;
-    product.findMany.mockResolvedValue(mockProductsFromDb);
+    (product.findMany as jest.Mock).mockResolvedValue(mockProductsFromDb);
 
     const result = await getProducts();
 
@@ -198,12 +182,25 @@ describe("getProducts Server Action", () => {
 
   it("should return empty array when no products exist", async () => {
     const { product } = prisma;
-    product.findMany.mockResolvedValue([]);
+    (product.findMany as jest.Mock).mockResolvedValue([]);
 
     const result = await getProducts();
 
     expect(result.success).toBe(true);
     expect(result.data).toEqual([]);
+  });
+
+  it("excludes inactive products by default (where.active: true)", async () => {
+    const { product } = prisma;
+    (product.findMany as jest.Mock).mockResolvedValue([]);
+
+    await getProducts();
+
+    expect(product.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ active: true }),
+      })
+    );
   });
 });
 
@@ -238,10 +235,10 @@ describe("searchProducts Server Action", () => {
   it("should search by code prefix (ILIKE)", async () => {
     const { product } = prisma;
     const mockProducts = [
-      { id: 1, code: "AA001", name: "Producto A", price: 100, stock: 10 },
-      { id: 2, code: "AAB001", name: "Producto B", price: 200, stock: 5 },
+      { id: 1, code: "AA001", name: "Producto A", price: 100, inventory: [{ stock: 10, branchId: 1 }] },
+      { id: 2, code: "AAB001", name: "Producto B", price: 200, inventory: [{ stock: 5, branchId: 1 }] },
     ];
-    product.findMany.mockResolvedValue(mockProducts);
+    (product.findMany as jest.Mock).mockResolvedValue(mockProducts);
 
     const result = await searchProducts({ query: "AA" });
 
@@ -257,7 +254,15 @@ describe("searchProducts Server Action", () => {
             expect.objectContaining({ name: expect.objectContaining({ contains: "AA", mode: "insensitive" }) }),
           ]),
         }),
-        select: expect.objectContaining({ id: true, code: true, name: true, price: true, stock: true }),
+        select: expect.objectContaining({
+          id: true,
+          code: true,
+          name: true,
+          price: true,
+          inventory: expect.objectContaining({
+            select: expect.objectContaining({ stock: true, branchId: true }),
+          }),
+        }),
         take: 20,
       })
     );
@@ -266,10 +271,10 @@ describe("searchProducts Server Action", () => {
   it("should search by name fragment (ILIKE)", async () => {
     const { product } = prisma;
     const mockProducts = [
-      { id: 1, code: "PR001", name: "Jabón de Avena", price: 100, stock: 10 },
-      { id: 2, code: "PR002", name: "Jabón de Glicerina", price: 150, stock: 5 },
+      { id: 1, code: "PR001", name: "Jabón de Avena", price: 100, inventory: [{ stock: 10, branchId: 1 }] },
+      { id: 2, code: "PR002", name: "Jabón de Glicerina", price: 150, inventory: [{ stock: 5, branchId: 1 }] },
     ];
-    product.findMany.mockResolvedValue(mockProducts);
+    (product.findMany as jest.Mock).mockResolvedValue(mockProducts);
 
     const result = await searchProducts({ query: "Jabón" });
 
@@ -287,9 +292,9 @@ describe("searchProducts Server Action", () => {
       code: `PR${String(i).padStart(3, "0")}`,
       name: `Product ${i}`,
       price: 100,
-      stock: 10,
+      inventory: [{ stock: 10, branchId: 1 }],
     }));
-    product.findMany.mockResolvedValue(mockProducts.slice(0, 20)); // DB returns max 20 due to take
+    (product.findMany as jest.Mock).mockResolvedValue(mockProducts.slice(0, 20)); // DB returns max 20 due to take
 
     const result = await searchProducts({ query: "P" });
 
@@ -304,9 +309,9 @@ describe("searchProducts Server Action", () => {
     const { product } = prisma;
     // Mock returns only the selected fields (as real Prisma would with select)
     const mockProducts = [
-      { id: 1, code: "AA001", name: "Test", price: 100, stock: 5 },
+      { id: 1, code: "AA001", name: "Test", price: 100, inventory: [{ stock: 5, branchId: 1 }] },
     ];
-    product.findMany.mockResolvedValue(mockProducts);
+    (product.findMany as jest.Mock).mockResolvedValue(mockProducts);
 
     const result = await searchProducts({ query: "AA" });
 

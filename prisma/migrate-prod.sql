@@ -137,9 +137,61 @@ BEGIN
     WHERE table_schema = 'public'
       AND table_name   = 'Sale'
       AND column_name  = 'paymentMethod'
+   ) THEN
+     ALTER TABLE "Sale"
+       ADD COLUMN "paymentMethod" "PaymentMethod" NOT NULL DEFAULT 'EFECTIVO';
+   END IF;
+END$$;
+
+-- 12. Add authUserId column to Branch if it doesn't exist
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name   = 'Branch'
+      AND column_name  = 'authUserId'
   ) THEN
-    ALTER TABLE "Sale"
-      ADD COLUMN "paymentMethod" "PaymentMethod" NOT NULL DEFAULT 'EFECTIVO';
+    ALTER TABLE "Branch" ADD COLUMN "authUserId" TEXT;
+  END IF;
+END$$;
+
+-- 13. Create unique index on authUserId if it doesn't exist
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_indexes
+    WHERE schemaname = 'public'
+      AND tablename   = 'Branch'
+      AND indexname   = 'Branch_authUserId_key'
+  ) THEN
+    CREATE UNIQUE INDEX "Branch_authUserId_key" ON "Branch" ("authUserId");
+  END IF;
+END$$;
+
+-- 14. Add code column to Branch if it doesn't exist
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name   = 'Branch'
+      AND column_name  = 'code'
+  ) THEN
+    ALTER TABLE "Branch" ADD COLUMN "code" TEXT;
+  END IF;
+END$$;
+
+-- 15. Create unique index on code if it doesn't exist
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_indexes
+    WHERE schemaname = 'public'
+      AND tablename   = 'Branch'
+      AND indexname   = 'Branch_code_key'
+  ) THEN
+    CREATE UNIQUE INDEX "Branch_code_key" ON "Branch" ("code");
   END IF;
 END$$;
 

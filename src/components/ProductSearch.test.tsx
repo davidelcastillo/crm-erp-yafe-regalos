@@ -1,13 +1,19 @@
-import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
-import { ProductSearch } from "./ProductSearch";
+import { render, screen, fireEvent, act } from "@testing-library/react";
+import { ProductSearch, type ProductSearchResult } from "./ProductSearch";
 import { searchProducts } from '@/app/actions/product';
 
 // Mock searchProducts
-jest.mock("@/actions/product", () => ({
+jest.mock("@/app/actions/product", () => ({
   searchProducts: jest.fn(),
 }));
 
-const mockSearchProducts = searchProducts as jest.MockedFunction<typeof searchProducts>;
+type SearchResponse =
+  | { success: true; data: ProductSearchResult[] }
+  | { success: false; error: string };
+
+const mockSearchProducts = searchProducts as unknown as jest.MockedFunction<
+  (data: { query?: string; branchId?: number }) => Promise<SearchResponse>
+>;
 
 describe("ProductSearch Component", () => {
   const mockResults = [
@@ -64,10 +70,13 @@ describe("ProductSearch Component", () => {
     });
 
     it("shows loading state", async () => {
-      let resolveSearch: (value: any) => void;
-      mockSearchProducts.mockImplementation(() => new Promise((resolve) => {
-        resolveSearch = resolve;
-      }));
+      let resolveSearch: (value: SearchResponse) => void;
+      mockSearchProducts.mockImplementation(
+        () =>
+          new Promise<SearchResponse>((resolve) => {
+            resolveSearch = resolve;
+          })
+      );
       
       const onSelect = jest.fn();
       render(<ProductSearch mode="inline" onSelect={onSelect} />);
@@ -168,7 +177,9 @@ describe("ProductSearch Component", () => {
       const onClose = jest.fn();
       render(<ProductSearch mode="modal" isOpen={true} onClose={onClose} onSelect={onSelect} />);
       
-      fireEvent.click(screen.getByTestId("modal-backdrop") || screen.getByText("Buscar Producto").parentElement!);
+      // The outer backdrop div has role="dialog" and onClick={onClose};
+      // clicking it (not the inner content) should close the modal.
+      fireEvent.click(screen.getByRole("dialog"));
       expect(onClose).toHaveBeenCalled();
     });
 
@@ -178,7 +189,9 @@ describe("ProductSearch Component", () => {
       const onClose = jest.fn();
       render(<ProductSearch mode="modal" isOpen={true} onClose={onClose} onSelect={onSelect} />);
       
-      fireEvent.keyDown(document, { key: "Escape" });
+      // Escape handler is attached to the search input (input-scoped).
+      const input = screen.getByPlaceholderText("Buscar producto por código o nombre...");
+      fireEvent.keyDown(input, { key: "Escape" });
       expect(onClose).toHaveBeenCalled();
     });
 

@@ -10,12 +10,6 @@ export default async function ClientesPage() {
 
   return (
     <div className="min-h-screen bg-[#ffffff] pb-20">
-      {/* Header */}
-      <header className="sticky top-0 bg-white z-40 px-6 pt-6 pb-4 shadow-sm">
-        <h1 className="text-2xl font-bold text-[#222222]">Clientes</h1>
-        <p className="text-sm text-[#6a6a6a] mt-1">Gestión y seguimiento de deudas</p>
-      </header>
-
       {/* Clientes List */}
       <main className="px-6">
         <ClientesList initialCustomers={customers} />

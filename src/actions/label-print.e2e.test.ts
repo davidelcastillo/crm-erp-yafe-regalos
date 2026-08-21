@@ -20,7 +20,9 @@ jest.mock('pdf-lib', () => ({
       embedFont: jest.fn().mockResolvedValue({
         widthOfTextAtSize: jest.fn().mockResolvedValue(10),
       }),
-      save: jest.fn().mockResolvedValue(new ArrayBuffer(0)),
+      save: jest.fn().mockResolvedValue(
+        new Uint8Array([37, 80, 68, 70, 45, 49, 46, 48]).buffer // "%PDF-1.0"
+      ),
     }),
   },
   rgb: jest.fn(),
@@ -57,8 +59,8 @@ describe('E2E label generation', () => {
 
     const pdfBuffer = await generateProductLabels(selections);
 
-    // Verify that a PDF buffer was returned
-    expect(pdfBuffer).toBeInstanceOf(Buffer);
+    // Action returns a base64-encoded PDF string
+    expect(typeof pdfBuffer).toBe('string');
     expect(pdfBuffer.length).toBeGreaterThan(0);
 
     // Verify that the product data was fetched correctly
@@ -75,10 +77,10 @@ describe('E2E label generation', () => {
 
     // Test exactly 91 labels (one full page)
     let pdfBuffer = await generateProductLabels([{ productId: 1, quantity: 91 }]);
-    expect(pdfBuffer).toBeInstanceOf(Buffer);
+    expect(typeof pdfBuffer).toBe('string');
 
     // Test 92 labels (should overflow to second page)
     pdfBuffer = await generateProductLabels([{ productId: 1, quantity: 92 }]);
-    expect(pdfBuffer).toBeInstanceOf(Buffer);
+    expect(typeof pdfBuffer).toBe('string');
   });
 });

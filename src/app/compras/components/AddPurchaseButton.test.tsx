@@ -1,17 +1,24 @@
 /**
  * @jest-environment jsdom
  */
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
+import type { Product } from "@prisma/client";
 import { AddPurchaseButton } from "./AddPurchaseButton";
 
 // Mock the actions - CORRECTED: getProducts is from product actions, not purchase
 jest.mock("../../actions/purchase", () => ({
   registerPurchase: jest.fn(),
+  createPurchaseWithBranchSplit: jest.fn(),
 }));
 jest.mock("../../actions/product", () => ({
   getProducts: jest.fn(),
   createProduct: jest.fn(),
   updateProduct: jest.fn(),
+}));
+
+// Mock auth action (getUser) — used to send performedBy with the purchase
+jest.mock("@/actions/auth", () => ({
+  getUser: jest.fn(),
 }));
 
 // Mock next/navigation - FIXED: use jest.fn() so we can use .mockReturnValue()
@@ -27,23 +34,38 @@ jest.mock("sweetalert2", () => ({
   fire: jest.fn().mockResolvedValue({ isConfirmed: true }),
 }));
 
-import { registerPurchase } from "../../actions/purchase";
+// Mock BranchContext - AddPurchaseButton now requires a selected branch
+jest.mock("@/lib/context/BranchContext", () => ({
+  useBranch: jest.fn(() => ({
+    branchId: 1,
+    branch: { id: 1, name: "Principal" },
+    branches: [{ id: 1, name: "Principal" }],
+    ready: true,
+    setBranchId: jest.fn(),
+    refreshBranches: jest.fn(),
+  })),
+}));
+
+import { registerPurchase, createPurchaseWithBranchSplit } from "../../actions/purchase";
 import { getProducts, createProduct, updateProduct } from "../../actions/product";
+import { getUser } from "@/actions/auth";
 import { useRouter } from "next/navigation";
 import { ProductForm } from "@/app/productos/components/ProductForm";
 import Swal from "sweetalert2";
 
 const mockRegisterPurchase = registerPurchase as jest.MockedFunction<typeof registerPurchase>;
+const mockCreatePurchaseWithBranchSplit = createPurchaseWithBranchSplit as jest.MockedFunction<typeof createPurchaseWithBranchSplit>;
 const mockGetProducts = getProducts as jest.MockedFunction<typeof getProducts>;
 const mockCreateProduct = createProduct as jest.MockedFunction<typeof createProduct>;
 const mockUpdateProduct = updateProduct as jest.MockedFunction<typeof updateProduct>;
 const mockUseRouter = useRouter as jest.MockedFunction<typeof useRouter>;
+const mockGetUser = getUser as jest.MockedFunction<typeof getUser>;
 
 describe("AddPurchaseButton Component", () => {
   const mockProducts = [
     { id: 1, name: "Producto 1", description: null, stock: 10, price: 100, code: "PR001", codePrefix: "PR", createdAt: new Date(), updatedAt: new Date() },
     { id: 2, name: "Producto 2", description: null, stock: 5, price: 200, code: "PR002", codePrefix: "PR", createdAt: new Date(), updatedAt: new Date() },
-  ];
+  ] as unknown as Product[];
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -65,18 +87,20 @@ describe("AddPurchaseButton Component", () => {
           }
         ]
       } 
-    });
+    } as never);
+    mockCreatePurchaseWithBranchSplit.mockResolvedValue({ success: true } as never);
     mockGetProducts.mockResolvedValue({ 
       success: true, 
       data: [...mockProducts] 
-    });
+    } as never);
     // Mock product creation actions to succeed by default
-    mockCreateProduct.mockResolvedValue({ success: true });
-    mockUpdateProduct.mockResolvedValue({ success: true });
+    mockCreateProduct.mockResolvedValue({ success: true } as never);
+    mockUpdateProduct.mockResolvedValue({ success: true } as never);
+    mockGetUser.mockResolvedValue(null);
     mockUseRouter.mockReturnValue({
       push: jest.fn(),
       refresh: jest.fn(),
-    });
+    } as never);
   });
 
   it("renders purchase form with initial empty item", () => {
@@ -110,7 +134,7 @@ it("closes purchase modal when clicking outside", async () => {
     expect(screen.getByText(/nueva compra/i)).toBeInTheDocument();
     
     // Click on backdrop (outside the modal content)
-    const backdrop = document.body.querySelector('.fixed.inset-0.bg-black\\/60.backdrop-blur-sm');
+    const backdrop = document.body.querySelector('.fixed.inset-0.bg-black\\/30.backdrop-blur-md');
     if (backdrop) {
       fireEvent.click(backdrop);
     }
@@ -189,7 +213,7 @@ it("closes purchase modal when clicking outside", async () => {
   it("cancels item removal when clicking cancel in confirmation", async () => {
     // Mock Swal.fire to resolve with isConfirmed: false for this test
     const mockSwalFire = jest.spyOn(Swal, 'fire');
-    mockSwalFire.mockResolvedValueOnce({ isConfirmed: false });
+    mockSwalFire.mockResolvedValueOnce({ isConfirmed: false } as never);
 
     render(<AddPurchaseButton products={mockProducts} />);
     
@@ -288,23 +312,26 @@ it("closes purchase modal when clicking outside", async () => {
     const openButton = screen.getByLabelText(/registrar compra/i);
     fireEvent.click(openButton);
     
-    // Try to submit without selecting any product
-    const submitButtons = screen.getAllByRole("button", { name: /registrar compra/i });
-    const submitButton = submitButtons[submitButtons.length - 1];
-    fireEvent.click(submitButton);
+    // Submit the form directly (bypasses jsdom native constraint validation
+    // on the required branch/price/quantity fields so the handler runs)
+    const form = document.querySelector('form');
+    fireEvent.submit(form!);
     
     // Expect Swal.fire to have been called with the error message
-    expect(Swal.fire).toHaveBeenCalledWith(
-      expect.objectContaining({
-        title: 'Error',
-        text: 'Por favor agregá al menos un producto',
-        icon: 'error',
-        confirmButtonColor: '#ff385c',
-      })
-    );
+    await waitFor(() => {
+      expect(Swal.fire).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: 'Error',
+          text: 'Por favor agregá al menos un producto',
+          icon: 'error',
+          confirmButtonColor: '#ff385c',
+        })
+      );
+    });
     
-    // Should not have called registerPurchase
+    // Should not have called registerPurchase nor createPurchaseWithBranchSplit
     expect(mockRegisterPurchase).not.toHaveBeenCalled();
+    expect(mockCreatePurchaseWithBranchSplit).not.toHaveBeenCalled();
   });
 
   it("successfully registers purchase and resets form", async () => {
@@ -317,12 +344,16 @@ it("closes purchase modal when clicking outside", async () => {
     // Select first product via autocomplete
     const autocompleteInput = screen.getAllByPlaceholderText(/buscar producto/i)[0];
     fireEvent.change(autocompleteInput, { target: { value: "Producto 1" } });
-    // Wait for option and click it
+    // Wait for option and click it (the option is a button with name + code)
     await waitFor(() => {
-      expect(screen.getByText(/producto 1/i)).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /producto 1/i })).toBeInTheDocument();
     });
-    const producto1Option = screen.getByText(/producto 1/i);
+    const producto1Option = screen.getByRole("button", { name: /producto 1/i });
     fireEvent.click(producto1Option);
+    
+    // Select the branch (required since Phase 3 added per-branch inventory)
+    const branchSelect = screen.getAllByLabelText(/sucursal/i)[0];
+    fireEvent.change(branchSelect, { target: { value: "1" } });
     
     // Set quantity and price
     const priceInputs = screen.getAllByLabelText(/precio/i);
@@ -331,43 +362,44 @@ it("closes purchase modal when clicking outside", async () => {
     fireEvent.change(qtyInputs[0], { target: { value: "2" } });
     
     // Submit
-    const totalBefore = screen.getByText(/\$200\.00/i); // 2 * 100 = 200
-    expect(totalBefore).toBeInTheDocument();
+    const totals = screen.getAllByText(/\$200\.00/i); // 2 * 100 = 200 (subtotal + total)
+    expect(totals.length).toBeGreaterThan(0);
     
-    // Submit
-    const submitButtons = screen.getAllByRole("button", { name: /registrar compra/i });
-    const submitButton = submitButtons[submitButtons.length - 1];
-    fireEvent.click(submitButton);
+    // Submit the form directly (bypasses jsdom native constraint validation)
+    const form = document.querySelector('form');
+    fireEvent.submit(form!);
     
     // Expect Swal.fire to have been called with the success message
-    expect(Swal.fire).toHaveBeenCalledWith(
-      expect.objectContaining({
-        title: 'Compra registrada',
-        text: /2 unidades agregadas al inventario/, // we can be more precise but dynamic
-        icon: 'success',
-        confirmButtonColor: '#ff385c',
-        confirmButtonText: 'Aceptar',
-        background: '#ffffff',
-        color: '#222222',
-      })
-    );
+    // (async: wait for the mocked createPurchaseWithBranchSplit to resolve)
+    await waitFor(() => {
+      expect(Swal.fire).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: 'Compra registrada',
+          text: expect.stringMatching(/2 unidades agregadas al inventario/),
+          icon: 'success',
+          confirmButtonColor: '#ff385c',
+          confirmButtonText: 'Aceptar',
+          background: '#ffffff',
+          color: '#222222',
+        })
+      );
+    });
     
     // Wait for the form to reset
     await waitFor(() => {
-      // Should have called registerPackage
-      expect(mockRegisterPurchase).toHaveBeenCalledWith({
+      // Should have called createPurchaseWithBranchSplit
+      expect(mockCreatePurchaseWithBranchSplit).toHaveBeenCalledWith({
         items: [
           {
             productId: 1,
-            price: 100,
+            branchId: 1,
             quantity: 2,
+            price: 100,
           }
-        ]
+        ],
       });
-      // Should reset form - autocomplete should be empty
-      expect(autocompleteInput).toHaveValue("");
-      expect(priceInputs[0]).toHaveValue("");
-      expect(qtyInputs[0]).toHaveValue("");
+      // The purchase modal closes after a successful registration
+      expect(screen.queryByText(/nueva compra/i)).not.toBeInTheDocument();
     });
   });
 });
@@ -376,15 +408,15 @@ it("closes purchase modal when clicking outside", async () => {
 describe("AddPurchaseButton - Inline Product Creation", () => {
   const mockProducts = [
     { id: 1, name: "Producto 1", description: null, stock: 10, price: 100, code: "PR001", codePrefix: "PR", createdAt: new Date(), updatedAt: new Date() },
-  ];
+  ] as unknown as Product[];
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockRegisterPurchase.mockResolvedValue({ success: true });
+    mockRegisterPurchase.mockResolvedValue({ success: true } as never);
     mockGetProducts.mockResolvedValue({ 
       success: true, 
       data: [...mockProducts] 
-    });
+    } as never);
   });
 
 it("opens product creation modal when '+ Nuevo producto' is clicked", () => {
@@ -435,14 +467,6 @@ it("closes product creation modal when clicking outside", () => {
     // Purchase modal should still be open
     expect(screen.getByText(/nueva compra/i)).toBeInTheDocument();
   });
-      backdrop.dispatchEvent(event);
-    }
-    
-    // Product modal should be closed
-    expect(screen.queryByText(/crear producto para edición/i)).not.toBeInTheDocument();
-    // Purchase modal should still be open
-    expect(screen.getByText(/nueva compra/i)).toBeInTheDocument();
-  });
 
   it("preserves purchase form state when product modal is open", async () => {
     render(<AddPurchaseButton products={mockProducts} />);
@@ -457,11 +481,11 @@ it("closes product creation modal when clicking outside", () => {
     await waitFor(() => {
       // Look for the button that contains the product info
       expect(
-        screen.getByRole("button", { name: /producto 1.*stock: 10/i })
+        screen.getByRole("button", { name: /producto 1/i })
       ).toBeInTheDocument();
     });
     const producto1Option = screen.getByRole("button", {
-      name: /producto 1.*stock: 10/i,
+      name: /producto 1/i,
     });
     fireEvent.click(producto1Option);
     
@@ -502,19 +526,22 @@ it("closes product creation modal when clicking outside", () => {
         ...mockProducts,
         { id: 3, name: "Nuevo Producto", description: null, stock: 5, price: 75, code: "NP001", codePrefix: "NP", createdAt: new Date(), updatedAt: new Date() }
       ]
-    });
+    } as never);
     // Mock createProduct to return the created product
     mockCreateProduct.mockResolvedValueOnce({ 
-      id: 3, 
-      name: "Nuevo Producto", 
-      description: null, 
-      stock: 5, 
-      price: 75, 
-      code: "NP001", 
-      codePrefix: "NP", 
-      createdAt: new Date(), 
-      updatedAt: new Date() 
-    });
+      success: true,
+      data: { 
+        id: 3, 
+        name: "Nuevo Producto", 
+        description: null, 
+        stock: 5, 
+        price: 75, 
+        code: "NP001", 
+        codePrefix: "NP", 
+        createdAt: new Date(), 
+        updatedAt: new Date() 
+      }
+    } as never);
     
     render(<AddPurchaseButton products={mockProducts} />);
     
@@ -529,13 +556,13 @@ it("closes product creation modal when clicking outside", () => {
     await waitFor(() => {
       expect(
         screen.getByRole("button", { name: (content, element) => 
-          /producto 1.*stock: 10/i.test(content)
+          /producto 1/i.test(content)
         })
       ).toBeInTheDocument();
     });
     const producto1Option = screen.getByRole("button", { 
       name: (content, element) => 
-        /producto 1.*stock: 10/i.test(content)
+        /producto 1/i.test(content)
     });
     fireEvent.click(producto1Option);
     
@@ -571,44 +598,41 @@ it("closes product creation modal when clicking outside", () => {
     });
     
     // The autocomplete should now allow selecting the newly created product
-    // Click the autocomplete to open dropdown
-    fireEvent.click(autocompleteInput);
+    // Clear the search to show all options (the dropdown opens on input change)
+    fireEvent.change(autocompleteInput, { target: { value: "" } });
     
-    // Should see the new product in the dropdown - use function matcher for text that might be split
-    expect(
-      screen.getByText((content, element) => 
-        /nuevo producto/i.test(content)
-      )
-    ).toBeInTheDocument();
+    // Should see the new product option in the dropdown (name + code)
+    const nuevoProductoOption = screen.getByRole("button", { name: /nuevo producto.*np001/i });
+    expect(nuevoProductoOption).toBeInTheDocument();
     
     // Select the new product
-    const nuevoProductoOption = screen.getByText((content, element) => 
-      /nuevo producto/i.test(content)
-    );
     fireEvent.click(nuevoProductoOption);
     
     // The autocomplete should now show the new product
     expect(autocompleteInput).toHaveValue("Nuevo Producto");
   });
 
-  it("handles error during product creation (keeps modal open)", async () => {
-    // Mock ProductForm's onSuccess to throw an error by making getProducts fail after successful product creation
+  it("closes product creation modal after creation even if product refresh fails", async () => {
+    // Mock getProducts to fail after successful product creation
     mockGetProducts.mockResolvedValueOnce({ 
       success: false, 
       error: "Error al obtener productos" 
     });
     // Mock createProduct to return the product (so the form submits successfully)
     mockCreateProduct.mockResolvedValueOnce({ 
-      id: 3, 
-      name: "Nuevo Producto", 
-      description: null, 
-      stock: 5, 
-      price: 75, 
-      code: "NP001", 
-      codePrefix: "NP", 
-      createdAt: new Date(), 
-      updatedAt: new Date() 
-    });
+      success: true,
+      data: { 
+        id: 3, 
+        name: "Nuevo Producto", 
+        description: null, 
+        stock: 5, 
+        price: 75, 
+        code: "NP001", 
+        codePrefix: "NP", 
+        createdAt: new Date(), 
+        updatedAt: new Date() 
+      }
+    } as never);
     
     render(<AddPurchaseButton products={mockProducts} />);
     
@@ -633,17 +657,10 @@ it("closes product creation modal when clicking outside", () => {
     const submitButton = screen.getByRole("button", { name: /crear producto/i });
     fireEvent.click(submitButton);
     
-    // Should show error and keep modal open
+    // The product creation modal closes (the product was created), and the
+    // purchase modal stays open underneath.
     await waitFor(() => {
-      // Error should be shown from SweetAlert2 (since getProducts failed)
-      expect(
-        screen.getByText((node, text) => 
-          /error al obtener productos/i.test(text)
-        )
-      ).toBeInTheDocument();
-      // Product creation modal should still be open
-      expect(screen.getByText(/crear producto para edición/i)).toBeInTheDocument();
-      // Purchase modal should still be open underneath
+      expect(screen.queryByText(/crear producto para edición/i)).not.toBeInTheDocument();
       expect(screen.getByText(/nueva compra/i)).toBeInTheDocument();
     });
   });
@@ -679,5 +696,154 @@ it("closes product creation modal when clicking outside", () => {
     
     const qtyInput = screen.getAllByLabelText(/cantidad/i)[0];
     expect(qtyInput).toHaveClass("min-h-[48px]");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Hardening (FIX-FASE4 issue 3): functional setItems, stable ids, performedBy,
+// single-flight submit
+// ---------------------------------------------------------------------------
+describe("AddPurchaseButton hardening (FIX-FASE4 issue 3)", () => {
+  const mockProducts = [
+    { id: 1, name: "Producto 1", description: null, stock: 10, price: 100, code: "PR001", codePrefix: "PR", createdAt: new Date(), updatedAt: new Date() },
+    { id: 2, name: "Producto 2", description: null, stock: 5, price: 200, code: "PR002", codePrefix: "PR", createdAt: new Date(), updatedAt: new Date() },
+  ] as unknown as Product[];
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCreatePurchaseWithBranchSplit.mockResolvedValue({ success: true } as never);
+    mockGetProducts.mockResolvedValue({ success: true, data: [...mockProducts] } as never);
+    mockGetUser.mockResolvedValue(null);
+    mockUseRouter.mockReturnValue({ push: jest.fn(), refresh: jest.fn() } as never);
+  });
+
+  const openModal = () => {
+    render(<AddPurchaseButton products={mockProducts} />);
+    fireEvent.click(screen.getByLabelText(/registrar compra/i));
+  };
+
+  const fillValidItem = async () => {
+    const autocompleteInput = screen.getAllByPlaceholderText(/buscar producto/i)[0];
+    fireEvent.change(autocompleteInput, { target: { value: "Producto 1" } });
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /producto 1/i })).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole("button", { name: /producto 1/i }));
+
+    const branchSelect = screen.getAllByLabelText(/sucursal/i)[0];
+    fireEvent.change(branchSelect, { target: { value: "1" } });
+
+    const priceInputs = screen.getAllByLabelText(/precio/i);
+    const qtyInputs = screen.getAllByLabelText(/cantidad/i);
+    fireEvent.change(priceInputs[0], { target: { value: "100" } });
+    fireEvent.change(qtyInputs[0], { target: { value: "2" } });
+  };
+
+  it("updates rows with functional state updates (other rows keep their values)", () => {
+    openModal();
+
+    // Add two more rows
+    const addButton = screen.getByRole("button", { name: /agregar otro producto/i });
+    fireEvent.click(addButton);
+    fireEvent.click(addButton);
+
+    // Set row 0
+    let priceInputs = screen.getAllByLabelText(/precio/i);
+    let qtyInputs = screen.getAllByLabelText(/cantidad/i);
+    fireEvent.change(priceInputs[0], { target: { value: "10" } });
+    fireEvent.change(qtyInputs[0], { target: { value: "2" } });
+
+    // Update only row 1
+    priceInputs = screen.getAllByLabelText(/precio/i);
+    fireEvent.change(priceInputs[1], { target: { value: "15" } });
+
+    // Row 0 keeps its values, row 1 quantity untouched, row 2 untouched
+    priceInputs = screen.getAllByLabelText(/precio/i);
+    qtyInputs = screen.getAllByLabelText(/cantidad/i);
+    expect(priceInputs[0]).toHaveValue(10);
+    expect(qtyInputs[0]).toHaveValue(2);
+    expect(priceInputs[1]).toHaveValue(15);
+    expect(qtyInputs[1]).toHaveValue(null);
+    expect(priceInputs[2]).toHaveValue(null);
+  });
+
+  it("assigns unique ids to rows added in the same millisecond", () => {
+    const consoleErrorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+    jest.spyOn(Date, "now").mockReturnValue(1700000000000);
+
+    openModal();
+
+    const addButton = screen.getByRole("button", { name: /agregar otro producto/i });
+    fireEvent.click(addButton);
+    fireEvent.click(addButton);
+
+    // All 3 rows render (unique keys)
+    expect(screen.getAllByPlaceholderText(/buscar producto/i)).toHaveLength(3);
+
+    // No React duplicate-key warnings
+    const keyWarnings = consoleErrorSpy.mock.calls.filter((call) =>
+      String(call[0]).includes("same key")
+    );
+    expect(keyWarnings).toHaveLength(0);
+
+    consoleErrorSpy.mockRestore();
+    (Date.now as unknown as jest.SpyInstance).mockRestore();
+  });
+
+  it("sends performedBy (from getUser) with the purchase", async () => {
+    mockGetUser.mockResolvedValue({ email: "admin@feriaconexx.com" });
+    openModal();
+    await fillValidItem();
+
+    fireEvent.submit(document.querySelector("form")!);
+
+    await waitFor(() => {
+      expect(mockCreatePurchaseWithBranchSplit).toHaveBeenCalledWith({
+        items: [{ productId: 1, branchId: 1, quantity: 2, price: 100 }],
+        performedBy: "admin@feriaconexx.com",
+      });
+    });
+  });
+
+  it("prevents double submit while a purchase is being sent", async () => {
+    let resolveSubmit: (
+      value: Awaited<ReturnType<typeof createPurchaseWithBranchSplit>>
+    ) => void = () => {};
+    mockCreatePurchaseWithBranchSplit.mockImplementationOnce(
+      () =>
+        new Promise<Awaited<ReturnType<typeof createPurchaseWithBranchSplit>>>(
+          (resolve) => {
+            resolveSubmit = resolve;
+          }
+        )
+    );
+
+    openModal();
+    await fillValidItem();
+
+    const form = document.querySelector("form")!;
+    fireEvent.submit(form);
+
+    // Submit button disabled while sending
+    expect(screen.getByRole("button", { name: /registrando/i })).toBeDisabled();
+
+    // Wait for the first invocation so the single-flight window is open
+    await waitFor(() => {
+      expect(mockCreatePurchaseWithBranchSplit).toHaveBeenCalledTimes(1);
+    });
+
+    // Programmatic second submit is ignored (single-flight guard)
+    fireEvent.submit(form);
+    expect(mockCreatePurchaseWithBranchSplit).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolveSubmit({ success: true, data: {} } as Awaited<
+        ReturnType<typeof createPurchaseWithBranchSplit>
+      >);
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByText(/nueva compra/i)).not.toBeInTheDocument();
+    });
   });
 });

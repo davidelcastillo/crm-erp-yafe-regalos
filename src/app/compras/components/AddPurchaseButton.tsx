@@ -1,53 +1,65 @@
 "use client";
 
-import { useState, useMemo, useRef, useEffect, useCallback } from "react";
-import { registerPurchase } from "../../actions/purchase";
+import { useState, useRef } from "react";
+import { registerPurchase, createPurchaseWithBranchSplit } from "../../actions/purchase";
 import { getProducts } from "../../actions/product";
+import { getUser } from "@/actions/auth";
 import { useRouter } from "next/navigation";
 import { Product } from "@prisma/client";
 import Swal from "sweetalert2";
 import { ProductAutocomplete } from "./ProductAutocomplete";
 import { ProductForm } from "@/app/productos/components/ProductForm";
+import { useBranch } from "@/lib/context/BranchContext";
 
 interface AddPurchaseButtonProps {
   products: Product[];
+  /** Called after a successful purchase, so the page can re-run its load effect. */
+  onSuccess?: () => void;
 }
 
 interface PurchaseItem {
   id: string;
   productId: string;
+  branchId: string;
   price: string;
   quantity: string;
 }
 
-export function AddPurchaseButton({ products: initialProducts }: AddPurchaseButtonProps) {
+export function AddPurchaseButton({ products: initialProducts, onSuccess }: AddPurchaseButtonProps) {
   const router = useRouter();
+  const { branchId, branch, branches, ready } = useBranch();
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<PurchaseItem[]>([
-    { id: "1", productId: "", price: "", quantity: "" }
+    { id: "1", productId: "", branchId: "", price: "", quantity: "" }
   ]);
   const [products, setProducts] = useState<Product[]>(initialProducts);
   const [showProductModal, setShowProductModal] = useState(false);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
 
+  // Contador por ref para ids de fila estables (evita colisiones de Date.now())
+  const nextItemId = useRef(1);
+
   const addItem = () => {
-    setItems([...items, { 
-      id: Date.now().toString(), 
+    nextItemId.current += 1;
+    setItems(prev => [...prev, { 
+      id: String(nextItemId.current), 
       productId: "", 
+      branchId: "",
       price: "", 
       quantity: "" 
     }]);
   };
 
   const removeItem = (id: string) => {
-    if (items.length > 1) {
-      setItems(items.filter(item => item.id !== id));
-    }
+    setItems(prev => {
+      if (prev.length <= 1) return prev;
+      return prev.filter(item => item.id !== id);
+    });
   };
 
   const updateItem = (id: string, field: string, value: string) => {
-    setItems(items.map(item => 
+    setItems(prev => prev.map(item => 
       item.id === id ? { ...item, [field]: value } : item
     ));
   };
@@ -64,9 +76,12 @@ export function AddPurchaseButton({ products: initialProducts }: AddPurchaseButt
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
+    // Single-flight: ignorar envíos mientras ya hay uno en curso
+    if (loading) return;
+
     // Validate all items
-    const validItems = items.filter(item => item.productId && item.price && item.quantity);
+    const validItems = items.filter(item => item.productId && item.branchId && item.price && item.quantity);
     if (validItems.length === 0) {
       await Swal.fire({
         title: "Error",
@@ -79,13 +94,18 @@ export function AddPurchaseButton({ products: initialProducts }: AddPurchaseButt
 
     setLoading(true);
 
-    const result = await registerPurchase({
-      items: validItems.map(item => ({
-        productId: parseInt(item.productId),
-        price: parseFloat(item.price),
-        quantity: parseInt(item.quantity),
-      })),
-    });
+    // performedBy: email del usuario autenticado (audit trail de movimientos)
+    const user = await getUser();
+
+    const result = await createPurchaseWithBranchSplit({
+        items: validItems.map(item => ({
+          productId: parseInt(item.productId),
+          branchId: parseInt(item.branchId),
+          quantity: parseInt(item.quantity),
+          price: parseFloat(item.price),
+        })),
+        ...(user?.email ? { performedBy: user.email } : {}),
+      });
 
     if (result.success) {
       const totalItems = validItems.reduce((sum, item) => sum + parseInt(item.quantity), 0);
@@ -99,8 +119,9 @@ export function AddPurchaseButton({ products: initialProducts }: AddPurchaseButt
         color: "#222222",
       });
       router.refresh();
+      onSuccess?.();
       setIsOpen(false);
-      setItems([{ id: "1", productId: "", price: "", quantity: "" }]);
+      setItems([{ id: "1", productId: "", branchId: "", price: "", quantity: "" }]);
     } else {
       await Swal.fire({
         title: "Error",
@@ -217,7 +238,27 @@ export function AddPurchaseButton({ products: initialProducts }: AddPurchaseButt
                         setShowProductModal(true);
                       }}
                     />
-                    
+
+                    <div>
+                      <label htmlFor={`branch-${item.id}`} className="block text-xs text-[#6a6a6a] mb-2">
+                        Sucursal
+                      </label>
+                      <select
+                        id={`branch-${item.id}`}
+                        value={item.branchId}
+                        onChange={(e) => updateItem(item.id, "branchId", e.target.value)}
+                        className="w-full px-3 py-3 min-h-[48px] rounded-lg border border-gray-200 focus:border-[#ff385c] outline-none transition-all text-sm touch-manipulation"
+                        required
+                      >
+                        <option value="">Seleccionar sucursal</option>
+                        {branches.map((b) => (
+                          <option key={b.id} value={b.id}>
+                            {b.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label htmlFor={`price-${item.id}`} className="block text-xs text-[#6a6a6a] mb-2">

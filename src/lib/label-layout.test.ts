@@ -1,5 +1,5 @@
 // src/lib/label-layout.test.ts
-import { calculateLabelLayout, LabelPosition, LabelRenderingInstructions, SHEET_WIDTH_MM, SHEET_HEIGHT_MM, LABEL_WIDTH_MM, LABEL_HEIGHT_MM, LABELS_PER_SHEET } from './label-layout';
+import { calculateLabelLayout, calculateSheetCount, LabelPosition, LabelRenderingInstructions, SHEET_WIDTH_MM, SHEET_HEIGHT_MM, LABEL_WIDTH_MM, LABEL_HEIGHT_MM, LABELS_PER_SHEET } from './label-layout';
 
 describe('label-layout.ts', () => {
   test('calculateSheetCount returns correct pages', () => {

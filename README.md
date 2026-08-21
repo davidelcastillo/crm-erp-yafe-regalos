@@ -11,6 +11,20 @@
 - **Módulo de Clientes**: Seguimiento de deudas por cliente
 - **Dashboard**: Estadísticas globales y análisis por producto
 
+## 🆕 Nuevas funcionalidades (v3 / Fase 4)
+
+- **Sucursales**: gestión completa con código único, y usuario de sucursal creado automáticamente en Supabase Auth (rol `branch_user`).
+- **Portal externo de solo lectura**: cada sucursal consulta su propio inventario en `/sucursal/[branchId]/inventory` (solo `GET`).
+- **Exportación a PDF**: asistente de 3 pasos para descargar el inventario de una sucursal como `inventario-<branchCode>-<YYYYMMDD>.pdf`.
+- **Dashboard configurable**: selector de periodo (7/30/90 días o personalizado) y de sucursal, con etiquetas de contexto "(Sucursal X)" / "(Todas)".
+- **Búsquedas mejoradas**: búsqueda unificada server-side en inventario (nombre, código, descripción, categoría) y búsqueda con debounce + "Cargar más" en ventas.
+
+Documentación detallada:
+
+- [Gestión de sucursales](./docs/gestion-sucursales.md)
+- [Portal externo de sucursal](./docs/portal-externo-sucursal.md)
+- [Exportar inventario a PDF](./docs/exportar-inventario-pdf.md)
+
 ## 🛠️ Tech Stack
 
 - **Framework**: Next.js 16 (App Router)
@@ -36,9 +50,8 @@ cd seguimientos-compras
 npm install
 
 # 3. Configurar variables de entorno
-# Crear archivo .env con:
-DATABASE_URL="postgresql://..."
-DIRECT_URL="postgresql://..."
+# Copiar la plantilla y completar con tus valores (ver .env.example):
+cp .env.example .env
 
 # 4. Sincronizar base de datos
 npx prisma db push
@@ -139,6 +152,18 @@ npx prisma studio  # UI de base de datos
 ## 📄 Licencia
 
 MIT
+
+---
+
+## Auth-User-Id en Branch
+
+La tabla `Branch` incluye un campo `authUserId` que almacena el ID de usuario de Supabase Auth asociado con cada sucursal. Este campo es único y nullable, permitiendo:
+
+1. Eliminación precisa de usuarios de Auth al borrar una sucursal
+2. Asociación explícita entre sucursales y usuarios del sistema
+3. Back-fill de registros existentes mediante el servicio de administración
+
+El campo se indexa para búsquedas eficientes y se mantiene a través de migraciones tanto en desarrollo como en producción.
 
 ---
 

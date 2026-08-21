@@ -4,8 +4,9 @@ import { cookies } from 'next/headers';
 import { createServerClient } from '@/lib/supabase/server';
 import { decideBranchAccess } from '@/middleware/branch';
 import { getUserRole, getUserBranchId } from '@/lib/supabase/auth';
+import { isPortalLoginPath } from '@/lib/supabase/branch';
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   // Create a response that we can modify (for setting cookies, etc.)
   const response = NextResponse.next({
     request: {
@@ -28,9 +29,12 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Define paths that should be excluded from authentication checks
-  // Note: /sucursal/ is NOT excluded here because we want to check branch authorization
+  // Note: /sucursal/ is NOT excluded here because we want to check branch
+  // authorization. The exception is the portal login path (/sucursal/<id>/login)
+  // which must be reachable WITHOUT a central session.
   const isExcluded =
     pathname === '/login' ||
+    isPortalLoginPath(pathname) ||
     pathname.startsWith('/_next/') ||
     pathname === '/favicon.ico' ||
     pathname.startsWith('/images/') ||
@@ -55,18 +59,23 @@ export async function middleware(request: NextRequest) {
   if (user) {
     // Check for branch-specific paths (/sucursal/*)
     if (pathname.startsWith('/sucursal/')) {
-      const role = await getUserRole();
-      const branchId = await getUserBranchId();
-      const accessDecision = decideBranchAccess({
-        pathname,
-        method: request.method,
-        role,
-        branchId,
-      });
+      // The portal login path is excluded from the branch-access guard: it must
+      // stay reachable for branch users to authenticate. Everything else under
+      // /sucursal/* stays protected (GET-only + branch_user).
+      if (!isPortalLoginPath(pathname)) {
+        const role = await getUserRole();
+        const branchId = await getUserBranchId();
+        const accessDecision = decideBranchAccess({
+          pathname,
+          method: request.method,
+          role,
+          branchId,
+        });
 
-      if (!accessDecision.allowed) {
-        // User is not authorized to access this branch
-        return NextResponse.redirect(new URL('/unauthorized', request.url));
+        if (!accessDecision.allowed) {
+          // User is not authorized to access this branch
+          return NextResponse.redirect(new URL('/unauthorized', request.url));
+        }
       }
     } else if (!isExcluded) {
       // Admin gating for internal routes (not /login, not /sucursal/*, not

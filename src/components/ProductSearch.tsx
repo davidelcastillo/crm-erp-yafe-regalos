@@ -17,12 +17,14 @@ type ProductSearchModalProps = {
   onClose: () => void;
   onSelect: (product: ProductSearchResult) => void;
   placeholder?: string;
+  branchId?: number | null;
 };
 
 type ProductSearchInlineProps = {
   mode: "inline";
   onSelect: (product: ProductSearchResult) => void;
   placeholder?: string;
+  branchId?: number | null;
 };
 
 type ProductSearchProps = ProductSearchModalProps | ProductSearchInlineProps;
@@ -31,7 +33,7 @@ const DEBOUNCE_MS = 300;
 const MAX_RESULTS = 10;
 
 export function ProductSearch(props: ProductSearchProps) {
-  const { mode, onSelect, placeholder = "Buscar producto por código o nombre..." } = props;
+  const { mode, onSelect, placeholder = "Buscar producto por código o nombre...", branchId } = props;
   
   // Modal-specific props
   const isOpen = mode === "modal" ? props.isOpen : true;
@@ -70,7 +72,7 @@ export function ProductSearch(props: ProductSearchProps) {
       setError(null);
 
       try {
-        const result = await searchProducts({ query: trimmedQuery });
+        const result = await searchProducts({ query: trimmedQuery, branchId: branchId ?? undefined });
         if (result.success) {
           // Convert Decimal price to number for ProductSearchResult
           const converted = result.data?.slice(0, MAX_RESULTS).map(p => ({
@@ -95,7 +97,7 @@ export function ProductSearch(props: ProductSearchProps) {
         clearTimeout(debounceRef.current);
       }
     };
-  }, [query, mode, isOpen]);
+  }, [query, mode, isOpen, branchId]);
 
   // Focus input when modal opens
   useEffect(() => {

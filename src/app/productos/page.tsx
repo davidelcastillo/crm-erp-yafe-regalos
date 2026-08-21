@@ -7,7 +7,8 @@ import { AddProductButton } from './components/AddProductButton';
 import { LabelSelector } from '@/components/ui/LabelSelector';
 import { ProductCard } from './components/ProductCard';
 import { ProductForm } from './components/ProductForm';
-import { useEffect, useState } from 'react';
+import { BranchSelector } from '@/components/ui/BranchSelector';
+import { useEffect, useState, useCallback } from 'react';
 
 export default function ProductosPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -16,39 +17,28 @@ export default function ProductosPage() {
   const [labelSelectorOpen, setLabelSelectorOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [branchId, setBranchId] = useState<number | null>(null);
+
+  const fetchProducts = useCallback(async (bId: number | null) => {
+    try {
+      setLoading(true);
+      const result = await getProducts(bId ?? undefined);
+      if (result.success && result.data) {
+        setProducts(result.data as Product[]);
+        setError(null);
+      } else {
+        setError(result.error ?? 'Failed to load products');
+      }
+    } catch {
+      setError('Error al cargar productos');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    let cancelled = false;
-
-    const fetchProducts = async () => {
-      try {
-        setLoading(true);
-        const result = await getProducts();
-        if (!cancelled) {
-          if (result.success && result.data) {
-            setProducts(result.data as Product[]);
-            setError(null);
-          } else {
-            setError(result.error ?? 'Failed to load products');
-          }
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setError('Error al cargar productos');
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    };
-
-    fetchProducts();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    fetchProducts(branchId);
+  }, [branchId, fetchProducts]);
 
   const handleEditProduct = (product: Product) => {
     setSelectedProduct(product);
@@ -56,39 +46,12 @@ export default function ProductosPage() {
   };
 
   const handleProductCreated = () => {
-    // Refresh the product list when a product is created/updated
-    setLoading(true);
-    getProducts().then(result => {
-      if (result.success && result.data) {
-        setProducts(result.data as Product[]);
-        setError(null);
-      } else {
-        setError(result.error ?? 'Failed to load products');
-      }
-      setLoading(false);
-    });
+    fetchProducts(branchId);
   };
 
   if (loading) {
     return (
       <div className="min-h-screen bg-white pb-20">
-        <header className="sticky top-0 bg-white z-40 px-6 pt-6 pb-4 shadow-sm">
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-2xl font-bold text-[#222222]">Productos</h1>
-              <p className="text-sm text-[#6a6a6a] mt-1">Gestión de productos y códigos</p>
-            </div>
-            <button
-              onClick={() => setLabelSelectorOpen(true)}
-              className="flex items-center px-3 py-2 bg-[#3b82f6] text-white rounded-md hover:bg-[#2563eb] transition-colors"
-            >
-              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-              </svg>
-              Imprimir Etiquetas
-            </button>
-          </div>
-        </header>
         <main className="px-6 py-8">
           <div className="flex items-center justify-center h-[60vh]">
             <div className="flex items-center gap-2 animate-spin">
@@ -107,23 +70,6 @@ export default function ProductosPage() {
   if (error) {
     return (
       <div className="min-h-screen bg-white pb-20">
-        <header className="sticky top-0 bg-white z-40 px-6 pt-6 pb-4 shadow-sm">
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-2xl font-bold text-[#222222]">Productos</h1>
-              <p className="text-sm text-[#6a6a6a] mt-1">Gestión de productos y códigos</p>
-            </div>
-            <button
-              onClick={() => setLabelSelectorOpen(true)}
-              className="flex items-center px-3 py-2 bg-[#3b82f6] text-white rounded-md hover:bg-[#2563eb] transition-colors"
-            >
-              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-              </svg>
-              Imprimir Etiquetas
-            </button>
-          </div>
-        </header>
         <main className="px-6 py-8">
           <div className="bg-red-50 border border-red-200 rounded-lg p-4">
             <p className="text-red-700">{error}</p>
@@ -141,35 +87,20 @@ export default function ProductosPage() {
 
   return (
     <div className="min-h-screen bg-white pb-20 relative">
-      {/* Header */}
-      <header className="sticky top-0 bg-white z-40 px-6 pt-6 pb-4 shadow-sm">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-2xl font-bold text-[#222222]">Productos</h1>
-            <p className="text-sm text-[#6a6a6a] mt-1">Gestión de productos y códigos</p>
-          </div>
-          <button
-            onClick={() => setLabelSelectorOpen(true)}
-            className="flex items-center px-3 py-2 bg-[#3b82f6] text-white rounded-md hover:bg-[#2563eb] transition-colors"
-          >
-            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-            </svg>
-            Imprimir Etiquetas
-          </button>
-        </div>
-      </header>
-
       {/* Floating Action Button for adding new products */}
       <div className="absolute bottom-6 right-6">
         <AddProductButton />
       </div>
 
       {/* Main Content */}
-      <main className="px-6 pt-20 pb-12">
-        {/* Page Title */}
-        <div className="mb-6">
+      <main className="px-6 pb-12">
+        {/* Page Title + Branch Selector */}
+        <div className="mb-6 flex items-center justify-between flex-wrap gap-3">
           <h1 className="text-2xl font-bold text-[#222222]">Productos</h1>
+          <BranchSelector
+            onChange={(id) => setBranchId(id)}
+            label="Stock por sucursal"
+          />
         </div>
 
         {/* Products Grid */}
@@ -177,7 +108,7 @@ export default function ProductosPage() {
           {products.length === 0 ? (
             <div className="col-span-full text-center py-12 text-[#6a6a6a]">
               <p>No hay productos registrados</p>
-              <p className="mt-2 text-sm">Use el botón flotante "+" para agregar su primer producto</p>
+              <p className="mt-2 text-sm">Use el botón flotante + para agregar su primer producto</p>
             </div>
           ) : (
             products.map(product => (
@@ -196,7 +127,7 @@ export default function ProductosPage() {
       {selectedProduct && isEditing && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70] flex items-end justify-center">
           <div className="bg-white w-full max-w-lg rounded-t-3xl p-6 animate-slide-up max-h-[90vh] overflow-y-auto"
-               onClick={(e) => e.stopPropagation()}>
+                onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-xl font-semibold text-[#222222]">Editar producto</h2>
               <button

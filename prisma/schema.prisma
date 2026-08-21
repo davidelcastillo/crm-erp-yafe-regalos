@@ -9,20 +9,57 @@ datasource db {
 }
 
 model Product {
-  id            Int            @id @default(autoincrement())
+  id            Int              @id @default(autoincrement())
   name          String
-  description   String?        @default("-")
-  stock         Int            @default(0)
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  code          String         @unique
+  description   String?          @default("-")
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  code          String           @unique
   codePrefix    String?
-  price         Decimal        @default(0) @db.Decimal(10, 2)
+  price         Decimal          @default(0) @db.Decimal(10, 2)
+  categoryId    Int?
+  category      Category?        @relation(fields: [categoryId], references: [id])
+  active        Boolean          @default(true)
   purchaseItems PurchaseItem[]
   saleItems     SaleItem[]
+  inventory     BranchInventory[]
+  movements     BranchMovement[] @relation("ProductMovements")
+}
 
-  @@index([codePrefix])
-  @@index([code, name])
+model Branch {
+  id            Int      @id @default(autoincrement())
+  name          String
+  address       String?
+  phone         String?
+  email         String?
+   code          String   @unique
+  authUserId    String?  @unique
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  inventory     BranchInventory[]
+  purchases     Purchase[]              @relation("BranchPurchases")
+  sales         Sale[]                  @relation("BranchSales")
+  movements     BranchMovement[]        @relation("BranchMovements")
+
+  @@index([isActive])
+  @@index([authUserId])
+  @@index([code])
+}
+
+model BranchInventory {
+  id        Int      @id @default(autoincrement())
+  branchId  Int
+  branch    Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  productId Int
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  stock     Int      @default(0)
+  lastUpdated DateTime @updatedAt
+
+  @@unique([branchId, productId])
+  @@index([branchId])
+  @@index([productId])
 }
 
 model Purchase {
@@ -31,7 +68,11 @@ model Purchase {
   createdAt   DateTime       @default(now())
   totalAmount Decimal        @default(0) @db.Decimal(10, 2)
   updatedAt   DateTime       @updatedAt
+  branchId    Int
+  branch      Branch         @relation("BranchPurchases", fields: [branchId], references: [id])
   items       PurchaseItem[]
+
+  @@index([branchId])
 }
 
 model PurchaseItem {
@@ -58,10 +99,13 @@ model Sale {
   pendingBalance Decimal       @default(0) @db.Decimal(10, 2)
   customerId     Int?
   paymentMethod  PaymentMethod @default(EFECTIVO)
+  branchId       Int
+  branch         Branch        @relation("BranchSales", fields: [branchId], references: [id])
   customer       Customer?     @relation(fields: [customerId], references: [id])
   items          SaleItem[]
 
   @@index([customerId])
+  @@index([branchId])
 }
 
 model SaleItem {
@@ -71,7 +115,7 @@ model SaleItem {
   price     Decimal @db.Decimal(10, 2)
   quantity  Int
   subtotal  Decimal @db.Decimal(10, 2)
-  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
   sale      Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
 
   @@index([saleId])
@@ -103,4 +147,31 @@ enum PaymentMethod {
   EFECTIVO
   TRANSFERENCIA
   MIXTO
+}
+
+model Category {
+  id   Int      @id @default(autoincrement())
+  name String   @unique
+  products Product[]
+}
+
+model BranchMovement {
+  id          Int      @id @default(autoincrement())
+  productId   Int
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade, name: "ProductMovements")
+  branchId    Int
+  branch      Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade, name: "BranchMovements")
+  movementType MovementType // ENUM: ENTRY, EXIT, TRANSFER_IN, TRANSFER_OUT, ADJUSTMENT
+  quantity    Int
+  reference   String?  // e.g., purchase id, sale id, etc.
+  createdAt   DateTime @default(now())
+  performedBy String   // user id or name
+}
+
+enum MovementType {
+  ENTRY
+  EXIT
+  TRANSFER_IN
+  TRANSFER_OUT
+  ADJUSTMENT
 }

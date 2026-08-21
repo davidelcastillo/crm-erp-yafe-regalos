@@ -6,15 +6,20 @@ import { registerSale } from "../actions/sale";
 
 // Mock prisma
 const mockProductFindUnique = jest.fn();
+const mockBranchFindFirst = jest.fn();
 const mockSaleCreate = jest.fn();
 const mockSaleItemCreateMany = jest.fn();
 const mockProductUpdate = jest.fn();
 const mockSaleItemFindMany = jest.fn();
 const mockCustomerFindUnique = jest.fn();
 const mockCustomerUpdate = jest.fn();
+const mockBranchInventoryUpdateMany = jest.fn();
 
 jest.mock("@/lib/prisma", () => ({
   prisma: {
+    branch: {
+      findFirst: (...args: unknown[]) => mockBranchFindFirst(...args),
+    },
     product: {
       findUnique: (...args: unknown[]) => mockProductFindUnique(...args),
       update: (...args: unknown[]) => mockProductUpdate(...args),
@@ -38,6 +43,9 @@ jest.mock("@/lib/prisma", () => ({
         customer: {
           update: (...args: unknown[]) => mockCustomerUpdate(...args),
         },
+        branchInventory: {
+          updateMany: (...args: unknown[]) => mockBranchInventoryUpdateMany(...args),
+        },
       };
       return callback(tx);
     }),
@@ -50,11 +58,13 @@ describe("registerSale - Debt Calculation", () => {
   });
 
   it("should create $600 pending balance when $1000 sale with $400 paid to customer", async () => {
+    // Setup: Branch exists
+    mockBranchFindFirst.mockResolvedValue({ id: 1 });
+
     // Setup: Product with 10 units in stock
     mockProductFindUnique.mockResolvedValue({
       id: 1,
       name: "Producto Test",
-      stock: 10,
     });
 
     // Setup: Customer with $0 balance
@@ -64,6 +74,9 @@ describe("registerSale - Debt Calculation", () => {
       surname: "Pérez",
       totalBalance: 0,
     });
+
+    // Stock validation passes (inventory row with sufficient stock)
+    mockBranchInventoryUpdateMany.mockResolvedValue({ count: 1 });
 
     // Sale created with pendingBalance
     const mockSale = {
@@ -92,6 +105,7 @@ describe("registerSale - Debt Calculation", () => {
 
     // Execute: $1000 sale, paying $400, customer X
     const result = await registerSale({
+      branchId: 1,
       items: [{ productId: 1, price: 1000, quantity: 1 }],
       customerId: 1,
       amountPaid: 400,
@@ -116,11 +130,12 @@ describe("registerSale - Debt Calculation", () => {
   });
 
   it("should not create debt when amountPaid equals total", async () => {
+    mockBranchFindFirst.mockResolvedValue({ id: 1 });
     mockProductFindUnique.mockResolvedValue({
       id: 1,
       name: "Producto Test",
-      stock: 10,
     });
+    mockBranchInventoryUpdateMany.mockResolvedValue({ count: 1 });
 
     const mockSale = {
       id: 1,
@@ -145,6 +160,7 @@ describe("registerSale - Debt Calculation", () => {
     ]);
 
     const result = await registerSale({
+      branchId: 1,
       items: [{ productId: 1, price: 1000, quantity: 1 }],
       customerId: 1,
       amountPaid: 1000, // Full payment
@@ -159,11 +175,12 @@ describe("registerSale - Debt Calculation", () => {
   });
 
   it("should work without customer (anonymous sale)", async () => {
+    mockBranchFindFirst.mockResolvedValue({ id: 1 });
     mockProductFindUnique.mockResolvedValue({
       id: 1,
       name: "Producto Test",
-      stock: 10,
     });
+    mockBranchInventoryUpdateMany.mockResolvedValue({ count: 1 });
 
     const mockSale = {
       id: 1,
@@ -189,6 +206,7 @@ describe("registerSale - Debt Calculation", () => {
     ]);
 
     const result = await registerSale({
+      branchId: 1,
       items: [{ productId: 1, price: 500, quantity: 1 }],
       // No customerId = anonymous sale
       amountPaid: 500,

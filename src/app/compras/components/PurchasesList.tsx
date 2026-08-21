@@ -19,6 +19,7 @@ interface PurchaseWithItems {
   date: string;
   totalAmount: number;
   items: PurchaseItem[];
+  branch?: { id: number; name: string } | null;
 }
 
 interface PurchaseCardProps {
@@ -39,7 +40,7 @@ export function PurchaseCard({ purchase, onExpand, expanded }: PurchaseCardProps
   const itemCount = purchase.items.length;
   const total = purchase.totalAmount;
 
-  return (
+    return (
     <div className="bg-white rounded-2xl shadow-[rgba(0,0,0,0.02)_0px_0px_0px_1px,rgba(0,0,0,0.04)_0px_2px_6px,rgba(0,0,0,0.1)_0px_4px_8px]">
       <div className="p-4 cursor-pointer" onClick={onExpand}>
         <div className="flex justify-between items-start">
@@ -48,6 +49,11 @@ export function PurchaseCard({ purchase, onExpand, expanded }: PurchaseCardProps
             <p className="text-sm text-[#6a6a6a] mt-1">
               {purchase.items.map(item => item.product.name).join(', ')}
             </p>
+            {purchase.branch && (
+              <span className="inline-block mt-1 px-2 py-0.5 bg-[#3b82f6]/10 text-[#3b82f6] rounded text-xs font-medium">
+                {purchase.branch.name}
+              </span>
+            )}
           </div>
           <div className="flex flex-col items-end gap-2">
             <span className="text-lg font-bold text-red-800">- ${total.toFixed(2)}</span>

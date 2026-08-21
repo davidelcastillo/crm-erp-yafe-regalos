@@ -109,8 +109,8 @@ export function LabelSelector({ isOpen, onClose }: LabelSelectorProps) {
        window.URL.revokeObjectURL(url);
        a.remove();
        setSuccess(true);
-    } catch (err: any) {
-      setGenerateError(err.message ?? 'Error al generar el PDF');
+    } catch (err) {
+      setGenerateError(err instanceof Error ? err.message : 'Error al generar el PDF');
     } finally {
       setGenerating(false);
     }

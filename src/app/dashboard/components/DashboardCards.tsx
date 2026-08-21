@@ -9,9 +9,10 @@ interface Stats {
 
 interface DashboardCardsProps {
   stats: Stats | null | undefined;
+  branchLabel?: string;
 }
 
-export function DashboardCards({ stats }: DashboardCardsProps) {
+export function DashboardCards({ stats, branchLabel = "(Todas)" }: DashboardCardsProps) {
   if (!stats) {
     return (
       <div className="grid grid-cols-2 gap-3">
@@ -59,16 +60,22 @@ export function DashboardCards({ stats }: DashboardCardsProps) {
   ];
 
   return (
-    <div className="grid grid-cols-2 gap-3">
-      {cards.map((card, index) => (
-        <div
-          key={index}
-          className={`${card.bg} rounded-xl p-4`}
-        >
-          <div className="text-xs text-[#6a6a6a] mb-1">{card.label}</div>
-          <div className={`text-lg font-bold ${card.color}`}>{card.value}</div>
-        </div>
-      ))}
-    </div>
+    <section>
+      <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
+        <h2 className="text-lg font-semibold text-[#222222]">Resumen</h2>
+        <span className="text-sm text-[#6a6a6a]">{branchLabel}</span>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        {cards.map((card, index) => (
+          <div
+            key={index}
+            className={`${card.bg} rounded-xl p-4`}
+          >
+            <div className="text-xs text-[#6a6a6a] mb-1">{card.label}</div>
+            <div className={`text-lg font-bold ${card.color}`}>{card.value}</div>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }

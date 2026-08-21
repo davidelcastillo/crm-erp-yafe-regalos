@@ -3,13 +3,14 @@
  */
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { ProductAutocomplete } from "./ProductAutocomplete";
+import { Product } from "@prisma/client";
 
 describe("ProductAutocomplete Component", () => {
   const mockProducts = [
     { id: 1, name: "Producto Uno", description: null, stock: 10, price: 100, code: "PR001", codePrefix: "PR", createdAt: new Date(), updatedAt: new Date() },
     { id: 2, name: "Producto Dos", description: null, stock: 5, price: 200, code: "PR002", codePrefix: "PR", createdAt: new Date(), updatedAt: new Date() },
     { id: 3, name: "Otro Producto", description: null, stock: 0, price: 50, code: "OT001", codePrefix: "OT", createdAt: new Date(), updatedAt: new Date() },
-  ];
+  ] as unknown as Product[];
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -98,7 +99,7 @@ it("limits results to 20 items", () => {
         codePrefix: "PR",
         createdAt: new Date(),
         updatedAt: new Date(),
-      }));
+      })) as unknown as Product[];
 
       render(<ProductAutocomplete products={manyProducts} value="" onChange={() => {}} />);
 
@@ -125,17 +126,17 @@ it("shows 'no products' message when list is empty", () => {
       expect(input).toBeInTheDocument();
     });
 
-  it("shows stock information for selected product", () => {
+  it("shows selected product information for selected product", () => {
     render(<ProductAutocomplete products={mockProducts} value="1" onChange={() => {}} />);
 
     const input = screen.getByPlaceholderText(/buscar producto/i);
     fireEvent.focus(input); // Open dropdown
 
-    // Should show stock info for selected product (ID 1)
-    expect(screen.getByText(/stock actual: 10 unidades/i)).toBeInTheDocument();
+    // Should show the selected product info (name + code) for ID 1
+    expect(screen.getByText(/producto uno \(pr001\)/i)).toBeInTheDocument();
   });
 
-it("updates stock information when selection changes", () => {
+it("updates selected product information when selection changes", () => {
     let value = "1";
     const onChangeMock = jest.fn((newValue) => {
       value = newValue;
@@ -151,9 +152,9 @@ it("updates stock information when selection changes", () => {
     // Re-render with updated value
     rerender(<ProductAutocomplete products={mockProducts} value={value} onChange={onChangeMock} />);
 
-    // Should now show stock for product 2
-    expect(screen.getByText(/stock actual: 5 unidades/i)).toBeInTheDocument();
-    expect(screen.queryByText(/stock actual: 10 unidades/i)).not.toBeInTheDocument();
+    // Should now show the selected product info for product 2
+    expect(screen.getByText(/producto dos \(pr002\)/i)).toBeInTheDocument();
+    expect(screen.queryByText(/producto uno \(pr001\)/i)).not.toBeInTheDocument();
   });
 
   // TESTS FOR renderCreateButton PROP

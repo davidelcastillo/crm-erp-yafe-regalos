@@ -9,9 +9,13 @@ import { Product } from "@prisma/client";
 import Swal from "sweetalert2";
 import { ProductSearch, ProductSearchResult } from "@/components/ProductSearch";
 import { PaymentMethod } from "@/lib/utils/payment";
+import { BranchSelector } from "@/components/ui/BranchSelector";
+import { useBranch } from "@/lib/context/BranchContext";
 
 interface AddSaleButtonProps {
   products: Product[];
+  /** Called after a successful sale, so the page can re-run its load effect. */
+  onSuccess?: () => void;
 }
 
 interface CustomerOption {
@@ -32,18 +36,22 @@ interface SaleItem {
 
 type PaymentMethodType = "EFECTIVO" | "TRANSFERENCIA" | "MIXTO";
 
-export function AddSaleButton({ products }: AddSaleButtonProps) {
+export function AddSaleButton({ products, onSuccess }: AddSaleButtonProps) {
   const router = useRouter();
+  const { branchId, branch, ready } = useBranch();
   const [isOpen, setIsOpen] = useState(false);
   const [isProductSearchOpen, setIsProductSearchOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [customers, setCustomers] = useState<CustomerOption[]>([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
   const [amountPaid, setAmountPaid] = useState<string>("");
+  const [cashAmount, setCashAmount] = useState<string>("");
+  const [transferAmount, setTransferAmount] = useState<string>("");
   const [items, setItems] = useState<SaleItem[]>([
     { id: "1", productId: "", name: "", code: "", price: "", quantity: "" }
   ]);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethodType>("EFECTIVO");
+  const [saleBranchId, setSaleBranchId] = useState<number | null>(null);
 
   useEffect(() => {
     async function loadCustomers() {
@@ -124,61 +132,96 @@ export function AddSaleButton({ products }: AddSaleButtonProps) {
     setIsProductSearchOpen(true);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+   const handleSubmit = async (e: React.FormEvent) => {
+     e.preventDefault();
 
-    const validItems = items.filter(item => item.productId && item.price && item.quantity);
-    if (validItems.length === 0) {
-      await Swal.fire({
-        title: "Error",
-        text: "Por favor agregá al menos un producto",
-        icon: "error",
-        confirmButtonColor: "#ff385c",
-      });
-      return;
-    }
+     // Require a branch for new sales (stock is branch-scoped)
+     if (!saleBranchId) {
+       await Swal.fire({
+         title: "Sucursal requerida",
+         text: "Seleccioná una sucursal antes de registrar una venta",
+         icon: "warning",
+         confirmButtonColor: "#ff385c",
+       });
+       return;
+     }
 
-    setLoading(true);
+     const validItems = items.filter(item => item.productId && item.price && item.quantity);
+     if (validItems.length === 0) {
+       await Swal.fire({
+         title: "Error",
+         text: "Por favor agregá al menos un producto",
+         icon: "error",
+         confirmButtonColor: "#ff385c",
+       });
+       return;
+     }
 
-    const result = await registerSale({
-      items: validItems.map(item => ({
-        productId: parseInt(item.productId),
-        price: parseFloat(item.price),
-        quantity: parseInt(item.quantity),
-      })),
-      customerId: selectedCustomerId ? parseInt(selectedCustomerId) : undefined,
-      paymentMethod: paymentMethod,
-      amountPaid: parseFloat(amountPaid) || 0,
-    });
+     // MIXTO requires at least one split amount greater than 0
+     if (paymentMethod === "MIXTO") {
+       const cash = parseFloat(cashAmount) || 0;
+       const transfer = parseFloat(transferAmount) || 0;
+       if (cash + transfer <= 0) {
+         await Swal.fire({
+           title: "Error",
+           text: "se requiere una cantidad en efectivo o transferencia mayor a 0",
+           icon: "error",
+           confirmButtonColor: "#ff385c",
+         });
+         return;
+       }
+     }
 
-    if (result.success) {
-      const totalItems = validItems.reduce((sum, item) => sum + parseInt(item.quantity), 0);
-      await Swal.fire({
-        title: "Venta registrada",
-        text: totalItems + " unidades vendidas por $" + calculateTotal().toFixed(2),
-        icon: "success",
-        confirmButtonColor: "#ff385c",
-        confirmButtonText: "Aceptar",
-        background: "#ffffff",
-        color: "#222222",
-      });
-      router.refresh();
-      setIsOpen(false);
-      setItems([{ id: "1", productId: "", name: "", code: "", price: "", quantity: "" }]);
-      setAmountPaid("");
-      setPaymentMethod("EFECTIVO");
-    } else {
-      await Swal.fire({
-        title: "Error",
-        text: result.error || "Error al registrar la venta",
-        icon: "error",
-        confirmButtonColor: "#ff385c",
-        background: "#ffffff",
-        color: "#222222",
-      });
-    }
-    setLoading(false);
-  };
+     setLoading(true);
+
+     const result = await registerSale({
+       items: validItems.map(item => ({
+         productId: parseInt(item.productId),
+         price: parseFloat(item.price),
+         quantity: parseInt(item.quantity),
+       })),
+       branchId: saleBranchId,
+       customerId: selectedCustomerId ? parseInt(selectedCustomerId) : undefined,
+       paymentMethod: paymentMethod,
+       ...(paymentMethod === "MIXTO"
+         ? {
+             cashAmount: parseFloat(cashAmount) || 0,
+             transferAmount: parseFloat(transferAmount) || 0,
+           }
+         : { amountPaid: parseFloat(amountPaid) || 0 }),
+     });
+
+     if (result.success) {
+       const totalItems = validItems.reduce((sum, item) => sum + parseInt(item.quantity), 0);
+       await Swal.fire({
+         title: "Venta registrada",
+         text: totalItems + " unidades vendidas por $" + calculateTotal().toFixed(2),
+         icon: "success",
+         confirmButtonColor: "#ff385c",
+         confirmButtonText: "Aceptar",
+         background: "#ffffff",
+         color: "#222222",
+       });
+        router.refresh();
+        onSuccess?.();
+        setIsOpen(false);
+       setItems([{ id: "1", productId: "", name: "", code: "", price: "", quantity: "" }]);
+       setAmountPaid("");
+       setCashAmount("");
+       setTransferAmount("");
+       setPaymentMethod("EFECTIVO");
+     } else {
+       await Swal.fire({
+         title: "Error",
+         text: result.error || "Error al registrar la venta",
+         icon: "error",
+         confirmButtonColor: "#ff385c",
+         background: "#ffffff",
+         color: "#222222",
+       });
+     }
+     setLoading(false);
+   };
 
   const paymentMethodColors: Record<PaymentMethodType, string> = {
     EFECTIVO: "bg-green-100 text-green-800 border-green-200",
@@ -188,15 +231,15 @@ export function AddSaleButton({ products }: AddSaleButtonProps) {
 
   return (
     <>
-      <button
-        onClick={() => setIsOpen(true)}
-        className="fixed bottom-24 right-6 w-14 h-14 bg-[#ff385c] text-white rounded-full shadow-lg hover-[#e00b41] transition-colors flex items-center justify-center z-40"
-        aria-label="Registrar venta"
-      >
-        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-        </svg>
-      </button>
+       <button
+         onClick={() => { setSaleBranchId(branchId ?? null); setIsOpen(true); }}
+         className="fixed bottom-24 right-6 w-14 h-14 bg-[#ff385c] text-white rounded-full shadow-lg hover-[#e00b41] transition-colors flex items-center justify-center z-40"
+         aria-label="Registrar venta"
+       >
+         <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+         </svg>
+       </button>
 
 {isOpen && (
          <div className="fixed inset-0 bg-black/30 backdrop-blur-md z-[60] flex items-end justify-center">
@@ -204,19 +247,26 @@ export function AddSaleButton({ products }: AddSaleButtonProps) {
             className="bg-white w-full max-w-lg rounded-t-3xl p-6 animate-slide-up max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-semibold text-[#222222]">Nueva Venta</h2>
-              <button
-                type="button"
-                onClick={() => setIsOpen(false)}
-                className="p-2 rounded-full hover:bg-[#f2f2f2] transition-colors"
-                aria-label="Cerrar"
-              >
-                <svg className="w-6 h-6 text-[#6a6a6a]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
+             <div className="flex justify-between items-center mb-6">
+               <h2 className="text-xl font-semibold text-[#222222]">Nueva Venta</h2>
+               <button
+                 type="button"
+                 onClick={() => setIsOpen(false)}
+                 className="p-2 rounded-full hover:bg-[#f2f2f2] transition-colors"
+                 aria-label="Cerrar"
+               >
+                 <svg className="w-6 h-6 text-[#6a6a6a]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                 </svg>
+               </button>
+             </div>
+             <div className="mb-4">
+               <BranchSelector
+                 label="Sucursal de venta"
+                 value={saleBranchId}
+                 onChange={setSaleBranchId}
+               />
+             </div>
 
             {products.length === 0 ? (
               <div className="text-center py-8">
@@ -338,21 +388,61 @@ export function AddSaleButton({ products }: AddSaleButtonProps) {
                 </div>
 
                 {/* Amount Paid (for all payment methods) */}
-                <div className="p-4 bg-[#f9f9f9] rounded-xl">
-                  <label className="block text-sm font-medium text-[#222222] mb-2">Monto Pagado</label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6a6a6a] text-sm">$</span>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={amountPaid}
-                      onChange={(e) => setAmountPaid(e.target.value)}
-                      className="w-full pl-7 pr-3 py-3 rounded-xl border border-gray-200 focus:border-[#ff385c] focus:ring-2 focus:ring-[#ff385c]/20 outline-none transition-all"
-                      placeholder="0.00"
-                    />
+                {paymentMethod === "MIXTO" ? (
+                  <div className="p-4 bg-[#f9f9f9] rounded-xl">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label htmlFor="cashAmount" className="block text-sm font-medium text-[#222222] mb-2">Efectivo</label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6a6a6a] text-sm">$</span>
+                          <input
+                            id="cashAmount"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={cashAmount}
+                            onChange={(e) => setCashAmount(e.target.value)}
+                            className="w-full pl-7 pr-3 py-3 rounded-xl border border-gray-200 focus:border-[#ff385c] focus:ring-2 focus:ring-[#ff385c]/20 outline-none transition-all"
+                            placeholder="0.00"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label htmlFor="transferAmount" className="block text-sm font-medium text-[#222222] mb-2">Transferencia</label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6a6a6a] text-sm">$</span>
+                          <input
+                            id="transferAmount"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={transferAmount}
+                            onChange={(e) => setTransferAmount(e.target.value)}
+                            className="w-full pl-7 pr-3 py-3 rounded-xl border border-gray-200 focus:border-[#ff385c] focus:ring-2 focus:ring-[#ff385c]/20 outline-none transition-all"
+                            placeholder="0.00"
+                          />
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="p-4 bg-[#f9f9f9] rounded-xl">
+                    <label htmlFor="amountPaid" className="block text-sm font-medium text-[#222222] mb-2">Monto Pagado</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6a6a6a] text-sm">$</span>
+                      <input
+                        id="amountPaid"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={amountPaid}
+                        onChange={(e) => setAmountPaid(e.target.value)}
+                        className="w-full pl-7 pr-3 py-3 rounded-xl border border-gray-200 focus:border-[#ff385c] focus:ring-2 focus:ring-[#ff385c]/20 outline-none transition-all"
+                        placeholder="0.00"
+                      />
+                    </div>
+                  </div>
+                )}
 
                 {/* Totals */}
                 <div className="p-4 bg-green-50 rounded-xl border border-green-200">
@@ -396,13 +486,14 @@ export function AddSaleButton({ products }: AddSaleButtonProps) {
         </div>
       )}
 
-      <ProductSearch
-        mode="modal"
-        isOpen={isProductSearchOpen}
-        onClose={() => setIsProductSearchOpen(false)}
-        onSelect={handleProductSelect}
-        placeholder="Buscar producto por código o nombre..."
-      />
+       <ProductSearch
+         mode="modal"
+         isOpen={isProductSearchOpen}
+         onClose={() => setIsProductSearchOpen(false)}
+         onSelect={handleProductSelect}
+         placeholder="Buscar producto por código o nombre..."
+         branchId={saleBranchId}
+       />
     </>
   );
 }

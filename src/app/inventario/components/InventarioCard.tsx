@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import { Product } from "@prisma/client";
-import { updateProduct, deleteProduct } from "@/app/actions/product";
+import { updateProduct, deleteProduct, toggleProductActive, updateProductExtended } from "@/app/actions/product";
+import { adjustProductStock } from "@/app/actions/inventory";
+import { sumStock, type StockSource } from "@/lib/inventory-stock";
 import Swal from "sweetalert2";
 
 interface InventarioCardProps {
@@ -10,6 +12,10 @@ interface InventarioCardProps {
   dataProductId?: string;
   isHighlighted?: boolean;
   onViewMovements?: (product: Product) => void;
+  /** Current branch id; when provided, stock edits target BranchInventory. */
+  branchId?: number | null;
+  /** Category options hoisted from the page (shared by all cards, avoids N+1). */
+  categories?: Array<{ id: number; name: string }>;
 }
 
 type SerializedProduct = Omit<Product, "createdAt" | "updatedAt"> & {
@@ -31,15 +37,18 @@ function getStockStatus(stock: number): {
   return { color: "text-white", bgColor: "bg-[#22c55e]", label: "En stock" };
 }
 
-export function InventarioCard({ product, dataProductId, isHighlighted, onViewMovements }: InventarioCardProps) {
+export function InventarioCard({ product, dataProductId, isHighlighted, onViewMovements, branchId, categories = [] }: InventarioCardProps) {
   const [isEditing, setIsEditing] = useState(false);
-  const [localStock, setLocalStock] = useState(product.stock);
+  // Sum stock across all branch rows: correct for "Todas" and for a single branch.
+  const displayStock = sumStock(product as unknown as StockSource);
+  const [localStock, setLocalStock] = useState(displayStock);
   const [localName, setLocalName] = useState(product.name);
   const [localDescription, setLocalDescription] = useState(product.description || "");
   const [localPrice, setLocalPrice] = useState(product.price ? Number(product.price) : 0);
+  const [localCategoryId, setLocalCategoryId] = useState<number | null>(product.categoryId ?? null);
 
-  // Stock status for badge
-  const status = getStockStatus(product.stock);
+  // Stock status for badge based on displayed stock (0 if no branch context)
+  const status = getStockStatus(displayStock);
 
   const handleEdit = () => {
     setIsEditing(true);
@@ -47,96 +56,121 @@ export function InventarioCard({ product, dataProductId, isHighlighted, onViewMo
 
   const handleCancel = () => {
     setIsEditing(false);
-    setLocalStock(product.stock);
+    setLocalStock(displayStock);
     setLocalName(product.name);
     setLocalDescription(product.description || "");
+    setLocalPrice(product.price ? Number(product.price) : 0);
+    setLocalCategoryId(product.categoryId ?? null);
   };
 
-  const handleSave = async () => {
-    try {
-      const result = await updateProduct({
-        id: product.id,
-        name: localName,
-        description: localDescription || null,
-        stock: localStock,
-        price: localPrice,
-      });
+   const handleSave = async () => {
+     try {
+       // 1. Update product fields (name, description, price, categoryId) - stock no longer lives here
+       const result = await updateProductExtended({
+         id: product.id,
+         name: localName,
+         description: localDescription || null,
+         price: localPrice,
+         categoryId: localCategoryId,
+         // active: product.active, // keep current active state (optional)
+       });
 
-      if (result.success) {
-        await Swal.fire({
-          title: "¡Listo!",
-          text: "Producto actualizado",
-          icon: "success",
-          confirmButtonColor: "#22c55e",
-          timer: 1500,
-          showConfirmButton: false,
-        });
-        setIsEditing(false);
-        // Refresh the page to get updated data
-        window.location.reload();
-      } else {
-        await Swal.fire({
-          title: "Error",
-          text: result.error || "No se pudo actualizar",
-          icon: "error",
-          confirmButtonColor: "#ef4444",
-        });
-      }
-    } catch (error) {
-      console.error("Error updating product:", error);
-      await Swal.fire({
-        title: "Error",
-        text: "Error al actualizar el producto",
-        icon: "error",
-        confirmButtonColor: "#ef4444",
-      });
-    }
-  };
+       if (!result.success) {
+         await Swal.fire({
+           title: "Error",
+           text: result.error || "No se pudo actualizar",
+           icon: "error",
+           confirmButtonColor: "#ef4444",
+         });
+         return;
+       }
 
-  const handleDelete = async () => {
-    const result = await Swal.fire({
-      title: "¿Eliminar producto?",
-      text: `"${product.name}" será eliminado del inventario. Esta acción no se puede deshacer.`,
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonText: "Eliminar",
-      cancelButtonText: "Cancelar",
-      confirmButtonColor: "#ef4444",
-      cancelButtonColor: "#6b7280",
-    });
+       // 2. Adjust branch stock via BranchInventory (only if a branch is selected)
+       if (branchId) {
+         const delta = localStock - displayStock;
+         if (delta !== 0) {
+           const stockResult = await adjustProductStock({
+             productId: product.id,
+             branchId,
+             change: delta,
+           });
+           if (!stockResult.success) {
+             await Swal.fire({
+               title: "Error",
+               text: stockResult.error || "No se pudo actualizar el stock",
+               icon: "error",
+               confirmButtonColor: "#ef4444",
+             });
+             return;
+           }
+         }
+       }
 
-    if (result.isConfirmed) {
-      try {
-        const res = await deleteProduct({ id: product.id });
-        if (res.success) {
-          await Swal.fire({
-            title: "¡Eliminado!",
-            text: "Producto eliminado del inventario",
-            icon: "success",
-            confirmButtonColor: "#22c55e",
-            timer: 1500,
-            showConfirmButton: false,
-          });
-          window.location.reload();
-        } else {
-          await Swal.fire({
-            title: "Error",
-            text: res.error || "No se pudo eliminar",
-            icon: "error",
-            confirmButtonColor: "#ef4444",
-          });
-        }
-      } catch (error) {
-        console.error("Error deleting product:", error);
-        await Swal.fire({
-          title: "Error",
-          text: "Error al eliminar el producto",
-          icon: "error",
-          confirmButtonColor: "#ef4444",
-        });
-      }
-    }
-  };
+       await Swal.fire({
+         title: "¡Listo!",
+         text: "Producto actualizado",
+         icon: "success",
+         confirmButtonColor: "#22c55e",
+         timer: 1500,
+         showConfirmButton: false,
+       });
+       setIsEditing(false);
+       // Refresh the page to get updated data
+       window.location.reload();
+     } catch (error) {
+       console.error("Error updating product:", error);
+       await Swal.fire({
+         title: "Error",
+         text: "Error al actualizar el producto",
+         icon: "error",
+         confirmButtonColor: "#ef4444",
+       });
+     }
+   };
+
+   const handleDelete = async () => {
+     const result = await Swal.fire({
+       title: '¿Desactivar producto?',
+       text: "Esto lo marcará como inactivo pero conservará su stock e historial. ¿Continuar?",
+       icon: 'warning',
+       showCancelButton: true,
+       confirmButtonText: 'Sí, desactivar',
+       cancelButtonText: 'Cancelar',
+       reverseButtons: true,
+     });
+
+     if (result.isConfirmed) {
+       try {
+         const res = await toggleProductActive({ id: product.id, active: false });
+         if (res.success) {
+           await Swal.fire({
+             title: "¡Desactivado!",
+             text: "Producto marcado como inactivo",
+             icon: "success",
+             confirmButtonColor: "#22c55e",
+             timer: 1500,
+             showConfirmButton: false,
+           });
+           window.location.reload();
+         } else {
+           await Swal.fire({
+             title: "Error",
+             text: res.error || "No se pudo desactivar",
+             icon: "error",
+             confirmButtonColor: "#ef4444",
+           });
+         }
+       } catch (error) {
+         console.error("Error deactivating product:", error);
+         await Swal.fire({
+           title: "Error",
+           text: "Error al desactivar el producto",
+           icon: "error",
+           confirmButtonColor: "#ef4444",
+         });
+       }
+     }
+   };
 
   const handleViewMovements = () => {
     if (onViewMovements) {
@@ -144,94 +178,113 @@ export function InventarioCard({ product, dataProductId, isHighlighted, onViewMo
     }
   };
 
-  if (isEditing) {
-    // Edit mode - show form
-    return (
-      <div className="bg-white rounded-2xl p-4 shadow-sm border-2 border-[#3b82f6]">
-        <div className="flex flex-col gap-3">
-          <div>
-            <label className="block text-xs text-[#6a6a6a] mb-1">Nombre</label>
-            <input
-              type="text"
-              value={localName}
-              onChange={(e) => setLocalName(e.target.value)}
-              className="w-full px-3 py-2 bg-[#f8f8f8] rounded-lg text-[#222222] focus:outline-none focus:ring-2 focus:ring-[#3b82f6]/20"
-            />
-          </div>
+   if (isEditing) {
+     // Edit mode - show form
+     return (
+       <div className="bg-white rounded-2xl p-4 shadow-sm border-2 border-[#3b82f6]">
+         <div className="flex flex-col gap-3">
+           <div>
+             <label className="block text-xs text-[#6a6a6a] mb-1">Nombre</label>
+             <input
+               type="text"
+               value={localName}
+               onChange={(e) => setLocalName(e.target.value)}
+               className="w-full px-3 py-2 bg-[#f8f8f8] rounded-lg text-[#222222] focus:outline-none focus:ring-2 focus:ring-[#3b82f6]/20"
+             />
+           </div>
 
-          <div>
-            <label className="block text-xs text-[#6a6a6a] mb-1">Descripción</label>
-            <textarea
-              value={localDescription}
-              onChange={(e) => setLocalDescription(e.target.value)}
-              rows={2}
-              className="w-full px-3 py-2 bg-[#f8f8f8] rounded-lg text-[#222222] focus:outline-none focus:ring-2 focus:ring-[#3b82f6]/20 resize-none"
-            />
-          </div>
+           <div>
+             <label className="block text-xs text-[#6a6a6a] mb-1">Descripción</label>
+             <textarea
+               value={localDescription}
+               onChange={(e) => setLocalDescription(e.target.value)}
+               rows={2}
+               className="w-full px-3 py-2 bg-[#f8f8f8] rounded-lg text-[#222222] focus:outline-none focus:ring-2 focus:ring-[#3b82f6]/20 resize-none"
+             />
+           </div>
 
-          <div>
-            <label className="block text-xs text-[#6a6a6a] mb-1">Stock</label>
-            <input
-              type="number"
-              value={localStock}
-              onChange={(e) => setLocalStock(parseInt(e.target.value) || 0)}
-              min={0}
-              className="w-full px-3 py-2 bg-[#f8f8f8] rounded-lg text-[#222222] focus:outline-none focus:ring-2 focus:ring-[#3b82f6]/20"
-            />
-          </div>
+           <div>
+             <label className="block text-xs text-[#6a6a6a] mb-1">Categoría</label>
+             <select
+               value={localCategoryId ?? ''}
+               onChange={(e) => {
+                 const val = e.target.value;
+                 setLocalCategoryId(val === '' ? null : Number(val));
+               }}
+               className="w-full px-3 py-2 bg-[#f8f8f8] rounded-lg text-[#222222] focus:outline-none focus:ring-2 focus:ring-[#3b82f6]/20"
+             >
+               <option value="">Sin categoría</option>
+               {categories.map(cat => (
+                 <option key={cat.id} value={cat.id}>
+                   {cat.name}
+                 </option>
+               ))}
+             </select>
+           </div>
 
-          <div>
-            <label className="block text-xs text-[#6a6a6a] mb-1">Código</label>
-            <input
-              type="text"
-              value={product.code || ""}
-              readOnly
-              className="w-full px-3 py-2 bg-[#f2f2f2] rounded-lg text-[#222222] font-mono text-sm"
-              title="El código no se puede modificar"
-            />
-          </div>
+           <div>
+             <label className="block text-xs text-[#6a6a6a] mb-1">Stock</label>
+             <input
+               type="number"
+               value={localStock}
+               onChange={(e) => setLocalStock(parseInt(e.target.value) || 0)}
+               min={0}
+               className="w-full px-3 py-2 bg-[#f8f8f8] rounded-lg text-[#222222] focus:outline-none focus:ring-2 focus:ring-[#3b82f6]/20"
+             />
+           </div>
 
-          <div>
-            <label className="block text-xs text-[#6a6a6a] mb-1">Prefijo</label>
-            <input
-              type="text"
-              value={product.codePrefix || ""}
-              readOnly
-              className="w-full px-3 py-2 bg-[#f2f2f2] rounded-lg text-[#222222] font-mono text-sm text-uppercase"
-              title="El prefijo no se puede modificar"
-            />
-          </div>
+           <div>
+             <label className="block text-xs text-[#6a6a6a] mb-1">Código</label>
+             <input
+               type="text"
+               value={product.code || ""}
+               readOnly
+               className="w-full px-3 py-2 bg-[#f2f2f2] rounded-lg text-[#222222] font-mono text-sm"
+               title="El código no se puede modificar"
+             />
+           </div>
 
-          <div>
-            <label className="block text-xs text-[#6a6a6a] mb-1">Precio de venta</label>
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              value={localPrice}
-              onChange={(e) => setLocalPrice(parseFloat(e.target.value) || 0)}
-              className="w-full px-3 py-2 bg-[#f8f8f8] rounded-lg text-[#222222] focus:outline-none focus:ring-2 focus:ring-[#3b82f6]/20"
-            />
-          </div>
+           <div>
+             <label className="block text-xs text-[#6a6a6a] mb-1">Prefijo</label>
+             <input
+               type="text"
+               value={product.codePrefix || ""}
+               readOnly
+               className="w-full px-3 py-2 bg-[#f2f2f2] rounded-lg text-[#222222] font-mono text-sm text-uppercase"
+               title="El prefijo no se puede modificar"
+             />
+           </div>
 
-          <div className="flex gap-2 pt-2">
-            <button
-              onClick={handleSave}
-              className="flex-1 py-2 px-3 text-sm font-medium text-white bg-[#22c55e] rounded-lg hover:bg-[#16a34a] transition-colors"
-            >
-              Guardar
-            </button>
-            <button
-              onClick={handleCancel}
-              className="flex-1 py-2 px-3 text-sm font-medium text-[#222222] bg-[#f2f2f2] rounded-lg hover:bg-[#e5e5e5] transition-colors"
-            >
-              Cancelar
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
+           <div>
+             <label className="block text-xs text-[#6a6a6a] mb-1">Precio de venta</label>
+             <input
+               type="number"
+               step="0.01"
+               min="0"
+               value={localPrice}
+               onChange={(e) => setLocalPrice(parseFloat(e.target.value) || 0)}
+               className="w-full px-3 py-2 bg-[#f8f8f8] rounded-lg text-[#222222] focus:outline-none focus:ring-2 focus:ring-[#3b82f6]/20"
+             />
+           </div>
+
+           <div className="flex gap-2 pt-2">
+             <button
+               onClick={handleSave}
+               className="flex-1 py-2 px-3 text-sm font-medium text-white bg-[#22c55e] rounded-lg hover:bg-[#16a34a] transition-colors"
+             >
+               Guardar
+             </button>
+             <button
+               onClick={handleCancel}
+               className="flex-1 py-2 px-3 text-sm font-medium text-[#222222] bg-[#f2f2f2] rounded-lg hover:bg-[#e5e5e5] transition-colors"
+             >
+               Cancelar
+             </button>
+           </div>
+         </div>
+       </div>
+     );
+   }
 
   const formatPrice = (price: unknown) => {
     let num = 0;
@@ -266,11 +319,11 @@ export function InventarioCard({ product, dataProductId, isHighlighted, onViewMo
            )}
          </div>
          <div className="flex flex-col items-end gap-2">
-           <span
-             className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${status.color} ${status.bgColor}`}
-           >
-             {product.stock} uds
-           </span>
+            <span
+              className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${status.color} ${status.bgColor}`}
+            >
+              {displayStock} uds
+            </span>
            <span className="text-xs text-[#6a6a6a]">{status.label}</span>
            <span className="text-sm font-semibold text-[#222222]">{formatPrice(product.price)}</span>
          </div>
@@ -289,12 +342,12 @@ export function InventarioCard({ product, dataProductId, isHighlighted, onViewMo
          >
            Ver Movimientos
          </button>
-         <button
-           onClick={handleDelete}
-           className="flex-1 py-2 px-3 text-sm font-medium text-white bg-[#ef4444] rounded-lg hover:bg-[#dc2626] transition-colors"
-         >
-           Eliminar
-         </button>
+          <button
+            onClick={handleDelete}
+            className="flex-1 py-2 px-3 text-sm font-medium text-white bg-[#ef4444] rounded-lg hover:bg-[#dc2626] transition-colors"
+          >
+            Desactivar
+          </button>
        </div>
      </div>
    );

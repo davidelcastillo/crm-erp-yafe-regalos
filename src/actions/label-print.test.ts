@@ -51,6 +51,9 @@ describe('generateProductLabels', () => {
   });
 
   test('throws error when quantity less than 1', async () => {
+    (prisma.product.findMany as jest.Mock).mockResolvedValue([
+      { id: 1, code: 'AAA000', price: 100 },
+    ]);
     await expect(generateProductLabels([{ productId: 1, quantity: 0 }])).rejects.toThrow(
       'Quantity must be at least 1 for product 1'
     );
@@ -63,7 +66,7 @@ describe('generateProductLabels', () => {
     );
   });
 
-  test('returns PDF buffer for valid selection', async () => {
+  test('returns base64 PDF string for valid selection', async () => {
     // Mock product data
     (prisma.product.findMany as jest.Mock).mockResolvedValue([
       { id: 1, code: 'AAA000', price: 123.45 },
@@ -71,7 +74,8 @@ describe('generateProductLabels', () => {
 
     const result = await generateProductLabels([{ productId: 1, quantity: 2 }]);
 
-    expect(result).toBeInstanceOf(Buffer);
+    // Action returns a base64-encoded PDF string (not a Buffer)
+    expect(typeof result).toBe('string');
     expect(prisma.product.findMany).toHaveBeenCalledWith({
       where: { id: { in: [1] } },
       select: { id: true, code: true, price: true },

@@ -21,7 +21,9 @@ jest.mock('pdf-lib', () => ({
       embedFont: jest.fn().mockResolvedValue({
         widthOfTextAtSize: jest.fn().mockResolvedValue(10),
       }),
-      save: jest.fn().mockResolvedValue(new ArrayBuffer(0)),
+      save: jest.fn().mockResolvedValue(
+        new Uint8Array([37, 80, 68, 70, 45, 49, 46, 48]).buffer // "%PDF-1.0"
+      ),
     }),
   },
   rgb: jest.fn(),
@@ -46,37 +48,61 @@ describe('generateProductLabels integration', () => {
   test('generates PDF after searching for products', async () => {
     // Mock product data for search
     (prisma.product.findMany as jest.Mock).mockResolvedValue([
-      { id: 1, code: 'AAA000', name: 'Product A', price: 100.0 },
+      {
+        id: 1,
+        code: 'AAA000',
+        name: 'Product A',
+        price: 100.0,
+        inventory: [{ stock: 5, branchId: 1 }],
+      },
     ]);
 
-    // Simulate searching for a product
-    const searchResults = await searchProducts('AAA');
-    expect(searchResults).toHaveLength(1);
-    expect(searchResults[0].code).toBe('AAA000');
+     // Simulate searching for a product
+     const searchResults = await searchProducts({ query: 'AAA' });
+     expect(searchResults.success).toBe(true);
+     const searchData = searchResults.data!;
+     expect(searchData).toHaveLength(1);
+     expect(searchData[0].code).toBe('AAA000');
 
     // Now generate labels for the found product
-    const selection = [{ productId: searchResults[0].id, quantity: 3 }];
-    const pdfBuffer = await generateProductLabels(selection);
+    const selection = [{ productId: searchData[0].id, quantity: 3 }];
+    const pdfBase64 = await generateProductLabels(selection);
 
-    expect(pdfBuffer).toBeInstanceOf(Buffer);
-    expect(pdfBuffer.length).toBeGreaterThan(0);
+    // Action returns a base64-encoded PDF string
+    expect(typeof pdfBase64).toBe('string');
+    expect(pdfBase64.length).toBeGreaterThan(0);
   });
 
   test('handles multiple products from search', async () => {
     (prisma.product.findMany as jest.Mock).mockResolvedValue([
-      { id: 1, code: 'AAA000', name: 'Product A', price: 100.0 },
-      { id: 2, code: 'BBB000', name: 'Product B', price: 200.0 },
+      {
+        id: 1,
+        code: 'AAA000',
+        name: 'Product A',
+        price: 100.0,
+        inventory: [{ stock: 3, branchId: 1 }],
+      },
+      {
+        id: 2,
+        code: 'BBB000',
+        name: 'Product B',
+        price: 200.0,
+        inventory: [{ stock: 7, branchId: 1 }],
+      },
     ]);
 
-    const searchResults = await searchProducts('');
-    expect(searchResults).toHaveLength(2);
+     const searchResults = await searchProducts({ query: 'A' });
+     expect(searchResults.success).toBe(true);
+     const searchData = searchResults.data!;
+     expect(searchData).toHaveLength(2);
 
-    const selections = searchResults.map(p => ({
-      productId: p.id,
-      quantity: 2,
-    }));
+     const selections = searchData.map(p => ({
+       productId: p.id,
+       quantity: 2,
+     }));
 
-    const pdfBuffer = await generateProductLabels(selections);
-    expect(pdfBuffer).toBeInstanceOf(Buffer);
+    const pdfBase64 = await generateProductLabels(selections);
+    expect(typeof pdfBase64).toBe('string');
+    expect(pdfBase64.length).toBeGreaterThan(0);
   });
 });

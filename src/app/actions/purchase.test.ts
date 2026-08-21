@@ -4,14 +4,18 @@
 import { registerPurchase, getPurchases } from "../actions/purchase";
 
 // Mock prisma
+const mockBranchFindFirst = jest.fn();
 const mockPurchaseCreate = jest.fn();
 const mockPurchaseItemCreateMany = jest.fn();
-const mockProductUpdate = jest.fn();
+const mockBranchInventoryUpsert = jest.fn();
 const mockPurchaseItemFindMany = jest.fn();
 const mockPurchaseFindMany = jest.fn();
 
 jest.mock("@/lib/prisma", () => ({
   prisma: {
+    branch: {
+      findFirst: (...args: unknown[]) => mockBranchFindFirst(...args),
+    },
     $transaction: jest.fn((callback) => {
       const tx = {
         purchase: {
@@ -21,8 +25,8 @@ jest.mock("@/lib/prisma", () => ({
           createMany: (...args: unknown[]) => mockPurchaseItemCreateMany(...args),
           findMany: (...args: unknown[]) => mockPurchaseItemFindMany(...args),
         },
-        product: {
-          update: (...args: unknown[]) => mockProductUpdate(...args),
+        branchInventory: {
+          upsert: (...args: unknown[]) => mockBranchInventoryUpsert(...args),
         },
       };
       return callback(tx);
@@ -45,12 +49,14 @@ describe("registerPurchase Server Action - Multi-product", () => {
       { id: 2, purchaseId: 1, productId: 3, price: 25.50, quantity: 2, subtotal: 51, product: { id: 3, name: "Product B" } },
     ];
 
+    mockBranchFindFirst.mockResolvedValue({ id: 1 });
     mockPurchaseCreate.mockResolvedValue(mockPurchase);
     mockPurchaseItemCreateMany.mockResolvedValue({ count: 2 });
-    mockProductUpdate.mockResolvedValue({});
+    mockBranchInventoryUpsert.mockResolvedValue({});
     mockPurchaseItemFindMany.mockResolvedValue(mockItems);
 
     const result = await registerPurchase({
+      branchId: 1,
       items: [
         { productId: 5, price: 50, quantity: 2 },
         { productId: 3, price: 25.50, quantity: 2 },
@@ -61,7 +67,7 @@ describe("registerPurchase Server Action - Multi-product", () => {
     expect(result.data?.totalAmount).toBe(151); // 100 + 51 = 151
     
     expect(mockPurchaseCreate).toHaveBeenCalledWith({
-      data: { totalAmount: 151 },
+      data: { totalAmount: 151, branchId: 1 },
     });
     
     expect(mockPurchaseItemCreateMany).toHaveBeenCalledWith({
@@ -71,7 +77,8 @@ describe("registerPurchase Server Action - Multi-product", () => {
       ],
     });
     
-    expect(mockProductUpdate).toHaveBeenCalledTimes(2);
+    // Stock increments target BranchInventory (once per item), not Product
+    expect(mockBranchInventoryUpsert).toHaveBeenCalledTimes(2);
   });
 
   it("should accept string values from form with coerce", async () => {
@@ -80,20 +87,22 @@ describe("registerPurchase Server Action - Multi-product", () => {
       { id: 1, purchaseId: 1, productId: 1, price: 100, quantity: 5, subtotal: 500, product: { id: 1, name: "Product" } },
     ];
 
+    mockBranchFindFirst.mockResolvedValue({ id: 1 });
     mockPurchaseCreate.mockResolvedValue(mockPurchase);
     mockPurchaseItemCreateMany.mockResolvedValue({ count: 1 });
-    mockProductUpdate.mockResolvedValue({});
+    mockBranchInventoryUpsert.mockResolvedValue({});
     mockPurchaseItemFindMany.mockResolvedValue(mockItems);
 
     // Strings from form
     const result = await registerPurchase({
+      branchId: 1,
       items: [
         { productId: "1", price: "100", quantity: "5" },
       ],
     });
 
     expect(result.success).toBe(true);
-    expect(mockProductUpdate).toHaveBeenCalledTimes(1);
+    expect(mockBranchInventoryUpsert).toHaveBeenCalledTimes(1);
   });
 
   it("should return error when no items provided", async () => {
@@ -102,9 +111,11 @@ describe("registerPurchase Server Action - Multi-product", () => {
   });
 
   it("should handle database errors", async () => {
+    mockBranchFindFirst.mockResolvedValue({ id: 1 });
     mockPurchaseCreate.mockRejectedValue(new Error("Database error"));
 
     const result = await registerPurchase({
+      branchId: 1,
       items: [{ productId: 1, price: 100, quantity: 5 }],
     });
 

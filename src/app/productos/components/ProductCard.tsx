@@ -1,5 +1,6 @@
 import { Product } from "@prisma/client";
 import { DeleteButton } from "./DeleteButton";
+import { sumStock, StockSource } from "@/lib/inventory-stock";
 
 interface ProductCardProps {
   product: Product;
@@ -23,6 +24,12 @@ const formatPrice = (price: unknown) => {
 };
 
 export function ProductCard({ product, onEdit }: ProductCardProps) {
+  // Stock is branch-scoped: when a branch is selected the product carries an
+  // `inventory` array with that branch's entry; without a branch it carries
+  // every branch's entries, so the total is the SUM across all branches.
+  const totalStock = sumStock(product as unknown as StockSource);
+  const stockLabel = `${totalStock} uds`;
+
   return (
     <div className="bg-white rounded-2xl p-4 shadow-[rgba(0,0,0,0.02)_0px_0px_0px_1px,rgba(0,0,0,0.04)_0px_2px_6px,rgba(0,0,0,0.1)_0px_4px_8px]">
       <div className="flex justify-between items-start">
@@ -39,7 +46,7 @@ export function ProductCard({ product, onEdit }: ProductCardProps) {
         </div>
         <div className="flex flex-col items-end gap-2">
           <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-[#f2f2f2] text-[#222222]">
-            {product.stock} uds
+            {stockLabel}
           </span>
           <span className="text-sm font-semibold text-[#222222]">{formatPrice(product.price)}</span>
         </div>

@@ -27,7 +27,7 @@ export function DashboardChart({ data }: DashboardChartProps) {
     return (
       <div className="bg-white rounded-2xl p-4 shadow-sm">
         <h2 className="text-lg font-semibold text-[#222222] mb-4">
-          Ingresos vs Egresos (�ltimos 7 d�as)
+          Ingresos vs Egresos (Últimos 7 días)
         </h2>
         <div className="h-64 flex items-center justify-center text-[#6a6a6a]">
           No hay datos disponibles
@@ -45,7 +45,7 @@ export function DashboardChart({ data }: DashboardChartProps) {
   return (
     <div className="bg-white rounded-2xl p-4 shadow-sm">
       <h2 className="text-lg font-semibold text-[#222222] mb-4">
-        Ingresos vs Egresos (�ltimos 7 d�as)
+        Ingresos vs Egresos (Últimos 7 días)
       </h2>
       <div className="h-64">
         <ResponsiveContainer width="100%" height="100%">

@@ -41,47 +41,48 @@ const ClientsIcon = ({ active }: { active: boolean }) => (
   </svg>
 );
 
-// We no longer need BottomNavMasMenu import or overflow handling
+// Icon for Sucursales (simple building-like icon)
+const SucursalIcon = ({ active }: { active: boolean }) => (
+   <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3l18 0M5 7l0 12M7 7l0 12M9 7l0 12M11 7l0 12M13 7l0 12M15 7l0 12M17 7l0 12" />
+   </svg>
+);
 
 const navItems = [
-  { href: "/dashboard", label: "Dashboard", icon: DashboardIcon },
-  { href: "/productos", label: "Productos", icon: ProductIcon },
-  { href: "/compras", label: "Compras", icon: PurchaseIcon },
-  { href: "/ventas", label: "Ventas", icon: SaleIcon },
-  { href: "/inventario", label: "Inventario", icon: InventoryIcon },
-  { href: "/inventario/inactivos", label: "Sucursales", icon: ClientsIcon }, // New link
-  { href: "/clientes", label: "Clientes", icon: ClientsIcon },
+   { href: "/dashboard", label: "Dashboard", icon: DashboardIcon },
+   { href: "/productos", label: "Productos", icon: ProductIcon },
+   { href: "/compras", label: "Compras", icon: PurchaseIcon },
+   { href: "/ventas", label: "Ventas", icon: SaleIcon },
+   { href: "/inventario", label: "Inventario", icon: InventoryIcon },
+   { href: "/sucursales", label: "Sucursales", icon: SucursalIcon },
+   { href: "/clientes", label: "Clientes", icon: ClientsIcon },
 ];
 
 export default function BottomNav() {
   const pathname = usePathname();
 
+  if (pathname.startsWith("/sucursal/")) {
+    return null;
+  }
+
   return (
     <>
       <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-[0_-2px_10px_rgba(0,0,0,0.05)] z-50">
         <div className="flex justify-around items-center h-16 max-w-lg mx-auto">
-          {navItems.map((item) => {
-            const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
-            const Icon = item.icon;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`
-                  flex flex-col items-center justify-center flex-1 h-full
-                  transition-all duration-200 ease-in-out
-                  ${isActive 
-                    ? "text-[#ff385c]" 
-                    : "text-[#6a6a6a] hover:text-[#3f3f3f]"
-                `}
-              >
-                <Icon active={isActive} />
-                <span className={`text-xs mt-1 font-medium ${isActive ? "text-[#ff385c]" : "text-[#6a6a6a]"}`}>
-                  {item.label}
-                </span>
-              </Link>
-            );
-          })}
+           {navItems.map((item) => {
+             const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
+             const Icon = item.icon;
+             const linkClassName = `flex flex-col items-center justify-center flex-1 h-full transition-all duration-200 ease-in-out ${isActive ? "text-[#ff385c]" : "text-[#6a6a6a] hover:text-[#3f3f3f]"}`;
+             const spanClassName = `text-xs mt-1 font-medium ${isActive ? "text-[#ff385c]" : "text-[#6a6a6a]"}`;
+             return (
+               <Link key={item.href} href={item.href} className={linkClassName}>
+                 <Icon active={isActive} />
+                 <span className={spanClassName}>
+                   {item.label}
+                 </span>
+               </Link>
+             );
+           })}
         </div>
       </nav>
     </>
