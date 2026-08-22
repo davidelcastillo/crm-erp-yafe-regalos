@@ -42,6 +42,39 @@
   --shadow-hover: var(--shadow-hover);
 }
 
+/* Entrance animation for centered modals: soft fade + scale (mobile-first). */
+@theme {
+  --animate-scale-in: scale-in 0.2s ease-out;
+
+  @keyframes scale-in {
+    from {
+      opacity: 0;
+      transform: scale(0.96);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+}
+
+/* Native <select> <option> best-effort styling (browser rendering varies). */
+select option {
+  background-color: #ffffff;
+  color: #222222;
+}
+
+select option:checked {
+  background-color: #ffe7eb; /* soft Rausch tint */
+  color: #222222;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-scale-in {
+    animation: none;
+  }
+}
+
 body {
   background: var(--background);
   color: var(--foreground);

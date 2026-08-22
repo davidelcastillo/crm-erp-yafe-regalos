@@ -158,14 +158,14 @@ export function ExportWizard({ open, onClose, branches }: ExportWizardProps) {
 
   return (
     <div
-      className="fixed inset-0 bg-black/30 backdrop-blur-md z-[60] flex items-end justify-center"
+      className="fixed inset-0 bg-black/30 backdrop-blur-md z-[60] flex items-center justify-center"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
       aria-labelledby="export-wizard-title"
     >
       <div
-        className="bg-white w-full max-w-xl rounded-t-3xl p-6 animate-slide-up max-h-[90vh] overflow-y-auto"
+        className="bg-white w-full max-w-xl rounded-2xl p-6 animate-scale-in max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-between items-center mb-4">
@@ -213,23 +213,45 @@ export function ExportWizard({ open, onClose, branches }: ExportWizardProps) {
               >
                 Sucursal
               </label>
-              <select
-                id="export-branch"
-                value={branchId ?? ""}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  setBranchId(value === "" ? null : Number(value));
-                  setBranchError(null);
-                }}
-                className="w-full px-3 py-3 min-h-[48px] rounded-lg border border-gray-200 focus:border-[#ff385c] outline-none transition-all text-sm touch-manipulation"
-              >
-                <option value="">Seleccionar sucursal</option>
-                {branches.map((branch) => (
-                  <option key={branch.id} value={branch.id}>
-                    {branch.name}
+              <div className="relative">
+                <select
+                  id="export-branch"
+                  value={branchId ?? ""}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setBranchId(value === "" ? null : Number(value));
+                    setBranchError(null);
+                  }}
+                  className="w-full px-3 py-3 min-h-[48px] rounded-xl border border-gray-200 bg-white focus:border-[#ff385c] focus:ring-2 focus:ring-[#ff385c]/20 outline-none transition-all text-sm touch-manipulation appearance-none cursor-pointer pr-10"
+                >
+                  <option value="" className="bg-white text-[#222222]">
+                    Seleccionar sucursal
                   </option>
-                ))}
-              </select>
+                  {branches.map((branch) => (
+                    <option
+                      key={branch.id}
+                      value={branch.id}
+                      className="bg-white text-[#222222]"
+                    >
+                      {branch.name}
+                    </option>
+                  ))}
+                </select>
+                <svg
+                  className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[#6a6a6a] pointer-events-none"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  aria-hidden="true"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M19 9l-7 7-7-7"
+                  />
+                </svg>
+              </div>
             </div>
             {branchError && (
               <p className="mt-2 text-sm text-red-600">{branchError}</p>

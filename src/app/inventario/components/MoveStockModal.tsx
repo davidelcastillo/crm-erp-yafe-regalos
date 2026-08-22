@@ -173,18 +173,18 @@ export const MoveStockModal = ({
   }
 
   const selectClass =
-    "w-full px-3 py-3 min-h-[48px] rounded-xl border border-gray-200 focus:border-[#ff385c] focus:ring-2 focus:ring-[#ff385c]/20 outline-none transition-all text-sm touch-manipulation";
+    "w-full px-3 py-3 min-h-[48px] rounded-xl border border-gray-200 bg-white focus:border-[#ff385c] focus:ring-2 focus:ring-[#ff385c]/20 outline-none transition-all text-sm touch-manipulation appearance-none cursor-pointer";
 
   return (
     <div
-      className="fixed inset-0 bg-black/30 backdrop-blur-md z-[60] flex items-end justify-center"
+      className="fixed inset-0 bg-black/30 backdrop-blur-md z-[60] flex items-center justify-center"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
       aria-labelledby="move-stock-title"
     >
       <div
-        className="bg-white w-full max-w-lg rounded-t-3xl p-6 animate-slide-up max-h-[90vh] overflow-y-auto"
+        className="bg-white w-full max-w-lg rounded-2xl p-6 animate-scale-in max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-between items-center mb-4">
@@ -226,23 +226,45 @@ export const MoveStockModal = ({
             >
               Sucursal origen
             </label>
-            <select
-              id="ms-origen"
-              value={sourceBranchId ?? ""}
-              onChange={(e) => {
-                const val = e.target.value;
-                handleOriginChange(val === "" ? null : Number(val));
-              }}
-              className={selectClass}
-              disabled={pending}
-            >
-              <option value="">Seleccionar origen</option>
-              {branches.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name}
+            <div className="relative">
+              <select
+                id="ms-origen"
+                value={sourceBranchId ?? ""}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  handleOriginChange(val === "" ? null : Number(val));
+                }}
+                className={`${selectClass} pr-10`}
+                disabled={pending}
+              >
+                <option value="" className="bg-white text-[#222222]">
+                  Seleccionar origen
                 </option>
-              ))}
-            </select>
+                {branches.map((b) => (
+                  <option
+                    key={b.id}
+                    value={b.id}
+                    className="bg-white text-[#222222]"
+                  >
+                    {b.name}
+                  </option>
+                ))}
+              </select>
+              <svg
+                className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[#6a6a6a] pointer-events-none"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                aria-hidden="true"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 9l-7 7-7-7"
+                />
+              </svg>
+            </div>
           </div>
         )}
 
@@ -254,25 +276,47 @@ export const MoveStockModal = ({
             >
               Sucursal destino
             </label>
-            <select
-              id="ms-destino"
-              value={destBranchId ?? ""}
-              onChange={(e) => {
-                const val = e.target.value;
-                setDestBranchId(val === "" ? null : Number(val));
-              }}
-              className={selectClass}
-              disabled={pending}
-            >
-              <option value="">Seleccionar destino</option>
-              {branches
-                .filter((b) => b.id !== sourceBranchId)
-                .map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.name}
-                  </option>
-                ))}
-            </select>
+            <div className="relative">
+              <select
+                id="ms-destino"
+                value={destBranchId ?? ""}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setDestBranchId(val === "" ? null : Number(val));
+                }}
+                className={`${selectClass} pr-10`}
+                disabled={pending}
+              >
+                <option value="" className="bg-white text-[#222222]">
+                  Seleccionar destino
+                </option>
+                {branches
+                  .filter((b) => b.id !== sourceBranchId)
+                  .map((b) => (
+                    <option
+                      key={b.id}
+                      value={b.id}
+                      className="bg-white text-[#222222]"
+                    >
+                      {b.name}
+                    </option>
+                  ))}
+              </select>
+              <svg
+                className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[#6a6a6a] pointer-events-none"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                aria-hidden="true"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 9l-7 7-7-7"
+                />
+              </svg>
+            </div>
 
             <p className="block text-xs text-[#6a6a6a] mt-4 mb-2">
               Productos con stock en la sucursal de origen
