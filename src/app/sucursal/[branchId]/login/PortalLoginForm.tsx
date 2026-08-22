@@ -49,7 +49,7 @@ export default function PortalLoginForm({ branchId }: { branchId: number }) {
   return (
     <form className="space-y-6" onSubmit={handleSubmit}>
       <div>
-        <label htmlFor="email" className="block mb-2 text-sm font-medium text-gray-900">
+        <label htmlFor="email" className="block mb-2 text-sm font-medium text-[#6a6a6a]">
           Correo electrónico
         </label>
         <input
@@ -58,14 +58,14 @@ export default function PortalLoginForm({ branchId }: { branchId: number }) {
           type="email"
           autoComplete="email"
           required
-          className="block w-full rounded-xl border-0 px-3 py-3 min-h-[44px] text-sm font-medium text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 touch-manipulation"
+          className="block w-full rounded-xl border-0 px-3 py-3 min-h-[44px] text-sm font-medium text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:border-[#ff385c] focus:ring-[#ff385c]/20 touch-manipulation"
           value={formState.email}
           onChange={handleChange}
         />
       </div>
 
       <div>
-        <label htmlFor="password" className="block mb-2 text-sm font-medium text-gray-900">
+        <label htmlFor="password" className="block mb-2 text-sm font-medium text-[#6a6a6a]">
           Contraseña
         </label>
         <input
@@ -74,20 +74,20 @@ export default function PortalLoginForm({ branchId }: { branchId: number }) {
           type="password"
           autoComplete="current-password"
           required
-          className="block w-full rounded-xl border-0 px-3 py-3 min-h-[44px] text-sm font-medium text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 touch-manipulation"
+          className="block w-full rounded-xl border-0 px-3 py-3 min-h-[44px] text-sm font-medium text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:border-[#ff385c] focus:ring-[#ff385c]/20 touch-manipulation"
           value={formState.password}
           onChange={handleChange}
         />
       </div>
 
-      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+      {error && <p className="mt-2 text-sm text-[#c13515]">{error}</p>}
 
       {success && <p className="mt-2 text-sm text-green-600">{success}</p>}
 
       <button
         type="submit"
         disabled={pending}
-        className="w-full flex justify-center py-2 px-4 min-h-[44px] border border-transparent text-sm font-medium rounded-xl shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 transition-colors touch-manipulation"
+        className="w-full flex justify-center py-2 px-4 min-h-[44px] border border-transparent text-sm font-medium rounded-xl shadow-sm text-white bg-[#ff385c] hover:bg-[#e00b41] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#ff385c]/50 disabled:opacity-50 transition-colors touch-manipulation"
       >
         {pending ? 'Iniciando sesión...' : 'Iniciar sesión'}
       </button>

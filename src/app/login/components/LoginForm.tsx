@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { z } from 'zod';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { login } from '@/actions/auth';
 import { loginSchema } from '@/lib/validations/auth';
 
@@ -112,12 +113,12 @@ export default function LoginForm() {
           </div>
 
           <div className="text-sm">
-            <a
-              href="#"
+            <Link
+              href="/forgot-password"
               className="font-medium text-[#ff385c] hover:text-[#e00b41]"
             >
               Olvidé mi contraseña
-            </a>
+            </Link>
           </div>
         </div>
 
@@ -131,16 +132,6 @@ export default function LoginForm() {
           </button>
         </div>
       </form>
-
-<p className="mt-4 text-sm text-center text-[#6a6a6a]">
-         ¿No tienes una cuenta?
-         <a
-           href="/register"
-           className="font-medium text-[#ff385c] hover:text-[#e00b41]"
-         >
-           Regístrate aquí
-         </a>
-       </p>
     </div>
   );
 }

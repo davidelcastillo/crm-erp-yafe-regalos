@@ -17,7 +17,7 @@ export default async function BranchPortalLoginPage({
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center px-6 py-12 lg:px-8">
-      <div className="w-full bg-white rounded-2xl shadow-md p-6 space-y-6 sm:w-[400px]">
+      <div className="w-full bg-white rounded-xl shadow-md p-6 space-y-6 sm:w-[400px]">
         <h2 className="text-2xl font-bold text-center text-[#222222]">
           Portal de la Sucursal
         </h2>

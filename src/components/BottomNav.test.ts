@@ -66,4 +66,16 @@ describe("BottomNav", () => {
     expect(screen.queryByRole("link")).toBeNull();
     expect(container).toBeEmptyDOMElement();
   });
+
+  it.each([
+    ["/forgot-password"],
+    ["/reset-password"],
+    ["/auth/callback"],
+  ])("renders nothing on the auth route %s", (pathname) => {
+    (usePathname as jest.Mock).mockReturnValue(pathname);
+    const { container } = render(React.createElement(BottomNav));
+
+    expect(screen.queryByRole("link")).toBeNull();
+    expect(container).toBeEmptyDOMElement();
+  });
 });
