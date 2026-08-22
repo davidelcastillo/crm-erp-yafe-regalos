@@ -96,8 +96,8 @@ export default function InactivosPage() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-bold text-gray-900">Productos Inactivos</h1>
-          <Link href="/productos" className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300">
-            Volver a productos
+          <Link href="/inventario" className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300">
+            Volver a inventario
           </Link>
         </div>
 

@@ -19,13 +19,12 @@ describe("BottomNav", () => {
     (usePathname as jest.Mock).mockReturnValue("/dashboard");
     render(React.createElement(BottomNav));
 
-    // Should have 7 nav links (Inactivos was removed — now a button in /inventario)
+    // Should have 6 nav links (Productos was removed — /productos now redirects to /inventario)
     const navLinks = screen.getAllByRole("link");
-    expect(navLinks).toHaveLength(7);
+    expect(navLinks).toHaveLength(6);
     expect(navLinks.map((l) => l.textContent)).toEqual(
       expect.arrayContaining([
         "Dashboard",
-        "Productos",
         "Compras",
         "Ventas",
         "Inventario",
@@ -33,13 +32,14 @@ describe("BottomNav", () => {
         "Clientes",
       ])
     );
+    expect(screen.queryByRole("link", { name: /productos/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /inactivos/i })).not.toBeInTheDocument();
   });
 
   it("highlights active link", () => {
-    (usePathname as jest.Mock).mockReturnValue("/productos");
+    (usePathname as jest.Mock).mockReturnValue("/inventario");
     render(React.createElement(BottomNav));
-    const activo = screen.getByRole("link", { name: /productos/i });
+    const activo = screen.getByRole("link", { name: /inventario/i });
     expect(activo).toHaveClass("text-[#ff385c]"); // active color
   });
 
