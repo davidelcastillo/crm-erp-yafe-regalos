@@ -43,7 +43,7 @@ export default function ResetPasswordForm() {
         setError(actionResult.error || 'No se pudo actualizar la contraseña');
         setStatus('idle');
       }
-    } catch (err) {
+    } catch {
       setError('Ocurrió un error inesperado');
       setStatus('idle');
     }

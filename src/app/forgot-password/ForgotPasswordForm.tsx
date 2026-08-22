@@ -38,7 +38,7 @@ export default function ForgotPasswordForm() {
         setError(actionResult.error || 'Ocurrió un error inesperado');
         setStatus('idle');
       }
-    } catch (err) {
+    } catch {
       setError('Ocurrió un error inesperado');
       setStatus('idle');
     }
