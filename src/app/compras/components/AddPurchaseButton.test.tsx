@@ -110,6 +110,15 @@ describe("AddPurchaseButton Component", () => {
     expect(screen.getByRole("button", { name: /registrar compra/i })).toBeInTheDocument();
   });
 
+  it("shows the 'sección Inventario' copy when there are 0 registered products", () => {
+    render(<AddPurchaseButton products={[]} />);
+
+    fireEvent.click(screen.getByLabelText(/registrar compra/i));
+
+    expect(screen.getByText(/no hay productos registrados/i)).toBeInTheDocument();
+    expect(screen.getByText(/sección Inventario/i)).toBeInTheDocument();
+  });
+
 it("opens purchase modal when button is clicked", () => {
     render(<AddPurchaseButton products={mockProducts} />);
     

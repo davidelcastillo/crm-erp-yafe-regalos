@@ -271,7 +271,7 @@ export function AddSaleButton({ products, onSuccess }: AddSaleButtonProps) {
             {products.length === 0 ? (
               <div className="text-center py-8">
                 <p className="text-[#6a6a6a] mb-4">No hay productos registrados</p>
-                <p className="text-sm text-[#6a6a6a]">Primero creá un producto en la sección Productos</p>
+                <p className="text-sm text-[#6a6a6a]">Primero creá un producto en la sección Inventario</p>
               </div>
             ) : (
               <form onSubmit={handleSubmit} className="space-y-4">

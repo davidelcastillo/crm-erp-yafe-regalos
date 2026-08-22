@@ -19,6 +19,7 @@ import {
   updateCategory,
   deleteCategory,
 } from "@/app/actions/category";
+import { revalidatePath } from "next/cache";
 
 const mockCategoryCreate = jest.fn();
 const mockCategoryFindMany = jest.fn();
@@ -46,6 +47,8 @@ jest.mock("next/cache", () => ({
   revalidatePath: jest.fn(),
 }));
 
+const mockRevalidatePath = revalidatePath as jest.Mock;
+
 describe("createCategory (Fase 3)", () => {
   beforeEach(() => jest.clearAllMocks());
 
@@ -57,6 +60,15 @@ describe("createCategory (Fase 3)", () => {
     expect(result.success).toBe(true);
     expect(result.data).toEqual({ id: 1, name: "General" });
     expect(mockCategoryCreate).toHaveBeenCalledWith({ data: { name: "General" } });
+  });
+
+  it("revalidates /categorias and /inventario after a successful create", async () => {
+    mockCategoryCreate.mockResolvedValue({ id: 1, name: "General" });
+
+    await createCategory({ name: "General" });
+
+    expect(mockRevalidatePath).toHaveBeenCalledWith("/categorias");
+    expect(mockRevalidatePath).toHaveBeenCalledWith("/inventario");
   });
 
   it("rejects an empty name (Zod)", async () => {
@@ -73,6 +85,8 @@ describe("createCategory (Fase 3)", () => {
 
     expect(result.success).toBe(false);
     expect(result.error).toContain("Ya existe");
+    // P2002 must NOT trigger any revalidation
+    expect(mockRevalidatePath).not.toHaveBeenCalled();
   });
 });
 

@@ -35,6 +35,7 @@ export async function createCategory(data: { name: string }) {
     });
 
     revalidatePath('/categorias');
+    revalidatePath("/inventario");
     return { success: true as const, data: category };
   } catch (error) {
     if (error instanceof z.ZodError) {

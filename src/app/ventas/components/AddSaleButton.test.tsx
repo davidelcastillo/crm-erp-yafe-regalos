@@ -172,4 +172,13 @@ describe("AddSaleButton MIXTO (mejoras-f3-f4 item 4)", () => {
       expect.not.objectContaining({ amountPaid: expect.anything() })
     );
   });
+
+  it("shows the 'sección Inventario' copy when there are 0 registered products", () => {
+    render(<AddSaleButton products={[]} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Registrar venta" }));
+
+    expect(screen.getByText(/no hay productos registrados/i)).toBeInTheDocument();
+    expect(screen.getByText(/sección Inventario/i)).toBeInTheDocument();
+  });
 });
