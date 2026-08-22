@@ -6,6 +6,11 @@
  * redirected to /unauthorized over and over again, and an unauthenticated
  * user visiting /unauthorized is not bounced to /login.
  *
+ * Plus the app-middleware delta behavior: anonymous requests to /sucursal/*
+ * pass through without redirect (visibility is decided by the catalog action),
+ * and authenticated requests to /sucursal/* go through decideBranchAccess
+ * (GET-only, URL shape) with no role/claim rules.
+ *
  * @jest-environment node
  */
 import { NextResponse } from "next/server";
@@ -22,12 +27,6 @@ jest.mock("@/lib/supabase/server", () => ({
 
 jest.mock("@/lib/supabase/auth", () => ({
   getUserRole: jest.fn(),
-  getUserBranchId: jest.fn(),
-}));
-
-jest.mock("@/lib/supabase/branch", () => ({
-  isPortalLoginPath: jest.requireActual("@/lib/supabase/branch")
-    .isPortalLoginPath,
 }));
 
 import { createServerClient } from "@/lib/supabase/server";
@@ -128,5 +127,42 @@ describe("proxy middleware", () => {
 
     expect(redirectSpy).not.toHaveBeenCalled();
     expect(response).toEqual({ __mock: "next-response" });
+  });
+
+  it("lets an anonymous GET /sucursal/39/inventory pass without redirect", async () => {
+    mockUser(null);
+
+    const response = await proxy(mockRequest("/sucursal/39/inventory"));
+
+    expect(redirectSpy).not.toHaveBeenCalled();
+    expect(response).toEqual({ __mock: "next-response" });
+  });
+
+  it("lets an anonymous POST /sucursal/39/inventory pass without redirect", async () => {
+    mockUser(null);
+
+    const response = await proxy(mockRequest("/sucursal/39/inventory", "POST"));
+
+    expect(redirectSpy).not.toHaveBeenCalled();
+    expect(response).toEqual({ __mock: "next-response" });
+  });
+
+  it("lets an authenticated GET /sucursal/39/inventory pass (no role rule)", async () => {
+    mockUser({ id: "user-1" });
+
+    const response = await proxy(mockRequest("/sucursal/39/inventory"));
+
+    expect(redirectSpy).not.toHaveBeenCalled();
+    expect(response).toEqual({ __mock: "next-response" });
+  });
+
+  it("redirects an authenticated GET to a malformed /sucursal/abc/inventory to /unauthorized", async () => {
+    mockUser({ id: "user-1" });
+
+    await proxy(mockRequest("/sucursal/abc/inventory"));
+
+    expect(redirectSpy).toHaveBeenCalledTimes(1);
+    const redirectTarget = redirectSpy.mock.calls[0][0] as URL;
+    expect(new URL(redirectTarget).pathname).toBe("/unauthorized");
   });
 });

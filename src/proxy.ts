@@ -3,8 +3,7 @@ import type { NextRequest } from 'next/server';
 import { cookies } from 'next/headers';
 import { createServerClient } from '@/lib/supabase/server';
 import { decideBranchAccess } from '@/middleware/branch';
-import { getUserRole, getUserBranchId } from '@/lib/supabase/auth';
-import { isPortalLoginPath } from '@/lib/supabase/branch';
+import { getUserRole } from '@/lib/supabase/auth';
 
 export async function proxy(request: NextRequest) {
   // Create a response that we can modify (for setting cookies, etc.)
@@ -29,9 +28,10 @@ export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Define paths that should be excluded from authentication checks
-  // Note: /sucursal/ is NOT excluded here because we want to check branch
-  // authorization. The exception is the portal login path (/sucursal/<id>/login)
-  // which must be reachable WITHOUT a central session.
+  // /sucursal/* is NOT excluded here: anonymous GET requests pass through the
+  // proxy without a session (the catalog action decides visibility), and
+  // authenticated requests go through the branch-access guard below. The
+  // portal login path no longer exists.
   // /unauthorized is excluded so the error page can always render — an
   // authenticated non-admin must NOT be redirected to /unauthorized again
   // (that caused an infinite redirect loop), and unauthenticated visitors
@@ -42,7 +42,6 @@ export async function proxy(request: NextRequest) {
     pathname === '/forgot-password' ||
     pathname === '/reset-password' ||
     pathname === '/auth/callback' ||
-    isPortalLoginPath(pathname) ||
     pathname.startsWith('/_next/') ||
     pathname === '/favicon.ico' ||
     pathname.startsWith('/images/') ||
@@ -50,6 +49,12 @@ export async function proxy(request: NextRequest) {
 
   // If no user and path is not excluded, redirect to login
   if (!user && !isExcluded) {
+    // The external branch portal is public: anonymous visitors reach
+    // /sucursal/* directly without a session or a redirect-to cookie.
+    if (pathname.startsWith('/sucursal/')) {
+      return response;
+    }
+
     // Store the intended URL in an http-only cookie for redirect after login
     const redirectTo = request.nextUrl.pathname + request.nextUrl.search;
     cookieStore.set('redirect-to', redirectTo, {
@@ -67,23 +72,16 @@ export async function proxy(request: NextRequest) {
   if (user) {
     // Check for branch-specific paths (/sucursal/*)
     if (pathname.startsWith('/sucursal/')) {
-      // The portal login path is excluded from the branch-access guard: it must
-      // stay reachable for branch users to authenticate. Everything else under
-      // /sucursal/* stays protected (GET-only + branch_user).
-      if (!isPortalLoginPath(pathname)) {
-        const role = await getUserRole();
-        const branchId = await getUserBranchId();
-        const accessDecision = decideBranchAccess({
-          pathname,
-          method: request.method,
-          role,
-          branchId,
-        });
+      // /sucursal/* is public for GET requests (any role or no session); only
+      // the HTTP method and the URL shape are validated here.
+      const accessDecision = decideBranchAccess({
+        pathname,
+        method: request.method,
+      });
 
-        if (!accessDecision.allowed) {
-          // User is not authorized to access this branch
-          return NextResponse.redirect(new URL('/unauthorized', request.url));
-        }
+      if (!accessDecision.allowed) {
+        // User is not authorized to access this branch
+        return NextResponse.redirect(new URL('/unauthorized', request.url));
       }
     } else if (!isExcluded) {
       // Admin gating for internal routes (not /login, not /sucursal/*, not
