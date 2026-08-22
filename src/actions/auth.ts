@@ -4,6 +4,7 @@ import { createServerClient } from '@/lib/supabase/server';
 import { cookies } from 'next/headers';
 import { NextResponse, type NextRequest } from 'next/server';
 import { loginSchema } from '@/lib/validations/auth';
+import { REMEMBER_ME_MAX_AGE } from '@/lib/supabase/session';
 
 export type ActionResult = {
   success: boolean;
@@ -27,8 +28,11 @@ export async function login(formData: FormData): Promise<ActionResult> {
 
   const { email: validatedEmail, password: validatedPassword } = result.data;
 
+  // Recordarme: 'on' → 7-day session cookie; otherwise default 1 hour.
+  const remember = formData.get('remember-me') === 'on';
+
   // Create Supabase server client
-  const supabase = await createServerClient();
+  const supabase = await createServerClient(remember ? REMEMBER_ME_MAX_AGE : undefined);
 
   try {
     const { data, error } = await supabase.auth.signInWithPassword({
@@ -82,9 +86,8 @@ export async function logout(): Promise<ActionResult> {
 
   try {
     await supabase.auth.signOut();
-    // Clear any session cookies
-    const cookieStore = await cookies();
-    cookieStore.set('sb-token', '', { expires: new Date(0) });
+    // signOut() clears the real session cookies (sb-<ref>-auth-token + chunks)
+    // via the store's setAll with value '' / maxAge 0. No dead cookie here.
 
     return {
       success: true,

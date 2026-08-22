@@ -39,9 +39,11 @@ const nextSpy = jest
 const redirectSpy = jest.spyOn(NextResponse, "redirect");
 
 function mockRequest(pathname: string, method = "GET"): NextRequest {
+  // Parse like real Next.js: nextUrl.pathname never contains the query string.
+  const url = new URL(pathname, "https://app.example.com");
   return {
-    nextUrl: { pathname, search: "" },
-    url: `https://app.example.com${pathname}`,
+    nextUrl: { pathname: url.pathname, search: url.search },
+    url: url.toString(),
     method,
     headers: new Headers(),
   } as unknown as NextRequest;
@@ -94,6 +96,35 @@ describe("proxy middleware", () => {
     mockUser(null);
 
     const response = await proxy(mockRequest("/login"));
+
+    expect(redirectSpy).not.toHaveBeenCalled();
+    expect(response).toEqual({ __mock: "next-response" });
+  });
+
+  it("lets an unauthenticated user reach /forgot-password without redirect", async () => {
+    mockUser(null);
+
+    const response = await proxy(mockRequest("/forgot-password"));
+
+    expect(redirectSpy).not.toHaveBeenCalled();
+    expect(response).toEqual({ __mock: "next-response" });
+  });
+
+  it("lets an unauthenticated user reach /reset-password without redirect", async () => {
+    mockUser(null);
+
+    const response = await proxy(mockRequest("/reset-password"));
+
+    expect(redirectSpy).not.toHaveBeenCalled();
+    expect(response).toEqual({ __mock: "next-response" });
+  });
+
+  it("lets an unauthenticated user reach /auth/callback (critical PKCE) without redirect", async () => {
+    mockUser(null);
+
+    const response = await proxy(
+      mockRequest("/auth/callback?code=pkce-code&next=/reset-password")
+    );
 
     expect(redirectSpy).not.toHaveBeenCalled();
     expect(response).toEqual({ __mock: "next-response" });
