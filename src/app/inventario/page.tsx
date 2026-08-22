@@ -4,7 +4,7 @@
 import Link from "next/link";
 import { getProductsWithBranchStock } from "../actions/inventory";
 import { getBranchOptions } from "../actions/branch";
-import { getCategoryOptions } from "../actions/category";
+import { getCategoryOptions, createCategory } from "../actions/category";
 import { InventarioList } from "./components/InventarioList";
 import { InventoryFilters } from "./components/InventoryFilters";
 import { MoveStockModal } from "./components/MoveStockModal";
@@ -12,8 +12,11 @@ import { ExportWizard } from "./components/ExportWizard";
 import { LabelSelector } from "@/components/ui/LabelSelector";
 import { MovementsModal } from "@/components/ui/MovementsModal";
 import { BranchFilterDropdown } from "@/components/ui/BranchFilterDropdown";
+import { AddProductButton } from "../productos/components/AddProductButton";
+import { ProductForm } from "../productos/components/ProductForm";
 import { useEffect, useState, useCallback } from 'react';
 import { Product } from "@prisma/client";
+import Swal from "sweetalert2";
 
 type BranchOption = { id: number; name: string };
 type CategoryOption = { id: number; name: string };
@@ -36,6 +39,7 @@ export default function InventarioPage() {
   const [moveStockOpen, setMoveStockOpen] = useState(false);
   const [moveStockProductId, setMoveStockProductId] = useState<number | null>(null);
   const [exportWizardOpen, setExportWizardOpen] = useState(false);
+  const [productFormOpen, setProductFormOpen] = useState(false);
 
   // Task 4.6: unified search (debounce 300 ms) that drives the server-side
   // `search` param of getProductsWithBranchStock. The old client-side filtering
@@ -98,6 +102,75 @@ export default function InventarioPage() {
     })();
   }, []);
 
+  // Refetch tras crear un producto desde el FAB: respeta los filtros AND
+  // activos (sucursal + categoría + búsqueda) SIN resetearlos (spec
+  // inventory-ui). Si el producto nuevo no matchea los filtros, no aparece
+  // en la lista — comportamiento correcto del AND.
+  const handleProductCreated = async (_created: Product) => {
+    try {
+      const data = await fetchProducts(branchId, selectedCategoryId, debouncedSearch);
+      setProducts(data);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al cargar productos');
+    }
+  };
+
+  // "Nueva categoría" del header — patrón Swal exacto de CategorySelector
+  // (input text, maxlength 100, validación vacío/>100). Ante éxito refresca
+  // getCategoryOptions → setCategories (alimenta InventoryFilters); ante
+  // error (incluido P2002) muestra Swal error y NO muta la lista local.
+  const handleCreateCategory = async () => {
+    const modal = await Swal.fire({
+      title: "Nueva categoría",
+      input: "text",
+      inputLabel: "Nombre",
+      inputPlaceholder: "Ej: Limpieza, Alimentos…",
+      inputAttributes: { maxlength: "100", autocapitalize: "on" },
+      showCancelButton: true,
+      confirmButtonText: "Crear",
+      cancelButtonText: "Cancelar",
+      confirmButtonColor: "#ff385c",
+      cancelButtonColor: "#6a6a6a",
+      background: "#ffffff",
+      color: "#222222",
+      inputValidator: (value) => {
+        if (!value || !value.trim()) return "El nombre es requerido";
+        if (value.length > 100) return "Máximo 100 caracteres";
+        return null;
+      },
+    });
+
+    if (!modal.isConfirmed) return;
+
+    const result = await createCategory({ name: modal.value.trim() });
+    if (result.success && result.data) {
+      const categoryRes = await getCategoryOptions();
+      if (categoryRes.success && categoryRes.data) {
+        setCategories(categoryRes.data as CategoryOption[]);
+      }
+      await Swal.fire({
+        title: "Categoría creada",
+        text: `Se creó "${result.data.name}"`,
+        icon: "success",
+        confirmButtonColor: "#ff385c",
+        confirmButtonText: "Aceptar",
+        background: "#ffffff",
+        color: "#222222",
+      });
+    } else {
+      await Swal.fire({
+        title: "Error",
+        text: result.error ?? "No se pudo crear la categoría",
+        icon: "error",
+        confirmButtonColor: "#ff385c",
+        confirmButtonText: "Aceptar",
+        background: "#ffffff",
+        color: "#222222",
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-white pb-20">
@@ -145,6 +218,14 @@ export default function InventarioPage() {
               onValueChange={setBranchId}
               label="Stock por sucursal"
             />
+            <button
+              type="button"
+              onClick={handleCreateCategory}
+              className="px-4 py-2 min-h-[44px] text-sm font-medium text-[#222222] bg-white border border-gray-200 rounded-xl hover:bg-[#f2f2f2] transition-colors touch-manipulation"
+              aria-label="Nueva categoría"
+            >
+              Nueva categoría
+            </button>
             <button
               type="button"
               onClick={() => {
@@ -244,6 +325,22 @@ export default function InventarioPage() {
             open={exportWizardOpen}
             onClose={() => setExportWizardOpen(false)}
             branches={branches}
+          />
+        )}
+
+        {/* FAB crear producto + ProductForm directo (Fase 1 unificar
+            productos): scrim propio z-[60] de ProductForm, SIN wrapper z-[70].
+            El FAB (z-40) queda cubierto por el scrim del modal. */}
+        <AddProductButton
+          open={productFormOpen}
+          onOpenChange={setProductFormOpen}
+          onSuccess={handleProductCreated}
+        />
+        {productFormOpen && (
+          <ProductForm
+            product={null}
+            onSuccess={handleProductCreated}
+            onClose={() => setProductFormOpen(false)}
           />
         )}
       </main>
