@@ -16,10 +16,24 @@ export async function getExternalBranchInventory(data: unknown) {
 
   try {
     const { branchId } = branchIdSchema.parse(data);
-    
-    // Get products with their inventory details for the specific branch
+
+    // Visibility check: the catalog is public only for branches that exist,
+    // are marked isPublic AND are active. The same `success: false` is
+    // returned for non-public, inactive and non-existent branches so the
+    // reason is never leaked. This applies to every role (admin included).
+    const branch = await prisma.branch.findUnique({
+      where: { id: branchId },
+      select: { isPublic: true, isActive: true },
+    });
+
+    if (!branch || !branch.isPublic || !branch.isActive) {
+      return { success: false };
+    }
+
+    // Get active products with their inventory details for the specific branch
     const productsWithInventory = await prisma.product.findMany({
       where: {
+        active: true,
         inventory: {
           some: {
             branchId: branchId,
@@ -27,7 +41,6 @@ export async function getExternalBranchInventory(data: unknown) {
         },
       },
       select: {
-        id: true,
         code: true,
         name: true,
         price: true,

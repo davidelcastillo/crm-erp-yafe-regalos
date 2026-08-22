@@ -1,6 +1,5 @@
 import { notFound } from 'next/navigation';
 import { getExternalBranchInventory } from '@/app/actions/inventory.external';
-import { getUserBranchId } from '@/lib/supabase/auth';
 import ExternalInventoryTable, {
   type InventoryItem,
 } from '@/lib/components/ExternalInventoryTable';
@@ -20,18 +19,11 @@ export default async function BranchInventoryPage({
     notFound();
   }
 
-  // Get the user's branch ID from auth metadata
-  const userBranchId = await getUserBranchId();
-  
-  // Check if user is authorized to view this branch's inventory
-  // Branch users can only see their own branch
-  // Admin users can see any branch (handled by middleware)
-  if (userBranchId !== null && userBranchId !== branchId) {
-    notFound();
-  }
-
   // Fetch inventory for this branch (external portal format)
-  // The action expects a { branchId } object (zod-validated)
+  // The action expects a { branchId } object (zod-validated).
+  // Visibility is decided inside getExternalBranchInventory: the catalog is
+  // public only for branches with isPublic && isActive (same notFound for
+  // non-public, inactive and non-existent branches — no existence leak).
   const inventoryResult = await getExternalBranchInventory({ branchId });
   
   if (!inventoryResult.success) {
