@@ -43,6 +43,7 @@ export async function createBranch(data: unknown) {
           email: validatedData.email || null,
           code: validatedData.code,
           isActive: validatedData.isActive,
+          isPublic: validatedData.isPublic,
         },
       });
 
@@ -163,6 +164,9 @@ export async function updateBranch(data: unknown) {
         ...(validatedData.email !== undefined && { email: validatedData.email }),
         ...(validatedData.isActive !== undefined && {
           isActive: validatedData.isActive,
+        }),
+        ...(validatedData.isPublic !== undefined && {
+          isPublic: validatedData.isPublic,
         }),
         // Note: authUserId is not updated here as it should remain tied to the
         // original Supabase Auth user. Changing authUserId would require

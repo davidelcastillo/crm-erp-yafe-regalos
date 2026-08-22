@@ -22,6 +22,7 @@ interface Branch {
   phone?: string | null;
   email?: string | null;
   isActive: boolean;
+  isPublic: boolean;
   code?: string | null;
 }
 
@@ -31,6 +32,7 @@ interface BranchForm {
   phone: string;
   email: string;
   isActive: boolean;
+  isPublic: boolean;
   code: string;
 }
 
@@ -42,6 +44,7 @@ const EMPTY_FORM: BranchForm = {
   phone: "",
   email: "",
   isActive: true,
+  isPublic: false,
   code: "",
 };
 
@@ -82,6 +85,7 @@ export function BranchManager({ branches }: { branches: Branch[] }) {
       phone: branch.phone ?? "",
       email: branch.email ?? "",
       isActive: branch.isActive,
+      isPublic: branch.isPublic,
       code: branch.code ?? "",
     });
     setEditingId(branch.id);
@@ -100,6 +104,7 @@ export function BranchManager({ branches }: { branches: Branch[] }) {
       phone: form.phone?.trim() || null,
       email: form.email?.trim() || null,
       isActive: form.isActive,
+      isPublic: form.isPublic,
       ...(mode === "create" && { code: form.code.trim() }),
     };
 
@@ -278,6 +283,16 @@ export function BranchManager({ branches }: { branches: Branch[] }) {
               <span className="text-sm text-[#222222]">Sucursal activa</span>
             </label>
 
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.isPublic}
+                onChange={(e) => setForm({ ...form, isPublic: e.target.checked })}
+                className="w-5 h-5 rounded"
+              />
+              <span className="text-sm text-[#222222]">Sucursal pública</span>
+            </label>
+
             <div className="flex gap-3 pt-2">
               <button
                 type="submit"
@@ -351,6 +366,11 @@ export function BranchManager({ branches }: { branches: Branch[] }) {
                         Inactiva
                       </span>
                     )}
+                    {branch.isPublic === true && (
+                      <span className="px-2 py-0.5 bg-[#ff385c]/10 text-[#ff385c] rounded-full text-[11px] font-semibold">
+                        Pública
+                      </span>
+                    )}
                   </div>
                   {branch.address && (
                     <p className="text-sm text-[#6a6a6a] mt-1">{branch.address}</p>
@@ -363,7 +383,7 @@ export function BranchManager({ branches }: { branches: Branch[] }) {
 
                 <div className="flex items-center gap-1">
                   <Link
-                    href={`/sucursal/${branch.id}/login`}
+                    href={`/sucursal/${branch.id}/inventory`}
                     aria-label={`Ver portal de ${branch.name}`}
                     className="inline-flex items-center gap-1.5 px-3 min-h-[44px] rounded-xl bg-[#f2f2f2] text-[#222222] text-sm font-medium hover:bg-[#ebebeb] transition-colors touch-manipulation"
                   >

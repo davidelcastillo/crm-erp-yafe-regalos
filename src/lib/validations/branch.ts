@@ -20,6 +20,7 @@ export const createBranchSchema = z.object({
     .nullable()
     .or(z.literal("")),
   isActive: z.boolean().default(true),
+  isPublic: z.boolean().default(false),
   code: z
     .string()
     .regex(/^[A-Za-z0-9]{2,10}$/, "El código debe ser letras o números y entre 2 y 10 caracteres")
@@ -47,6 +48,7 @@ export const updateBranchSchema = z.object({
     .nullable()
     .or(z.literal("")),
   isActive: z.boolean().optional(),
+  isPublic: z.boolean().optional(),
   code: z
     .string()
     .regex(/^[A-Za-z0-9]{2,10}$/, "El código debe ser letras o números y entre 2 y 10 caracteres")

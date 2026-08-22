@@ -151,6 +151,14 @@ describe("branch validation schemas (HU2)", () => {
       expect(parsed.isActive).toBe(true);
     });
 
+    it("defaults isPublic to false when not provided (explicit opt-in)", () => {
+      const parsed = createBranchSchema.parse({
+        name: "Sucursal Norte",
+        code: "sn",
+      });
+      expect(parsed.isPublic).toBe(false);
+    });
+
     it("rejects missing code", () => {
       const result = createBranchSchema.safeParse({ name: "Sucursal" });
       expect(result.success).toBe(false);
@@ -197,6 +205,17 @@ describe("branch validation schemas (HU2)", () => {
       expect(parsed.id).toBe(3);
       expect(parsed.isActive).toBe(false);
       expect(parsed.name).toBeUndefined();
+    });
+
+    it("accepts isPublic as an optional field on updates", () => {
+      const parsed = updateBranchSchema.parse({ id: 3, isPublic: true });
+      expect(parsed.isPublic).toBe(true);
+
+      const without = updateBranchSchema.safeParse({ id: 4, name: "X" });
+      expect(without.success).toBe(true);
+      if (without.success) {
+        expect(without.data.isPublic).toBeUndefined();
+      }
     });
   });
 
@@ -258,6 +277,20 @@ describe("createBranch Server Action (HU2)", () => {
         name: "Sucursal Centro",
         isActive: true,
       }),
+    });
+  });
+
+  it("persists isPublic: true when creating a public branch", async () => {
+    mockBranchCreate.mockResolvedValue(mockBranchRecord({ isPublic: true }));
+    mockBranchUpdate.mockResolvedValue(
+      mockBranchRecord({ authUserId: "auth-user-123", isPublic: true })
+    );
+
+    const result = await createBranch({ ...baseValidInput, isPublic: true });
+
+    expect(result.success).toBe(true);
+    expect(mockBranchCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({ isPublic: true }),
     });
   });
 
@@ -406,6 +439,36 @@ describe("updateBranch Server Action (HU2)", () => {
     expect(result.data?.isActive).toBe(false);
     // The action must call .update, never .delete
     expect(mockBranchDelete).not.toHaveBeenCalled();
+  });
+
+  it("persists isPublic: false when a branch is un-published", async () => {
+    const updated = mockBranchRecord({ id: 4, isPublic: false });
+    mockBranchUpdate.mockResolvedValue(updated);
+
+    const result = await updateBranch({ id: 4, isPublic: false });
+
+    expect(result.success).toBe(true);
+    expect(result.data?.isPublic).toBe(false);
+    expect(mockBranchUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 4 },
+        data: expect.objectContaining({ isPublic: false }),
+      })
+    );
+  });
+
+  it("does not include isPublic in the update data when omitted", async () => {
+    mockBranchUpdate.mockResolvedValue(
+      mockBranchRecord({ id: 3, name: "Sucursal Sur" })
+    );
+
+    await updateBranch({ id: 3, name: "Sucursal Sur" });
+
+    expect(mockBranchUpdate).toHaveBeenCalledTimes(1);
+    const updateArg = mockBranchUpdate.mock.calls[0][0] as {
+      data: Record<string, unknown>;
+    };
+    expect(updateArg.data).not.toHaveProperty("isPublic");
   });
 
   it("rejects an invalid id (Zod)", async () => {
