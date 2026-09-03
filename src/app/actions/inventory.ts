@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { parseArray, parseObject } from "@/lib/parse-prisma";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import {
+import { 
   moveStockSchema,
   moveStockBatchSchema,
   assignStockSchema,
@@ -42,6 +42,7 @@ export async function getBranchInventory(data: unknown) {
     // First, get products that have inventory entry for this branch (including stock)
     const productsWithInventory = await prisma.product.findMany({
       where: {
+        active: true,
         inventory: {
           some: {
             branchId,
@@ -54,6 +55,7 @@ export async function getBranchInventory(data: unknown) {
       select: {
         id: true,
         name: true,
+        active: true,
         inventory: {
           where: {
             branchId,
@@ -70,6 +72,7 @@ export async function getBranchInventory(data: unknown) {
       id: p.id,
       name: p.name,
       stock: p.inventory[0]?.stock ?? 0,
+      active: p.active,
     }));
     return { success: true, data: parseArray(result) };
   } catch (error) {

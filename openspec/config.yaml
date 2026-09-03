@@ -1,0 +1,62 @@
+schema: spec-driven
+
+context: |
+  Tech stack: Next.js 16.2.4 (App Router) + React 19.2 + TypeScript 5 (strict) + Prisma 6.19 + PostgreSQL (Supabase) + Tailwind CSS v4 + Zod 4 + Recharts
+  Architecture: App Router with route groups (routes, auth); Server Actions for mutations; Supabase Auth + RLS; middleware-protected admin routes; external branch inventory routes (GET-only, branch_user role)
+  Testing: Jest 30 + ts-jest + jsdom + Testing Library (unit only; integration/E2E pending, Playwright not installed)
+  Style: Tailwind v4; visual rules in STYLE.MD at project root
+
+strict_tdd: true
+
+testing:
+  runner:
+    command: npm test
+    framework: jest 30 (ts-jest preset, jsdom environment, setup jest.setup.ts)
+  layers:
+    unit:
+      available: true
+      tool: "@testing-library/react + jest-dom"
+    integration:
+      available: false
+      tool: null
+    e2e:
+      available: false
+      tool: null
+  coverage:
+    available: true
+    command: npx jest --coverage
+  quality:
+    linter:
+      available: true
+      command: npm run lint
+    type_checker:
+      available: true
+      command: npx tsc --noEmit
+    formatter:
+      available: false
+      command: null
+
+rules:
+  proposal:
+    - Include rollback plan for risky changes
+  specs:
+    - Use Given/When/Then for scenarios
+    - Use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY)
+  design:
+    - Include sequence diagrams for complex flows
+    - Document architecture decisions with rationale
+  tasks:
+    - Group by phase, use hierarchical numbering
+    - Keep tasks completable in one session
+  apply:
+    guidelines:
+      - Follow existing code patterns
+      - Run `npm test` before applying changes
+    tdd: true
+    test_command: npm test
+  verify:
+    test_command: npm test
+    build_command: npm run build
+    coverage_threshold: 0
+  archive:
+    - Warn before merging destructive deltas

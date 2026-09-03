@@ -1,0 +1,10 @@
+ 1. En el BottonNav, agregemos las sucursales como un acceso como los demas, es decir, lo saquemos del boton de ... mas y lo pongamos como una opcion mas normal, corrigamos el icono de ventas del BottonNav 
+ 2. El filtro para filtrar productos de acuerdo a cierta sucursal en la pagina de productos no funciona, no importa si selecciono sucursales con productos o no, los produtos se muestran todos los mismos en la pagina de ventas. 
+ 3. Al eliminar un producto desde la pagina de productos, debe salir una alerta de SweerAlert2 en donde se pregunto que si se desea eliminar pero que no lo elimine, sino que lo desactive 
+ 4. En la pagina de compras, se puede 
+ 5. Al momento de registar una venta, el modal debe mostrar primero un selector para seleccionar la sucursal, el form pide la sucursal pero en el front, no sale ninguna opcion para registrar o seleccionar una. por logica primero se selecciona la sucursal y luego se consumen todos los productos que esten en esa sucursal 
+ 6. Dentro de la pagina de inventario, no funcionan los selectores para filtrar por Sucursal o por Categoria 
+ 7. Dentro de la edición por cada producto en la pagina de inventario, ademas de las opciones que ya existen para editar, se debe incluir una seccion para editar la categoria del producto en base a las categorias existentes, dentro de ese mismo editor, la opcion para editar el stock de un producto 
+ 8. El modal MoveStockModal que sale cuando se apreta el boton para mover stock no funciona ya que no me deja seleccionar el producto que se desea mover, primero se debe seleccionar una sucursal de origine, luego se consumen todos los productos que esten en esa sucursal y se debe agregar un selecctor del producto/s de origen, y por ultimo agregar un selecctor para la sucursal de destino. 
+ 9. Se debe agreagar un boton para ir a la pagina inventario/inactivos 
+ 10. Todos los botones de Eliminar, tanto en la pagina de PRoductos como en Inventario, se deben modificar, ahora deben decir "Desactivar" y debe poner el producto como inactivo y no desactivarlo. 

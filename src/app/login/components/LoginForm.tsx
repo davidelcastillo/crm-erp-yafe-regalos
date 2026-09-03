@@ -42,7 +42,7 @@ export default function LoginForm() {
         setSuccess('Inicio de sesión exitoso');
         // Redirect after a short delay to show success message
         setTimeout(() => {
-          router.push(actionResult.redirectTo || '/');
+          router.push(actionResult.redirectTo || '/dashboard');
         }, 1500);
 } else {
          setError(actionResult.error || 'Credenciales inválidas');
