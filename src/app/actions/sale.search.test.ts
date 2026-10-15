@@ -24,7 +24,13 @@ let productId = 0
 describe('getSales search (integración, base local)', () => {
   beforeAll(async () => {
     const branch = await prisma.branch.create({
-      data: { name: `QA venta ${sufijo}`, code: `QB${sufijo}` },
+      data: {
+        name: `QA venta ${sufijo}`,
+        code: `QB${sufijo}`,
+        // authUserId no nulo: `branchAdminService.test.ts` cuenta las sucursales sin
+        // authUserId de toda la base y falla si otra suite crea una en paralelo.
+        authUserId: `qa-venta-${sufijo}`,
+      },
     })
     branchId = branch.id
 
