@@ -47,7 +47,7 @@ Cada bug nuevo entra como unidad propia: reproducir → preguntar → implementa
 
 ## 1. Skills disponibles y carga selectiva
 
-Índice: `.atl/skill-registry.md`. Cargar solo lo relevante, no todo el registro.
+Índice local: `.atl/skill-registry.md` (generado por la herramienta; no se versiona). Cargar solo lo relevante, no todo el registro.
 
 | Skill | Cuándo usarlo | Ruta |
 |---|---|---|
