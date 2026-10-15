@@ -293,7 +293,8 @@ describe("registerSale Server Action - Payment Method Logic", () => {
     );
   });
 
-  it("should set amountPaid = 0 and pendingBalance = total for TRANSFERENCIA", async () => {
+  // Bug 8.3 del usuario: una transferencia es plata cobrada, no deuda.
+  it("should set amountPaid = total and pendingBalance = 0 for TRANSFERENCIA", async () => {
     setupSuccessfulSale();
 
     const result = await registerSale({
@@ -307,8 +308,8 @@ describe("registerSale Server Action - Payment Method Logic", () => {
       expect.objectContaining({
         data: expect.objectContaining({
           paymentMethod: PaymentMethod.TRANSFERENCIA,
-          amountPaid: 0,
-          pendingBalance: 500,
+          amountPaid: 500,
+          pendingBalance: 0,
         }),
       })
     );

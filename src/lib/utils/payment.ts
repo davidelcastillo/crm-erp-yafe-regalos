@@ -39,7 +39,8 @@ export function computePayment(
       amountPaid = total;
       break;
     case PaymentMethod.TRANSFERENCIA:
-      amountPaid = 0;
+      // Una transferencia es plata cobrada, no deuda (bug 8.3 del usuario).
+      amountPaid = total;
       break;
     case PaymentMethod.MIXTO:
       amountPaid = (manualInput?.cash ?? 0) + (manualInput?.transfer ?? 0);

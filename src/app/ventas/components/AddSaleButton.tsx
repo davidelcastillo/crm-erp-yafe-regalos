@@ -8,7 +8,7 @@ import { useRouter } from "next/navigation";
 import { Product } from "@prisma/client";
 import Swal from "sweetalert2";
 import { ProductSearch, ProductSearchResult } from "@/components/ProductSearch";
-import { PaymentMethod } from "@/lib/utils/payment";
+import { PaymentMethod, computePayment } from "@/lib/utils/payment";
 import { BranchSelector } from "@/components/ui/BranchSelector";
 import { useBranch } from "@/lib/context/BranchContext";
 
@@ -44,7 +44,6 @@ export function AddSaleButton({ products, onSuccess }: AddSaleButtonProps) {
   const [loading, setLoading] = useState(false);
   const [customers, setCustomers] = useState<CustomerOption[]>([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
-  const [amountPaid, setAmountPaid] = useState<string>("");
   const [cashAmount, setCashAmount] = useState<string>("");
   const [transferAmount, setTransferAmount] = useState<string>("");
   const [items, setItems] = useState<SaleItem[]>([
@@ -102,11 +101,14 @@ export function AddSaleButton({ products, onSuccess }: AddSaleButtonProps) {
     return items.reduce((sum, item) => sum + calculateSubtotal(item.price, item.quantity), 0);
   };
 
-  const calculatePending = () => {
-    const total = calculateTotal();
-    const paid = parseFloat(amountPaid) || 0;
-    return Math.max(0, total - paid);
-  };
+  // El pago sigue la misma regla que el servidor (`computePayment`): EFECTIVO y
+  // TRANSFERENCIA cobran el total y MIXTO reparte efectivo/transferencia. Ya no
+  // hay campo "Monto Pagado" (bug 8.3 del usuario).
+  const calcularPago = () =>
+    computePayment(PaymentMethod[paymentMethod], calculateTotal(), {
+      cash: parseFloat(cashAmount) || 0,
+      transfer: parseFloat(transferAmount) || 0,
+    });
 
   const getProductDisplay = (item: SaleItem) => {
     if (!item.productId) return "Seleccionar producto...";
@@ -205,7 +207,7 @@ export function AddSaleButton({ products, onSuccess }: AddSaleButtonProps) {
              cashAmount: parseFloat(cashAmount) || 0,
              transferAmount: parseFloat(transferAmount) || 0,
            }
-         : { amountPaid: parseFloat(amountPaid) || 0 }),
+         : { amountPaid: calcularPago().amountPaid }),
      });
 
      if (result.success) {
@@ -223,7 +225,6 @@ export function AddSaleButton({ products, onSuccess }: AddSaleButtonProps) {
         onSuccess?.();
         setIsOpen(false);
        setItems([{ id: "1", productId: "", name: "", code: "", price: "", quantity: "" }]);
-       setAmountPaid("");
        setCashAmount("");
        setTransferAmount("");
        setPaymentMethod("EFECTIVO");
@@ -410,7 +411,7 @@ export function AddSaleButton({ products, onSuccess }: AddSaleButtonProps) {
                 </div>
 
                 {/* Amount Paid (for all payment methods) */}
-                {paymentMethod === "MIXTO" ? (
+                {paymentMethod === "MIXTO" && (
                   <div className="p-4 bg-[#f9f9f9] rounded-xl">
                     <div className="grid grid-cols-2 gap-3">
                       <div>
@@ -447,23 +448,6 @@ export function AddSaleButton({ products, onSuccess }: AddSaleButtonProps) {
                       </div>
                     </div>
                   </div>
-                ) : (
-                  <div className="p-4 bg-[#f9f9f9] rounded-xl">
-                    <label htmlFor="amountPaid" className="block text-sm font-medium text-[#222222] mb-2">Monto Pagado</label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6a6a6a] text-sm">$</span>
-                      <input
-                        id="amountPaid"
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={amountPaid}
-                        onChange={(e) => setAmountPaid(e.target.value)}
-                        className="w-full pl-7 pr-3 py-3 rounded-xl border border-gray-200 focus:border-[#ff385c] focus:ring-2 focus:ring-[#ff385c]/20 outline-none transition-all"
-                        placeholder="0.00"
-                      />
-                    </div>
-                  </div>
                 )}
 
                 {/* Totals */}
@@ -476,21 +460,12 @@ export function AddSaleButton({ products, onSuccess }: AddSaleButtonProps) {
                   </div>
                   <div className="flex justify-between items-center mb-2">
                     <span className="text-green-800">Monto Pagado</span>
-                    <span className="text-green-600">-${(parseFloat(amountPaid) || 0).toFixed(2)}</span>
+                    <span className="text-green-600">-${calcularPago().amountPaid.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between items-center pt-2 border-t border-green-200">
-                    <div className="flex items-center gap-2">
-                      <span className="text-green-800 font-medium">Saldo Pendiente</span>
-                      <button
-                        type="button"
-                        onClick={() => setAmountPaid(calculateTotal().toString())}
-                        className="px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
-                      >
-                        Pagar Total
-                      </button>
-                    </div>
+                    <span className="text-green-800 font-medium">Saldo Pendiente</span>
                     <span className="text-green-700 text-xl font-bold">
-                      ${calculatePending().toFixed(2)}
+                      ${calcularPago().pendingBalance.toFixed(2)}
                     </span>
                   </div>
                 </div>

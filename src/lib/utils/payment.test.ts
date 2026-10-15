@@ -23,9 +23,10 @@ describe("computePayment - Pure Function", () => {
   });
 
   describe("TRANSFERENCIA", () => {
-    it("should return zero paid, full amount pending", () => {
+    // Bug 8.3 del usuario: una transferencia es plata cobrada, no deuda.
+    it("should count the transfer as paid", () => {
       const result = computePayment(PaymentMethod.TRANSFERENCIA, 500);
-      expect(result).toEqual({ amountPaid: 0, pendingBalance: 500 });
+      expect(result).toEqual({ amountPaid: 500, pendingBalance: 0 });
     });
 
     it("should handle zero total", () => {
@@ -35,7 +36,7 @@ describe("computePayment - Pure Function", () => {
 
     it("should handle decimal amounts", () => {
       const result = computePayment(PaymentMethod.TRANSFERENCIA, 123.45);
-      expect(result).toEqual({ amountPaid: 0, pendingBalance: 123.45 });
+      expect(result).toEqual({ amountPaid: 123.45, pendingBalance: 0 });
     });
   });
 

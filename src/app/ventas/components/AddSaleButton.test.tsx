@@ -108,13 +108,33 @@ describe("AddSaleButton MIXTO (mejoras-f3-f4 item 4)", () => {
     (registerSale as jest.Mock).mockResolvedValue({ success: true });
   });
 
-  it("renders the single Monto Pagado input for EFECTIVO and no cash/transfer inputs", () => {
+  it("no pide Monto Pagado ni muestra efectivo/transferencia para EFECTIVO", () => {
     setup();
     fireEvent.click(screen.getByRole("button", { name: "Registrar venta" }));
 
-    expect(screen.getByLabelText("Monto Pagado")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Monto Pagado")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Efectivo")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Transferencia")).not.toBeInTheDocument();
+  });
+
+  // Bug 8.3 del usuario: el total es el monto pagado, y una transferencia es
+  // plata cobrada (no deuda).
+  it("con TRANSFERENCIA manda el total como monto pagado", async () => {
+    setup();
+    fireEvent.click(screen.getByRole("button", { name: "Registrar venta" }));
+    fireEvent.click(screen.getByRole("button", { name: "mock-select-product" }));
+    fireEvent.change(screen.getAllByPlaceholderText("0")[0], { target: { value: "2" } });
+    fireEvent.click(screen.getByRole("button", { name: "TRANSFERENCIA" }));
+    fireEvent.click(screen.getByRole("button", { name: "Registrar Venta" }));
+
+    await waitFor(() => {
+      expect(registerSale).toHaveBeenCalledWith(
+        expect.objectContaining({
+          paymentMethod: "TRANSFERENCIA",
+          amountPaid: 200,
+        })
+      );
+    });
   });
 
   it("shows Efectivo/Transferencia inputs and hides Monto Pagado when MIXTO", async () => {
