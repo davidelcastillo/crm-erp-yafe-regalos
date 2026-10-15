@@ -8,25 +8,21 @@ import Swal from 'sweetalert2';
 
 type InactiveProduct = Product & { category: { id: number; name: string } | null };
 
+const DEBOUNCE_MS = 300;
+
 export default function InactivosPage() {
   const [products, setProducts] = useState<InactiveProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
 
   const loadProducts = async () => {
     setLoading(true);
     try {
       const result = await getInactiveProducts();
       if (result.success) {
-        const all = result.data as InactiveProduct[];
-        const filtered = search
-          ? all.filter(p =>
-              p.name.toLowerCase().includes(search.toLowerCase()) ||
-              (p.code && p.code.toLowerCase().includes(search.toLowerCase()))
-            )
-          : all;
-        setProducts(filtered);
+        setProducts(result.data as InactiveProduct[]);
         setError(null);
       } else {
         setError(result.error || 'Error loading products');
@@ -69,9 +65,24 @@ export default function InactivosPage() {
     }
   };
 
+  // La lista se carga una sola vez: el filtro es local, así que escribir no golpea el servidor.
   useEffect(() => {
     loadProducts();
+  }, []);
+
+  // Igual que en /ventas y /inventario: el filtro se aplica 300 ms después de la última tecla.
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search.trim().toLowerCase()), DEBOUNCE_MS);
+    return () => clearTimeout(timer);
   }, [search]);
+
+  const visibleProducts = debouncedSearch
+    ? products.filter(
+        (p) =>
+          p.name.toLowerCase().includes(debouncedSearch) ||
+          (p.code && p.code.toLowerCase().includes(debouncedSearch))
+      )
+    : products;
 
   if (loading) {
     return (
@@ -143,14 +154,14 @@ export default function InactivosPage() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {products.length === 0 ? (
+              {visibleProducts.length === 0 ? (
                 <tr>
                   <td colSpan={4} className="px-6 py-4 text-center text-gray-500">
                     No hay productos inactivos
                   </td>
                 </tr>
               ) : (
-                products.map((product) => (
+                visibleProducts.map((product) => (
                   <tr key={product.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {product.name}
