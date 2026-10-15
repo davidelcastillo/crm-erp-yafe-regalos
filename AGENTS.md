@@ -80,7 +80,13 @@ Antes de delegar, pasá las rutas exactas de los skills necesarios. Si falta una
 | `NEXT_PUBLIC_FEATURE_*` | Flags de la plantilla; verificar consumidores antes de asumir que controlan algo |
 | `BRANCH_EMAIL_DOMAIN`, `ADMIN_EMAIL` | Aprovisionamiento heredado y destino de scripts administrativos |
 
-**Base aislada:** usar una base separada de producción antes de correr tests que escriben. **En este repo no hay stack local de Supabase configurado** (`supabase/config.toml` no existe): Docker 29.8.2 está disponible y el CLI de Supabase es invocable, pero haría falta `supabase init` y `supabase start` para tener un stack local, o bien un proyecto Supabase aparte. Definí con el responsable cuál usar antes de ejecutar algo que escriba datos.
+**Base aislada:** los tests que escriben datos corren contra el stack local de Supabase en Docker (`supabase/config.toml`), nunca contra un proyecto remoto.
+
+1. `supabase db start` — levanta la base local desechable (solo Postgres; `supabase stop` la baja).
+2. `npm run db:local:push` — aplica el esquema de Prisma a esa base.
+3. `npm run test:local-db` — corre la suite contra ella; acepta argumentos de Jest (`npm run test:local-db -- ruta/al.test.ts`).
+
+`scripts/local-db.mjs` resuelve la URL del stack, rechaza cualquier host que no sea local y avisa si la base no está levantada. La variable opcional `DATABASE_URL_TEST` permite fijar otra base local; un destino remoto se rechaza.
 
 **Engram:** usar `project: "seguimientos-compras"`. Hay memorias históricas bajo `crm-erp-yafe-regalos` y variantes del nombre: consultarlas si hace falta, sin duplicar ni fusionar automáticamente. Para retomar: contexto → búsqueda del topic → observación completa → archivo local → reconciliar.
 
@@ -115,7 +121,7 @@ Ficha breve, si hace falta: [docs/flujo-odd.md](docs/flujo-odd.md).
 - Documentación/movimientos sin comportamiento nuevo: explicar por qué no hay RED significativo y comprobar estructura, referencias e integridad.
 - Registrar comandos, salida relevante y fallos/saltos reales.
 - UI: verificar el flujo; no sustituir pruebas de navegador por leer JSX.
-- **Comandos que existen hoy** (no ejecutar lo que no existe): `npm test`, `npm run lint`, `npx tsc --noEmit`, `npm run build`.
+- **Comandos que existen hoy** (no ejecutar lo que no existe): `npm test`, `npm run test:local-db` (§2, el que corresponde cuando algo toca base), `npm run lint`, `npx tsc --noEmit`, `npm run build`.
 - **No hay E2E en CI** ni migraciones Prisma reproducibles: no afirmes cobertura E2E ni instalaciones implícitas.
 
 ### 3.5 Definition of Done
@@ -165,7 +171,7 @@ Ficha breve, si hace falta: [docs/flujo-odd.md](docs/flujo-odd.md).
 - [ ] Documento ODD/espejo si requiere continuidad; skills pertinentes.
 - [ ] Base aislada antes de ejecutar tests que escriben datos.
 - [ ] RED/GREEN o justificación N/A.
-- [ ] `npm run lint` y `npx tsc --noEmit` cuando corresponda; `npm test` y `npm run build` para cerrar.
+- [ ] `npm run lint` y `npx tsc --noEmit` cuando corresponda; `npm run test:local-db` (§2) y `npm run build` para cerrar.
 - [ ] Documentación, evidencia y memoria actualizadas.
 - [ ] Riesgos y limitaciones informados; nada publicado sin autorización.
 

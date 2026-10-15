@@ -18,6 +18,16 @@ El trabajo nuevo usa **ODD**, con preguntas de alcance por bug antes de implemen
 - [Historial SDD](../openspec/README.md): cierre administrativo, artefactos originales y comprobaciones pendientes al retirarlo. Cerrado no significa verificado de nuevo.
 - `docs/history/`: prompts y antecedentes preservados durante la limpieza. No son instrucciones vigentes.
 
+## Base de datos para tests
+
+Los tests que escriben datos corren contra un stack local de Supabase en Docker, nunca contra un proyecto remoto:
+
+1. `supabase db start` — levanta la base local desechable (configuración en `supabase/config.toml`; `supabase stop` la baja).
+2. `npm run db:local:push` — aplica el esquema de Prisma a esa base.
+3. `npm run test:local-db` — corre la suite contra ella.
+
+`scripts/local-db.mjs` resuelve la URL del stack local, rechaza cualquier host que no sea local y avisa si la base no está levantada. `prisma db push` contra una base con datos ajenos sigue necesitando autorización explícita.
+
 ## Antes de ejecutar comandos
 
-Los checks con BD necesitan un destino aislado y autorizado. Los scripts SQL/TS de reparación son mantenimiento manual, no pasos de instalación ni de arranque. No usar credenciales de producción para probar una corrección.
+Los scripts SQL/TS de reparación son mantenimiento manual, no pasos de instalación ni de arranque. No usar credenciales de producción para probar una corrección.
