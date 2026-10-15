@@ -100,35 +100,6 @@ describe("proxy middleware", () => {
     expect(response).toEqual({ __mock: "next-response" });
   });
 
-  it("lets an unauthenticated user reach /forgot-password without redirect", async () => {
-    mockUser(null);
-
-    const response = await proxy(mockRequest("/forgot-password"));
-
-    expect(redirectSpy).not.toHaveBeenCalled();
-    expect(response).toEqual({ __mock: "next-response" });
-  });
-
-  it("lets an unauthenticated user reach /reset-password without redirect", async () => {
-    mockUser(null);
-
-    const response = await proxy(mockRequest("/reset-password"));
-
-    expect(redirectSpy).not.toHaveBeenCalled();
-    expect(response).toEqual({ __mock: "next-response" });
-  });
-
-  it("lets an unauthenticated user reach /auth/callback (critical PKCE) without redirect", async () => {
-    mockUser(null);
-
-    const response = await proxy(
-      mockRequest("/auth/callback?code=pkce-code&next=/reset-password")
-    );
-
-    expect(redirectSpy).not.toHaveBeenCalled();
-    expect(response).toEqual({ __mock: "next-response" });
-  });
-
   it("lets an anonymous GET /sucursal/39/inventory pass without redirect", async () => {
     mockUser(null);
 

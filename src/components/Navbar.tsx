@@ -15,10 +15,7 @@ export default function Navbar() {
   // screens render standalone (same pattern as BottomNav on /sucursal/*).
   if (
     pathname === '/login' ||
-    pathname === '/unauthorized' ||
-    pathname === '/forgot-password' ||
-    pathname === '/reset-password' ||
-    pathname === '/auth/callback'
+    pathname === '/unauthorized'
   ) {
     return null;
   }

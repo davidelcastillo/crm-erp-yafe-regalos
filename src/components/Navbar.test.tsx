@@ -39,18 +39,6 @@ describe("Navbar", () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it.each([
-    ["/forgot-password"],
-    ["/reset-password"],
-    ["/auth/callback"],
-  ])("renders nothing on the auth route %s", (pathname) => {
-    (usePathname as jest.Mock).mockReturnValue(pathname);
-    const { container } = render(React.createElement(Navbar));
-
-    expect(screen.queryByRole("link")).toBeNull();
-    expect(container).toBeEmptyDOMElement();
-  });
-
   it("renders brand and login link on internal pages", async () => {
     (usePathname as jest.Mock).mockReturnValue("/dashboard");
     render(React.createElement(Navbar));

@@ -39,9 +39,6 @@ export async function proxy(request: NextRequest) {
   const isExcluded =
     pathname === '/login' ||
     pathname === '/unauthorized' ||
-    pathname === '/forgot-password' ||
-    pathname === '/reset-password' ||
-    pathname === '/auth/callback' ||
     pathname.startsWith('/_next/') ||
     pathname === '/favicon.ico' ||
     pathname.startsWith('/images/') ||

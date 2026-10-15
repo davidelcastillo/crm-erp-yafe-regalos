@@ -57,10 +57,7 @@ export default function BottomNav() {
   if (
     pathname.startsWith("/sucursal/") ||
     pathname === "/login" ||
-    pathname === "/unauthorized" ||
-    pathname === "/forgot-password" ||
-    pathname === "/reset-password" ||
-    pathname === "/auth/callback"
+    pathname === "/unauthorized"
   ) {
     return null;
   }
