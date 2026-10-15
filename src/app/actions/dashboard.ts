@@ -90,8 +90,11 @@ export async function getStats(data?: unknown) {
         };
       }
 
-      const start = new Date(validated.startDate);
-      const end = new Date(validated.endDate);
+      // Días calendario locales: `new Date("YYYY-MM-DD")` da medianoche UTC, así que
+      // el día final quedaba afuera y, en hora local (UTC-3), un rango de un solo
+      // día quedaba vacío (bug 4 del usuario).
+      const start = new Date(`${validated.startDate}T00:00:00`);
+      const end = new Date(`${validated.endDate}T23:59:59.999`);
       if (isNaN(start.getTime()) || isNaN(end.getTime()) || start > end) {
         return { success: false, error: "Rango de fechas inválido" };
       }
