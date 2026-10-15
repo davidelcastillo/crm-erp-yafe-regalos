@@ -1,8 +1,9 @@
 import { prisma } from '../../lib/prisma'
 import { branchAdminService } from './branchAdminService'
 
-// Integration tests hit the remote Supabase DB; hooks need more than the
-// default 5s Jest timeout (cleanup now also deletes dependent Purchase/Sale rows).
+// Integration tests write to the local Supabase stack (see AGENTS.md §2);
+// hooks need more than the default 5s Jest timeout (cleanup now also deletes
+// dependent Purchase/Sale rows). Run them with `npm run test:local-db`.
 jest.setTimeout(30000)
 
 describe('branchAdminService', () => {
