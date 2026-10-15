@@ -22,8 +22,8 @@ El trabajo nuevo usa **ODD**, con preguntas de alcance por bug antes de implemen
 
 Los tests que escriben datos corren contra un stack local de Supabase en Docker, nunca contra un proyecto remoto:
 
-1. `supabase db start` — levanta la base local desechable (configuración en `supabase/config.toml`; `supabase stop` la baja).
-2. `npm run db:local:push` — aplica el esquema de Prisma a esa base.
+1. `supabase db start` — levanta la base local desechable (configuración en `supabase/config.toml`).
+2. `npm run db:local:push` — aplica el esquema de Prisma a esa base; hace falta en cada arranque en frío (`supabase stop --no-backup` descarta el contenido).
 3. `npm run test:local-db` — corre la suite contra ella.
 
 `scripts/local-db.mjs` resuelve la URL del stack local, rechaza cualquier host que no sea local y avisa si la base no está levantada. `prisma db push` contra una base con datos ajenos sigue necesitando autorización explícita.

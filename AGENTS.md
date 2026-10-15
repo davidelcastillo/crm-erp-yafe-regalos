@@ -82,8 +82,8 @@ Antes de delegar, pasá las rutas exactas de los skills necesarios. Si falta una
 
 **Base aislada:** los tests que escriben datos corren contra el stack local de Supabase en Docker (`supabase/config.toml`), nunca contra un proyecto remoto.
 
-1. `supabase db start` — levanta la base local desechable (solo Postgres; `supabase stop` la baja).
-2. `npm run db:local:push` — aplica el esquema de Prisma a esa base.
+1. `supabase db start` — levanta la base local desechable (solo Postgres).
+2. `npm run db:local:push` — aplica el esquema de Prisma a esa base; hace falta en cada arranque en frío (`supabase stop --no-backup` descarta el contenido).
 3. `npm run test:local-db` — corre la suite contra ella; acepta argumentos de Jest (`npm run test:local-db -- ruta/al.test.ts`).
 
 `scripts/local-db.mjs` resuelve la URL del stack, rechaza cualquier host que no sea local y avisa si la base no está levantada. La variable opcional `DATABASE_URL_TEST` permite fijar otra base local; un destino remoto se rechaza.
