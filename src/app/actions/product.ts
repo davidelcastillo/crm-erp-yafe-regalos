@@ -217,6 +217,9 @@ export async function searchProducts(data: unknown) {
 
     const products = await prisma.product.findMany({
       where: {
+        // Con sucursal (ventas) solo se ofrece lo que hay en esa sucursal; sin
+        // sucursal (etiquetas) no se puede filtrar por stock.
+        ...(branchId ? { inventory: { some: { branchId, stock: { gt: 0 } } } } : {}),
         OR: [
           { code: { contains: query, mode: "insensitive" } },
           { name: { contains: query, mode: "insensitive" } },
