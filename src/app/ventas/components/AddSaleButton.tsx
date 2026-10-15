@@ -1,7 +1,7 @@
 // src/app/ventas/components/AddSaleButton.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { registerSale } from "../../actions/sale";
 import { getCustomers } from "../../actions/customer";
 import { useRouter } from "next/navigation";
@@ -52,6 +52,12 @@ export function AddSaleButton({ products, onSuccess }: AddSaleButtonProps) {
   ]);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethodType>("EFECTIVO");
   const [saleBranchId, setSaleBranchId] = useState<number | null>(null);
+  const [searchRowId, setSearchRowId] = useState<string | null>(null);
+  const rowIdRef = useRef(0);
+
+  // Id monótono por fila: Date.now() se repetía cuando se agregaban dos filas en el
+  // mismo milisegundo y la edición terminaba tocando las dos (bug 7.1 del usuario).
+  const nextRowId = () => `row-${++rowIdRef.current}`;
 
   useEffect(() => {
     async function loadCustomers() {
@@ -65,7 +71,7 @@ export function AddSaleButton({ products, onSuccess }: AddSaleButtonProps) {
 
   const addItem = () => {
     setItems([...items, {
-      id: Date.now().toString(),
+      id: nextRowId(),
       productId: "",
       name: "",
       code: "",
@@ -110,25 +116,36 @@ export function AddSaleButton({ products, onSuccess }: AddSaleButtonProps) {
   };
 
   const handleProductSelect = (product: ProductSearchResult) => {
-    const emptyItemIndex = items.findIndex(item => !item.productId);
-    if (emptyItemIndex >= 0) {
-      updateItem(items[emptyItemIndex].id, "productId", product.id.toString());
-      updateItem(items[emptyItemIndex].id, "name", product.name);
-      updateItem(items[emptyItemIndex].id, "code", product.code);
-      updateItem(items[emptyItemIndex].id, "price", product.price.toString());
-    } else {
-      setItems([...items, {
-        id: Date.now().toString(),
-        productId: product.id.toString(),
-        name: product.name,
-        code: product.code,
-        price: product.price.toString(),
-        quantity: "1"
-      }]);
+    // Manda la fila donde se abrió el selector. Antes se completaba la primera
+    // fila vacía o se agregaba una nueva, así que cambiar un producto duplicaba
+    // la fila con el mismo código (bug 7.1 del usuario).
+    const targetId =
+      searchRowId && items.some((item) => item.id === searchRowId)
+        ? searchRowId
+        : items.find((item) => !item.productId)?.id;
+
+    if (targetId) {
+      updateItem(targetId, "productId", product.id.toString());
+      updateItem(targetId, "name", product.name);
+      updateItem(targetId, "code", product.code);
+      updateItem(targetId, "price", product.price.toString());
+      setSearchRowId(null);
+      return;
     }
+
+    setItems([...items, {
+      id: nextRowId(),
+      productId: product.id.toString(),
+      name: product.name,
+      code: product.code,
+      price: product.price.toString(),
+      quantity: "1"
+    }]);
+    setSearchRowId(null);
   };
 
-  const openProductSearch = () => {
+  const openProductSearch = (rowId: string) => {
+    setSearchRowId(rowId);
     setIsProductSearchOpen(true);
   };
 
@@ -292,7 +309,7 @@ export function AddSaleButton({ products, onSuccess }: AddSaleButtonProps) {
 
                     <button
                       type="button"
-                      onClick={openProductSearch}
+                      onClick={() => openProductSearch(item.id)}
                       className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-[#ff385c] focus:ring-2 focus:ring-[#ff385c]/20 outline-none transition-all bg-white text-left hover:bg-[#f8f8f8]"
                     >
                       {getProductDisplay(item)}

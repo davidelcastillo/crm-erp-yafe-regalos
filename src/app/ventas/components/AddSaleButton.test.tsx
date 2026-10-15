@@ -181,4 +181,45 @@ describe("AddSaleButton MIXTO (mejoras-f3-f4 item 4)", () => {
     expect(screen.getByText(/no hay productos registrados/i)).toBeInTheDocument();
     expect(screen.getByText(/sección Inventario/i)).toBeInTheDocument();
   });
+
+  // Bug 7.1 del usuario: al cambiar el producto de una fila se agregaba una fila
+  // N+1 con el mismo código en lugar de reemplazarlo en la fila clickeada.
+  it("cambiar el producto de una fila no agrega una fila nueva", () => {
+    setup();
+    fireEvent.click(screen.getByRole("button", { name: "Registrar venta" }));
+
+    // Fila 1: se elige el producto.
+    fireEvent.click(screen.getByRole("button", { name: "mock-select-product" }));
+    expect(screen.getAllByText("Producto A (P1) - $100.00")).toHaveLength(1);
+
+    // Se vuelve a abrir el selector de esa misma fila para cambiarlo.
+    fireEvent.click(screen.getByText("Producto A (P1) - $100.00"));
+    fireEvent.click(screen.getByRole("button", { name: "mock-select-product" }));
+
+    expect(screen.getAllByText("Producto A (P1) - $100.00")).toHaveLength(1);
+  });
+
+  // Mismo bug, otra causa: las filas nuevas se identificaban con Date.now(), así
+  // que dos filas agregadas en el mismo milisegundo compartían id y se editaban
+  // juntas.
+  it("las filas nuevas tienen ids únicos: editar una no cambia la otra", () => {
+    const nowSpy = jest.spyOn(Date, "now").mockReturnValue(999);
+
+    setup();
+    fireEvent.click(screen.getByRole("button", { name: "Registrar venta" }));
+    fireEvent.click(screen.getByRole("button", { name: "Agregar otro producto" }));
+    fireEvent.click(screen.getByRole("button", { name: "Agregar otro producto" }));
+
+    const cantidades = screen.getAllByPlaceholderText("0");
+    expect(cantidades).toHaveLength(3);
+
+    fireEvent.change(cantidades[2], { target: { value: "5" } });
+
+    const conCinco = screen
+      .getAllByPlaceholderText("0")
+      .filter((input) => (input as HTMLInputElement).value === "5");
+    expect(conCinco).toHaveLength(1);
+
+    nowSpy.mockRestore();
+  });
 });
