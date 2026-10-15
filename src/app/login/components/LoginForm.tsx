@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { z } from 'zod';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { login } from '@/actions/auth';
 import { loginSchema } from '@/lib/validations/auth';
 
@@ -95,7 +94,7 @@ export default function LoginForm() {
           <p role="status" className="mt-2 text-sm text-green-600">{success}</p>
         )}
 
-        <div className="flex items-center justify-between">
+        <div className="flex items-center">
           <div className="flex items-start">
             <div className="flex items-center h-5">
               <input
@@ -110,15 +109,6 @@ export default function LoginForm() {
                 Recordarme
               </label>
             </div>
-          </div>
-
-          <div className="text-sm">
-            <Link
-              href="/forgot-password"
-              className="font-medium text-[#ff385c] hover:text-[#e00b41]"
-            >
-              Olvidé mi contraseña
-            </Link>
           </div>
         </div>
 
