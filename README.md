@@ -4,7 +4,7 @@
 
 ## 🚀 Características
 
-- **Módulo de Productos**: CRUD completo con stock
+- **Productos en Inventario**: gestión de productos, categorías y stock; `/productos` redirige a `/inventario`
 - **Módulo de Compras**: Registro de ingresos con múltiples productos por compra
 - **Módulo de Ventas**: Registro de ventas con validación de stock
 - **Módulo de Inventario**: Gestión de stock en tiempo real
@@ -14,13 +14,16 @@
 ## 🆕 Nuevas funcionalidades (v3 / Fase 4)
 
 - **Sucursales**: gestión completa con código único, y usuario de sucursal creado automáticamente en Supabase Auth (rol `branch_user`).
-- **Portal externo de solo lectura**: cada sucursal consulta su propio inventario en `/sucursal/[branchId]/inventory` (solo `GET`).
+- **Catálogo externo de solo lectura**: acceso sin login a `/sucursal/[branchId]/inventory` únicamente para sucursales activas y publicadas (`isPublic=true`, solo `GET`).
 - **Exportación a PDF**: asistente de 3 pasos para descargar el inventario de una sucursal como `inventario-<branchCode>-<YYYYMMDD>.pdf`.
 - **Dashboard configurable**: selector de periodo (7/30/90 días o personalizado) y de sucursal, con etiquetas de contexto "(Sucursal X)" / "(Todas)".
 - **Búsquedas mejoradas**: búsqueda unificada server-side en inventario (nombre, código, descripción, categoría) y búsqueda con debounce + "Cargar más" en ventas.
 
 Documentación detallada:
 
+- [Índice de documentación y flujo ODD](./docs/README.md)
+- [Preguntas de alcance y resolución de bugs](./docs/flujo-odd.md)
+- [Historial SDD cerrado](./openspec/README.md)
 - [Gestión de sucursales](./docs/gestion-sucursales.md)
 - [Portal externo de sucursal](./docs/portal-externo-sucursal.md)
 - [Exportar inventario a PDF](./docs/exportar-inventario-pdf.md)
@@ -36,7 +39,7 @@ Documentación detallada:
 
 ## 📋 Requisitos
 
-- Node.js 18+
+- Node.js >=20.9.0 (requisito del Next.js instalado)
 - Supabase (PostgreSQL)
 
 ## ⚡ Instalación
@@ -53,8 +56,9 @@ npm install
 # Copiar la plantilla y completar con tus valores (ver .env.example):
 cp .env.example .env
 
-# 4. Sincronizar base de datos
-npx prisma db push
+# 4. Revisar esquema y destino de la base de datos
+# No ejecutar db push ni SQL históricos sobre una base con datos sin autorización y respaldo.
+# Confirmar con el responsable cómo preparar una base aislada para este entorno.
 
 # 5. Generar cliente Prisma
 npx prisma generate
@@ -82,7 +86,9 @@ seguimientos-compras/
 │   └── lib/
 │       ├── prisma.ts        # Cliente Prisma
 │       └── parse-prisma.ts  # Utilidad de serialización
-├── promts/                  # Prompts de desarrollo
+├── docs/                   # Guías actuales e historial preservado
+├── odd/tasks/              # Trabajo ODD que requiere continuidad
+├── openspec/               # Historial SDD cerrado
 ├── jest.config.js          # Configuración de tests
 ├── package.json
 └── README.md
@@ -98,7 +104,7 @@ npm test
 npm test -- --coverage
 ```
 
-**33 tests pasando** - Cubren Server Actions y lógica de negocio.
+Jest + React Testing Library cubren acciones y componentes. No se fija un número de tests: depende del checkout y la ejecución observada. Hay antecedentes de tests con base real; comprobar aislamiento y autorización antes de ejecutar la suite. Playwright y `test:e2e` no están configurados en este baseline.
 
 ## 📱 UI/UX
 
@@ -127,9 +133,7 @@ vercel
 
 ### Variables de Entorno en Vercel
 
-Agregar en el dashboard de Vercel:
-- `DATABASE_URL`
-- `DIRECT_URL`
+Configurar las variables del entorno según `.env.example` y [AGENTS.md](./AGENTS.md), incluidas las conexiones de base y Supabase. `SUPABASE_SERVICE_ROLE_KEY` es solo de servidor; nunca exponerla al cliente. No desplegar como parte de una limpieza documental.
 
 ## 📝 Comandos Útiles
 
@@ -163,7 +167,7 @@ La tabla `Branch` incluye un campo `authUserId` que almacena el ID de usuario de
 2. Asociación explícita entre sucursales y usuarios del sistema
 3. Back-fill de registros existentes mediante el servicio de administración
 
-El campo se indexa para búsquedas eficientes y se mantiene a través de migraciones tanto en desarrollo como en producción.
+El campo permite asociar el usuario heredado de Auth; no concede acceso al catálogo público. Los SQL históricos conservados no equivalen a un historial reproducible de migraciones Prisma: comprobar cada entorno antes de operar sobre el esquema.
 
 ---
 

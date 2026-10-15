@@ -1,58 +1,48 @@
-# Portal externo de sucursal (solo lectura)
+# Catálogo público de sucursal (solo lectura)
 
-El portal externo permite que cada **usuario de sucursal** consulte el inventario de su propia sucursal **sin poder modificarlo**. Vive en `/sucursal/[branchId]/inventory` y solo es accesible para el rol `branch_user`.
+El catálogo `/sucursal/[branchId]/inventory` se comparte **sin login** únicamente cuando la sucursal existe, está activa y tiene `isPublic=true`. Desactivar su publicación impide que la acción devuelva el inventario. El antiguo login `branch_user` del portal fue retirado.
 
 ## Acceso rápido
 
-1. El admin crea la sucursal desde **Sucursales** → el usuario de sucursal se crea automáticamente (email + contraseña temporal que se muestran **una sola vez**).
-2. El usuario ingresa en `/login` con esas credenciales.
-3. Abre `/sucursal/<branchId>/inventory` y ve su inventario con búsqueda.
-4. Cualquier intento de ver otra sucursal, de usar otro verbo HTTP o de un rol distinto → se redirige a `/unauthorized`.
+1. El admin entra en **Sucursales** y habilita la publicación de la sucursal que quiere compartir.
+2. Comparte `/sucursal/<branchId>/inventory`.
+3. El visitante abre el catálogo sin credenciales; puede consultar el inventario, no modificarlo.
+4. Para retirar el acceso, desactivar la publicación o la sucursal desde el panel autorizado.
 
-## Cómo se crea el usuario de sucursal
+Los usuarios de Auth que conserve el aprovisionamiento heredado no son un requisito para visitar este catálogo.
 
-Al crear una sucursal, el sistema provisiona automáticamente un usuario en Supabase Auth:
+## Controles actuales
 
-| Campo | Valor |
-|-------|-------|
-| Rol | `branch_user` (en `app_metadata`) |
-| Reclamo de sucursal | `branchId` (en `app_metadata`) |
-| Email | `sucursal-<code>@<domain>` (ej. `sucursal-cen@feriaconexx.com`) |
-| Dominio | `BRANCH_EMAIL_DOMAIN` (default `feriaconexx.com`) |
-| Contraseña temporal | ≥ 12 caracteres, 4 clases (mayúscula, minúscula, dígito, símbolo), generada con `crypto` |
+| Capa | Responsabilidad |
+|---|---|
+| `src/proxy.ts` y `src/middleware/branch.ts` | Tratamiento de la ruta externa y restricción del recorrido de catálogo a `GET` |
+| `src/app/actions/inventory.external.ts` | Validar `branchId` entero positivo; consultar `isPublic` e `isActive` antes de devolver inventario |
+| `src/app/sucursal/[branchId]/inventory/page.tsx` | Mostrar el catálogo o `notFound()` cuando la consulta no lo permite |
 
-> La contraseña temporal **solo se muestra una vez** al crear la sucursal. No se persiste en la base de datos. Si se pierde, se debe gestionar el reset del usuario en Supabase Auth.
+Una sucursal inexistente, inactiva o no publicada produce la misma respuesta de indisponibilidad, también para un admin que visite el catálogo. Publicar el catálogo no habilita mutaciones ni las rutas internas del panel.
 
-## Restricciones de acceso
+## Qué muestra
 
-La decisión la toma `decideBranchAccess` (`src/middleware/branch.ts`), invocada desde `src/proxy.ts` (Next 16 proxy). Se permite la petición **solo** si se cumplen TODAS:
-
-| Regla | Condición |
-|-------|-----------|
-| Rol | el usuario tiene `role: branch_user` |
-| Reclamo | el usuario tiene `branchId` en `app_metadata` |
-| Verbo HTTP | es `GET` |
-| Sucursal | el `branchId` de la URL coincide con el reclamo |
-
-Cualquier falla → redirect a `/unauthorized`. Las rutas internas del admin (`/inventario`, `/ventas`, `/sucursales`, etc.) quedan bloqueadas para este rol.
-
-## Backfill del reclamo `admin` (importante)
-
-El gating de rutas internas exige que el usuario admin tenga `role: admin` en `app_metadata`. Si el admin se creó antes de esta funcionalidad, **no tiene el reclamo** y quedaría lockeado de la app.
-
-```bash
-node scripts/backfill-admin-claim.mjs
-```
-
-- **OJO: correr ANTES de habilitar el gating estricto.** Si el gating ya está activo y el admin no tiene claim, primero hay que habilitarlo desde fuera (p. ej. Supabase Dashboard) y recién después el admin puede ejecutar el script.
-- Usa `SUPABASE_SERVICE_ROLE_KEY` y `NEXT_PUBLIC_SUPABASE_URL`.
-- Apunta a `ADMIN_EMAIL` si está definido; si no, al primer usuario con email. Es **idempotente** (se puede re-ejecutar).
+Productos activos que tienen un registro de inventario en esa sucursal, con código, nombre, stock y precio. El catálogo puede incluir stock cero; no confundirlo con el asistente PDF, cuya selección exige stock positivo.
 
 ## Troubleshooting
 
-| Síntoma | Causa probable | Solución |
-|---------|----------------|----------|
-| Redirect a `/unauthorized` al abrir `/sucursal/5/inventory` | El `branchId` de la URL no coincide con el claim del usuario | Verificar que el usuario logueado es el de esa sucursal |
-| Redirect a `/unauthorized` con rol admin | El admin no tiene `app_metadata.role = "admin"` | Ejecutar `node scripts/backfill-admin-claim.mjs` |
-| 403 en el portal externo | Verbo distinto de `GET` o rol distinto de `branch_user` | El portal es de solo lectura: usar `GET` con la sesión de sucursal |
-| El admin no puede entrar a la app | Gating activo sin backfill previo | Habilitar el rol del admin desde Supabase Dashboard y ejecutar el backfill |
+| Síntoma | Qué revisar |
+|---|---|
+| 404 al abrir el catálogo | ID válido, sucursal existente, activa y publicada; después, posibles fallos de consulta registrados en servidor |
+| Catálogo sin productos | Inventario asignado a esa sucursal y productos activos; publicar no crea stock |
+| Se buscan credenciales o `/sucursal/<id>/login` | Es el flujo retirado; usar directamente el enlace de inventario publicado |
+| Admin enviado a `/unauthorized` en el panel | Sesión y claim `app_metadata.role=admin`; no es una restricción del catálogo público |
+
+Los scripts administrativos de claims no forman parte del acceso al catálogo. Antes de usarlos hay que confirmar destinatario, entorno y autorización: no ejecutarlos como respuesta automática a un fallo de login.
+
+## Seguridad pendiente de comprobación de entorno
+
+La visibilidad de la aplicación **no demuestra** que las tablas estén protegidas en la Data API de Supabase. Existen advertencias históricas de RLS deshabilitado; su vigencia y las políticas/permisos deben comprobarse en el entorno autorizado. Esta guía no certifica el estado actual de producción.
+
+## Checklist manual (no ejecutado por esta actualización documental)
+
+- [ ] Anónimo abre una sucursal activa y publicada.
+- [ ] Sucursal no publicada, inactiva o inexistente no devuelve inventario.
+- [ ] El catálogo no ofrece modificaciones ni exige login de sucursal.
+- [ ] El panel interno mantiene su autenticación y autorización.

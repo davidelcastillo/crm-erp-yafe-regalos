@@ -1,6 +1,6 @@
 # Gestión de sucursales
 
-Guía de las funcionalidades de sucursales de la v3: creación con usuario automático, edición, eliminación con guards, portal externo, dashboard por periodo/sucursal y búsquedas en ventas e inventario.
+Guía de sucursales: creación, edición, eliminación con guards, catálogo público opt-in, dashboard por periodo/sucursal y búsquedas en ventas e inventario. El aprovisionamiento heredado de usuarios de Auth no es un requisito para consultar el catálogo.
 
 ## Crear una sucursal
 
@@ -33,7 +33,7 @@ Si pasa los guards, se elimina primero el usuario de Auth asociado (vía `delete
 
 ## Portal externo de sucursal
 
-Cada usuario de sucursal puede consultar el inventario de su propia sucursal en `/sucursal/[branchId]/inventory` (solo lectura, solo `GET`). Detalles y troubleshooting en [portal-externo-sucursal.md](./portal-externo-sucursal.md).
+Cualquier visitante puede consultar `/sucursal/[branchId]/inventory` sin login si la sucursal existe, está activa y tiene `isPublic=true` (solo lectura, solo `GET`). La publicación se administra desde Sucursales; los usuarios `branch_user` heredados no controlan el acceso al catálogo. Detalles y troubleshooting en [portal-externo-sucursal.md](./portal-externo-sucursal.md).
 
 ## Dashboard por periodo y sucursal
 
@@ -58,5 +58,5 @@ El dashboard ahora es configurable:
 - [ ] Crear sucursal muestra código normalizado en mayúsculas y credenciales de una sola vez.
 - [ ] Duplicar un código de sucursal se rechaza.
 - [ ] Eliminar la sucursal por defecto, con compras/ventas o con stock se bloquea con su guard correspondiente.
-- [ ] Un usuario de sucursal solo ve su propio inventario y no puede modificarlo.
+- [ ] El catálogo de una sucursal activa y publicada es accesible sin login; una no publicada, inactiva o inexistente no devuelve inventario.
 - [ ] El dashboard reacciona a cambios de periodo y sucursal y muestra la etiqueta correcta.
