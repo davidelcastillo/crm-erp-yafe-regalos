@@ -21,7 +21,9 @@ export default function ComprasPage() {
     const branchParam = branchId ?? undefined;
     (async () => {
       const [productsResult, purchasesResult] = await Promise.all([
-        getProducts(branchId ?? undefined),
+        // Para cargar una compra se ofrecen todos los productos activos: la compra
+        // es la que crea el stock en la sucursal, no al revés (bug 2 del usuario).
+        getProducts(),
         getPurchases({ branchId: branchParam }),
       ]);
       if (cancelled) return;
