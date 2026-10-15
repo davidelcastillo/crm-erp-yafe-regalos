@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { baseBranchCode, freeBranchCode } from "./branch-code";
 
 async function main() {
   // Get all branches that don't have a code yet.
@@ -10,31 +11,17 @@ async function main() {
 
   console.log(`Found ${branchesWithoutCode.length} branches without code`);
 
-  // Generate codes for each branch
+  // Los códigos ya usados se leen una sola vez y se amplían en memoria: así el
+  // bucle termina y dos sucursales no pueden recibir el mismo código.
+  const assigned = await prisma.$queryRaw<{ code: string }[]>`
+    SELECT "code" FROM "Branch" WHERE "code" IS NOT NULL
+  `;
+  const taken = new Set(assigned.map((row) => row.code));
+
   for (const branch of branchesWithoutCode) {
-    // Generate code from name: take first letters of each word, uppercase, limit to 10 chars
-    const code = branch.name
-      .toUpperCase()
-      .split(/\s+/)
-      .map(word => word.charAt(0))
-      .join('')
-      .replace(/[^A-Z0-9]/g, '')
-      .slice(0, 10) || `BR${branch.id.toString().padStart(3, '0')}`;
+    const finalCode = freeBranchCode(baseBranchCode(branch.name, branch.id), taken);
+    taken.add(finalCode);
 
-    // Check if this code already exists (shouldn't happen with our generation logic, but just in case)
-    const existingBranch = await prisma.branch.findFirst({
-      where: { code },
-    });
-
-    let finalCode = code;
-    let counter = 1;
-    while (existingBranch && existingBranch.id !== branch.id) {
-      // If code already exists, append a number
-      finalCode = `${code.slice(0, 8)}${counter.toString().padStart(2, '0')}`;
-      counter++;
-    }
-
-    // Update the branch with the generated code
     await prisma.branch.update({
       where: { id: branch.id },
       data: {
