@@ -4,9 +4,9 @@ const LOCAL_HOSTS = ["127.0.0.1", "localhost", "::1"];
 
 /**
  * En tests la base tiene que ser local: `npm test` no debe escribir en un proyecto remoto.
- * Sin URL interpretable decide Prisma, que va a fallar igual al conectar.
- * Hay que llamarla **después** de construir el cliente: recién ahí Prisma cargó `.env`,
- * que es la URL que realmente se termina usando.
+ * La guarda se apoya en que `@prisma/client` carga `.env` al importarse, así que a esta
+ * altura `DATABASE_URL` ya es la que se va a usar. Sin URL interpretable decide Prisma,
+ * que va a fallar igual al conectar.
  */
 export function assertLocalTestDatabase(rawUrl: string | undefined): void {
   let host: string;
@@ -33,7 +33,8 @@ export const prisma =
     log: process.env.NODE_ENV === "development" ? ["query", "error", "warn"] : ["error"],
   });
 
-if (process.env.NODE_ENV === "test") {
+// Jest define JEST_WORKER_ID; NODE_ENV puede venir prefijado desde el entorno del shell.
+if (process.env.NODE_ENV === "test" || process.env.JEST_WORKER_ID) {
   assertLocalTestDatabase(process.env.DATABASE_URL);
 }
 
