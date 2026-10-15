@@ -28,7 +28,14 @@ export function ProductAutocomplete({
   const filteredProducts = useMemo(() => {
     if (!search.trim()) return products.slice(0, 20); // Show max 20 initially
     const lower = search.toLowerCase();
-    return products.filter((p) => p.name.toLowerCase().includes(lower)).slice(0, 20);
+    return products
+      .filter(
+        (p) =>
+          p.name.toLowerCase().includes(lower) ||
+          p.code.toLowerCase().includes(lower) ||
+          (p.codePrefix ?? "").toLowerCase().includes(lower)
+      )
+      .slice(0, 20);
   }, [products, search]);
 
   // Find selected product
@@ -60,8 +67,12 @@ const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     // Update input to what user typed
     setSearch(newValue);
 
-    // Auto-select if exact match
-    const match = products.find(p => p.name.toLowerCase() === newValue.toLowerCase());
+    // Auto-select if exact match (por nombre o por código)
+    const match = products.find(
+      (p) =>
+        p.name.toLowerCase() === newValue.toLowerCase() ||
+        p.code.toLowerCase() === newValue.toLowerCase()
+    );
     if (match) {
       onChange(match.id.toString());
       // Optionally, correct the casing of the input

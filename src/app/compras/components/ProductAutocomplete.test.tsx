@@ -36,6 +36,42 @@ describe("ProductAutocomplete Component", () => {
     expect(screen.queryByText(/otro producto/i)).not.toBeInTheDocument();
   });
 
+  it("filters products by code", () => {
+    render(<ProductAutocomplete products={mockProducts} value="" onChange={() => {}} />);
+
+    const input = screen.getByPlaceholderText(/buscar producto/i);
+    fireEvent.change(input, { target: { value: "PR002" } });
+
+    expect(screen.getByText(/producto dos/i)).toBeInTheDocument();
+    expect(screen.queryByText(/producto uno/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/otro producto/i)).not.toBeInTheDocument();
+  });
+
+  it("filters products by code prefix", () => {
+    // Datos propios: el prefijo "CA" no aparece en el nombre, así que solo lo
+    // encuentra la búsqueda por código/prefijo.
+    const conPrefijo = [
+      { id: 9, name: "Cinta Adhesiva", description: null, stock: 1, price: 10, code: "CA001", codePrefix: "CA", createdAt: new Date(), updatedAt: new Date() },
+    ] as unknown as Product[];
+
+    render(<ProductAutocomplete products={conPrefijo} value="" onChange={() => {}} />);
+
+    const input = screen.getByPlaceholderText(/buscar producto/i);
+    fireEvent.change(input, { target: { value: "CA" } });
+
+    expect(screen.getByText(/cinta adhesiva/i)).toBeInTheDocument();
+  });
+
+  it("selects the product when the exact code is typed", () => {
+    const onChangeMock = jest.fn();
+    render(<ProductAutocomplete products={mockProducts} value="" onChange={onChangeMock} />);
+
+    const input = screen.getByPlaceholderText(/buscar producto/i);
+    fireEvent.change(input, { target: { value: "PR001" } });
+
+    expect(onChangeMock).toHaveBeenCalledWith("1");
+  });
+
 it("selects product when clicked from dropdown", () => {
       const onChangeMock = jest.fn();
       render(<ProductAutocomplete products={mockProducts} value="" onChange={onChangeMock} />);
