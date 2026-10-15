@@ -1,5 +1,6 @@
 "use server";
 
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { parseArray, parseObject } from "@/lib/parse-prisma";
 import { revalidatePath } from "next/cache";
@@ -217,7 +218,20 @@ export async function getPurchaseById(id: number) {
  * En cada `branchId` destino, se crea los `PurchaseItem`, se incrementa
  * `BranchInventory`, y se insertan movimientos `BranchMovement(ENTRY)` por
  * línea para reflejar la distribución (audit trail).
+ *
+ * Las escrituras van agrupadas (un `INSERT` por tabla) para que la cantidad de
+ * viajes a la base no crezca con la cantidad de líneas: la transacción
+ * interactiva tiene un tope de tiempo y con ~3 viajes por ítem una compra de 25
+ * líneas se cortaba en el pooler remoto con el error genérico. (Bug 6)
  */
+
+/**
+ * Tope de la transacción interactiva (el default de Prisma son 5 s). Con las
+ * escrituras agrupadas el caso reportado de 25 líneas pasa de 82 queries a 10
+ * (incluye validación, BEGIN y COMMIT), así que 20 s es solo la red de
+ * seguridad para una conexión lenta, no el arreglo.
+ */
+const PURCHASE_TRANSACTION_TIMEOUT_MS = 20_000;
 
 // Códigos de error transitorio de Prisma (pool/conexión/timeout) que se
 // reintentan de forma acotada. (FIX-FASE4 issue 3)
@@ -256,64 +270,81 @@ async function executePurchase(validatedData: CreatePurchaseWithBranchSplitValue
   const headBranchId = items[0].branchId;
 
   // 6. Transacción atómica
-  const result = await prisma.$transaction(async (tx) => {
-    // a. Cabecera de la compra
-    const purchase = await tx.purchase.create({
-      data: { totalAmount, branchId: headBranchId },
-    });
+  const result = await prisma.$transaction(
+    async (tx) => {
+      // a. Cabecera de la compra
+      const purchase = await tx.purchase.create({
+        data: { totalAmount, branchId: headBranchId },
+      });
 
-    // b. Items + distribuciones
-    for (const it of items) {
-      await tx.purchaseItem.create({
-        data: {
+      // b. Todas las líneas en un solo INSERT
+      await tx.purchaseItem.createMany({
+        data: items.map((it) => ({
           purchaseId: purchase.id,
           productId: it.productId,
           price: it.price,
           quantity: it.quantity,
           subtotal: it.price * it.quantity,
-        },
+        })),
       });
 
-      // c. Incrementar BranchInventory en el branchId destino de la línea
-      await tx.branchInventory.upsert({
-        where: {
-          branchId_productId: {
+      // c. Inventario: un solo INSERT ... ON CONFLICT DO UPDATE que incrementa el
+      // stock de cada par (branchId, productId). Los pares repetidos se suman
+      // antes porque la sentencia no puede impactar la misma fila dos veces.
+      const stockPorPar = new Map<
+        string,
+        { branchId: number; productId: number; quantity: number }
+      >();
+      for (const it of items) {
+        const clave = `${it.branchId}:${it.productId}`;
+        const acumulado = stockPorPar.get(clave);
+        if (acumulado) {
+          acumulado.quantity += it.quantity;
+        } else {
+          stockPorPar.set(clave, {
             branchId: it.branchId,
             productId: it.productId,
-          },
-        },
-        create: {
-          branchId: it.branchId,
-          productId: it.productId,
-          stock: it.quantity,
-        },
-        update: {
-          stock: { increment: it.quantity },
-        },
-      });
+            quantity: it.quantity,
+          });
+        }
+      }
+      // `lastUpdated` es @updatedAt: en SQL crudo hay que escribirlo a mano.
+      const filasStock = Array.from(stockPorPar.values()).map(
+        (fila) =>
+          Prisma.sql`(${fila.branchId}, ${fila.productId}, ${fila.quantity}, NOW())`
+      );
+      await tx.$executeRaw`
+        INSERT INTO "BranchInventory" ("branchId", "productId", "stock", "lastUpdated")
+        VALUES ${Prisma.join(filasStock)}
+        ON CONFLICT ("branchId", "productId")
+        DO UPDATE SET
+          "stock" = "BranchInventory"."stock" + EXCLUDED."stock",
+          "lastUpdated" = EXCLUDED."lastUpdated"
+      `;
 
-      // d. Movimiento ENTRY por línea para auditar la distribución
+      // d. Movimientos ENTRY por línea para auditar la distribución
       if (performedBy) {
-        await tx.branchMovement.create({
-          data: {
+        await tx.branchMovement.createMany({
+          data: items.map((it) => ({
             productId: it.productId,
             branchId: it.branchId,
             movementType: "ENTRY",
             quantity: it.quantity,
             reference: `PURCHASE-${purchase.id}`,
             performedBy,
-          },
+          })),
         });
       }
-    }
 
-    // e. Devolver cabecera + items creados
-    const createdItems = await tx.purchaseItem.findMany({
-      where: { purchaseId: purchase.id },
-      include: { product: { select: { id: true, name: true, code: true } } },
-    });
-    return { purchase, items: createdItems, totalAmount };
-  });
+      // e. Devolver cabecera + items creados
+      const createdItems = await tx.purchaseItem.findMany({
+        where: { purchaseId: purchase.id },
+        include: { product: { select: { id: true, name: true, code: true } } },
+      });
+      return { purchase, items: createdItems, totalAmount };
+    },
+    { timeout: PURCHASE_TRANSACTION_TIMEOUT_MS }
+  );
 
   return result;
 }

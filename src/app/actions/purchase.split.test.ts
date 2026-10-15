@@ -16,9 +16,9 @@ import { createPurchaseWithBranchSplit } from "@/app/actions/purchase";
 const mockBranchFindMany = jest.fn();
 const mockProductFindMany = jest.fn();
 const mockPurchaseCreate = jest.fn();
-const mockPurchaseItemCreate = jest.fn();
-const mockBranchInventoryUpsert = jest.fn();
-const mockBranchMovementCreate = jest.fn();
+const mockPurchaseItemCreateMany = jest.fn();
+const mockBranchMovementCreateMany = jest.fn();
+const mockExecuteRaw = jest.fn();
 const mockPurchaseItemFindMany = jest.fn();
 
 // Default $transaction implementation (used by non-retry tests). Retry tests
@@ -27,15 +27,13 @@ const defaultTransaction = async (callback: (tx: unknown) => Promise<unknown>) =
   const tx = {
     purchase: { create: (...a: unknown[]) => mockPurchaseCreate(...a) },
     purchaseItem: {
-      create: (...a: unknown[]) => mockPurchaseItemCreate(...a),
+      createMany: (...a: unknown[]) => mockPurchaseItemCreateMany(...a),
       findMany: (...a: unknown[]) => mockPurchaseItemFindMany(...a),
     },
-    branchInventory: {
-      upsert: (...a: unknown[]) => mockBranchInventoryUpsert(...a),
-    },
     branchMovement: {
-      create: (...a: unknown[]) => mockBranchMovementCreate(...a),
+      createMany: (...a: unknown[]) => mockBranchMovementCreateMany(...a),
     },
+    $executeRaw: mockExecuteRaw,
   };
   return callback(tx);
 };
@@ -46,12 +44,6 @@ jest.mock("@/lib/prisma", () => ({
   prisma: {
     branch: { findMany: (...a: unknown[]) => mockBranchFindMany(...a) },
     product: { findMany: (...a: unknown[]) => mockProductFindMany(...a) },
-    branchInventory: {
-      upsert: (...a: unknown[]) => mockBranchInventoryUpsert(...a),
-    },
-    branchMovement: {
-      create: (...a: unknown[]) => mockBranchMovementCreate(...a),
-    },
     $transaction: (callback: (tx: unknown) => Promise<unknown>) => mockTransaction(callback),
   },
 }));
@@ -105,7 +97,6 @@ describe("createPurchaseWithBranchSplit (Fase 3)", () => {
       { id: 2, active: true, name: "Shampoo" },
     ]);
     mockPurchaseCreate.mockResolvedValue({ id: 99, branchId: 1, totalAmount: 35 });
-    mockBranchInventoryUpsert.mockResolvedValue({ stock: 5 });
     mockPurchaseItemFindMany.mockResolvedValue([
       { id: 1, product: { id: 1, name: "Jabón", code: "AA000" } },
       { id: 2, product: { id: 2, name: "Shampoo", code: "BB000" } },
@@ -124,22 +115,30 @@ describe("createPurchaseWithBranchSplit (Fase 3)", () => {
     expect(mockPurchaseCreate).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ branchId: 1 }) })
     );
-    // 2 upserts to BranchInventory (uno por línea, distinto branchId)
-    expect(mockBranchInventoryUpsert).toHaveBeenCalledTimes(2);
-    const firstUpsert = mockBranchInventoryUpsert.mock.calls[0][0];
-    const secondUpsert = mockBranchInventoryUpsert.mock.calls[1][0];
-    expect(firstUpsert.where.branchId_productId).toEqual({
-      branchId: 1,
+    // Un solo INSERT ... ON CONFLICT con las 2 filas de BranchInventory, una por
+    // línea: (branchId, productId, quantity)
+    expect(mockExecuteRaw).toHaveBeenCalledTimes(1);
+    // El mock recibe los literales del template y, como valor interpolado, el
+    // Sql de las filas agrupadas: 6 parámetros = 2 filas (branchId, productId, quantity).
+    const [stockStrings, stockRows] = mockExecuteRaw.mock.calls[0];
+    expect(stockStrings.join(" ")).toContain('ON CONFLICT ("branchId", "productId")');
+    expect(stockRows.values).toEqual([1, 1, 2, 2, 2, 5]);
+    // 2 ENTRY BranchMovement rows en un solo createMany
+    expect(mockBranchMovementCreateMany).toHaveBeenCalledTimes(1);
+    const movimientos = mockBranchMovementCreateMany.mock.calls[0][0].data;
+    expect(movimientos).toHaveLength(2);
+    expect(movimientos[0]).toMatchObject({
       productId: 1,
+      branchId: 1,
+      movementType: "ENTRY",
+      reference: "PURCHASE-99",
     });
-    expect(secondUpsert.where.branchId_productId).toEqual({
-      branchId: 2,
+    expect(movimientos[1]).toMatchObject({
       productId: 2,
+      branchId: 2,
+      movementType: "ENTRY",
+      reference: "PURCHASE-99",
     });
-    // 2 ENTRY BranchMovement rows
-    expect(mockBranchMovementCreate).toHaveBeenCalledTimes(2);
-    expect(mockBranchMovementCreate.mock.calls[0][0].data.movementType).toBe("ENTRY");
-    expect(mockBranchMovementCreate.mock.calls[0][0].data.reference).toBe("PURCHASE-99");
   });
 });
 
@@ -150,7 +149,6 @@ describe("createPurchaseWithBranchSplit retry (FIX-FASE4 issue 3)", () => {
     mockBranchFindMany.mockResolvedValue([{ id: 1 }]);
     mockProductFindMany.mockResolvedValue([{ id: 1, active: true, name: "Jabón" }]);
     mockPurchaseCreate.mockResolvedValue({ id: 1, branchId: 1, totalAmount: 10 });
-    mockBranchInventoryUpsert.mockResolvedValue({ stock: 1 });
     mockPurchaseItemFindMany.mockResolvedValue([
       { id: 1, product: { id: 1, name: "Jabón", code: "AA000" } },
     ]);
