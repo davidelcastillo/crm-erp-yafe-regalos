@@ -285,7 +285,12 @@ export function AddSaleButton({ products, onSuccess }: AddSaleButtonProps) {
                />
              </div>
 
-            {products.length === 0 ? (
+            {!saleBranchId ? (
+              <div className="text-center py-8">
+                <p className="text-[#6a6a6a] mb-2">Primero elegí la sucursal de la venta</p>
+                <p className="text-sm text-[#6a6a6a]">Después cargás los productos y el pago.</p>
+              </div>
+            ) : products.length === 0 ? (
               <div className="text-center py-8">
                 <p className="text-[#6a6a6a] mb-4">No hay productos registrados</p>
                 <p className="text-sm text-[#6a6a6a]">Primero creá un producto en la sección Inventario</p>

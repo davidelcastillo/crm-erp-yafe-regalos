@@ -29,10 +29,12 @@ jest.mock("@/app/actions/customer", () => ({
   getCustomers: jest.fn().mockResolvedValue({ success: true, data: [] }),
 }));
 
+let mockBranchId: number | null = 1;
+
 jest.mock("@/lib/context/BranchContext", () => ({
   useBranch: () => ({
-    branchId: 1,
-    branch: { id: 1, name: "Principal" },
+    branchId: mockBranchId,
+    branch: mockBranchId ? { id: mockBranchId, name: "Principal" } : null,
     ready: true,
   }),
 }));
@@ -102,6 +104,7 @@ async function openAndFillSale() {
 describe("AddSaleButton MIXTO (mejoras-f3-f4 item 4)", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockBranchId = 1;
     (registerSale as jest.Mock).mockResolvedValue({ success: true });
   });
 
@@ -171,6 +174,20 @@ describe("AddSaleButton MIXTO (mejoras-f3-f4 item 4)", () => {
     expect(registerSale).toHaveBeenCalledWith(
       expect.not.objectContaining({ amountPaid: expect.anything() })
     );
+  });
+
+  // S7.2 del usuario: primero la sucursal y después todo lo demás.
+  it("sin sucursal no deja cargar productos y los habilita al elegirla", () => {
+    mockBranchId = null;
+    setup();
+    fireEvent.click(screen.getByRole("button", { name: "Registrar venta" }));
+
+    expect(screen.getByText(/primero elegí la sucursal/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /seleccionar producto/i })).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Sucursal de venta"), { target: { value: "1" } });
+
+    expect(screen.getByRole("button", { name: /seleccionar producto/i })).toBeInTheDocument();
   });
 
   it("shows the 'sección Inventario' copy when there are 0 registered products", () => {
