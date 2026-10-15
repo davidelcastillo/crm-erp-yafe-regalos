@@ -8,6 +8,18 @@ Todos los ciclos SDD quedan **cerrados por transición a ODD**, no por verificac
 - `admin-partial` — implementado en su mayor parte; quedaba una comprobación manual abierta.
 - `admin-unverified` — el checklist no acredita implementación; requiere reconciliación antes de reutilizarlo.
 - `admin-abandoned` — nunca se aplicó.
+- `pre-archived` — ya archivado por SDD antes de esta transición, con su propio registro de verificación de la época; no re-verificado en este cierre.
+
+## Ciclos archivados antes de la transición
+
+| Cambio | Carpeta | closeType | Evidencia | Pendiente conservado |
+|---|---|---|---|---|
+| Fase 1 — Seguridad Core | `2026-07-29-fase1-seguridad-core/fase1-seguridad-core/` | `pre-archived` | Su `archive-report.md` declara PASS con warnings: 16/16 requisitos y unit tests de Zod en verde; la suite completa figuraba en FAIL **pre-existente** | Lo que el propio informe deja abierto: sin integración/E2E, monitoreo de bundle y roles granulares para fases posteriores |
+| HU2 — Branch Management | `2026-07-30-HU2/` | `pre-archived` | `tasks.md` con 31 tareas marcadas y 0 abiertas, más diseño, propuesta y 5 specs | Sin informe de archivo propio; la verificación consta solo por el checklist |
+
+Estos dos ciclos no se movieron ni se editaron: ya estaban en `openspec/changes/archive/`. Se registran aquí para cumplir el cierre de **todos** los ciclos, incluidos los ya archivados.
+
+## Ciclos cerrados en esta transición
 
 | Cambio | Carpeta | closeType | Evidencia al cerrar | Pendiente conservado |
 |---|---|---|---|---|
@@ -24,7 +36,7 @@ Todos los ciclos SDD quedan **cerrados por transición a ODD**, no por verificac
 | fix-filtros-inventario-modales | `.../fix-filtros-inventario-modales/` | `admin` | Estado `✅ completado (PR2)` | Ninguno |
 | mejoras-f3-f4 | `.../mejoras-f3-f4/` | `admin-partial` | Todas marcadas salvo 4.2 | **4.2** manual: selector post-login, MIXTO, portal a 360 px, grilla de productos |
 | portal-externo-publico-isPublic | `.../portal-externo-publico-isPublic/` | `admin-partial` | `verify-report.md`: PASS con advertencias, 34/34 requisitos y 32/32 escenarios (ejecución histórica, no repetida) | **4.2** manual del flujo público; marcar obsoleta la spec `branch-portal-login-ui`; deuda histórica de RLS sin revalidar |
-| unificar-productos-inventario | `.../unificar-productos-inventario/` | `admin` | Fases 1–4 sin checkbox pero verificadas por memoria y presentes en `main` | Sin informe de verificación en disco |
+| unificar-productos-inventario | `.../unificar-productos-inventario/` | `admin` | Fases marcadas en prosa, sin checkbox y **sin informe de verificación en disco**; su contenido está en `main` | Reconciliar el checklist si se retoma; no hay verificación registrada que reutilizar |
 
 Comprobaciones transversales conservadas, ninguna ejecutada por este cierre:
 
