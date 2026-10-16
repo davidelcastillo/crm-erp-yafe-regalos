@@ -524,7 +524,7 @@ El rebranding reemplaza el rojo `#ff385c` (que sigue existiendo como legado, pen
 | **Degradé claro** | `.brand-gradient` (celeste `#bfdbfe` → rosa `#f472b6`) | Bandas de encabezado y botones de acción. **Texto oscuro** (`text-gray-800` / `#222222`). |
 | **Degradé fuerte** | `.brand-gradient-strong` (violeta `#a855f7` → rosa fuerte `#ec4899`) | Solo decorativo o texto grande en negrita (≥ 18,66 px). |
 | Interacción | `.brand-gradient-hover` | Sobre el degradé claro: oscurece un poco en vez de cambiar de tono, así el texto oscuro conserva el contraste. |
-| **Acción de marca** | `.brand-action` | Botones que ejecutan la acción principal. En mobile: degradé claro con texto oscuro. **Desde desktop: sólido** (`#be185d`) con texto blanco, porque el degradé claro pierde presencia en pantalla grande. `#be185d` es el tono de marca más claro que llega a **4.5:1** con texto blanco (el rosa fuerte `#ec4899` da 3.5:1 y no sirve para una etiqueta de 14 px). |
+| **Acción de marca** | `.brand-action` | Botones que ejecutan la acción principal: **sólido violeta `#6d28d9` con texto blanco (7,1:1)**, igual en celular y en escritorio. No usar el degradé claro acá: en un botón chico pierde presencia y con texto blanco no llega al contraste. |
 
 - **Sobre el degradé claro el texto va oscuro.** `text-gray-800` da **10,2:1** en el extremo celeste y **5,5:1** en el rosa: AA cumplido con margen. **Blanco sobre el mismo degradé da ~1,9:1 en el celeste: falla.** Es el error más fácil de cometer al copiar un botón viejo (los del rojo usaban texto blanco).
 - Sobre el degradé fuerte, blanco da **3,5–3,9:1**: alcanza para texto grande en negrita o para íconos (piso 3:1), **no** para una etiqueta de 14 px.
@@ -543,7 +543,7 @@ Estos son los tonos que ya se usan en el sistema y el contraste que alcanzan sob
 | Atención (stock bajo, «con deuda») | `#b45309` | 5,0:1 |
 | Error de formulario | `#c13515` | 5,2:1 |
 | Banner de error (fondo `#ffe4ea`) | `#8f0020` | 8,0:1 |
-| Confirmar en un diálogo | `#be185d` (o el `brand-action`) | 6,0:1 con blanco |
+| Confirmar en un diálogo | `#6d28d9` (la clase `brand-action`) | 7,1:1 con blanco |
 | Error en un diálogo | `#dc2626` | 4,8:1 con blanco |
 
 - **Ningún verde ni ámbar brillante para texto**: `#22c55e` da 2,3:1 con texto blanco y `#f59e0b` 2,2:1 sobre claro. Si el diseño pide «más vivo», el color va en un **punto o ícono grande**, no en el texto.

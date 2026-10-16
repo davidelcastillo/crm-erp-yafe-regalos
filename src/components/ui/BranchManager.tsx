@@ -325,11 +325,12 @@ export function BranchManager({ branches }: { branches: Branch[] }) {
   // ---- List View ----
   return (
     <div>
-      {/* El título de la página lo pone `PageHeader`: acá va solo la acción. */}
-      <div className="mb-4 flex justify-end">
+      {/* El título de la página lo pone `PageHeader`: acá va solo la acción.
+          En celular ocupa todo el ancho; desde desktop va a la derecha. */}
+      <div className="mb-4 flex sm:justify-end">
         <button
           onClick={openCreate}
-          className="inline-flex items-center gap-2 min-h-[44px] px-4 py-2 rounded-xl brand-action text-sm font-medium touch-manipulation"
+          className="inline-flex w-full items-center justify-center gap-2 min-h-[48px] px-4 py-2 rounded-xl brand-action text-sm font-medium touch-manipulation sm:w-auto"
         >
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -411,7 +412,7 @@ export function BranchManager({ branches }: { branches: Branch[] }) {
                   <Link
                     href={`/sucursal/${branch.id}/inventory`}
                     aria-label={`Ver portal de ${branch.name}`}
-                    className="inline-flex items-center gap-1.5 px-3 min-h-[44px] rounded-xl bg-[#f2f2f2] text-[#222222] text-sm font-medium hover:bg-[#ebebeb] transition-colors touch-manipulation"
+                    className="inline-flex flex-1 items-center justify-center gap-1.5 px-3 min-h-[44px] rounded-xl bg-[#f2f2f2] text-[#222222] text-sm font-medium hover:bg-[#ebebeb] transition-colors touch-manipulation md:flex-none"
                   >
                     Portal
                   </Link>
