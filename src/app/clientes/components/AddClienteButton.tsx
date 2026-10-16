@@ -8,19 +8,43 @@ interface AddClienteButtonProps {
 }
 
 export function AddClienteButton({ onAdd }: AddClienteButtonProps) {
+  // Estilos comunes de los diálogos: esquinas bien redondeadas y los botones con
+  // las clases del sistema.`buttonsStyling: false` apaga el estilo propio de Swal,
+  // que si no pisa los colores de marca.
+  const estiloSwal = {
+    width: 'min(92vw, 22rem)',
+    background: '#ffffff',
+    color: '#222222',
+    buttonsStyling: false,
+    customClass: {
+      popup: 'rounded-3xl',
+      confirmButton: 'brand-action rounded-xl px-4 min-h-[44px] text-sm font-medium',
+      cancelButton:
+        'rounded-xl px-4 min-h-[44px] text-sm font-medium bg-[#f2f2f2] text-[#222222]',
+    },
+    confirmButtonColor: undefined,
+    cancelButtonColor: undefined,
+  };
+
+  const estiloError = {
+    ...estiloSwal,
+    customClass: {
+      ...estiloSwal.customClass,
+      confirmButton:
+        'rounded-xl px-4 min-h-[44px] text-sm font-medium bg-[#dc2626] text-white',
+    },
+  };
+
   const handleAdd = async () => {
     const result = await Swal.fire({
+      ...estiloSwal,
       title: "Nuevo Cliente",
-      // Swal usa 32em de ancho por defecto: en un celular se sale de la pantalla.
-      width: 'min(92vw, 22rem)',
-      background: '#ffffff',
-      color: '#222222',
       // Inputs propios (16px para que iOS no haga zoom al enfocar, 44px de alto).
       html: `
         <input type="text" id="name" placeholder="Nombre"
-          style="width:100%;min-height:44px;border-radius:0.75rem;background:#f8f8f8;border:1px solid #e5e5e5;padding:0.75rem;font-size:16px;color:#222222;" />
+          style="width:100%;min-height:44px;border-radius:1rem;background:#f8f8f8;border:1px solid #e5e5e5;padding:0.75rem;font-size:16px;color:#222222;" />
         <input type="text" id="surname" placeholder="Apellido"
-          style="width:100%;min-height:44px;margin-top:0.75rem;border-radius:0.75rem;background:#f8f8f8;border:1px solid #e5e5e5;padding:0.75rem;font-size:16px;color:#222222;" />
+          style="width:100%;min-height:44px;margin-top:0.75rem;border-radius:1rem;background:#f8f8f8;border:1px solid #e5e5e5;padding:0.75rem;font-size:16px;color:#222222;" />
       `,
       preConfirm: () => {
         const name = (document.getElementById("name") as HTMLInputElement)?.value;
@@ -32,10 +56,8 @@ export function AddClienteButton({ onAdd }: AddClienteButtonProps) {
         return { name, surname };
       },
       confirmButtonText: "Crear Cliente",
-      confirmButtonColor: "#15803d",
       showCancelButton: true,
       cancelButtonText: "Cancelar",
-      cancelButtonColor: "#6b7280",
     });
 
     if (result.isConfirmed && result.value) {
@@ -43,29 +65,29 @@ export function AddClienteButton({ onAdd }: AddClienteButtonProps) {
         const res = await createCustomer(result.value);
         if (res.success) {
           await Swal.fire({
+            ...estiloSwal,
             title: "¡Cliente creado!",
             text: `${result.value.name} ${result.value.surname} fue agregado`,
             icon: "success",
-            confirmButtonColor: "#15803d",
             timer: 1500,
             showConfirmButton: false,
           });
           onAdd();
         } else {
           await Swal.fire({
+            ...estiloError,
             title: "Error",
             text: res.error || "No se pudo crear el cliente",
             icon: "error",
-            confirmButtonColor: "#dc2626",
           });
         }
       } catch (error) {
         console.error("Error creating customer:", error);
         await Swal.fire({
+          ...estiloError,
           title: "Error",
           text: "Error al crear el cliente",
           icon: "error",
-          confirmButtonColor: "#dc2626",
         });
       }
     }
