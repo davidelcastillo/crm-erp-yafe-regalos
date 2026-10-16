@@ -7,6 +7,7 @@ import { getBranchOptions } from '../actions/branch';
 import { SalesList } from './components/SalesList';
 import { AddSaleButton } from './components/AddSaleButton';
 import { CashMovementsModal } from './components/CashMovementsModal';
+import { CashCloseModal } from './components/CashCloseModal';
 import { BranchSelector } from '@/components/ui/BranchSelector';
 import { useReloadKey } from '@/lib/hooks/useReloadKey';
 import { useEffect, useState } from 'react';
@@ -29,6 +30,7 @@ export default function VentasPage() {
   // Sucursales y acceso a la caja (plata), pedidos en S14.
   const [branches, setBranches] = useState<BranchOption[]>([]);
   const [cashModalOpen, setCashModalOpen] = useState(false);
+  const [closeModalOpen, setCloseModalOpen] = useState(false);
 
   // Las sucursales se cargan una vez: las necesita el modal de caja.
   useEffect(() => {
@@ -128,6 +130,13 @@ export default function VentasPage() {
             >
               Caja
             </button>
+            <button
+              type="button"
+              onClick={() => setCloseModalOpen(true)}
+              className="px-4 py-2 min-h-[44px] text-sm font-medium text-white bg-[#ff385c] rounded-xl hover:bg-[#e00b41] transition-colors touch-manipulation"
+            >
+              Cerrar caja
+            </button>
             <BranchSelector
               onChange={(id) => setBranchId(id)}
               label="Filtrar por sucursal"
@@ -190,6 +199,12 @@ export default function VentasPage() {
       <CashMovementsModal
         open={cashModalOpen}
         onClose={() => setCashModalOpen(false)}
+        branches={branches}
+        onConfirm={bump}
+      />
+      <CashCloseModal
+        open={closeModalOpen}
+        onClose={() => setCloseModalOpen(false)}
         branches={branches}
         onConfirm={bump}
       />
