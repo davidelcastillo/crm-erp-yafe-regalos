@@ -21,6 +21,8 @@ interface Sale {
   items: SaleItem[];
   paymentMethod?: "EFECTIVO" | "TRANSFERENCIA" | "MIXTO";
   branch?: { id: number; name: string } | null;
+  /** Anterior al último cierre de caja de su sucursal (S17). */
+  previousCash?: boolean;
 }
 
 interface SaleCardProps {
@@ -48,9 +50,14 @@ export function SaleCard({ sale, onExpand, expanded }: SaleCardProps) {
   };
 
   const paymentMethod = sale.paymentMethod ?? "EFECTIVO";
+  const deCajaAnterior = sale.previousCash === true;
 
   return (
-    <div className="bg-white rounded-2xl shadow-[rgba(0,0,0,0.02)_0px_0px_0px_1px,rgba(0,0,0,0.04)_0px_2px_6px,rgba(0,0,0,0.1)_0px_4px_8px]">
+    <div
+      className={`rounded-2xl shadow-[rgba(0,0,0,0.02)_0px_0px_0px_1px,rgba(0,0,0,0.04)_0px_2px_6px,rgba(0,0,0,0.1)_0px_4px_8px] ${
+        deCajaAnterior ? "bg-[#f2f2f2]" : "bg-white"
+      }`}
+    >
       <div className="p-4 cursor-pointer" onClick={onExpand}>
         <div className="flex justify-between items-start">
           <div className="flex-1">
@@ -61,6 +68,12 @@ export function SaleCard({ sale, onExpand, expanded }: SaleCardProps) {
             {sale.branch && (
               <span className="inline-block mt-1 px-2 py-0.5 bg-[#3b82f6]/10 text-[#3b82f6] rounded text-xs font-medium">
                 {sale.branch.name}
+              </span>
+            )}
+            {/* El estado no se comunica solo por color: la caja anterior lleva rótulo. */}
+            {deCajaAnterior && (
+              <span className="inline-block mt-1 ml-1 px-2 py-0.5 bg-[#222222]/10 text-[#6a6a6a] rounded text-xs font-medium">
+                Caja anterior
               </span>
             )}
           </div>
