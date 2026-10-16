@@ -57,9 +57,7 @@ function renderWizard() {
 
 async function goToStep2() {
   renderWizard();
-  fireEvent.change(screen.getByLabelText(/sucursal/i), {
-    target: { value: "1" },
-  });
+  fireEvent.click(screen.getByRole("button", { name: "Principal" }));
   fireEvent.click(screen.getByRole("button", { name: /continuar/i }));
   await waitFor(() => {
     expect(screen.getByText(/seleccionar productos/i)).toBeInTheDocument();
@@ -96,20 +94,18 @@ beforeEach(() => {
 });
 
 describe("ExportWizard", () => {
-  it("renders step 1 and disables Continuar until a branch is selected", () => {
+  it("muestra el paso 1 y deja Continuar deshabilitado hasta elegir sucursal", () => {
     renderWizard();
 
     expect(screen.getByText(/paso 1 de 3/i)).toBeInTheDocument();
     const continuar = screen.getByRole("button", { name: /continuar/i });
     expect(continuar).toBeDisabled();
 
-    fireEvent.change(screen.getByLabelText(/sucursal/i), {
-      target: { value: "2" },
-    });
+    fireEvent.click(screen.getByRole("button", { name: "Centro" }));
     expect(continuar).toBeEnabled();
   });
 
-  it("shows checkboxes only for products with stock > 0 and updates the counter", async () => {
+  it("muestra checkboxes solo para productos con stock > 0 y actualiza el contador", async () => {
     await goToStep2();
 
     // 3 productos en el mock, uno con stock 0 → sólo 2 checkboxes.
@@ -127,7 +123,7 @@ describe("ExportWizard", () => {
     expect(screen.getByText(/2 seleccionados/i)).toBeInTheDocument();
   });
 
-  it("selects every product with stock from the TODOS selector", async () => {
+  it("el selector Todos marca todos los productos con stock", async () => {
     await goToStep2();
 
     const todos = screen.getByRole("checkbox", { name: /todos/i });
@@ -145,7 +141,7 @@ describe("ExportWizard", () => {
     checkboxesDeProductos().forEach((checkbox) => expect(checkbox).not.toBeChecked());
   });
 
-  it("marks the TODOS selector when every product is selected by hand", async () => {
+  it("marca el selector Todos cuando se eligen todos a mano", async () => {
     await goToStep2();
 
     checkboxesDeProductos().forEach((checkbox) => fireEvent.click(checkbox));
@@ -153,7 +149,7 @@ describe("ExportWizard", () => {
     expect(screen.getByRole("checkbox", { name: /todos/i })).toBeChecked();
   });
 
-  it("disables Generar PDF on step 3 when nothing is selected and enables it after selection", async () => {
+  it("deshabilita Generar PDF en el paso 3 sin selección y lo habilita después de elegir", async () => {
     await goToStep2();
 
     fireEvent.click(screen.getByRole("button", { name: /siguiente/i }));
@@ -174,7 +170,7 @@ describe("ExportWizard", () => {
     expect(screen.getByRole("button", { name: /generar pdf/i })).toBeEnabled();
   });
 
-  it("stays on step 3 and preserves selection when PDF generation fails", async () => {
+  it("se queda en el paso 3 y conserva la selección si falla la generación del PDF", async () => {
     mockExportBranchProductsPdf.mockResolvedValue({
       success: false,
       error: "Error al exportar el inventario",
@@ -202,7 +198,7 @@ describe("ExportWizard", () => {
     expect(screen.getByText(/1 seleccionados/i)).toBeInTheDocument();
   });
 
-  it("downloads the PDF on success", async () => {
+  it("descarga el PDF cuando la generación sale bien", async () => {
     URL.createObjectURL = jest.fn(() => "blob:test");
     URL.revokeObjectURL = jest.fn();
     // jsdom no implementa navegación para anchors; stubeamos el click.

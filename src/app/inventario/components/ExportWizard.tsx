@@ -7,6 +7,7 @@ import {
   getBranchProductsForExport,
   exportBranchProductsPdf,
 } from "@/app/actions/inventory";
+import { BranchPicker } from "@/components/ui/BranchPicker";
 
 type BranchOption = { id: number; name: string };
 
@@ -126,8 +127,7 @@ export function ExportWizard({ open, onClose, branches }: ExportWizardProps) {
         title: "PDF generado",
         text: "El inventario se exportó correctamente",
         icon: "success",
-        confirmButtonColor: "#ff385c",
-        confirmButtonText: "Aceptar",
+        confirmButtonColor: "#be185d",
         background: "#ffffff",
         color: "#222222",
       });
@@ -136,8 +136,7 @@ export function ExportWizard({ open, onClose, branches }: ExportWizardProps) {
         title: "Error",
         text: result.error || "Error al generar el PDF",
         icon: "error",
-        confirmButtonColor: "#ff385c",
-        background: "#ffffff",
+        confirmButtonColor: "#dc2626",
         color: "#222222",
       });
     }
@@ -212,53 +211,16 @@ export function ExportWizard({ open, onClose, branches }: ExportWizardProps) {
             <h3 className="text-base font-semibold text-[#222222] mb-3">
               Elegí la sucursal
             </h3>
-            <div>
-              <label
-                htmlFor="export-branch"
-                className="block text-xs text-[#6a6a6a] mb-2"
-              >
-                Sucursal
-              </label>
-              <div className="relative">
-                <select
-                  id="export-branch"
-                  value={branchId ?? ""}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    setBranchId(value === "" ? null : Number(value));
-                    setBranchError(null);
-                  }}
-                  className="w-full px-3 py-3 min-h-[48px] rounded-xl border border-gray-200 bg-white focus:border-[#ff385c] focus:ring-2 focus:ring-[#ff385c]/20 outline-none transition-all text-sm touch-manipulation appearance-none cursor-pointer pr-10"
-                >
-                  <option value="" className="bg-white text-[#222222]">
-                    Seleccionar sucursal
-                  </option>
-                  {branches.map((branch) => (
-                    <option
-                      key={branch.id}
-                      value={branch.id}
-                      className="bg-white text-[#222222]"
-                    >
-                      {branch.name}
-                    </option>
-                  ))}
-                </select>
-                <svg
-                  className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[#6a6a6a] pointer-events-none"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  aria-hidden="true"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M19 9l-7 7-7-7"
-                  />
-                </svg>
-              </div>
-            </div>
+            <p className="block text-xs text-[#6a6a6a] mb-2">Sucursal a exportar</p>
+            <BranchPicker
+              branches={branches}
+              value={branchId}
+              onChange={(id) => {
+                setBranchId(id);
+                setBranchError(null);
+              }}
+              label="Sucursal a exportar"
+            />
             {branchError && (
               <p className="mt-2 text-sm text-red-600">{branchError}</p>
             )}
@@ -266,7 +228,7 @@ export function ExportWizard({ open, onClose, branches }: ExportWizardProps) {
               type="button"
               onClick={handleContinue}
               disabled={branchId === null}
-              className="w-full py-4 mt-6 bg-[#ff385c] text-white font-medium rounded-xl hover:bg-[#e00b41] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full py-4 mt-6 brand-gradient brand-gradient-hover text-gray-800 font-medium rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Continuar
             </button>
@@ -279,7 +241,7 @@ export function ExportWizard({ open, onClose, branches }: ExportWizardProps) {
               <h3 className="text-base font-semibold text-[#222222]">
                 Seleccionar productos
               </h3>
-              <span className="text-sm font-medium text-[#ff385c]">
+              <span className="text-sm font-medium text-[#be185d]">
                 {selectedCount} seleccionados
               </span>
             </div>
@@ -292,7 +254,7 @@ export function ExportWizard({ open, onClose, branches }: ExportWizardProps) {
                     type="checkbox"
                     checked={allSelected}
                     onChange={toggleAll}
-                    className="w-5 h-5 accent-[#ff385c]"
+                    className="w-5 h-5 accent-[#ec4899]"
                   />
                   <span className="text-sm font-medium text-[#222222]">
                     Todos
@@ -339,7 +301,7 @@ export function ExportWizard({ open, onClose, branches }: ExportWizardProps) {
                     setProductsError(null);
                     setLoadAttempt((attempt) => attempt + 1);
                   }}
-                  className="px-4 py-3 min-h-[44px] text-sm font-medium text-white bg-[#ff385c] rounded-xl hover:bg-[#e00b41] transition-colors touch-manipulation"
+                  className="px-4 py-3 min-h-[44px] text-sm font-medium brand-gradient brand-gradient-hover text-gray-800 rounded-xl transition-colors touch-manipulation"
                 >
                   Reintentar
                 </button>
@@ -371,7 +333,7 @@ export function ExportWizard({ open, onClose, branches }: ExportWizardProps) {
                         type="checkbox"
                         checked={selectedIds.includes(row.id)}
                         onChange={() => toggleProduct(row.id)}
-                        className="w-5 h-5 accent-[#ff385c]"
+                        className="w-5 h-5 accent-[#ec4899]"
                       />
                       <span className="flex-1 min-w-0">
                         <span className="block text-sm font-medium text-[#222222] truncate">
@@ -394,7 +356,7 @@ export function ExportWizard({ open, onClose, branches }: ExportWizardProps) {
               <button
                 type="button"
                 onClick={() => setStep(3)}
-                className="flex-1 py-3 min-h-[44px] bg-[#ff385c] text-white font-medium rounded-xl hover:bg-[#e00b41] transition-colors touch-manipulation"
+                className="flex-1 py-3 min-h-[44px] brand-gradient brand-gradient-hover text-gray-800 font-medium rounded-xl transition-colors touch-manipulation"
               >
                 Siguiente
               </button>
@@ -429,7 +391,7 @@ export function ExportWizard({ open, onClose, branches }: ExportWizardProps) {
                 type="button"
                 onClick={handleGenerate}
                 disabled={selectedCount === 0 || generating}
-                className="flex-1 py-3 min-h-[44px] bg-[#ff385c] text-white font-medium rounded-xl hover:bg-[#e00b41] transition-colors disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
+                className="flex-1 py-3 min-h-[44px] brand-gradient brand-gradient-hover text-gray-800 font-medium rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
               >
                 {generating ? "Generando..." : "Generar PDF"}
               </button>

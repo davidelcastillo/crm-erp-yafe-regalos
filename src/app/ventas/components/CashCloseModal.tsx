@@ -4,6 +4,7 @@ import { useState } from "react";
 import Swal from "sweetalert2";
 import { getCashClosePreview, closeCash } from "@/app/actions/cash";
 import { getUser } from "@/actions/auth";
+import { BranchPicker } from "@/components/ui/BranchPicker";
 
 /**
  * Cierre de caja de una sucursal (S9/S17): pide la sucursal, muestra el total
@@ -94,7 +95,7 @@ export const CashCloseModal = ({
         title: "Caja cerrada",
         text: `Se guardó el corte de ${resumen?.branchName ?? "la sucursal"} por ${plata(resumen?.total ?? 0)}`,
         icon: "success",
-        confirmButtonColor: "#ff385c",
+        confirmButtonColor: "#be185d",
         background: "#ffffff",
         color: "#222222",
       });
@@ -137,40 +138,18 @@ export const CashCloseModal = ({
           </button>
         </div>
 
-        <label htmlFor="cc-sucursal" className="block text-xs text-[#6a6a6a] mb-2">
-          Sucursal
-        </label>
-        <div className="relative">
-          <select
-            id="cc-sucursal"
-            value={branchId ?? ""}
-            onChange={(e) => {
-              const value = e.target.value;
-              setBranchId(value === "" ? null : Number(value));
-              setResumen(null);
-              setError(null);
-            }}
-            className="w-full px-3 py-3 min-h-[48px] rounded-xl border border-gray-200 bg-white focus:border-[#ff385c] focus:ring-2 focus:ring-[#ff385c]/20 outline-none transition-all text-sm touch-manipulation appearance-none cursor-pointer pr-10"
-          >
-            <option value="" className="bg-white text-[#222222]">
-              Seleccionar sucursal
-            </option>
-            {branches.map((b) => (
-              <option key={b.id} value={b.id} className="bg-white text-[#222222]">
-                {b.name}
-              </option>
-            ))}
-          </select>
-          <svg
-            className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[#6a6a6a] pointer-events-none"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            aria-hidden="true"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
-        </div>
+        <p className="block text-xs text-[#6a6a6a] mb-2">Sucursal a cerrar</p>
+        <BranchPicker
+          branches={branches}
+          value={branchId}
+          onChange={(id) => {
+            setBranchId(id);
+            setResumen(null);
+            setError(null);
+          }}
+          label="Sucursal a cerrar"
+          emptyLabel="No hay sucursales activas para elegir."
+        />
 
         {error && <p className="mt-3 text-sm text-[#c13515]">{error}</p>}
 
@@ -181,7 +160,7 @@ export const CashCloseModal = ({
             type="button"
             onClick={handleContinuar}
             disabled={branchId === null}
-            className="w-full py-4 mt-6 min-h-[48px] bg-[#ff385c] text-white font-medium rounded-xl hover:bg-[#e00b41] transition-colors disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
+            className="w-full py-4 mt-6 min-h-[48px] brand-gradient brand-gradient-hover text-gray-800 font-medium rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
           >
             Continuar
           </button>
@@ -244,7 +223,7 @@ export const CashCloseModal = ({
               type="button"
               onClick={handleConfirmar}
               disabled={pending}
-              className="w-full py-4 mt-6 min-h-[48px] bg-[#ff385c] text-white font-medium rounded-xl hover:bg-[#e00b41] transition-colors disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
+              className="w-full py-4 mt-6 min-h-[48px] brand-gradient brand-gradient-hover text-gray-800 font-medium rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
             >
               {pending ? "Cerrando..." : "Cerrar caja"}
             </button>

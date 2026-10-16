@@ -56,7 +56,7 @@ const checkboxes = () =>
   within(screen.getByRole("group", { name: "Productos" })).getAllByRole("checkbox");
 
 async function irAlPaso2(tipo: "Entrada" | "Salida" = "Entrada") {
-  fireEvent.change(screen.getByLabelText("Sucursal"), { target: { value: "1" } });
+  fireEvent.click(screen.getByRole("button", { name: "Principal" }));
   fireEvent.click(screen.getByRole("button", { name: tipo }));
   fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
   await waitFor(() =>
@@ -85,7 +85,7 @@ describe("StockAdjustmentModal", () => {
     const continuar = screen.getByRole("button", { name: "Continuar" });
     expect(continuar).toBeDisabled();
 
-    fireEvent.change(screen.getByLabelText("Sucursal"), { target: { value: "1" } });
+    fireEvent.click(screen.getByRole("button", { name: "Principal" }));
     expect(continuar).toBeEnabled();
   });
 

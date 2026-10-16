@@ -5,6 +5,7 @@ import Swal from "sweetalert2";
 import { getCashMovements, registerCashMovement } from "@/app/actions/cash";
 import { getUser } from "@/actions/auth";
 import { toLocalDateKey } from "@/lib/dates";
+import { BranchPicker } from "@/components/ui/BranchPicker";
 
 /**
  * Plata de la caja de una sucursal: ingresos y egresos que no son ventas
@@ -126,7 +127,7 @@ export const CashMovementsModal = ({
         title: tipo === "INGRESO" ? "Ingreso registrado" : "Egreso registrado",
         text: `${plata(monto)} en la caja de la sucursal`,
         icon: "success",
-        confirmButtonColor: "#ff385c",
+        confirmButtonColor: "#be185d",
         background: "#ffffff",
         color: "#222222",
       });
@@ -173,41 +174,17 @@ export const CashMovementsModal = ({
           </button>
         </div>
 
-        <label htmlFor="cm-sucursal" className="block text-xs text-[#6a6a6a] mb-2">
-          Sucursal
-        </label>
-        <div className="relative">
-          <select
-            id="cm-sucursal"
-            value={branchId ?? ""}
-            onChange={(e) => {
-              const value = e.target.value;
-              const id = value === "" ? null : Number(value);
-              setBranchId(id);
-              setError(null);
-              if (id !== null) void cargar(id);
-            }}
-            className="w-full px-3 py-3 min-h-[48px] rounded-xl border border-gray-200 bg-white focus:border-[#ff385c] focus:ring-2 focus:ring-[#ff385c]/20 outline-none transition-all text-sm touch-manipulation appearance-none cursor-pointer pr-10"
-          >
-            <option value="" className="bg-white text-[#222222]">
-              Seleccionar sucursal
-            </option>
-            {branches.map((b) => (
-              <option key={b.id} value={b.id} className="bg-white text-[#222222]">
-                {b.name}
-              </option>
-            ))}
-          </select>
-          <svg
-            className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[#6a6a6a] pointer-events-none"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            aria-hidden="true"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
-        </div>
+        <p className="block text-xs text-[#6a6a6a] mb-2">Sucursal</p>
+        <BranchPicker
+          branches={branches}
+          value={branchId}
+          onChange={(id) => {
+            setBranchId(id);
+            setError(null);
+            void cargar(id);
+          }}
+          label="Sucursal"
+        />
 
         {branchId === null && (
           <p className="mt-4 text-sm text-[#6a6a6a]">
@@ -264,7 +241,7 @@ export const CashMovementsModal = ({
                     id="cm-metodo"
                     value={method}
                     onChange={(e) => setMethod(e.target.value)}
-                    className="w-full px-3 py-3 min-h-[48px] rounded-xl border border-gray-200 bg-white focus:border-[#ff385c] focus:ring-2 focus:ring-[#ff385c]/20 outline-none transition-all text-sm touch-manipulation appearance-none cursor-pointer"
+                    className="w-full px-3 py-3 min-h-[48px] rounded-xl border border-gray-200 bg-white focus:border-[#ec4899] focus:ring-2 focus:ring-[#ec4899]/30 outline-none transition-all text-sm touch-manipulation appearance-none cursor-pointer"
                   >
                     {METODOS.map((m) => (
                       <option key={m.value} value={m.value} className="bg-white text-[#222222]">
@@ -286,7 +263,7 @@ export const CashMovementsModal = ({
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
                     placeholder="0.00"
-                    className="w-full px-3 py-3 min-h-[48px] rounded-xl border border-gray-200 bg-white focus:border-[#ff385c] focus:ring-2 focus:ring-[#ff385c]/20 outline-none transition-all text-sm touch-manipulation"
+                    className="w-full px-3 py-3 min-h-[48px] rounded-xl border border-gray-200 bg-white focus:border-[#ec4899] focus:ring-2 focus:ring-[#ec4899]/30 outline-none transition-all text-sm touch-manipulation"
                   />
                 </div>
               </div>
@@ -300,7 +277,7 @@ export const CashMovementsModal = ({
                   type="date"
                   value={date}
                   onChange={(e) => setDate(e.target.value)}
-                  className="w-full px-3 py-3 min-h-[48px] rounded-xl border border-gray-200 bg-white focus:border-[#ff385c] focus:ring-2 focus:ring-[#ff385c]/20 outline-none transition-all text-sm touch-manipulation"
+                  className="w-full px-3 py-3 min-h-[48px] rounded-xl border border-gray-200 bg-white focus:border-[#ec4899] focus:ring-2 focus:ring-[#ec4899]/30 outline-none transition-all text-sm touch-manipulation"
                 />
               </div>
 
@@ -315,7 +292,7 @@ export const CashMovementsModal = ({
                   onChange={(e) => setDetalle(e.target.value)}
                   maxLength={200}
                   placeholder="Motivo del movimiento"
-                  className="w-full px-3 py-3 min-h-[48px] rounded-xl border border-gray-200 bg-white focus:border-[#ff385c] focus:ring-2 focus:ring-[#ff385c]/20 outline-none transition-all text-sm touch-manipulation"
+                  className="w-full px-3 py-3 min-h-[48px] rounded-xl border border-gray-200 bg-white focus:border-[#ec4899] focus:ring-2 focus:ring-[#ec4899]/30 outline-none transition-all text-sm touch-manipulation"
                 />
               </div>
 
@@ -324,7 +301,7 @@ export const CashMovementsModal = ({
               <button
                 type="submit"
                 disabled={pending}
-                className="mt-4 w-full py-3 min-h-[48px] rounded-xl bg-[#ff385c] text-white font-medium hover:bg-[#e00b41] transition-colors touch-manipulation disabled:opacity-50"
+                className="mt-4 w-full py-3 min-h-[48px] rounded-xl brand-gradient brand-gradient-hover text-gray-800 font-medium transition-colors touch-manipulation disabled:opacity-50"
               >
                 {pending ? "Registrando..." : `Registrar ${tipo === "INGRESO" ? "ingreso" : "egreso"}`}
               </button>

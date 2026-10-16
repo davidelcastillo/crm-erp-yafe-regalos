@@ -78,7 +78,7 @@ describe("CashCloseModal", () => {
   it("muestra el efectivo a retirar, la transferencia a verificar y el total, sin el método en 0", async () => {
     renderModal();
 
-    fireEvent.change(screen.getByLabelText("Sucursal"), { target: { value: "1" } });
+    fireEvent.click(screen.getByRole("button", { name: "Principal" }));
     fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
 
     await waitFor(() => expect(mockPreview).toHaveBeenCalledWith({ branchId: 1 }));
@@ -92,7 +92,7 @@ describe("CashCloseModal", () => {
   it("cierra la caja con la sucursal y el email del usuario, y avisa al listado", async () => {
     renderModal();
 
-    fireEvent.change(screen.getByLabelText("Sucursal"), { target: { value: "1" } });
+    fireEvent.click(screen.getByRole("button", { name: "Principal" }));
     fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
 
     fireEvent.click(await screen.findByRole("button", { name: "Cerrar caja" }));

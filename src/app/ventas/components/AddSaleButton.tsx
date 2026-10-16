@@ -10,8 +10,8 @@ import { Product } from "@prisma/client";
 import Swal from "sweetalert2";
 import { ProductSearch, ProductSearchResult } from "@/components/ProductSearch";
 import { PaymentMethod, computePayment } from "@/lib/utils/payment";
-import { BranchSelector } from "@/components/ui/BranchSelector";
 import { useBranch } from "@/lib/context/BranchContext";
+import { BranchPicker } from "@/components/ui/BranchPicker";
 
 interface AddSaleButtonProps {
   products: Product[];
@@ -37,10 +37,17 @@ interface SaleItem {
 
 type PaymentMethodType = "EFECTIVO" | "TRANSFERENCIA" | "MIXTO";
 
+type PasoVenta = "sucursal" | "productos";
+
+// shortcut: MIXTO desactivado por pedido (L30); reactivar mostrando la opción en la lista de medios
+const MEDIOS_DE_PAGO: PaymentMethodType[] = ["EFECTIVO", "TRANSFERENCIA"];
+
 export function AddSaleButton({ products, onSuccess }: AddSaleButtonProps) {
   const router = useRouter();
-  const { branchId, branch, ready } = useBranch();
+  const { branchId, branches } = useBranch();
   const [isOpen, setIsOpen] = useState(false);
+  // Paso 1: elegir la sucursal. Paso 2: productos y pago.
+  const [paso, setPaso] = useState<PasoVenta>("sucursal");
   const [isProductSearchOpen, setIsProductSearchOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [customers, setCustomers] = useState<CustomerOption[]>([]);
@@ -111,6 +118,9 @@ export function AddSaleButton({ products, onSuccess }: AddSaleButtonProps) {
       transfer: parseFloat(transferAmount) || 0,
     });
 
+  // Sucursal elegida en el paso 1: el paso 2 la muestra como etiqueta, sin selector.
+  const sucursalNombre = branches.find((b) => b.id === saleBranchId)?.name ?? "";
+
   const getProductDisplay = (item: SaleItem) => {
     if (!item.productId) return "Seleccionar producto...";
     return item.name && item.code
@@ -161,7 +171,7 @@ export function AddSaleButton({ products, onSuccess }: AddSaleButtonProps) {
          title: "Sucursal requerida",
          text: "Seleccioná una sucursal antes de registrar una venta",
          icon: "warning",
-         confirmButtonColor: "#ff385c",
+         confirmButtonColor: "#be185d",
        });
        return;
      }
@@ -172,7 +182,7 @@ export function AddSaleButton({ products, onSuccess }: AddSaleButtonProps) {
          title: "Error",
          text: "Por favor agregá al menos un producto",
          icon: "error",
-         confirmButtonColor: "#ff385c",
+         confirmButtonColor: "#dc2626",
        });
        return;
      }
@@ -186,7 +196,7 @@ export function AddSaleButton({ products, onSuccess }: AddSaleButtonProps) {
            title: "Error",
            text: "se requiere una cantidad en efectivo o transferencia mayor a 0",
            icon: "error",
-           confirmButtonColor: "#ff385c",
+           confirmButtonColor: "#dc2626",
          });
          return;
        }
@@ -221,7 +231,7 @@ export function AddSaleButton({ products, onSuccess }: AddSaleButtonProps) {
          title: "Venta registrada",
          text: totalItems + " unidades vendidas por $" + calculateTotal().toFixed(2),
          icon: "success",
-         confirmButtonColor: "#ff385c",
+         confirmButtonColor: "#be185d",
          confirmButtonText: "Aceptar",
          background: "#ffffff",
          color: "#222222",
@@ -238,7 +248,7 @@ export function AddSaleButton({ products, onSuccess }: AddSaleButtonProps) {
          title: "Error",
          text: result.error || "Error al registrar la venta",
          icon: "error",
-         confirmButtonColor: "#ff385c",
+         confirmButtonColor: "#dc2626",
          background: "#ffffff",
          color: "#222222",
        });
@@ -255,7 +265,7 @@ export function AddSaleButton({ products, onSuccess }: AddSaleButtonProps) {
   return (
     <>
        <button
-         onClick={() => { setSaleBranchId(branchId ?? null); setIsOpen(true); }}
+         onClick={() => { setSaleBranchId(branchId ?? null); setPaso("sucursal"); setIsOpen(true); }}
          className="fixed bottom-24 right-6 w-14 h-14 brand-gradient brand-gradient-hover text-gray-800 rounded-full shadow-lg transition-colors duration-300 flex items-center justify-center z-40"
          aria-label="Registrar venta"
        >
@@ -283,18 +293,27 @@ export function AddSaleButton({ products, onSuccess }: AddSaleButtonProps) {
                  </svg>
                </button>
              </div>
-             <div className="mb-4">
-               <BranchSelector
-                 label="Sucursal de venta"
-                 value={saleBranchId}
-                 onChange={setSaleBranchId}
-               />
-             </div>
-
-            {!saleBranchId ? (
-              <div className="text-center py-8">
+            {paso === "sucursal" ? (
+              <div>
                 <p className="text-[#6a6a6a] mb-2">Primero elegí la sucursal de la venta</p>
-                <p className="text-sm text-[#6a6a6a]">Después cargás los productos y el pago.</p>
+                <p className="text-sm text-[#6a6a6a] mb-4">Después cargás los productos y el pago.</p>
+
+                <BranchPicker
+                  branches={branches}
+                  value={saleBranchId}
+                  onChange={setSaleBranchId}
+                  label="Sucursal de la venta"
+                  emptyLabel="No hay sucursales activas para elegir."
+                />
+
+                <button
+                  type="button"
+                  onClick={() => setPaso("productos")}
+                  disabled={!saleBranchId}
+                  className="w-full min-h-[44px] mt-6 py-4 brand-gradient brand-gradient-hover text-gray-800 font-medium rounded-xl transition-colors disabled:opacity-50 touch-manipulation"
+                >
+                  Siguiente
+                </button>
               </div>
             ) : products.length === 0 ? (
               <div className="text-center py-8">
@@ -303,6 +322,8 @@ export function AddSaleButton({ products, onSuccess }: AddSaleButtonProps) {
               </div>
             ) : (
               <form onSubmit={handleSubmit} className="space-y-4">
+                {/* La sucursal se eligió en el paso 1: acá va como etiqueta, no como selector. */}
+                <p className="text-sm text-[#6a6a6a]">Sucursal: {sucursalNombre}</p>
                 {items.map((item, index) => (
                   <div key={item.id} className="p-4 bg-[#f9f9f9] rounded-xl space-y-3">
                     <div className="flex justify-between items-center">
@@ -321,7 +342,7 @@ export function AddSaleButton({ products, onSuccess }: AddSaleButtonProps) {
                     <button
                       type="button"
                       onClick={() => openProductSearch(item.id)}
-                      className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-[#ff385c] focus:ring-2 focus:ring-[#ff385c]/20 outline-none transition-all bg-white text-left hover:bg-[#f8f8f8]"
+                      className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-[#ec4899] focus:ring-2 focus:ring-[#ec4899]/30 outline-none transition-all bg-white text-left hover:bg-[#f8f8f8]"
                     >
                       {getProductDisplay(item)}
                     </button>
@@ -337,7 +358,7 @@ export function AddSaleButton({ products, onSuccess }: AddSaleButtonProps) {
                             min="0"
                             value={item.price}
                             onChange={(e) => updateItem(item.id, "price", e.target.value)}
-                            className="w-full pl-7 pr-3 py-2 rounded-lg border border-gray-200 focus:border-[#ff385c] outline-none transition-all text-sm"
+                            className="w-full pl-7 pr-3 py-2 rounded-lg border border-gray-200 focus:border-[#ec4899] outline-none transition-all text-sm"
                             placeholder="0.00"
                             required
                           />
@@ -350,7 +371,7 @@ export function AddSaleButton({ products, onSuccess }: AddSaleButtonProps) {
                           min="1"
                           value={item.quantity}
                           onChange={(e) => updateItem(item.id, "quantity", e.target.value)}
-                          className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:border-[#ff385c] outline-none transition-all text-sm"
+                          className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:border-[#ec4899] outline-none transition-all text-sm"
                           placeholder="0"
                           required
                         />
@@ -369,7 +390,7 @@ export function AddSaleButton({ products, onSuccess }: AddSaleButtonProps) {
                 <button
                   type="button"
                   onClick={addItem}
-                  className="w-full py-3 border-2 border-dashed border-gray-300 text-[#6a6a6a] rounded-xl hover:border-[#ff385c] hover:text-[#ff385c] transition-colors flex items-center justify-center gap-2"
+                  className="w-full py-3 border-2 border-dashed border-gray-300 text-[#6a6a6a] rounded-xl hover:border-[#ec4899] hover:text-[#be185d] transition-colors flex items-center justify-center gap-2"
                 >
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -381,7 +402,7 @@ export function AddSaleButton({ products, onSuccess }: AddSaleButtonProps) {
                 <div className="p-4 bg-[#f9f9f9] rounded-xl">
                   <label className="block text-sm font-medium text-[#222222] mb-3">Método de Pago</label>
                   <div className="flex gap-2 overflow-x-auto pb-2">
-                    {(["EFECTIVO", "TRANSFERENCIA", "MIXTO"] as PaymentMethodType[]).map((method) => (
+                    {MEDIOS_DE_PAGO.map((method) => (
                       <button
                         key={method}
                         type="button"
@@ -389,7 +410,7 @@ export function AddSaleButton({ products, onSuccess }: AddSaleButtonProps) {
                         className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all border ${
                           paymentMethod === method
                             ? paymentMethodColors[method]
-                            : "bg-white text-[#6a6a6a] border-gray-200 hover:border-[#ff385c]"
+                            : "bg-white text-[#6a6a6a] border-gray-200 hover:border-[#ec4899]"
                         }`}
                       >
                         {method}
@@ -404,7 +425,7 @@ export function AddSaleButton({ products, onSuccess }: AddSaleButtonProps) {
                   <select
                     value={selectedCustomerId}
                     onChange={(e) => setSelectedCustomerId(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-[#ff385c] focus:ring-2 focus:ring-[#ff385c]/20 outline-none transition-all bg-white"
+                    className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-[#ec4899] focus:ring-2 focus:ring-[#ec4899]/30 outline-none transition-all bg-white"
                   >
                     <option value="">Cliente Anónimo</option>
                     {customers.map((customer) => (
@@ -430,7 +451,7 @@ export function AddSaleButton({ products, onSuccess }: AddSaleButtonProps) {
                             min="0"
                             value={cashAmount}
                             onChange={(e) => setCashAmount(e.target.value)}
-                            className="w-full pl-7 pr-3 py-3 rounded-xl border border-gray-200 focus:border-[#ff385c] focus:ring-2 focus:ring-[#ff385c]/20 outline-none transition-all"
+                            className="w-full pl-7 pr-3 py-3 rounded-xl border border-gray-200 focus:border-[#ec4899] focus:ring-2 focus:ring-[#ec4899]/30 outline-none transition-all"
                             placeholder="0.00"
                           />
                         </div>
@@ -446,7 +467,7 @@ export function AddSaleButton({ products, onSuccess }: AddSaleButtonProps) {
                             min="0"
                             value={transferAmount}
                             onChange={(e) => setTransferAmount(e.target.value)}
-                            className="w-full pl-7 pr-3 py-3 rounded-xl border border-gray-200 focus:border-[#ff385c] focus:ring-2 focus:ring-[#ff385c]/20 outline-none transition-all"
+                            className="w-full pl-7 pr-3 py-3 rounded-xl border border-gray-200 focus:border-[#ec4899] focus:ring-2 focus:ring-[#ec4899]/30 outline-none transition-all"
                             placeholder="0.00"
                           />
                         </div>

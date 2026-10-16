@@ -7,6 +7,7 @@ import {
   getProductsWithBranchStock,
 } from "@/app/actions/inventory";
 import { getUser } from "@/actions/auth";
+import { BranchPicker } from "@/components/ui/BranchPicker";
 
 /**
  * Entrada o salida de stock de un LOTE de productos en UNA sucursal: la forma
@@ -195,7 +196,7 @@ export const StockAdjustmentModal = ({
         title: tipo === "ENTRY" ? "Entrada registrada" : "Salida registrada",
         text: `${totalUnidades} unidades en ${selectedBranchName}`,
         icon: "success",
-        confirmButtonColor: "#ff385c",
+        confirmButtonColor: "#be185d",
         background: "#ffffff",
         color: "#222222",
       });
@@ -256,47 +257,16 @@ export const StockAdjustmentModal = ({
 
         {step === 1 && (
           <div>
-            <label
-              htmlFor="sa-sucursal"
-              className="block text-xs text-[#6a6a6a] mb-2"
-            >
-              Sucursal
-            </label>
-            <div className="relative">
-              <select
-                id="sa-sucursal"
-                value={branchId ?? ""}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  setBranchId(value === "" ? null : Number(value));
-                  setError(null);
-                }}
-                className="w-full px-3 py-3 min-h-[48px] rounded-xl border border-gray-200 bg-white focus:border-[#ff385c] focus:ring-2 focus:ring-[#ff385c]/20 outline-none transition-all text-sm touch-manipulation appearance-none cursor-pointer pr-10"
-              >
-                <option value="" className="bg-white text-[#222222]">
-                  Seleccionar sucursal
-                </option>
-                {branches.map((b) => (
-                  <option key={b.id} value={b.id} className="bg-white text-[#222222]">
-                    {b.name}
-                  </option>
-                ))}
-              </select>
-              <svg
-                className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[#6a6a6a] pointer-events-none"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                aria-hidden="true"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M19 9l-7 7-7-7"
-                />
-              </svg>
-            </div>
+            <p className="block text-xs text-[#6a6a6a] mb-2">Sucursal</p>
+            <BranchPicker
+              branches={branches}
+              value={branchId}
+              onChange={(id) => {
+                setBranchId(id);
+                setError(null);
+              }}
+              label="Sucursal"
+            />
 
             <p className="block text-xs text-[#6a6a6a] mt-4 mb-2">
               ¿Suma o resta stock?
@@ -328,7 +298,7 @@ export const StockAdjustmentModal = ({
               type="button"
               onClick={handleContinue}
               disabled={branchId === null}
-              className="w-full py-4 mt-6 bg-[#ff385c] text-white font-medium rounded-xl hover:bg-[#e00b41] transition-colors disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
+              className="w-full py-4 mt-6 brand-gradient brand-gradient-hover text-gray-800 font-medium rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
             >
               Continuar
             </button>
@@ -341,7 +311,7 @@ export const StockAdjustmentModal = ({
               <h3 className="text-base font-semibold text-[#222222]">
                 {tipo === "ENTRY" ? "Productos que entran" : "Productos que salen"}
               </h3>
-              <span className="text-sm font-medium text-[#ff385c]">
+              <span className="text-sm font-medium text-[#be185d]">
                 {seleccionadas.length} seleccionados
               </span>
             </div>
@@ -352,7 +322,7 @@ export const StockAdjustmentModal = ({
               onChange={(e) => setBusqueda(e.target.value)}
               placeholder="Buscar por nombre o código"
               aria-label="Buscar producto"
-              className="w-full px-3 py-3 mb-3 min-h-[48px] rounded-xl border border-gray-200 focus:border-[#ff385c] focus:ring-2 focus:ring-[#ff385c]/20 outline-none transition-all text-sm touch-manipulation"
+              className="w-full px-3 py-3 mb-3 min-h-[48px] rounded-xl border border-gray-200 focus:border-[#ec4899] focus:ring-2 focus:ring-[#ec4899]/30 outline-none transition-all text-sm touch-manipulation"
             />
 
             {loading && (
@@ -390,7 +360,7 @@ export const StockAdjustmentModal = ({
                       checked={selectedIds.includes(fila.id)}
                       onChange={() => toggleSelection(fila.id)}
                       aria-label={`Seleccionar ${fila.name}`}
-                      className="w-5 h-5 accent-[#ff385c]"
+                      className="w-5 h-5 accent-[#ec4899]"
                     />
                     <div className="flex-1 min-w-0">
                       <label
@@ -417,7 +387,7 @@ export const StockAdjustmentModal = ({
                       disabled={!selectedIds.includes(fila.id) || pending}
                       aria-label={`Cantidad ${fila.name}`}
                       placeholder="0"
-                      className="w-20 px-3 py-2 rounded-xl border border-gray-200 focus:border-[#ff385c] focus:ring-2 focus:ring-[#ff385c]/20 outline-none transition-all text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                      className="w-20 px-3 py-2 rounded-xl border border-gray-200 focus:border-[#ec4899] focus:ring-2 focus:ring-[#ec4899]/30 outline-none transition-all text-sm disabled:opacity-40 disabled:cursor-not-allowed"
                     />
                   </div>
                 ))}
@@ -436,7 +406,7 @@ export const StockAdjustmentModal = ({
                 type="button"
                 onClick={() => setStep(3)}
                 disabled={!isValid}
-                className="flex-1 py-3 min-h-[44px] bg-[#ff385c] text-white font-medium rounded-xl hover:bg-[#e00b41] transition-colors disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
+                className="flex-1 py-3 min-h-[44px] brand-gradient brand-gradient-hover text-gray-800 font-medium rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
               >
                 Siguiente
               </button>
@@ -460,7 +430,7 @@ export const StockAdjustmentModal = ({
               onChange={(e) => setMotivo(e.target.value)}
               maxLength={200}
               placeholder="Ej.: conteo físico, rotura, corrección"
-              className="w-full px-3 py-3 min-h-[48px] rounded-xl border border-gray-200 focus:border-[#ff385c] focus:ring-2 focus:ring-[#ff385c]/20 outline-none transition-all text-sm touch-manipulation"
+              className="w-full px-3 py-3 min-h-[48px] rounded-xl border border-gray-200 focus:border-[#ec4899] focus:ring-2 focus:ring-[#ec4899]/30 outline-none transition-all text-sm touch-manipulation"
             />
 
             <div className="mt-4 p-4 bg-[#f8f8f8] rounded-xl space-y-3">
@@ -505,7 +475,7 @@ export const StockAdjustmentModal = ({
                 type="button"
                 onClick={handleSubmit}
                 disabled={pending}
-                className="flex-1 py-3 min-h-[44px] bg-[#ff385c] text-white font-medium rounded-xl hover:bg-[#e00b41] transition-colors disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
+                className="flex-1 py-3 min-h-[44px] brand-gradient brand-gradient-hover text-gray-800 font-medium rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
               >
                 {pending
                   ? "Guardando…"

@@ -62,7 +62,7 @@ const renderModal = () =>
   );
 
 const elegirSucursal = async () => {
-  fireEvent.change(screen.getByLabelText("Sucursal"), { target: { value: "1" } });
+  fireEvent.click(screen.getByRole("button", { name: "Principal" }));
   await waitFor(() => expect(screen.getByText("Conteo de caja")).toBeInTheDocument());
 };
 
