@@ -10,6 +10,7 @@ const mockSaleAggregate = jest.fn();
 const mockPurchaseAggregate = jest.fn();
 const mockCustomerAggregate = jest.fn();
 const mockCashGroupBy = jest.fn();
+const mockCashCloseFindMany = jest.fn();
 
 jest.mock("@/lib/prisma", () => ({
   prisma: {
@@ -26,6 +27,10 @@ jest.mock("@/lib/prisma", () => ({
     cashMovement: {
       groupBy: (...args: unknown[]) => mockCashGroupBy(...args),
     },
+    // Piso del cierre de caja para los indicadores (S17).
+    cashClose: {
+      findMany: (...args: unknown[]) => mockCashCloseFindMany(...args),
+    },
   },
 }));
 
@@ -36,6 +41,7 @@ function mockEmptyAggregates() {
   mockPurchaseAggregate.mockResolvedValue({ _sum: { totalAmount: 0 } });
   mockCustomerAggregate.mockResolvedValue({ _sum: { totalBalance: 0 } });
   mockCashGroupBy.mockResolvedValue([]);
+  mockCashCloseFindMany.mockResolvedValue([]);
 }
 
 describe("getStats (dashboard period + range + branch)", () => {

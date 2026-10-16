@@ -268,7 +268,23 @@ export async function getSales(filters?: unknown) {
       prisma.sale.count({ where }),
     ]);
 
-    return { success: true, data: { items: parseArray(sales), total } };
+    // Las ventas anteriores al último cierre de su sucursal son de la caja
+    // anterior (S17): el listado las muestra oscurecidas y las nuevas en blanco.
+    const cierres = await prisma.cashClose.findMany({
+      distinct: ["branchId"],
+      orderBy: { closedAt: "desc" },
+      select: { branchId: true, closedAt: true },
+    });
+    const ultimoCierre = new Map(cierres.map((c) => [c.branchId, c.closedAt]));
+
+    const items = parseArray(
+      sales.map((sale) => ({
+        ...sale,
+        previousCash: (ultimoCierre.get(sale.branchId)?.getTime() ?? 0) >= sale.date.getTime(),
+      }))
+    );
+
+    return { success: true, data: { items, total } };
   } catch (error) {
     if (error instanceof z.ZodError) {
       return {

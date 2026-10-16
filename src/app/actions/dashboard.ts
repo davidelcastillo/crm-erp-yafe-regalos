@@ -1,6 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
+import { pisoDeCaja } from "@/lib/cash-close";
 import { finDelDia, inicioDelDia, toLocalDateKey } from "@/lib/dates";
 import { z } from "zod";
 
@@ -67,11 +68,20 @@ const statsSchema = z.object({
   branchId: z.coerce.number().int().positive().optional(),
 });
 
-async function fetchStats(where: Record<string, unknown> = {}) {
+async function fetchStats(
+  where: Record<string, unknown> = {},
+  cajaWhere: Record<string, unknown> = {}
+) {
+  // Las ventas y la plata son la caja: llevan el piso del último cierre (S17).
+  // Las compras no: no son la caja y siguen el período elegido. El `AND` solo
+  // aparece cuando hay un cierre; sin cierres la consulta queda como estaba.
+  const hayPiso = Object.keys(cajaWhere).length > 0;
+  const deCaja = hayPiso ? { AND: [where, cajaWhere] } : where;
+
   // Get all sales
   const sales = await prisma.sale.aggregate({
     _sum: { totalAmount: true },
-    where,
+    where: deCaja,
   });
 
   // Get all purchases
@@ -84,13 +94,13 @@ async function fetchStats(where: Record<string, unknown> = {}) {
   // Antes sumaba la deuda global de clientes, que no sigue el filtro (bug 4).
   const pendingSales = await prisma.sale.aggregate({
     _sum: { pendingBalance: true },
-    where,
+    where: deCaja,
   });
 
   // Plata de caja (correcciones): también es balance del tablero (S18).
   const cashMovements = await prisma.cashMovement.groupBy({
     by: ["type"],
-    where,
+    where: deCaja,
     _sum: { amount: true },
   });
   const caja = (tipo: "INGRESO" | "EGRESO") =>
@@ -117,7 +127,10 @@ export async function getGlobalStats(data?: unknown) {
       ? { branchId: validated.branchId }
       : {};
 
-    const stats = await fetchStats({ ...branchWhere });
+    const stats = await fetchStats(
+      { ...branchWhere },
+      await pisoDeCaja(validated.branchId)
+    );
 
     return {
       success: true,
@@ -143,10 +156,13 @@ export async function getStats(data?: unknown) {
       return { success: false, error: rango.error };
     }
 
-    const stats = await fetchStats({
-      date: { gte: rango.desde, lte: rango.hasta },
-      ...branchWhere,
-    });
+    const stats = await fetchStats(
+      {
+        date: { gte: rango.desde, lte: rango.hasta },
+        ...branchWhere,
+      },
+      await pisoDeCaja(branchId)
+    );
 
     return {
       success: true,
@@ -177,13 +193,15 @@ export async function getPerformanceData(data?: unknown) {
       return { success: false, error: rango.error };
     }
     const dateFilter = { gte: rango.desde, lte: rango.hasta };
+    // Mismo piso de caja que las tarjetas: si no, los dos indicadores del
+    // tablero contarían ventas distintas (S17).
+    const caja = await pisoDeCaja(branchId);
 
     // Get daily sales
     const sales = await prisma.sale.groupBy({
       by: ["date"],
       where: {
-        date: dateFilter,
-        ...branchWhere,
+        AND: [{ date: dateFilter }, branchWhere, caja],
       },
       _sum: {
         totalAmount: true,
@@ -226,7 +244,7 @@ export async function getPerformanceData(data?: unknown) {
     // los dos indicadores del tablero contarían cosas distintas.
     const cashMovements = await prisma.cashMovement.groupBy({
       by: ["date", "type"],
-      where: { date: dateFilter, ...branchWhere },
+      where: { AND: [{ date: dateFilter }, branchWhere, caja] },
       _sum: { amount: true },
     });
 

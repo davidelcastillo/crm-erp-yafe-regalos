@@ -241,27 +241,3 @@ export async function closeCash(data: unknown) {
   }
 }
 
-/**
- * Piso del cierre para los indicadores (S17): una venta o un movimiento de plata
- * anterior al **último cierre de su sucursal** pertenece a la caja cerrada, así
- * que deja de contar. Se devuelve como filtro para combinarlo con el período y la
- * sucursal elegidos.
- */
-export async function pisoDeCaja(branchId?: number) {
-  const cierres = await prisma.cashClose.findMany({
-    distinct: ["branchId"],
-    orderBy: { closedAt: "desc" },
-    select: { branchId: true, closedAt: true },
-    ...(branchId ? { where: { branchId } } : {}),
-  });
-
-  if (cierres.length === 0) return {};
-
-  const conCierre = cierres.map((c) => c.branchId);
-  return {
-    OR: [
-      ...cierres.map((c) => ({ branchId: c.branchId, date: { gt: c.closedAt } })),
-      { branchId: { notIn: conCierre } },
-    ],
-  };
-}

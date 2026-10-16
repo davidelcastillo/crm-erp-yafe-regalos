@@ -50,6 +50,10 @@ jest.mock("@/lib/prisma", () => ({
       findMany: (...args: unknown[]) => mockSaleFindMany(...args),
       count: (...args: unknown[]) => mockSaleCount(...args),
     },
+    // Cierres de caja: `getSales` marca las ventas de la caja anterior (S17).
+    cashClose: {
+      findMany: jest.fn(async () => []),
+    },
   },
 }));
 
