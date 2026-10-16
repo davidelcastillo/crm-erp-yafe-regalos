@@ -317,7 +317,7 @@ export const StockAdjustmentModal = ({
                 <h3 className="text-base font-semibold text-[#222222]">
                   {tipo === "ENTRY" ? "Productos que entran" : "Productos que salen"}
                 </h3>
-                <span className="text-sm font-medium text-[#be185d]">
+                <span className="text-sm font-medium text-brand-rosa-texto">
                   {seleccionadas.length} seleccionados
                 </span>
               </div>

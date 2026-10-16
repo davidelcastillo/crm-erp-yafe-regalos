@@ -358,7 +358,7 @@ export function ExportWizard({ open, onClose, branches }: ExportWizardProps) {
                 <h3 className="text-xs font-medium uppercase tracking-wide text-[#6a6a6a]">
                   Selección
                 </h3>
-                <p className="mt-2 text-sm font-semibold text-[#be185d] tabular-nums">
+                <p className="mt-2 text-sm font-semibold text-brand-rosa-texto tabular-nums">
                   {selectedCount} seleccionados
                 </p>
               </aside>

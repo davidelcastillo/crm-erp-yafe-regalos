@@ -40,7 +40,8 @@ type Option = { id: number; name: string } | { id: number; name: string };
  *
  * Design tokens (Airbnb-inspired, see STYLE.md):
  *  - White canvas, ink (#222222) text, muted (#6a6a6a) helper.
- *  - Acento de marca (#ec4899) en la píldora «+ Nueva» y en la fila elegida (texto #be185d, AA).
+ *  - Acento de marca (#ec4899) en la píldora «+ Nueva» y en la fila elegida (texto
+ *    con el rosa de texto `text-brand-rosa-texto`, AA).
  *  - 44px minimum tap targets, full-width select on mobile.
  *  - Bottom-sheet (`rounded-t-3xl`) modal for creating a new category.
  */
@@ -218,7 +219,7 @@ export function CategorySelector({
             type="button"
             onClick={() => handleClick(null)}
             className={`w-full text-left px-4 py-3 min-h-[44px] text-sm hover:bg-[#f8f8f8] transition-colors ${
-              selectedId === null ? "bg-[#ec4899]/10 text-[#be185d] font-medium" : "text-[#222222]"
+              selectedId === null ? "bg-[#ec4899]/10 text-brand-rosa-texto font-medium" : "text-[#222222]"
             }`}
             role="option"
             aria-selected={selectedId === null}
@@ -231,7 +232,7 @@ export function CategorySelector({
               type="button"
               onClick={() => handleClick(o.id)}
               className={`w-full text-left px-4 py-3 min-h-[44px] text-sm hover:bg-[#f8f8f8] transition-colors ${
-                o.id === selectedId ? "bg-[#ec4899]/10 text-[#be185d] font-medium" : "text-[#222222]"
+                o.id === selectedId ? "bg-[#ec4899]/10 text-brand-rosa-texto font-medium" : "text-[#222222]"
               }`}
               role="option"
               aria-selected={o.id === selectedId}

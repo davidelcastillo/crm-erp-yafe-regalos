@@ -545,6 +545,7 @@ El rebranding reemplaza el rojo `#ff385c` (que sigue existiendo como legado, pen
 |---|---|---|
 | **Degradé claro** | `.brand-gradient` (celeste `#bfdbfe` → rosa `#f472b6`) | Bandas de encabezado y botones de acción. **Texto oscuro** (`text-gray-800` / `#222222`). |
 | **Degradé fuerte** | `.brand-gradient-strong` (violeta `#a855f7` → rosa fuerte `#ec4899`) | Solo decorativo o texto grande en negrita (≥ 18,66 px). |
+| **Rosa de texto** | `text-brand-rosa-texto` (`#be185d`) | Texto chico sobre superficies claras: llega a **4,5:1** tanto sobre blanco como sobre el tinte rosa al 10 %. El `#ec4899` del degradé fuerte **no** alcanza para texto chico. |
 | Interacción | `.brand-gradient-hover` | Sobre el degradé claro: oscurece un poco en vez de cambiar de tono, así el texto oscuro conserva el contraste. |
 | **Acción de marca** | `.brand-action` | Botones que ejecutan la acción principal: **sólido violeta `#6d28d9` con texto blanco (7,1:1)**, igual en celular y en escritorio. No usar el degradé claro acá: en un botón chico pierde presencia y con texto blanco no llega al contraste. |
 

@@ -20,6 +20,10 @@
   --palette-brand-rosa: #f472b6;
   --palette-brand-violeta: #a855f7;
   --palette-brand-rosa-fuerte: #ec4899;
+  /* Rosa de TEXTO: es el único rosa de la marca que llega a 4.5:1 sobre fondo
+     blanco o sobre el tinte rosa al 10 % (AA para texto chico). Para texto sobre
+     superficies claras, este y no `rosa-fuerte`. */
+  --palette-brand-rosa-texto: #be185d;
   /* Color de los botones de acción: violeta profundo, 7.1:1 con texto blanco
      (el doble del mínimo AA). Es el tercer color de la marca y se ve igual en
      celular y en escritorio. */
@@ -52,6 +56,7 @@
   --color-brand-rosa: var(--palette-brand-rosa);
   --color-brand-violeta: var(--palette-brand-violeta);
   --color-brand-rosa-fuerte: var(--palette-brand-rosa-fuerte);
+  --color-brand-rosa-texto: var(--palette-brand-rosa-texto);
   
   /* Shadows */
   --shadow-card: var(--shadow-card);

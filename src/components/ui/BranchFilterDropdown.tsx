@@ -34,7 +34,8 @@ export interface BranchFilterDropdownProps {
  * The "Todas las sucursales" option maps to `null`.
  *
  * Design tokens (Airbnb-inspired, see STYLE.md):
- *  - Acento de marca: la fila elegida usa #ec4899 al 10 % de fondo y #be185d en el texto (AA).
+ *  - Acento de marca: la fila elegida usa #ec4899 al 10 % de fondo y el rosa de
+ *    texto (`text-brand-rosa-texto`, AA) en el texto.
  *  - surface-soft (#f8f8f8) trigger, 44px minimum tap target.
  */
 export function BranchFilterDropdown({
@@ -127,7 +128,7 @@ export function BranchFilterDropdown({
             type="button"
             onClick={() => handleClick(null)}
             className={`w-full text-left px-4 py-3 min-h-[44px] text-sm hover:bg-[#f8f8f8] transition-colors ${
-              selectedId === null ? "bg-[#ec4899]/10 text-[#be185d] font-medium" : "text-[#222222]"
+              selectedId === null ? "bg-[#ec4899]/10 text-brand-rosa-texto font-medium" : "text-[#222222]"
             }`}
             role="option"
             aria-selected={selectedId === null}
@@ -140,7 +141,7 @@ export function BranchFilterDropdown({
               type="button"
               onClick={() => handleClick(o.id)}
               className={`w-full text-left px-4 py-3 min-h-[44px] text-sm hover:bg-[#f8f8f8] transition-colors ${
-                o.id === selectedId ? "bg-[#ec4899]/10 text-[#be185d] font-medium" : "text-[#222222]"
+                o.id === selectedId ? "bg-[#ec4899]/10 text-brand-rosa-texto font-medium" : "text-[#222222]"
               }`}
               role="option"
               aria-selected={o.id === selectedId}
