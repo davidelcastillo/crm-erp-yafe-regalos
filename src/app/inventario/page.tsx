@@ -1,7 +1,6 @@
 // src/app/inventario/page.tsx
 'use client';
 
-import Link from "next/link";
 import { getProductsWithBranchStock } from "../actions/inventory";
 import { getBranchOptions } from "../actions/branch";
 import { getCategoryOptions, createCategory } from "../actions/category";
@@ -13,6 +12,8 @@ import { ExportWizard } from "./components/ExportWizard";
 import { LabelSelector } from "@/components/ui/LabelSelector";
 import { MovementsModal } from "@/components/ui/MovementsModal";
 import { BranchFilterDropdown } from "@/components/ui/BranchFilterDropdown";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { ActionCard } from "@/components/ui/ActionCard";
 import { AddProductButton } from "../productos/components/AddProductButton";
 import { ProductForm } from "../productos/components/ProductForm";
 import { useEffect, useState, useCallback } from 'react';
@@ -211,55 +212,93 @@ export default function InventarioPage() {
 
   return (
     <div className="min-h-screen bg-white pb-20">
-      <main className="px-6 pb-8">
-        <div className="mb-4 flex items-center justify-between flex-wrap gap-3">
-          <h1 className="text-2xl font-bold text-[#222222]">Inventario</h1>
-          <div className="flex items-center gap-3 flex-wrap">
-            <BranchFilterDropdown
-              selectedId={branchId}
-              onValueChange={setBranchId}
-              label="Stock por sucursal"
-            />
-            <button
-              type="button"
-              onClick={handleCreateCategory}
-              className="px-4 py-2 min-h-[44px] text-sm font-medium text-[#222222] bg-white border border-gray-200 rounded-xl hover:bg-[#f2f2f2] transition-colors touch-manipulation"
-              aria-label="Nueva categoría"
-            >
-              Nueva categoría
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setMoveStockProductId(null);
-                setMoveStockOpen(true);
-              }}
-              className="px-4 py-2 min-h-[44px] text-sm font-medium text-white bg-[#ff385c] rounded-xl hover:bg-[#e00b41] transition-colors touch-manipulation"
-            >
-              Mover Stock
-            </button>
-            <button
-              type="button"
-              onClick={() => setStockAdjustmentOpen(true)}
-              className="px-4 py-2 min-h-[44px] text-sm font-medium text-white bg-[#ff385c] rounded-xl hover:bg-[#e00b41] transition-colors touch-manipulation"
-            >
-              Entrada / Salida
-            </button>
-            <button
-              type="button"
-              onClick={() => setExportWizardOpen(true)}
-              className="px-4 py-2 min-h-[44px] text-sm font-medium text-white bg-[#ff385c] rounded-xl hover:bg-[#e00b41] transition-colors touch-manipulation"
-            >
-              Exportar productos
-            </button>
-            <Link
-              href="/inventario/inactivos"
-              className="inline-flex items-center px-4 py-2 min-h-[44px] text-sm font-medium text-[#222222] bg-white border border-gray-200 rounded-xl hover:bg-[#f2f2f2] transition-colors touch-manipulation"
-            >
-              Inactivos
-            </Link>
+      <main>
+        <div className="pb-8 brand-gradient">
+          <PageHeader
+            title="Inventario"
+            right={
+              <BranchFilterDropdown
+                selectedId={branchId}
+                onValueChange={setBranchId}
+                label="Stock por sucursal"
+              />
+            }
+            actions={
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMoveStockProductId(null);
+                    setMoveStockOpen(true);
+                  }}
+                  className="px-4 min-h-[44px] rounded-xl brand-gradient brand-gradient-hover text-sm font-medium text-gray-800 touch-manipulation"
+                >
+                  Mover Stock
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStockAdjustmentOpen(true)}
+                  className="px-4 min-h-[44px] rounded-xl brand-gradient brand-gradient-hover text-sm font-medium text-gray-800 touch-manipulation"
+                >
+                  Entrada / Salida
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setExportWizardOpen(true)}
+                  className="px-4 min-h-[44px] rounded-xl brand-gradient brand-gradient-hover text-sm font-medium text-gray-800 touch-manipulation"
+                >
+                  Exportar
+                </button>
+              </>
+            }
+            menuItems={[
+              { label: "Inactivos", href: "/inventario/inactivos" },
+              { label: "Categorías", href: "/categorias" },
+              { label: "Nueva categoría", onClick: handleCreateCategory },
+            ]}
+          />
+
+          {/* Acciones de la pagina en mobile: en su propio div, con el fondo a la vista. */}
+          <div className="mt-4 px-3 md:hidden">
+            <div className="grid grid-cols-2 gap-3">
+              <ActionCard
+                label="Mover Stock"
+                hint="Entre sucursales"
+                onClick={() => {
+                  setMoveStockProductId(null);
+                  setMoveStockOpen(true);
+                }}
+                icon={
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L4 7m3-3l3 3M17 8v12m0 0l3-3m-3 3l-3-3" />
+                  </svg>
+                }
+              />
+              <ActionCard
+                label="Entrada / Salida"
+                hint="Corregir stock"
+                onClick={() => setStockAdjustmentOpen(true)}
+                icon={
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 3v18m0-18L5 6m3-3l3 3M16 21V3m0 18l3-3m-3 3l-3-3" />
+                  </svg>
+                }
+              />
+              <ActionCard
+                label="Exportar"
+                hint="Lista en PDF"
+                onClick={() => setExportWizardOpen(true)}
+                icon={
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2" />
+                  </svg>
+                }
+              />
+            </div>
           </div>
         </div>
+
+        <div className="glass border-t border-white/80 rounded-t-[2.5rem] -mt-6 px-5 pt-6 pb-8 shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
 
         {/* Phase 3: branch + category filters (the BranchSelector above keeps the
             HU2 single-branch view; this adds the category filter and reflects the
@@ -285,6 +324,8 @@ export default function InventarioPage() {
             setMovementsModalOpen(true);
           }}
         />
+
+        </div>
 
         {/* Label Selector Modal */}
         <LabelSelector
