@@ -524,6 +524,7 @@ El rebranding reemplaza el rojo `#ff385c` (que sigue existiendo como legado, pen
 | **Degradé claro** | `.brand-gradient` (celeste `#bfdbfe` → rosa `#f472b6`) | Bandas de encabezado y botones de acción. **Texto oscuro** (`text-gray-800` / `#222222`). |
 | **Degradé fuerte** | `.brand-gradient-strong` (violeta `#a855f7` → rosa fuerte `#ec4899`) | Solo decorativo o texto grande en negrita (≥ 18,66 px). |
 | Interacción | `.brand-gradient-hover` | Sobre el degradé claro: oscurece un poco en vez de cambiar de tono, así el texto oscuro conserva el contraste. |
+| **Acción de marca** | `.brand-action` | Botones que ejecutan la acción principal. En mobile: degradé claro con texto oscuro. **Desde desktop: sólido** (`#be185d`) con texto blanco, porque el degradé claro pierde presencia en pantalla grande. `#be185d` es el tono de marca más claro que llega a **4.5:1** con texto blanco (el rosa fuerte `#ec4899` da 3.5:1 y no sirve para una etiqueta de 14 px). |
 
 - **Sobre el degradé claro el texto va oscuro.** `text-gray-800` da **10,2:1** en el extremo celeste y **5,5:1** en el rosa: AA cumplido con margen. **Blanco sobre el mismo degradé da ~1,9:1 en el celeste: falla.** Es el error más fácil de cometer al copiar un botón viejo (los del rojo usaban texto blanco).
 - Sobre el degradé fuerte, blanco da **3,5–3,9:1**: alcanza para texto grande en negrita o para íconos (piso 3:1), **no** para una etiqueta de 14 px.
@@ -533,7 +534,9 @@ El rebranding reemplaza el rojo `#ff385c` (que sigue existiendo como legado, pen
 
 - Una sola fila en mobile: botón **☰**, título y, si hace falta, el selector de sucursal (`PageHeader`).
 - Las **acciones de la página** (por ejemplo «Caja» y «Cerrar caja») van como **tarjetas de vidrio** debajo del encabezado en mobile (`ActionCard`) y como botones dentro de la barra desde desktop (`actions`). No se esconden en el menú: son la razón por la que se entra a la página.
-- El **cierre de sesión** vive dentro del menú ☰ en mobile y visible en la barra en desktop.
+- El **cierre de sesión** vive dentro del menú ☰ en mobile y visible en la barra en desktop; va en gris (`bg-[#f2f2f2]`), no compite con las acciones de marca.
+- El **selector de sucursal** va en su propia línea en mobile (ancho completo) y **al nivel del título desde desktop**: la barra del encabezado envuelve (`flex-wrap`) y el contenido de la derecha es `w-full md:w-auto`.
+- Elegir una sucursal dentro de un modal se hace con **`BranchPicker`** (cards, `aria-pressed`, anillo de marca en la elegida, `disabledIds` para las excluidas), no con un `<select>`. Excepción: cuando la sucursal es **por línea** (una compra que se reparte entre sucursales, `AddPurchaseButton`) sigue siendo un `<select>` por ítem, porque una lista de cards por línea es peor de usar.
 - El menú es mobile-only (`md:hidden`) y se cierra con Escape, con el botón ✕ o tocando el fondo; sus filas tienen 48 px de alto.
 
 ### Carga y estados vacíos
