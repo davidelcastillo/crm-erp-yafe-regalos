@@ -5,10 +5,17 @@ import { useEffect, useState } from 'react';
 import { getInactiveProducts, reactivateProduct } from '@/app/actions/product';
 import type { Product } from '@prisma/client';
 import Swal from 'sweetalert2';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { Spinner } from '@/components/ui/Spinner';
+import { CardSkeleton } from '@/components/ui/Skeleton';
 
 type InactiveProduct = Product & { category: { id: number; name: string } | null };
 
 const DEBOUNCE_MS = 300;
+
+// Botón secundario gris del encabezado: no compite con la acción de marca.
+const VOLVER_CLASS =
+  'inline-flex items-center px-4 min-h-[44px] rounded-xl text-sm font-medium text-[#3f3f3f] bg-[#f2f2f2] hover:bg-[#e5e5e5] transition-colors touch-manipulation whitespace-nowrap';
 
 export default function InactivosPage() {
   const [products, setProducts] = useState<InactiveProduct[]>([]);
@@ -84,109 +91,116 @@ export default function InactivosPage() {
       )
     : products;
 
-  if (loading) {
-    return (
-      <div className="min-h-[calc(100vh-4rem)] pb-20 pt-12">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-center h-[60vh]">
-            <div className="flex items-center gap-2 animate-spin">
-              <svg className="w-8 h-8 text-[#ec4899]" viewBox="0 0 24 24" stroke="currentColor">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+  return (
+    <div className="min-h-screen bg-white pb-20">
+      <main>
+        <div className="pb-16 brand-gradient">
+          <PageHeader
+            title="Productos inactivos"
+            actions={
+              <Link href="/inventario" className={VOLVER_CLASS}>
+                Volver a inventario
+              </Link>
+            }
+            menuItems={[
+              // El slot `actions` solo se ve desde desktop: el volver va también acá.
+              { label: 'Volver a inventario', href: '/inventario' },
+            ]}
+          />
+        </div>
+
+        <div className="glass rounded-t-[2.5rem] border-t border-white/80 -mt-12 px-5 pt-6 pb-8 shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
+          {/* Buscador: la tarjeta lo separa de las cards de la lista. */}
+          <div className="glass rounded-2xl border border-black/5 p-4">
+            <label
+              htmlFor="inactivos-search"
+              className="mb-2 block text-sm font-medium text-[#222222]"
+            >
+              Buscar producto
+            </label>
+            <div className="relative">
+              <svg
+                className="w-5 h-5 text-[#6a6a6a] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                aria-hidden="true"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z"
+                />
               </svg>
-              <span className="text-sm text-[#6a6a6a]">Cargando inactivos...</span>
+              <input
+                id="inactivos-search"
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                /* 16px de fuente: por debajo de eso iOS hace zoom al enfocar el input. */
+                className="block w-full min-h-[44px] pl-11 pr-4 py-2.5 bg-[#f8f8f8] rounded-xl text-base text-[#222222] placeholder-[#6a6a6a] focus:outline-none focus:ring-2 focus:ring-[#ec4899]/30 touch-manipulation"
+                placeholder="Buscar por nombre o código..."
+                autoComplete="off"
+              />
             </div>
           </div>
-        </div>
-      </div>
-    );
-  }
 
-  return (
-    <div className="min-h-[calc(100vh-4rem)] pb-20 pt-12">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">Productos Inactivos</h1>
-          <Link href="/inventario" className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300">
-            Volver a inventario
-          </Link>
-        </div>
+          {error && (
+            <div
+              role="alert"
+              className="mt-4 rounded-xl border border-black/5 bg-[#ffe4ea] px-4 py-3 text-sm text-[#8f0020]"
+            >
+              {error}
+            </div>
+          )}
 
-        {error && (
-          <div className="mb-4 p-4 bg-red-50 text-red-800 rounded">
-            {error}
-          </div>
-        )}
+          {loading ? (
+            <div className="pt-6">
+              <Spinner label="Cargando inactivos..." />
+              <div className="mt-6 space-y-4">
+                <CardSkeleton />
+                <CardSkeleton />
+                <CardSkeleton />
+              </div>
+            </div>
+          ) : visibleProducts.length === 0 ? (
+            /* Mismo tono de vacío que el resto de las listas. */
+            <p className="py-12 text-center text-[#6a6a6a]">No hay productos inactivos</p>
+          ) : (
+            <ul className="mt-4 space-y-4">
+              {visibleProducts.map((product) => (
+                <li key={product.id} className="glass rounded-2xl border border-black/5 p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <h2 className="text-base font-semibold text-[#222222] break-words">
+                        {product.name}
+                      </h2>
+                      <p className="mt-0.5 text-sm text-[#6a6a6a] break-words">
+                        Código: {product.code ?? '-'}
+                      </p>
+                      <p className="mt-1 text-base font-semibold text-[#222222]">
+                        ${Number(product.price ?? 0).toFixed(2)}
+                      </p>
+                    </div>
 
-        <div className="mb-4">
-          <label htmlFor="inactivos-search" className="block mb-2 text-sm font-medium text-gray-700">
-            Buscar producto
-          </label>
-          <div className="relative">
-            <input
-              id="inactivos-search"
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="block w-full pl-10 pr-3 py-2 text-base border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 sm:text-sm"
-              placeholder="Buscar por nombre o código..."
-            />
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6a6a6a] text-sm">$</span>
-          </div>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Producto
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Código
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Precio
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Acciones
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {visibleProducts.length === 0 ? (
-                <tr>
-                  <td colSpan={4} className="px-6 py-4 text-center text-gray-500">
-                    No hay productos inactivos
-                  </td>
-                </tr>
-              ) : (
-                visibleProducts.map((product) => (
-                  <tr key={product.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {product.name}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {product.code ?? '-'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      ${Number(product.price ?? 0).toFixed(2)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 flex space-x-2">
+                    {/* La columna de acción no se encoge: el nombre es el que envuelve. */}
+                    <div className="flex shrink-0 flex-wrap gap-2">
                       <button
+                        type="button"
                         onClick={() => handleReactivate(product.id)}
-                        className="px-3 py-1 text-sm font-medium brand-gradient brand-gradient-hover text-gray-800 rounded transition-colors"
+                        className="px-4 min-h-[44px] rounded-xl brand-action text-sm font-medium touch-manipulation whitespace-nowrap"
                       >
                         Activar
                       </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
-      </div>
+      </main>
     </div>
   );
 }

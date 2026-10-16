@@ -4,7 +4,7 @@
  * El buscador no debe volver a pedir la lista al servidor en cada tecla: la lista
  * se carga una sola vez y el filtro se aplica localmente mientras el usuario escribe.
  */
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import InactivosPage from './page';
 
 const mockGetInactiveProducts = jest.fn();
@@ -41,6 +41,33 @@ describe('InactivosPage', () => {
     expect(screen.getByText('Producto Beta')).toBeInTheDocument();
     // Escribir no vuelve a golpear el servidor.
     expect(mockGetInactiveProducts).toHaveBeenCalledTimes(1);
+  });
+
+  it('mientras carga muestra la ruedita compartida en lugar de la lista', async () => {
+    // Promesa que nunca resuelve: deja la página en el estado de carga.
+    mockGetInactiveProducts.mockReturnValue(new Promise(() => {}));
+
+    render(<InactivosPage />);
+
+    // La ruedita compartida anuncia el estado (role=status) con su etiqueta.
+    expect(screen.getByRole('status')).toHaveAccessibleName(/cargando inactivos/i);
+    expect(screen.queryByText('Producto Alfa')).not.toBeInTheDocument();
+  });
+
+  it('deja «Volver a inventario» también en el menú ☰ del celular', async () => {
+    render(<InactivosPage />);
+    await screen.findByText('Producto Alfa');
+
+    // El slot `actions` solo se ve desde desktop: la misma acción tiene que estar en el menú.
+    expect(screen.getByRole('link', { name: 'Volver a inventario' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /abrir menú/i }));
+
+    const menu = screen.getByRole('dialog', { name: /menú de productos inactivos/i });
+    expect(within(menu).getByRole('link', { name: 'Volver a inventario' })).toHaveAttribute(
+      'href',
+      '/inventario'
+    );
   });
 
   it('filtra también por código', async () => {
