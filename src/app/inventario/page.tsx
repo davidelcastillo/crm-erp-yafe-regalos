@@ -14,6 +14,8 @@ import { MovementsModal } from "@/components/ui/MovementsModal";
 import { BranchFilterDropdown } from "@/components/ui/BranchFilterDropdown";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { ActionCard } from "@/components/ui/ActionCard";
+import { Spinner } from "@/components/ui/Spinner";
+import { CardSkeleton } from "@/components/ui/Skeleton";
 import { AddProductButton } from "../productos/components/AddProductButton";
 import { ProductForm } from "../productos/components/ProductForm";
 import { useEffect, useState, useCallback } from 'react';
@@ -177,17 +179,15 @@ export default function InventarioPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-white pb-20">
-        <main className="px-6 py-8">
-          <div className="flex items-center justify-center h-[60vh]">
-            <div className="flex items-center gap-2 animate-spin">
-              <svg className="w-8 h-8 text-[#3b82f6]" viewBox="0 0 24 24" stroke="currentColor">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
-              <span className="text-sm text-[#6a6a6a]">Cargando inventario...</span>
-            </div>
+        <div className="h-28 brand-gradient" />
+        <div className="glass rounded-t-[2.5rem] -mt-6 px-5 pt-8">
+          <Spinner label="Cargando inventario..." />
+          <div className="mt-6 space-y-4">
+            <CardSkeleton />
+            <CardSkeleton />
+            <CardSkeleton />
           </div>
-        </main>
+        </div>
       </div>
     );
   }
@@ -252,7 +252,6 @@ export default function InventarioPage() {
               </>
             }
             menuItems={[
-              { label: "Inactivos", href: "/inventario/inactivos" },
               { label: "Categorías", href: "/categorias" },
               { label: "Nueva categoría", onClick: handleCreateCategory },
             ]}
@@ -291,6 +290,16 @@ export default function InventarioPage() {
                 icon={
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2" />
+                  </svg>
+                }
+              />
+              <ActionCard
+                label="Inactivos"
+                hint="Productos dados de baja"
+                href="/inventario/inactivos"
+                icon={
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7h18M6 7v12a2 2 0 002 2h8a2 2 0 002-2V7M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2M10 12l4 4m0-4l-4 4" />
                   </svg>
                 }
               />

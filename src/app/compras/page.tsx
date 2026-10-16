@@ -7,6 +7,8 @@ import { PurchasesList } from './components/PurchasesList';
 import { AddPurchaseButton } from './components/AddPurchaseButton';
 import { BranchSelector } from '@/components/ui/BranchSelector';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { Spinner } from '@/components/ui/Spinner';
+import { CardSkeleton } from '@/components/ui/Skeleton';
 import { useReloadKey } from '@/lib/hooks/useReloadKey';
 import { useEffect, useState } from 'react';
 
@@ -39,18 +41,16 @@ export default function ComprasPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#ffffff] pb-20">
-        <main className="px-6 py-8">
-          <div className="flex items-center justify-center h-[60vh]">
-            <div className="flex items-center gap-2 animate-spin">
-              <svg className="w-8 h-8 text-[#ff385c]" viewBox="0 0 24 24" stroke="currentColor">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
-              <span className="text-sm text-[#6a6a6a]">Cargando compras...</span>
-            </div>
+      <div className="min-h-screen bg-white pb-20">
+        <div className="h-28 brand-gradient" />
+        <div className="glass rounded-t-[2.5rem] -mt-6 px-5 pt-8">
+          <Spinner label="Cargando compras..." />
+          <div className="mt-6 space-y-4">
+            <CardSkeleton />
+            <CardSkeleton />
+            <CardSkeleton />
           </div>
-        </main>
+        </div>
       </div>
     );
   }
