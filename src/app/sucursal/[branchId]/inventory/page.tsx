@@ -42,7 +42,9 @@ export default async function BranchInventoryPage({
             <h1 className="text-2xl font-bold text-[#222222]">
               Inventario de la sucursal
             </h1>
-            <p className="text-sm text-[#6a6a6a]">Sucursal #{branchId}</p>
+            <p className="text-sm text-[#6a6a6a]">
+              {inventoryResult.branchName ?? `Sucursal #${branchId}`}
+            </p>
           </div>
         </header>
       </div>
