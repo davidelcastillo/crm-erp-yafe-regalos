@@ -1,7 +1,62 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
+import { toLocalDateKey } from "@/lib/dates";
 import { z } from "zod";
+
+// Días calendario locales: `new Date("YYYY-MM-DD")` da medianoche UTC, así que el
+// día final quedaba afuera y, en hora local (UTC-3), un rango de un solo día
+// quedaba vacío (bug 4 del usuario).
+const inicioDelDia = (fecha: string) => new Date(`${fecha}T00:00:00`);
+const finDelDia = (fecha: string) => new Date(`${fecha}T23:59:59.999`);
+
+// Días del rango, en orden, como claves de día local.
+const diasDelRango = (desde: Date, hasta: Date) => {
+  const dias: string[] = [];
+  const cursor = new Date(desde);
+  cursor.setHours(0, 0, 0, 0);
+  while (cursor <= hasta && dias.length < 3660) {
+    dias.push(toLocalDateKey(cursor));
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return dias;
+};
+
+// Un solo rango para todo el tablero: "7" | "30" | "90" son los últimos N días
+// calendario locales contando hoy; un rango de fechas manda sobre `days`.
+function rangoDelPeriodo(periodo: {
+  type?: string;
+  days?: number;
+  startDate?: string;
+  endDate?: string;
+}): { success: true; desde: Date; hasta: Date } | { success: false; error: string } {
+  const conFechas = !!periodo.startDate || !!periodo.endDate;
+
+  if (periodo.type === "custom" || conFechas) {
+    if (!periodo.startDate || !periodo.endDate) {
+      return {
+        success: false,
+        error: "Seleccioná un rango de fechas para el periodo personalizado",
+      };
+    }
+
+    const desde = inicioDelDia(periodo.startDate);
+    const hasta = finDelDia(periodo.endDate);
+    if (isNaN(desde.getTime()) || isNaN(hasta.getTime()) || desde > hasta) {
+      return { success: false, error: "Rango de fechas inválido" };
+    }
+    return { success: true, desde, hasta };
+  }
+
+  const dias = Math.max(1, periodo.days ?? Number(periodo.type ?? 30));
+  const primerDia = new Date();
+  primerDia.setDate(primerDia.getDate() - (dias - 1));
+  return {
+    success: true,
+    desde: inicioDelDia(toLocalDateKey(primerDia)),
+    hasta: finDelDia(toLocalDateKey(new Date())),
+  };
+}
 
 const globalStatsSchema = z.object({
   branchId: z.coerce.number().int().positive().optional(),
@@ -74,36 +129,17 @@ export async function getStats(data?: unknown) {
   try {
     const validated = statsSchema.parse(data ?? {});
     const { branchId } = validated;
-    const type = validated.type ?? "30";
     const branchWhere = branchId ? { branchId } : {};
 
-    let dateFilter: { gte: Date; lte: Date };
-    if (type === "custom") {
-      if (!validated.startDate || !validated.endDate) {
-        return {
-          success: false,
-          error: "Seleccioná un rango de fechas para el periodo personalizado",
-        };
-      }
-
-      // Días calendario locales: `new Date("YYYY-MM-DD")` da medianoche UTC, así que
-      // el día final quedaba afuera y, en hora local (UTC-3), un rango de un solo
-      // día quedaba vacío (bug 4 del usuario).
-      const start = new Date(`${validated.startDate}T00:00:00`);
-      const end = new Date(`${validated.endDate}T23:59:59.999`);
-      if (isNaN(start.getTime()) || isNaN(end.getTime()) || start > end) {
-        return { success: false, error: "Rango de fechas inválido" };
-      }
-      dateFilter = { gte: start, lte: end };
-    } else {
-      const days = Number(type);
-      const end = new Date();
-      const start = new Date();
-      start.setDate(start.getDate() - days);
-      dateFilter = { gte: start, lte: end };
+    const rango = rangoDelPeriodo(validated);
+    if (!rango.success) {
+      return { success: false, error: rango.error };
     }
 
-    const stats = await fetchStats({ date: dateFilter, ...branchWhere });
+    const stats = await fetchStats({
+      date: { gte: rango.desde, lte: rango.hasta },
+      ...branchWhere,
+    });
 
     return {
       success: true,
@@ -117,25 +153,29 @@ export async function getStats(data?: unknown) {
 
 const performanceDataSchema = z.object({
   days: z.coerce.number().int().positive().default(30),
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
   branchId: z.coerce.number().int().positive().optional(),
 });
 
 // Get last N days of sales and purchases for chart
 export async function getPerformanceData(data?: unknown) {
   try {
-    const { days, branchId } = performanceDataSchema.parse(
-      data ?? { days: 30 }
-    );
+    const validated = performanceDataSchema.parse(data ?? { days: 30 });
+    const { branchId } = validated;
     const branchWhere = branchId ? { branchId } : {};
 
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - days);
+    const rango = rangoDelPeriodo(validated);
+    if (!rango.success) {
+      return { success: false, error: rango.error };
+    }
+    const dateFilter = { gte: rango.desde, lte: rango.hasta };
 
     // Get daily sales
     const sales = await prisma.sale.groupBy({
       by: ["date"],
       where: {
-        date: { gte: startDate },
+        date: dateFilter,
         ...branchWhere,
       },
       _sum: {
@@ -150,7 +190,7 @@ export async function getPerformanceData(data?: unknown) {
     const purchases = await prisma.purchase.groupBy({
       by: ["date"],
       where: {
-        date: { gte: startDate },
+        date: dateFilter,
         ...branchWhere,
       },
       _sum: {
@@ -161,40 +201,26 @@ export async function getPerformanceData(data?: unknown) {
       },
     });
 
-    // Normalize dates and combine data
+    // Cada fila es un timestamp distinto, así que se acumula por día local: antes
+    // se asignaba y el gráfico mostraba solo la última venta de cada día.
     const dailyData: Record<string, { income: number; expense: number }> = {};
+    const bucket = (fecha: string) =>
+      (dailyData[fecha] ??= { income: 0, expense: 0 });
 
-    // Initialize all days
-    for (let i = 0; i < days; i++) {
-      const date = new Date();
-      date.setDate(date.getDate() - i);
-      const dateStr = date.toISOString().split("T")[0];
-      dailyData[dateStr] = { income: 0, expense: 0 };
-    }
-
-    // Fill in sales
     sales.forEach((s) => {
-      const dateStr = new Date(s.date).toISOString().split("T")[0];
-      if (dailyData[dateStr]) {
-        dailyData[dateStr].income = Number(s._sum.totalAmount || 0);
-      }
+      bucket(toLocalDateKey(new Date(s.date))).income += Number(s._sum.totalAmount || 0);
     });
 
-    // Fill in purchases
     purchases.forEach((p) => {
-      const dateStr = new Date(p.date).toISOString().split("T")[0];
-      if (dailyData[dateStr]) {
-        dailyData[dateStr].expense = Number(p._sum.totalAmount || 0);
-      }
+      bucket(toLocalDateKey(new Date(p.date))).expense += Number(p._sum.totalAmount || 0);
     });
 
-    // Convert to array for chart
-    const chartData = Object.entries(dailyData)
-      .map(([date, values]) => ({
-        date,
-        ...values,
-      }))
-      .reverse();
+    // Un punto por día del rango, en orden, incluso los días sin movimientos.
+    const chartData = diasDelRango(rango.desde, rango.hasta).map((date) => ({
+      date,
+      income: dailyData[date]?.income ?? 0,
+      expense: dailyData[date]?.expense ?? 0,
+    }));
 
     return {
       success: true,

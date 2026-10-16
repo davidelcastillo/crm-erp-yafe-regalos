@@ -10,6 +10,7 @@ import { DashboardChart } from "./components/DashboardChart";
 import { ProductAnalytics } from "./components/ProductAnalytics";
 import { BranchSelector } from "@/components/ui/BranchSelector";
 import { useBranch } from "@/lib/context/BranchContext";
+import { toFullLabel } from "@/lib/dates";
 
 type PeriodType = "7" | "30" | "90" | "custom";
 
@@ -66,9 +67,15 @@ export default function DashboardPage() {
         statsParam.endDate = endDate;
       }
 
+      // El mismo período gobierna los dos: las tarjetas y el gráfico.
+      const performanceParam =
+        period === "custom"
+          ? { startDate, endDate, branchId: branchParam }
+          : { days: Number(period), branchId: branchParam };
+
       const [statsResult, performanceResult, productsResult] = await Promise.all([
         getStats(statsParam),
-        getPerformanceData({ days: 30, branchId: branchParam }),
+        getPerformanceData(performanceParam),
         getProducts(branchId ?? undefined),
       ]);
       if (cancelled) return;
@@ -95,6 +102,13 @@ export default function DashboardPage() {
   const branchLabel = selectedBranchName
     ? `(Sucursal ${selectedBranchName})`
     : "(Todas)";
+
+  const rangeLabel =
+    period === "custom"
+      ? startDate && endDate
+        ? `Del ${toFullLabel(startDate)} al ${toFullLabel(endDate)}`
+        : "Sin rango elegido"
+      : `Últimos ${period} días`;
 
   return (
     <div className="min-h-screen bg-[#ffffff] pb-20">
@@ -170,7 +184,7 @@ export default function DashboardPage() {
             <DashboardCards stats={stats} branchLabel={branchLabel} />
 
             {/* Performance Chart */}
-            <DashboardChart data={performanceData} />
+            <DashboardChart data={performanceData} rangeLabel={rangeLabel} />
 
             {/* Product Analytics */}
             <ProductAnalytics products={products} />

@@ -45,8 +45,11 @@ El dashboard ahora es configurable:
 | Sucursal | **Todas** (agrega todas las sucursales) o una sucursal activa específica |
 
 - Al cambiar cualquiera de los dos, las métricas se recalculan.
+- **Un solo período para todo el tablero**: las tarjetas (`getStats`) y el gráfico de ingresos vs egresos (`getPerformanceData`) usan el mismo rango. El gráfico dibuja un punto por cada día calendario local del rango, incluidos los días sin movimientos, y acumula todas las ventas y compras de un mismo día.
 - Las tarjetas muestran una etiqueta de contexto: **"(Sucursal X)"** cuando se filtra por sucursal o **"(Todas)"** cuando se agregan todas.
-- La Server Action `getStats(type, startDate, endDate, branchId?)` rechaza rangos inválidos (fecha de inicio después de la de fin).
+- El título del gráfico nombra el rango elegido: **"Últimos N días"** o **"Del DD/MM/AAAA al DD/MM/AAAA"**.
+- Los rangos se arman con **días calendario locales** (00:00:00 del día inicial a 23:59:59.999 del final). `new Date("YYYY-MM-DD")` es medianoche UTC y dejaba el día elegido afuera en UTC-3; el mismo criterio se usa para rotular el eje del gráfico (helper `src/lib/dates.ts`).
+- La Server Action `getStats(type, startDate, endDate, branchId?)` rechaza rangos inválidos (fecha de inicio después de la de fin); `getPerformanceData({ days | startDate+endDate, branchId })` usa el mismo criterio: un rango de fechas manda sobre `days` y un rango incompleto o inválido devuelve error.
 
 ## Búsquedas
 
@@ -60,3 +63,4 @@ El dashboard ahora es configurable:
 - [ ] Eliminar la sucursal por defecto, con compras/ventas o con stock se bloquea con su guard correspondiente.
 - [ ] El catálogo de una sucursal activa y publicada es accesible sin login; una no publicada, inactiva o inexistente no devuelve inventario.
 - [ ] El dashboard reacciona a cambios de periodo y sucursal y muestra la etiqueta correcta.
+- [ ] El gráfico de ingresos vs egresos muestra el período elegido (7 / 30 / 90 días o el rango personalizado) y cada día con el total de sus movimientos.

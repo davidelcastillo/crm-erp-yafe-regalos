@@ -78,15 +78,18 @@ describe("getStats (dashboard period + range + branch)", () => {
     }
 
     const where = mockSaleAggregate.mock.calls[0][0].where;
-    const now = new Date();
+    // Días calendario locales: 7 días contando hoy (del inicio de hoy-6 al final de
+    // hoy), que es el mismo rango que usa el gráfico. Antes era `now - 7 días`.
     const expectedStart = new Date();
-    expectedStart.setDate(now.getDate() - 7);
+    expectedStart.setDate(expectedStart.getDate() - 6);
+    expectedStart.setHours(0, 0, 0, 0);
+    const expectedEnd = new Date();
+    expectedEnd.setHours(23, 59, 59, 999);
 
     expect(where.date.gte).toBeInstanceOf(Date);
     expect(where.date.lte).toBeInstanceOf(Date);
-    expect(
-      Math.abs(where.date.gte.getTime() - expectedStart.getTime())
-    ).toBeLessThan(5000);
+    expect(where.date.gte.getTime()).toBe(expectedStart.getTime());
+    expect(where.date.lte.getTime()).toBe(expectedEnd.getTime());
   });
 
   it("omits branchId from the query when no branch is provided (global)", async () => {
