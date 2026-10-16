@@ -41,7 +41,7 @@ export function PurchaseCard({ purchase, onExpand, expanded }: PurchaseCardProps
   const total = purchase.totalAmount;
 
     return (
-    <div className="glass rounded-2xl">
+    <div className="glass rounded-2xl border border-black/5">
       <div className="p-4 cursor-pointer" onClick={onExpand}>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">

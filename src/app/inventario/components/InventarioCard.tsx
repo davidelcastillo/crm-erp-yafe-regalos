@@ -268,7 +268,7 @@ export function InventarioCard({ product, dataProductId, isHighlighted, onViewMo
 
 // View mode - show product info
    return (
-     <div className={`glass rounded-2xl p-4 ${isHighlighted ? "ring-2 ring-[#3b82f6]" : ""}`} data-product-id={dataProductId}>
+     <div className={`glass rounded-2xl border border-black/5 p-4 ${isHighlighted ? "ring-2 ring-[#3b82f6]" : ""}`} data-product-id={dataProductId}>
        <div className="flex items-start justify-between gap-3">
          <div className="min-w-0 flex-1">
            <div className="flex items-center gap-2 mb-1">

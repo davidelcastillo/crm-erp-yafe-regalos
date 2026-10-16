@@ -69,12 +69,14 @@ export function InventarioList({ products, onViewMovements, searchActive = false
   return (
     <div className="flex flex-col gap-4">
       {/* Sort and low-stock filters */}
-      <div className="bg-white rounded-2xl p-4 shadow-sm">
-        <div className="flex gap-2 mt-3 overflow-x-auto pb-1">
+      <div className="glass rounded-2xl border border-black/5 p-4">
+        {/* En celular se apilan: los dos controles no entran en una fila. */}
+        <div className="flex flex-col gap-2 sm:flex-row">
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as SortOption)}
-            className="px-3 py-2 text-sm bg-[#f2f2f2] rounded-lg text-[#222222] focus:outline-none"
+            aria-label="Ordenar por"
+            className="min-h-[44px] w-full rounded-xl bg-[#f8f8f8] px-3 py-2.5 text-base text-[#222222] focus:outline-none focus:ring-2 focus:ring-[#ec4899]/30 sm:w-auto sm:text-sm"
           >
             <option value="recent">Más recientes</option>
             <option value="name">Por nombre</option>
@@ -84,9 +86,10 @@ export function InventarioList({ products, onViewMovements, searchActive = false
 
           <button
             onClick={() => setShowOnlyLowStock(!showOnlyLowStock)}
-            className={`px-3 py-2 text-sm rounded-lg whitespace-nowrap transition-colors ${
+            aria-pressed={showOnlyLowStock}
+            className={`min-h-[44px] w-full rounded-xl px-3 py-2.5 text-base font-medium whitespace-nowrap transition-colors sm:w-auto sm:text-sm ${
               showOnlyLowStock
-                ? "bg-[#ef4444] text-white"
+                ? "bg-[#222222] text-white"
                 : "bg-[#f2f2f2] text-[#222222]"
             }`}
           >
@@ -97,15 +100,16 @@ export function InventarioList({ products, onViewMovements, searchActive = false
 
       {/* Stats Summary */}
       <div className="grid grid-cols-3 gap-2">
-        <div className="bg-white rounded-xl p-3 text-center shadow-sm">
+        <div className="glass rounded-xl border border-black/5 p-3 text-center">
           <div className="text-xl font-bold text-[#222222]">{stats.total}</div>
           <div className="text-xs text-[#6a6a6a]">Productos</div>
         </div>
-        <div className="bg-white rounded-xl p-3 text-center shadow-sm">
-          <div className="text-xl font-bold text-[#f59e0b]">{stats.lowStock}</div>
+        <div className="glass rounded-xl border border-black/5 p-3 text-center">
+          {/* #b45309 es el ámbar que llega a 4.5:1 sobre estas superficies. */}
+          <div className="text-xl font-bold text-[#b45309]">{stats.lowStock}</div>
           <div className="text-xs text-[#6a6a6a]">Stock bajo</div>
         </div>
-        <div className="bg-white rounded-xl p-3 text-center shadow-sm">
+        <div className="glass rounded-xl border border-black/5 p-3 text-center">
           <div className="text-xl font-bold text-[#222222]">{stats.totalUnits}</div>
           <div className="text-xs text-[#6a6a6a]">Total uds</div>
         </div>
