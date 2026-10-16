@@ -40,7 +40,7 @@ export const BranchPicker = ({
     <div
       role="group"
       aria-label={label}
-      className={`grid gap-2 ${columns === 2 ? "grid-cols-2" : "grid-cols-1"}`}
+      className={`grid gap-2 ${columns === 2 ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1"}`}
     >
       {branches.map((branch) => {
         const elegida = value === branch.id;

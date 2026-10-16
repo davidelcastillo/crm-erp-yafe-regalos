@@ -138,39 +138,43 @@ export const CashCloseModal = ({
           </button>
         </div>
 
-        {/* Paso 1: en celular el mismo bloque táctil a ancho completo; desde `md`
-            la lista de sucursales se limita para que no se estire a 768 px. */}
-        <div className="md:max-w-md">
-          <p className="block text-xs text-[#6a6a6a] mb-2">Sucursal a cerrar</p>
-          <BranchPicker
-            branches={branches}
-            value={branchId}
-            onChange={(id) => {
-              setBranchId(id);
-              setResumen(null);
-              setError(null);
-            }}
-            label="Sucursal a cerrar"
-            emptyLabel="No hay sucursales activas para elegir."
-          />
+        {/* Paso 1: el bloque desaparece cuando ya hay un resumen (antes quedaba
+            la lista de sucursales visible en el paso 2). Desde `md` usa el ancho
+            en dos columnas en vez de dejar media pantalla en blanco. */}
+        {!resumen && (
+          <div>
+            <p className="block text-xs text-[#6a6a6a] mb-2">Sucursal a cerrar</p>
+            <BranchPicker
+              branches={branches}
+              value={branchId}
+              onChange={(id) => {
+                setBranchId(id);
+                setResumen(null);
+                setError(null);
+              }}
+              columns={2}
+              label="Sucursal a cerrar"
+              emptyLabel="No hay sucursales activas para elegir."
+            />
 
-          {error && <p className="mt-3 text-sm text-[#c13515]">{error}</p>}
+            {error && <p className="mt-3 text-sm text-[#c13515]">{error}</p>}
 
-          {loading && <p className="mt-4 text-sm text-[#6a6a6a]">Calculando el cierre...</p>}
+            {loading && <p className="mt-4 text-sm text-[#6a6a6a]">Calculando el cierre...</p>}
 
-          {!resumen && !loading && (
-            <div className="md:flex md:justify-end">
-              <button
-                type="button"
-                onClick={handleContinuar}
-                disabled={branchId === null}
-                className="btn btn-primary w-full mt-6 md:w-auto"
-              >
-                Continuar
-              </button>
-            </div>
-          )}
-        </div>
+            {!loading && (
+              <div className="md:flex md:justify-end">
+                <button
+                  type="button"
+                  onClick={handleContinuar}
+                  disabled={branchId === null}
+                  className="btn btn-primary w-full mt-6 md:w-auto"
+                >
+                  Continuar
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Paso 2: en celular sigue siendo una sola columna con el botón al final;
             desde `md` los totales a la izquierda y la tarjeta del corte a la derecha. */}
