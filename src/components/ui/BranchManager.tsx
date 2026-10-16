@@ -356,7 +356,7 @@ export function BranchManager({ branches }: { branches: Branch[] }) {
               key={branch.id}
               className="glass rounded-2xl border border-black/5 p-4"
             >
-              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
                     <h3 className="text-base font-semibold text-[#222222] break-words">
@@ -405,8 +405,9 @@ export function BranchManager({ branches }: { branches: Branch[] }) {
                   </div>
                 </div>
 
-                {/* Estado y acciones: envuelven en celular chico, sin scroll horizontal. */}
-                <div className="flex flex-wrap items-center gap-2 md:shrink-0">
+                {/* Estado y acciones: envuelven en celular chico, sin scroll horizontal.
+                    Desde desktop van alineadas al centro de la tarjeta y a la derecha. */}
+                <div className="flex flex-wrap items-center justify-start gap-2 md:shrink-0 md:justify-end">
                   <Link
                     href={`/sucursal/${branch.id}/inventory`}
                     aria-label={`Ver portal de ${branch.name}`}
