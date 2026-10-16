@@ -27,7 +27,7 @@ jest.mock('@/components/ui/BranchSelector', () => ({
   BranchSelector: () => null,
 }));
 
-jest.mock('./components/DashboardCards', () => ({ DashboardCards: () => null }));
+// DashboardCards no se mockea: hay un caso que fija el título y los valores de las tarjetas.
 jest.mock('./components/ProductAnalytics', () => ({ ProductAnalytics: () => null }));
 
 beforeEach(() => {
@@ -45,7 +45,8 @@ describe('DashboardPage — período del gráfico', () => {
       expect(mockGetPerformanceData).toHaveBeenCalledWith({ days: 30, branchId: undefined })
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '90 días' }));
+    // La página muestra el estado de carga hasta que resuelven los datos.
+    fireEvent.click(await screen.findByRole('button', { name: '90 días' }));
 
     await waitFor(() =>
       expect(mockGetPerformanceData).toHaveBeenLastCalledWith({ days: 90, branchId: undefined })
@@ -55,7 +56,8 @@ describe('DashboardPage — período del gráfico', () => {
   it('con el rango personalizado pide las fechas elegidas y las muestra en el gráfico', async () => {
     render(<DashboardPage />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Personalizado' }));
+    // La página muestra el estado de carga hasta que resuelven los datos.
+    fireEvent.click(await screen.findByRole('button', { name: 'Personalizado' }));
     fireEvent.change(screen.getByLabelText('Desde'), { target: { value: '2026-10-01' } });
     fireEvent.change(screen.getByLabelText('Hasta'), { target: { value: '2026-10-15' } });
 
@@ -81,5 +83,42 @@ describe('DashboardPage — período del gráfico', () => {
     expect(await screen.findByText(/Sin rango elegido/)).toBeInTheDocument();
     expect(mockGetStats).toHaveBeenCalledTimes(1);
     expect(mockGetPerformanceData).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('DashboardPage — carga', () => {
+  it('mientras carga usa la ruedita compartida y los esqueletos', () => {
+    render(<DashboardPage />);
+
+    // El estado de carga lo anuncia el Spinner compartido (role="status"),
+    // no un spinner dibujado a mano por la página.
+    expect(screen.getByRole('status', { name: 'Cargando dashboard...' })).toBeInTheDocument();
+  });
+});
+
+describe('DashboardPage — resumen', () => {
+  it('muestra el título y las tarjetas con sus valores', async () => {
+    mockGetStats.mockResolvedValueOnce({
+      success: true,
+      data: {
+        totalIncome: 1500,
+        totalExpense: 800,
+        netProfit: 700,
+        accountsReceivable: 250,
+      },
+    });
+
+    render(<DashboardPage />);
+
+    expect(await screen.findByText('Ingresos')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Dashboard' })).toBeInTheDocument();
+    expect(screen.getByText('Egresos')).toBeInTheDocument();
+    expect(screen.getByText('Ganancia Neta')).toBeInTheDocument();
+    expect(screen.getByText('Cobrar')).toBeInTheDocument();
+
+    expect(screen.getByText(/\$ 1\.500/)).toBeInTheDocument();
+    expect(screen.getByText(/\$ 800/)).toBeInTheDocument();
+    expect(screen.getByText(/\$ 700/)).toBeInTheDocument();
+    expect(screen.getByText(/\$ 250/)).toBeInTheDocument();
   });
 });

@@ -9,6 +9,9 @@ import { DashboardCards } from "./components/DashboardCards";
 import { DashboardChart } from "./components/DashboardChart";
 import { ProductAnalytics } from "./components/ProductAnalytics";
 import { BranchSelector } from "@/components/ui/BranchSelector";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Spinner } from "@/components/ui/Spinner";
+import { CardSkeleton } from "@/components/ui/Skeleton";
 import { useBranch } from "@/lib/context/BranchContext";
 import { toFullLabel } from "@/lib/dates";
 
@@ -110,76 +113,87 @@ export default function DashboardPage() {
         : "Sin rango elegido"
       : `Últimos ${period} días`;
 
+  // Carga: la banda de marca y la hoja con la forma de las tarjetas que van a llegar.
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-white pb-20">
+        <div className="h-28 brand-gradient" />
+        <div className="glass rounded-t-[2.5rem] -mt-12 px-5 pt-8">
+          <Spinner label="Cargando dashboard..." />
+          <div className="mt-6 space-y-4">
+            <CardSkeleton />
+            <CardSkeleton />
+            <CardSkeleton />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-[#ffffff] pb-20">
-      <main className="px-6 space-y-6">
-        {/* Branch selector header */}
-        <div className="flex items-center justify-between flex-wrap gap-3">
-          <h1 className="text-2xl font-bold text-[#222222]">Dashboard</h1>
-          <BranchSelector
-            onChange={(id) => setBranchId(id)}
-            label="Filtrar por sucursal"
+    <div className="min-h-screen bg-white pb-20">
+      <main>
+        <div className="pb-16 brand-gradient">
+          <PageHeader
+            title="Dashboard"
+            right={
+              <BranchSelector
+                block
+                onChange={(id) => setBranchId(id)}
+                label="Filtrar por sucursal"
+              />
+            }
           />
         </div>
 
-        {/* Period selector */}
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="flex flex-col gap-1">
-            <span className="text-xs text-[#6a6a6a] font-medium">Periodo</span>
-            <div className="flex flex-wrap gap-2">
-              {PERIOD_OPTIONS.map((opt) => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => setPeriod(opt.value)}
-                  className={`min-h-11 px-4 rounded-xl text-sm transition-colors touch-manipulation ${
-                    period === opt.value
-                      ? "bg-[#222222] text-white"
-                      : "bg-[#f7f7f7] text-[#222222] hover:bg-[#f2f2f2]"
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          </div>
+        <div className="glass rounded-t-[2.5rem] border-t border-white/80 -mt-12 px-5 pt-6 pb-8 shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
+          <div className="space-y-6">
+            {/* Selector de período: el mismo rango gobierna las tarjetas y el gráfico. */}
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="flex min-w-0 flex-col gap-1">
+                <span className="text-xs text-[#6a6a6a] font-medium">Periodo</span>
+                <div className="flex flex-wrap gap-2">
+                  {PERIOD_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setPeriod(opt.value)}
+                      className={`min-h-[44px] px-4 whitespace-nowrap rounded-xl text-sm transition-colors touch-manipulation ${
+                        period === opt.value
+                          ? "bg-[#222222] text-white"
+                          : "bg-[#f2f2f2] text-[#222222] hover:bg-[#e5e5e5]"
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
-          {period === "custom" && (
-            <div className="flex flex-wrap items-end gap-2">
-              <label className="flex flex-col gap-1">
-                <span className="text-xs text-[#6a6a6a] font-medium">Desde</span>
-                <input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  className="h-11 px-3 bg-[#ffffff] border border-[#dddddd] rounded-xl text-sm text-[#222222] touch-manipulation"
-                />
-              </label>
-              <label className="flex flex-col gap-1">
-                <span className="text-xs text-[#6a6a6a] font-medium">Hasta</span>
-                <input
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className="h-11 px-3 bg-[#ffffff] border border-[#dddddd] rounded-xl text-sm text-[#222222] touch-manipulation"
-                />
-              </label>
+              {period === "custom" && (
+                <div className="flex flex-wrap items-end gap-2">
+                  <label className="flex flex-col gap-1">
+                    <span className="text-xs text-[#6a6a6a] font-medium">Desde</span>
+                    <input
+                      type="date"
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                      className="h-11 px-3 bg-[#ffffff] border border-[#dddddd] rounded-xl text-sm text-[#222222] touch-manipulation"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    <span className="text-xs text-[#6a6a6a] font-medium">Hasta</span>
+                    <input
+                      type="date"
+                      value={endDate}
+                      onChange={(e) => setEndDate(e.target.value)}
+                      className="h-11 px-3 bg-[#ffffff] border border-[#dddddd] rounded-xl text-sm text-[#222222] touch-manipulation"
+                    />
+                  </label>
+                </div>
+              )}
             </div>
-          )}
-        </div>
 
-        {loading ? (
-          <div className="flex items-center justify-center h-[40vh]">
-            <div className="flex items-center gap-2 animate-spin">
-              <svg className="w-8 h-8 text-[#3b82f6]" viewBox="0 0 24 24" stroke="currentColor">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
-              <span className="text-sm text-[#6a6a6a]">Cargando...</span>
-            </div>
-          </div>
-        ) : (
-          <>
             {/* Stats Cards */}
             <DashboardCards stats={stats} branchLabel={branchLabel} />
 
@@ -188,8 +202,8 @@ export default function DashboardPage() {
 
             {/* Product Analytics */}
             <ProductAnalytics products={products} />
-          </>
-        )}
+          </div>
+        </div>
       </main>
     </div>
   );

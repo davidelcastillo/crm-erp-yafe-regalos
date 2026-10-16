@@ -1,5 +1,7 @@
 "use client";
 
+import { Skeleton } from "@/components/ui/Skeleton";
+
 interface Stats {
   totalIncome: number;
   totalExpense: number;
@@ -17,7 +19,10 @@ export function DashboardCards({ stats, branchLabel = "(Todas)" }: DashboardCard
     return (
       <div className="grid grid-cols-2 gap-3">
         {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="bg-gray-100 animate-pulse rounded-xl h-24" />
+          <div key={i} className="glass rounded-2xl border border-black/5 p-4">
+            <Skeleton className="h-3 w-2/5" />
+            <Skeleton className="mt-3 h-6 w-4/5" />
+          </div>
         ))}
       </div>
     );
@@ -32,30 +37,28 @@ export function DashboardCards({ stats, branchLabel = "(Todas)" }: DashboardCard
     }).format(value);
   };
 
+  // El tono de cada monto es semántico (verde ingreso, rojo egreso, ámbar a cobrar):
+  // no se toca aunque la superficie sea la misma para las cuatro tarjetas.
   const cards = [
     {
       label: "Ingresos",
       value: formatCurrency(stats.totalIncome),
       color: "text-[#22c55e]",
-      bg: "bg-green-50",
     },
     {
       label: "Egresos",
       value: formatCurrency(stats.totalExpense),
       color: "text-[#ef4444]",
-      bg: "bg-red-50",
     },
     {
       label: "Ganancia Neta",
       value: formatCurrency(stats.netProfit),
       color: stats.netProfit >= 0 ? "text-[#22c55e]" : "text-[#ef4444]",
-      bg: stats.netProfit >= 0 ? "bg-green-50" : "bg-red-50",
     },
     {
       label: "Cobrar",
       value: formatCurrency(stats.accountsReceivable),
       color: "text-[#f59e0b]",
-      bg: "bg-yellow-50",
     },
   ];
 
@@ -63,16 +66,16 @@ export function DashboardCards({ stats, branchLabel = "(Todas)" }: DashboardCard
     <section>
       <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
         <h2 className="text-lg font-semibold text-[#222222]">Resumen</h2>
-        <span className="text-sm text-[#6a6a6a]">{branchLabel}</span>
+        <span className="text-sm text-[#6a6a6a] break-words">{branchLabel}</span>
       </div>
       <div className="grid grid-cols-2 gap-3">
         {cards.map((card, index) => (
           <div
             key={index}
-            className={`${card.bg} rounded-xl p-4`}
+            className="glass rounded-2xl border border-black/5 p-4"
           >
             <div className="text-xs text-[#6a6a6a] mb-1">{card.label}</div>
-            <div className={`text-lg font-bold ${card.color}`}>{card.value}</div>
+            <div className={`text-lg font-bold break-words ${card.color}`}>{card.value}</div>
           </div>
         ))}
       </div>
