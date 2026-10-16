@@ -15,9 +15,10 @@ import { CardSkeleton } from "@/components/ui/Skeleton";
 import { useBranch } from "@/lib/context/BranchContext";
 import { toFullLabel } from "@/lib/dates";
 
-type PeriodType = "7" | "30" | "90" | "custom";
+type PeriodType = "cierre" | "7" | "30" | "90" | "custom";
 
 const PERIOD_OPTIONS: { value: PeriodType; label: string }[] = [
+  { value: "cierre", label: "Desde el último cierre" },
   { value: "7", label: "7 días" },
   { value: "30", label: "30 días" },
   { value: "90", label: "90 días" },
@@ -34,7 +35,7 @@ interface Stats {
 export default function DashboardPage() {
   const { branches } = useBranch();
   const [branchId, setBranchId] = useState<number | null>(null);
-  const [period, setPeriod] = useState<PeriodType>("30");
+  const [period, setPeriod] = useState<PeriodType>("cierre");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [stats, setStats] = useState<Stats | null>(null);
@@ -70,11 +71,13 @@ export default function DashboardPage() {
         statsParam.endDate = endDate;
       }
 
-      // El mismo período gobierna los dos: las tarjetas y el gráfico.
-      const performanceParam =
-        period === "custom"
-          ? { startDate, endDate, branchId: branchParam }
-          : { days: Number(period), branchId: branchParam };
+      // El mismo período gobierna los dos: las tarjetas y el gráfico. En «cierre»
+      // el rango lo resuelve el servidor con el último cierre de caja.
+      const performanceParam = {
+        type: period,
+        branchId: branchParam,
+        ...(period === "custom" ? { startDate, endDate } : {}),
+      };
 
       const [statsResult, performanceResult, productsResult] = await Promise.all([
         getStats(statsParam),
@@ -107,11 +110,13 @@ export default function DashboardPage() {
     : "(Todas)";
 
   const rangeLabel =
-    period === "custom"
-      ? startDate && endDate
-        ? `Del ${toFullLabel(startDate)} al ${toFullLabel(endDate)}`
-        : "Sin rango elegido"
-      : `Últimos ${period} días`;
+    period === "cierre"
+      ? "Desde el último cierre de caja"
+      : period === "custom"
+        ? startDate && endDate
+          ? `Del ${toFullLabel(startDate)} al ${toFullLabel(endDate)}`
+          : "Sin rango elegido"
+        : `Últimos ${period} días`;
 
   // Carga: la banda de marca y la hoja con la forma de las tarjetas que van a llegar.
   if (loading) {

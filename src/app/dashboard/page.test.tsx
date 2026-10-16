@@ -42,14 +42,14 @@ describe('DashboardPage — período del gráfico', () => {
     render(<DashboardPage />);
 
     await waitFor(() =>
-      expect(mockGetPerformanceData).toHaveBeenCalledWith({ days: 30, branchId: undefined })
+      expect(mockGetPerformanceData).toHaveBeenCalledWith({ type: 'cierre', branchId: undefined })
     );
 
     // La página muestra el estado de carga hasta que resuelven los datos.
     fireEvent.click(await screen.findByRole('button', { name: '90 días' }));
 
     await waitFor(() =>
-      expect(mockGetPerformanceData).toHaveBeenLastCalledWith({ days: 90, branchId: undefined })
+      expect(mockGetPerformanceData).toHaveBeenLastCalledWith({ type: '90', branchId: undefined })
     );
   });
 
@@ -63,6 +63,7 @@ describe('DashboardPage — período del gráfico', () => {
 
     await waitFor(() =>
       expect(mockGetPerformanceData).toHaveBeenLastCalledWith({
+        type: 'custom',
         startDate: '2026-10-01',
         endDate: '2026-10-15',
         branchId: undefined,
@@ -92,11 +93,12 @@ describe('DashboardPage — variantes del sistema de botones', () => {
   it('el período elegido va btn-active y el resto btn-secondary', async () => {
     render(<DashboardPage />);
 
-    expect(await screen.findByRole('button', { name: '30 días' })).toHaveClass(
+    // Por defecto viene elegido el período del último cierre de caja.
+    expect(await screen.findByRole('button', { name: 'Desde el último cierre' })).toHaveClass(
       'btn',
       'btn-active'
     );
-    expect(screen.getByRole('button', { name: '90 días' })).toHaveClass('btn', 'btn-secondary');
+    expect(screen.getByRole('button', { name: '30 días' })).toHaveClass('btn', 'btn-secondary');
 
     fireEvent.click(screen.getByRole('button', { name: '90 días' }));
 

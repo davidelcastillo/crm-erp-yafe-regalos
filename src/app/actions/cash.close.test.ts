@@ -153,7 +153,7 @@ describe('cierre de caja (integración, base local)', () => {
     expect(await prisma.sale.count({ where: { branchId } })).toBe(ventasAntes)
   })
 
-  it('(c) el piso del cierre resetea ventas y plata, y deja las compras del período', async () => {
+  it('(c) el período «desde el último cierre» resetea todo; los períodos de días muestran el rango completo', async () => {
     const corte = await prisma.cashClose.findFirstOrThrow({
       where: { branchId },
       orderBy: { closedAt: 'desc' },
@@ -190,14 +190,14 @@ describe('cierre de caja (integración, base local)', () => {
       },
     })
 
-    // La compra no es caja: sigue el período elegido (decisión de T9).
+    // La compra del período: en el período del cierre cuenta (el piso mide todo
+    // desde el corte), y en un período de días también.
     const compra = await prisma.purchase.create({
       data: { branchId, totalAmount: COMPRA_DEL_PERIODO },
     })
     comprasIds.push(compra.id)
 
-    // Compra anterior al cierre: S21 (L26) pide que las tarjetas por defecto
-    // midan los egresos desde el cierre, asi el neto compara el mismo tramo.
+    // Compra anterior al cierre: solo entra en un período de días.
     const compraAnterior = await prisma.purchase.create({
       data: {
         branchId,
@@ -218,19 +218,27 @@ describe('cierre de caja (integración, base local)', () => {
       salesCount: 1,
     })
 
-    const stats = await getStats({ type: '7', branchId })
-    if (!stats.success) throw new Error(stats.error)
-    // Solo la venta nueva más la plata posterior al cierre; la anterior no cuenta.
-    expect(stats.data!.totalIncome).toBe(VENTA_NUEVA + INGRESO_POSTERIOR)
-    expect(stats.data!.totalExpense).toBe(COMPRA_DEL_PERIODO)
+    // El período del cierre es el único con piso: solo lo posterior al corte.
+    const cierre = await getStats({ type: 'cierre', branchId })
+    if (!cierre.success) throw new Error(cierre.error)
+    expect(cierre.data!.totalIncome).toBe(VENTA_NUEVA + INGRESO_POSTERIOR)
+    expect(cierre.data!.totalExpense).toBe(COMPRA_DEL_PERIODO)
 
-    const grafico = await getPerformanceData({ days: 7, branchId })
-    if (!grafico.success) throw new Error(grafico.error)
-    const egresosDelGrafico = grafico.data!.reduce(
-      (acc, dia) => acc + dia.expense,
-      0
+    // Un período de días muestra todo lo que cae en el rango, sin piso de cierre.
+    const semana = await getStats({ type: '7', branchId })
+    if (!semana.success) throw new Error(semana.error)
+    expect(semana.data!.totalIncome).toBe(
+      EFECTIVO + TRANSFERENCIA + MIXTO + VENTA_ANTERIOR + VENTA_NUEVA + INGRESO_ANTERIOR + INGRESO_POSTERIOR
     )
-    expect(egresosDelGrafico).toBe(COMPRA_DEL_PERIODO)
+    expect(semana.data!.totalExpense).toBe(COMPRA_DEL_PERIODO + COMPRA_ANTERIOR)
+
+    // El gráfico sigue el mismo criterio que las tarjetas.
+    const grafico = await getPerformanceData({ type: 'cierre', branchId })
+    if (!grafico.success) throw new Error(grafico.error)
+    const sumar = (campo: 'income' | 'expense') =>
+      grafico.data!.reduce((acc, dia) => acc + dia[campo], 0)
+    expect(sumar('income')).toBe(VENTA_NUEVA + INGRESO_POSTERIOR)
+    expect(sumar('expense')).toBe(COMPRA_DEL_PERIODO)
   })
 
   it('(d) rechaza el cierre de una sucursal inactiva sin dejar corte', async () => {

@@ -1,7 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { pisoDeCaja } from "@/lib/cash-close";
+import { pisoDeCaja, rangoDelUltimoCierre } from "@/lib/cash-close";
 import { finDelDia, inicioDelDia, toLocalDateKey } from "@/lib/dates";
 import { z } from "zod";
 
@@ -21,14 +21,22 @@ const diasDelRango = (desde: Date, hasta: Date) => {
   return dias;
 };
 
-// Un solo rango para todo el tablero: "7" | "30" | "90" son los últimos N días
-// calendario locales contando hoy; un rango de fechas manda sobre `days`.
-function rangoDelPeriodo(periodo: {
+// Un solo rango para todo el tablero. «cierre» es el período por defecto: va
+// desde el último cierre de caja (ver `rangoDelUltimoCierre`). «7» | «30» | «90»
+// son los últimos N días calendario locales contando hoy; un rango de fechas
+// manda sobre `days`.
+async function rangoDelPeriodo(periodo: {
   type?: string;
   days?: number;
   startDate?: string;
   endDate?: string;
-}): { success: true; desde: Date; hasta: Date } | { success: false; error: string } {
+  branchId?: number;
+}): Promise<{ success: true; desde: Date; hasta: Date } | { success: false; error: string }> {
+  if (periodo.type === "cierre") {
+    const rango = await rangoDelUltimoCierre(periodo.branchId);
+    return { success: true, ...rango };
+  }
+
   const conFechas = !!periodo.startDate || !!periodo.endDate;
 
   if (periodo.type === "custom" || conFechas) {
@@ -62,7 +70,7 @@ const globalStatsSchema = z.object({
 });
 
 const statsSchema = z.object({
-  type: z.enum(["7", "30", "90", "custom"]).optional(),
+  type: z.enum(["cierre", "7", "30", "90", "custom"]).optional(),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
   branchId: z.coerce.number().int().positive().optional(),
@@ -128,10 +136,8 @@ export async function getGlobalStats(data?: unknown) {
       ? { branchId: validated.branchId }
       : {};
 
-    const stats = await fetchStats(
-      { ...branchWhere },
-      await pisoDeCaja(validated.branchId)
-    );
+    // Sin período no hay piso de cierre: es la vista de todo el histórico.
+    const stats = await fetchStats({ ...branchWhere });
 
     return {
       success: true,
@@ -152,17 +158,21 @@ export async function getStats(data?: unknown) {
     const { branchId } = validated;
     const branchWhere = branchId ? { branchId } : {};
 
-    const rango = rangoDelPeriodo(validated);
+    const rango = await rangoDelPeriodo(validated);
     if (!rango.success) {
       return { success: false, error: rango.error };
     }
+
+    // El piso del cierre se aplica **solo** en el período «desde el último
+    // cierre»: 7/30/90/personalizado muestran todo lo que cae en el rango.
+    const caja = validated.type === "cierre" ? await pisoDeCaja(branchId) : {};
 
     const stats = await fetchStats(
       {
         date: { gte: rango.desde, lte: rango.hasta },
         ...branchWhere,
       },
-      await pisoDeCaja(branchId)
+      caja
     );
 
     return {
@@ -176,6 +186,7 @@ export async function getStats(data?: unknown) {
 }
 
 const performanceDataSchema = z.object({
+  type: z.enum(["cierre", "7", "30", "90", "custom"]).optional(),
   days: z.coerce.number().int().positive().default(30),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
@@ -189,14 +200,14 @@ export async function getPerformanceData(data?: unknown) {
     const { branchId } = validated;
     const branchWhere = branchId ? { branchId } : {};
 
-    const rango = rangoDelPeriodo(validated);
+    const rango = await rangoDelPeriodo(validated);
     if (!rango.success) {
       return { success: false, error: rango.error };
     }
     const dateFilter = { gte: rango.desde, lte: rango.hasta };
-    // Mismo piso de caja que las tarjetas: si no, los dos indicadores del
-    // tablero contarían ventas distintas (S17).
-    const caja = await pisoDeCaja(branchId);
+    // Mismo piso de caja que las tarjetas, y solo en el período del cierre: si no,
+    // los dos indicadores del tablero contarían cosas distintas.
+    const caja = validated.type === "cierre" ? await pisoDeCaja(branchId) : {};
 
     // Get daily sales
     const sales = await prisma.sale.groupBy({
