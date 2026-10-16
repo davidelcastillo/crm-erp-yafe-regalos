@@ -141,7 +141,7 @@ export function BranchManager({ branches }: { branches: Branch[] }) {
             </div>
           `,
           icon: "success",
-          confirmButtonColor: "#ff385c",
+          confirmButtonColor: "#be185d",
           background: "#ffffff",
           color: "#222222",
           confirmButtonText: "Entendido",
@@ -427,7 +427,7 @@ export function BranchManager({ branches }: { branches: Branch[] }) {
                           text: "¿Estás seguro de que deseas eliminar esta sucursal? Esta acción no se puede deshacer.",
                           icon: "warning",
                           showCancelButton: true,
-                          confirmButtonColor: "#ff385c",
+                          confirmButtonColor: "#be185d",
                           cancelButtonColor: "#6a6a6a",
                           confirmButtonText: "Sí, eliminar",
                           cancelButtonText: "Cancelar",
