@@ -140,7 +140,7 @@ export function LabelSelector({ isOpen, onClose }: LabelSelectorProps) {
           <button
             type="button"
             onClick={onClose}
-            className="p-2 rounded-full hover:bg-[#f2f2f2] transition-colors"
+            className="btn btn-icon btn-round hover:bg-[#f2f2f2]"
             aria-label="Cerrar"
           >
             <svg className="w-6 h-6 text-[#6a6a6a]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -300,14 +300,14 @@ export function LabelSelector({ isOpen, onClose }: LabelSelectorProps) {
         <div className="mt-6 flex justify-end space-x-3">
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium"
+            className="btn btn-secondary"
           >
             Cancelar
           </button>
           <button
             onClick={handleGenerate}
             disabled={generating || selections.size === 0}
-            className="px-4 py-2 bg-[#3b82f6] hover:bg-[#2563eb] text-white rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            className="btn btn-primary"
           >
             {generating ? 'Generando...' : 'Descargar Etiquetas PDF'}
           </button>

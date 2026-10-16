@@ -18,9 +18,8 @@ export function AddClienteButton({ onAdd }: AddClienteButtonProps) {
     buttonsStyling: false,
     customClass: {
       popup: 'rounded-3xl',
-      confirmButton: 'brand-action rounded-xl px-4 min-h-[44px] text-sm font-medium',
-      cancelButton:
-        'rounded-xl px-4 min-h-[44px] text-sm font-medium bg-[#f2f2f2] text-[#222222]',
+      confirmButton: 'btn btn-primary',
+      cancelButton: 'btn btn-secondary',
     },
     confirmButtonColor: undefined,
     cancelButtonColor: undefined,
@@ -30,8 +29,7 @@ export function AddClienteButton({ onAdd }: AddClienteButtonProps) {
     ...estiloSwal,
     customClass: {
       ...estiloSwal.customClass,
-      confirmButton:
-        'rounded-xl px-4 min-h-[44px] text-sm font-medium bg-[#dc2626] text-white',
+      confirmButton: 'btn btn-danger',
     },
   };
 
@@ -96,7 +94,7 @@ export function AddClienteButton({ onAdd }: AddClienteButtonProps) {
   return (
     <button
       onClick={handleAdd}
-      className="fixed bottom-24 right-6 w-14 h-14 brand-gradient brand-gradient-hover text-gray-800 rounded-full shadow-lg flex items-center justify-center transition-colors z-40"
+      className="btn-fab fixed bottom-24 right-6 z-40"
       aria-label="Agregar cliente"
     >
       <svg

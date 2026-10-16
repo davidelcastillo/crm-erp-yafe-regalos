@@ -145,7 +145,7 @@ export function BranchManager({ branches }: { branches: Branch[] }) {
             </div>
           `,
           icon: "success",
-          confirmButtonColor: "#be185d",
+          confirmButtonColor: "#6d28d9",
           background: "#ffffff",
           color: "#222222",
           confirmButtonText: "Entendido",
@@ -303,7 +303,7 @@ export function BranchManager({ branches }: { branches: Branch[] }) {
               <button
                 type="submit"
                 disabled={submitting}
-                className="flex-1 min-h-[44px] px-4 py-3 rounded-xl brand-action font-medium disabled:opacity-50 touch-manipulation"
+                className="btn btn-primary flex-1"
               >
                 {submitting ? "Guardando..." : "Guardar"}
               </button>
@@ -311,7 +311,7 @@ export function BranchManager({ branches }: { branches: Branch[] }) {
                 type="button"
                 onClick={() => setMode("list")}
                 disabled={submitting}
-                className="min-h-[44px] px-4 py-3 bg-[#f2f2f2] text-[#222222] rounded-xl font-medium hover:bg-[#ebebeb] disabled:opacity-50 transition-colors touch-manipulation"
+                className="btn btn-secondary"
               >
                 Cancelar
               </button>
@@ -330,7 +330,7 @@ export function BranchManager({ branches }: { branches: Branch[] }) {
       <div className="mb-4 flex sm:justify-end">
         <button
           onClick={openCreate}
-          className="inline-flex w-full items-center justify-center gap-2 min-h-[48px] px-4 py-2 rounded-xl brand-action text-sm font-medium touch-manipulation sm:w-auto"
+          className="btn btn-primary w-full sm:w-auto"
         >
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -412,7 +412,7 @@ export function BranchManager({ branches }: { branches: Branch[] }) {
                   <Link
                     href={`/sucursal/${branch.id}/inventory`}
                     aria-label={`Ver portal de ${branch.name}`}
-                    className="inline-flex flex-1 items-center justify-center gap-1.5 px-3 min-h-[44px] rounded-xl bg-[#f2f2f2] text-[#222222] text-sm font-medium hover:bg-[#ebebeb] transition-colors touch-manipulation md:flex-none"
+                    className="btn btn-secondary flex-1 md:flex-none"
                   >
                     Portal
                   </Link>
@@ -420,7 +420,7 @@ export function BranchManager({ branches }: { branches: Branch[] }) {
                   <button
                     onClick={() => openEdit(branch)}
                     aria-label={`Editar ${branch.name}`}
-                    className="inline-flex w-11 h-11 min-w-[44px] min-h-[44px] items-center justify-center rounded-xl bg-[#f2f2f2] text-[#6a6a6a] hover:bg-[#ebebeb] transition-colors touch-manipulation"
+                    className="btn btn-secondary btn-icon"
                   >
                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -435,7 +435,7 @@ export function BranchManager({ branches }: { branches: Branch[] }) {
                           text: "¿Estás seguro de que deseas eliminar esta sucursal? Esta acción no se puede deshacer.",
                           icon: "warning",
                           showCancelButton: true,
-                          confirmButtonColor: "#be185d",
+                          confirmButtonColor: "#6d28d9",
                           cancelButtonColor: "#6a6a6a",
                           confirmButtonText: "Sí, eliminar",
                           cancelButtonText: "Cancelar",
@@ -446,7 +446,7 @@ export function BranchManager({ branches }: { branches: Branch[] }) {
                         });
                       }}
                       aria-label={`Eliminar ${branch.name}`}
-                      className="inline-flex w-11 h-11 min-w-[44px] min-h-[44px] items-center justify-center rounded-xl bg-red-600 text-white hover:bg-red-700 transition-colors touch-manipulation"
+                      className="btn btn-danger btn-icon"
                     >
                       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />

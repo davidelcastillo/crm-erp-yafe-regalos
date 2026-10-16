@@ -52,7 +52,7 @@ export default function CategoriesPage() {
       showCancelButton: true,
       confirmButtonText: 'Crear',
       cancelButtonText: 'Cancelar',
-      confirmButtonColor: '#be185d',
+      confirmButtonColor: "#6d28d9",
       cancelButtonColor: '#6a6a6a',
       background: '#ffffff',
       color: '#222222',
@@ -70,7 +70,7 @@ export default function CategoriesPage() {
         title: 'Categoría creada',
         text: `Se creó "${name}"`,
         icon: 'success',
-        confirmButtonColor: '#be185d',
+        confirmButtonColor: "#6d28d9",
         confirmButtonText: 'Aceptar',
         background: '#ffffff',
         color: '#222222',
@@ -95,7 +95,7 @@ export default function CategoriesPage() {
       text: 'Esta acción no se puede deshacer. Si la categoría tiene productos asociados, se bloqueará.',
       icon: 'warning',
       showCancelButton: true,
-      confirmButtonColor: '#be185d',
+      confirmButtonColor: "#6d28d9",
       cancelButtonColor: '#6a6a6a',
       confirmButtonText: 'Sí, eliminar',
       cancelButtonText: 'Cancelar',
@@ -108,7 +108,7 @@ export default function CategoriesPage() {
       await Swal.fire({
         title: 'Categoría eliminada',
         icon: 'success',
-        confirmButtonColor: '#be185d',
+        confirmButtonColor: "#6d28d9",
         confirmButtonText: 'Aceptar',
         background: '#ffffff',
         color: '#222222',
@@ -137,7 +137,7 @@ export default function CategoriesPage() {
               <button
                 type="button"
                 onClick={handleCreate}
-                className="px-4 min-h-[44px] rounded-xl brand-action text-sm font-medium touch-manipulation"
+                className="btn btn-primary"
               >
                 Nueva categoría
               </button>
@@ -225,14 +225,14 @@ export default function CategoriesPage() {
                   <div className="mt-3 flex flex-wrap gap-2 border-t border-black/5 pt-3">
                     <Link
                       href={`/categorias/${cat.id}`}
-                      className="flex-1 whitespace-nowrap py-2 px-3 text-center text-sm font-medium text-[#3f3f3f] bg-[#f2f2f2] rounded-lg hover:bg-[#e5e5e5] transition-colors touch-manipulation"
+                      className="btn btn-secondary flex-1 whitespace-nowrap"
                     >
                       Editar
                     </Link>
                     <button
                       type="button"
                       onClick={() => handleDelete(cat.id)}
-                      className="flex-1 whitespace-nowrap py-2 px-3 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors touch-manipulation"
+                      className="btn btn-danger flex-1 whitespace-nowrap"
                     >
                       Eliminar
                     </button>

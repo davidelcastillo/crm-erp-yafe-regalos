@@ -52,7 +52,7 @@ export default function MovementsPage() {
             actions={
               <Link
                 href="/inventario"
-                className="flex items-center px-4 min-h-[44px] rounded-xl brand-action text-sm font-medium touch-manipulation"
+                className="btn btn-primary"
               >
                 Ir a Inventario
               </Link>

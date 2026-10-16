@@ -173,14 +173,14 @@ export function ClienteCard({ customer }: ClienteCardProps) {
         <button
           onClick={handleToggleHistory}
           disabled={loadingHistory}
-          className="flex-1 whitespace-nowrap py-2 px-3 text-sm font-medium text-[#3f3f3f] bg-[#f2f2f2] rounded-lg hover:bg-[#e5e5e5] transition-colors disabled:opacity-50"
+          className="btn btn-secondary flex-1 whitespace-nowrap"
         >
           {loadingHistory ? "Cargando..." : showHistory ? "Ocultar" : "Ver Historial"}
         </button>
         {hasDebt && (
           <button
             onClick={handlePayment}
-            className="flex-1 whitespace-nowrap py-2 px-3 text-sm font-medium text-white bg-[#15803d] rounded-lg hover:bg-[#16a34a] transition-colors"
+            className="btn btn-primary flex-1 whitespace-nowrap"
           >
             Registrar Pago
           </button>
@@ -190,23 +190,16 @@ export function ClienteCard({ customer }: ClienteCardProps) {
       {showHistory && historyData && (
         <div className="mt-3 pt-3 border-t border-black/5">
           <div className="flex gap-1 mb-3">
+            {/* Control segmentado: la pestaña elegida va `btn-active`, la otra `btn-secondary`. */}
             <button
               onClick={() => setActiveTab("sales")}
-              className={`flex-1 py-2 px-3 text-sm font-medium rounded-lg transition-colors ${
-                activeTab === "sales"
-                  ? "bg-[#222222] text-white"
-                  : "bg-[#f2f2f2] text-[#6a6a6a]"
-              }`}
+              className={`btn flex-1 ${activeTab === "sales" ? "btn-active" : "btn-secondary"}`}
             >
               Ventas ({historyData.sales.length})
             </button>
             <button
               onClick={() => setActiveTab("payments")}
-              className={`flex-1 py-2 px-3 text-sm font-medium rounded-lg transition-colors ${
-                activeTab === "payments"
-                  ? "bg-[#222222] text-white"
-                  : "bg-[#f2f2f2] text-[#6a6a6a]"
-              }`}
+              className={`btn flex-1 ${activeTab === "payments" ? "btn-active" : "btn-secondary"}`}
             >
               Pagos ({historyData.payments.length})
             </button>

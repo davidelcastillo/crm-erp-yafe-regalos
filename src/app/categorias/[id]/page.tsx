@@ -61,7 +61,7 @@ export default function CategoryEditPage() {
       text: 'Esta acción no se puede deshacer. Si tiene productos asociados, se bloqueará.',
       icon: 'warning',
       showCancelButton: true,
-      confirmButtonColor: '#be185d',
+      confirmButtonColor: "#6d28d9",
       cancelButtonColor: '#6a6a6a',
       confirmButtonText: 'Sí, eliminar',
       cancelButtonText: 'Cancelar',
@@ -74,7 +74,7 @@ export default function CategoryEditPage() {
       await Swal.fire({
         title: 'Categoría eliminada',
         icon: 'success',
-        confirmButtonColor: '#be185d',
+        confirmButtonColor: "#6d28d9",
         confirmButtonText: 'Aceptar',
         background: '#ffffff',
         color: '#222222',
@@ -104,7 +104,7 @@ export default function CategoryEditPage() {
           title: 'Categoría actualizada',
           text: 'La categoría se ha actualizado correctamente',
           icon: 'success',
-          confirmButtonColor: '#be185d',
+          confirmButtonColor: "#6d28d9",
           confirmButtonText: 'Aceptar',
           background: '#ffffff',
           color: '#222222',
@@ -138,7 +138,7 @@ export default function CategoryEditPage() {
         <p className="py-6 text-center text-sm text-[#6a6a6a]">Categoría no encontrada</p>
         <Link
           href="/categorias"
-          className="mx-auto flex min-h-[44px] w-fit items-center rounded-xl bg-[#f2f2f2] px-4 text-sm font-medium text-[#222222] hover:bg-[#e5e5e5] transition-colors"
+          className="btn btn-secondary mx-auto w-fit"
         >
           Volver a la lista
         </Link>
@@ -153,17 +153,10 @@ export default function CategoryEditPage() {
           title="Editar categoría"
           actions={
             <>
-              <Link
-                href="/categorias"
-                className="inline-flex min-h-[44px] items-center rounded-xl bg-[#f2f2f2] px-4 text-sm font-medium text-[#222222] hover:bg-[#e5e5e5] transition-colors"
-              >
+              <Link href="/categorias" className="btn btn-secondary">
                 Volver a la lista
               </Link>
-              <button
-                type="button"
-                onClick={handleDelete}
-                className="min-h-[44px] rounded-xl bg-red-600 px-4 text-sm font-medium text-white hover:bg-red-700 transition-colors"
-              >
+              <button type="button" onClick={handleDelete} className="btn btn-danger">
                 Eliminar
               </button>
             </>
@@ -205,7 +198,7 @@ export default function CategoryEditPage() {
             <button
               type="submit"
               disabled={saving || formPending}
-              className="w-full min-h-[48px] brand-action rounded-xl py-3 font-medium disabled:opacity-50"
+              className="btn btn-primary w-full"
             >
               {saving ? 'Guardando...' : 'Guardar cambios'}
             </button>

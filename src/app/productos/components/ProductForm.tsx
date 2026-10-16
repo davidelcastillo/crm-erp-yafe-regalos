@@ -66,7 +66,7 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
           "El producto dejará de aparecer en los selectores de compras, ventas y movimientos, pero conservará su stock e historial.",
         icon: "warning",
         showCancelButton: true,
-        confirmButtonColor: "#be185d",
+        confirmButtonColor: "#6d28d9",
         cancelButtonColor: "#6a6a6a",
         confirmButtonText: "Sí, desactivar",
         cancelButtonText: "Cancelar",
@@ -113,7 +113,7 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
           ? "El producto se ha actualizado correctamente"
           : "El producto se ha creado correctamente",
         icon: "success",
-        confirmButtonColor: "#be185d",
+        confirmButtonColor: "#6d28d9",
         confirmButtonText: "Aceptar",
         background: "#ffffff",
         color: "#222222",

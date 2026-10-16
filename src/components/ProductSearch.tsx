@@ -216,7 +216,7 @@ export function ProductSearch(props: ProductSearchProps) {
           <button
             type="button"
             onClick={onClose}
-            className="p-2 rounded-full hover:bg-[#f2f2f2] transition-colors"
+            className="btn btn-icon btn-round hover:bg-[#f2f2f2]"
             aria-label="Cerrar"
           >
             <svg className="w-6 h-6 text-[#6a6a6a]" fill="none" viewBox="0 0 24 24" stroke="currentColor">

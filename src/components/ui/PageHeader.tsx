@@ -69,7 +69,9 @@ export const PageHeader = ({ title, actions, right, menuItems = [] }: PageHeader
             onClick={() => setIsOpen(true)}
             aria-label="Abrir menú"
             aria-expanded={isOpen}
-            className="md:hidden w-11 h-11 -ml-2 flex items-center justify-center rounded-xl text-[#222222] hover:bg-white/60 transition-colors touch-manipulation"
+            /* `md:hidden!`: el base `btn` fija `display: inline-flex` fuera de capas,
+               así que pisa a las utilidades de visibilidad de Tailwind. */
+            className="btn btn-icon md:hidden -ml-2 text-[#222222] hover:bg-white/60"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
@@ -85,7 +87,7 @@ export const PageHeader = ({ title, actions, right, menuItems = [] }: PageHeader
           <button
             type="button"
             onClick={handleLogout}
-            className="hidden md:flex px-4 min-h-[44px] items-center text-sm font-medium text-[#3f3f3f] bg-[#f2f2f2] rounded-xl hover:bg-[#e5e5e5] transition-colors touch-manipulation"
+            className="btn btn-secondary hidden md:inline-flex"
           >
             Cerrar sesión
           </button>
@@ -113,7 +115,7 @@ export const PageHeader = ({ title, actions, right, menuItems = [] }: PageHeader
                 type="button"
                 onClick={() => setIsOpen(false)}
                 aria-label="Cerrar menú"
-                className="w-11 h-11 -mr-1 flex items-center justify-center rounded-full text-[#6a6a6a] hover:bg-white/60 transition-colors touch-manipulation"
+                className="btn btn-icon btn-round -mr-1 text-[#6a6a6a] hover:bg-white/60"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />

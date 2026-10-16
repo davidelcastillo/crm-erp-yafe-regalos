@@ -107,7 +107,7 @@ export function CategorySelector({
       showCancelButton: true,
       confirmButtonText: "Crear",
       cancelButtonText: "Cancelar",
-      confirmButtonColor: "#be185d",
+      confirmButtonColor: "#6d28d9",
       cancelButtonColor: "#6a6a6a",
       background: "#ffffff",
       color: "#222222",
@@ -136,7 +136,7 @@ export function CategorySelector({
           title: "Categoría creada",
           text: `Se creó "${created.name}"`,
           icon: "success" as const,
-          confirmButtonColor: "#be185d",
+          confirmButtonColor: "#6d28d9",
           confirmButtonText: "Aceptar",
           background: "#ffffff",
           color: "#222222",
@@ -194,7 +194,7 @@ export function CategorySelector({
           type="button"
           disabled={disabled || creating}
           onClick={handleCreateNew}
-          className="inline-flex items-center gap-1 px-3 min-h-[44px] whitespace-nowrap rounded-xl brand-gradient brand-gradient-hover text-gray-800 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
+          className="btn btn-primary whitespace-nowrap"
           aria-label="Crear nueva categoría"
         >
           {creating ? "Creando…" : (
