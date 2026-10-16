@@ -127,7 +127,7 @@ export function ExportWizard({ open, onClose, branches }: ExportWizardProps) {
         title: "PDF generado",
         text: "El inventario se exportó correctamente",
         icon: "success",
-        confirmButtonColor: "#be185d",
+        confirmButtonColor: "#6d28d9",
         background: "#ffffff",
         color: "#222222",
       });
@@ -155,7 +155,7 @@ export function ExportWizard({ open, onClose, branches }: ExportWizardProps) {
         }
         setStep(target);
       }}
-      className="px-4 py-3 min-h-[44px] text-sm font-medium text-[#222222] bg-[#f8f8f8] rounded-xl hover:bg-[#f2f2f2] transition-colors touch-manipulation"
+      className="btn btn-secondary"
     >
       Volver
     </button>
@@ -183,7 +183,7 @@ export function ExportWizard({ open, onClose, branches }: ExportWizardProps) {
           <button
             type="button"
             onClick={onClose}
-            className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full hover:bg-[#f2f2f2] transition-colors touch-manipulation"
+            className="btn btn-icon btn-round hover:bg-[#f2f2f2]"
             aria-label="Cerrar"
           >
             <svg
@@ -228,7 +228,7 @@ export function ExportWizard({ open, onClose, branches }: ExportWizardProps) {
               type="button"
               onClick={handleContinue}
               disabled={branchId === null}
-              className="w-full py-4 mt-6 brand-gradient brand-gradient-hover text-gray-800 font-medium rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="btn btn-primary w-full mt-6"
             >
               Continuar
             </button>
@@ -301,7 +301,7 @@ export function ExportWizard({ open, onClose, branches }: ExportWizardProps) {
                     setProductsError(null);
                     setLoadAttempt((attempt) => attempt + 1);
                   }}
-                  className="px-4 py-3 min-h-[44px] text-sm font-medium brand-gradient brand-gradient-hover text-gray-800 rounded-xl transition-colors touch-manipulation"
+                  className="btn btn-secondary"
                 >
                   Reintentar
                 </button>
@@ -356,7 +356,7 @@ export function ExportWizard({ open, onClose, branches }: ExportWizardProps) {
               <button
                 type="button"
                 onClick={() => setStep(3)}
-                className="flex-1 py-3 min-h-[44px] brand-gradient brand-gradient-hover text-gray-800 font-medium rounded-xl transition-colors touch-manipulation"
+                className="btn btn-primary flex-1"
               >
                 Siguiente
               </button>
@@ -391,7 +391,7 @@ export function ExportWizard({ open, onClose, branches }: ExportWizardProps) {
                 type="button"
                 onClick={handleGenerate}
                 disabled={selectedCount === 0 || generating}
-                className="flex-1 py-3 min-h-[44px] brand-gradient brand-gradient-hover text-gray-800 font-medium rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
+                className="btn btn-primary flex-1"
               >
                 {generating ? "Generando..." : "Generar PDF"}
               </button>

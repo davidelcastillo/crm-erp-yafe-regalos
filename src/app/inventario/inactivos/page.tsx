@@ -13,9 +13,9 @@ type InactiveProduct = Product & { category: { id: number; name: string } | null
 
 const DEBOUNCE_MS = 300;
 
-// Botón secundario gris del encabezado: no compite con la acción de marca.
+// Botón secundario gris del encabezado: no compite con la acción principal.
 const VOLVER_CLASS =
-  'inline-flex items-center px-4 min-h-[44px] rounded-xl text-sm font-medium text-[#3f3f3f] bg-[#f2f2f2] hover:bg-[#e5e5e5] transition-colors touch-manipulation whitespace-nowrap';
+  'btn btn-secondary whitespace-nowrap';
 
 export default function InactivosPage() {
   const [products, setProducts] = useState<InactiveProduct[]>([]);
@@ -47,7 +47,7 @@ export default function InactivosPage() {
       text: 'El producto volverá a estar disponible en los selectores de compras y ventas.',
       icon: 'question',
       showCancelButton: true,
-      confirmButtonColor: '#be185d',
+      confirmButtonColor: "#6d28d9",
       cancelButtonColor: '#6a6a6a',
       confirmButtonText: 'Sí, reactivar',
     });
@@ -59,7 +59,7 @@ export default function InactivosPage() {
         title: 'Producto reactivado',
         text: 'El producto ha sido reactivado correctamente.',
         icon: 'success',
-        confirmButtonColor: '#be185d',
+        confirmButtonColor: "#6d28d9",
       });
       await loadProducts();
     } else {
@@ -189,7 +189,7 @@ export default function InactivosPage() {
                       <button
                         type="button"
                         onClick={() => handleReactivate(product.id)}
-                        className="px-4 min-h-[44px] rounded-xl brand-action text-sm font-medium touch-manipulation whitespace-nowrap"
+                        className="btn btn-primary whitespace-nowrap"
                       >
                         Activar
                       </button>

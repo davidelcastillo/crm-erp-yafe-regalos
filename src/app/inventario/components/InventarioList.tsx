@@ -84,14 +84,11 @@ export function InventarioList({ products, onViewMovements, searchActive = false
             <option value="stock-desc">Stock: mayor a menor</option>
           </select>
 
+          {/* Control segmentado: la opción elegida va `btn-active`, la otra `btn-secondary`. */}
           <button
             onClick={() => setShowOnlyLowStock(!showOnlyLowStock)}
             aria-pressed={showOnlyLowStock}
-            className={`min-h-[44px] w-full rounded-xl px-3 py-2.5 text-base font-medium whitespace-nowrap transition-colors sm:w-auto sm:text-sm ${
-              showOnlyLowStock
-                ? "bg-[#222222] text-white"
-                : "bg-[#f2f2f2] text-[#222222]"
-            }`}
+            className={`btn ${showOnlyLowStock ? "btn-active" : "btn-secondary"} w-full whitespace-nowrap sm:w-auto`}
           >
             Stock bajo ({stats.lowStock})
           </button>

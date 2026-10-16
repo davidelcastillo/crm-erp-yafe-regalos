@@ -196,7 +196,7 @@ export const StockAdjustmentModal = ({
         title: tipo === "ENTRY" ? "Entrada registrada" : "Salida registrada",
         text: `${totalUnidades} unidades en ${selectedBranchName}`,
         icon: "success",
-        confirmButtonColor: "#be185d",
+        confirmButtonColor: "#6d28d9",
         background: "#ffffff",
         color: "#222222",
       });
@@ -232,7 +232,7 @@ export const StockAdjustmentModal = ({
           <button
             type="button"
             onClick={handleClose}
-            className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full hover:bg-[#f2f2f2] transition-colors touch-manipulation"
+            className="btn btn-icon btn-round hover:bg-[#f2f2f2]"
             aria-label="Cerrar"
           >
             <svg
@@ -278,11 +278,7 @@ export const StockAdjustmentModal = ({
                   type="button"
                   onClick={() => setTipo(opcion.value)}
                   aria-pressed={tipo === opcion.value}
-                  className={`flex-1 py-3 min-h-[44px] px-3 rounded-xl text-sm transition-colors touch-manipulation ${
-                    tipo === opcion.value
-                      ? "bg-[#222222] text-white"
-                      : "bg-[#f7f7f7] text-[#222222] hover:bg-[#f2f2f2]"
-                  }`}
+                  className={`btn ${tipo === opcion.value ? "btn-active" : "btn-secondary"} flex-1`}
                 >
                   {opcion.label}
                 </button>
@@ -298,7 +294,7 @@ export const StockAdjustmentModal = ({
               type="button"
               onClick={handleContinue}
               disabled={branchId === null}
-              className="w-full py-4 mt-6 brand-gradient brand-gradient-hover text-gray-800 font-medium rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
+              className="btn btn-primary w-full mt-6"
             >
               Continuar
             </button>
@@ -398,7 +394,7 @@ export const StockAdjustmentModal = ({
               <button
                 type="button"
                 onClick={() => setStep(1)}
-                className="px-4 py-3 min-h-[44px] text-sm font-medium text-[#222222] bg-[#f8f8f8] rounded-xl hover:bg-[#f2f2f2] transition-colors touch-manipulation"
+                className="btn btn-secondary"
               >
                 Volver
               </button>
@@ -406,7 +402,7 @@ export const StockAdjustmentModal = ({
                 type="button"
                 onClick={() => setStep(3)}
                 disabled={!isValid}
-                className="flex-1 py-3 min-h-[44px] brand-gradient brand-gradient-hover text-gray-800 font-medium rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
+                className="btn btn-primary flex-1"
               >
                 Siguiente
               </button>
@@ -467,7 +463,7 @@ export const StockAdjustmentModal = ({
                 type="button"
                 onClick={() => setStep(2)}
                 disabled={pending}
-                className="px-4 py-3 min-h-[44px] text-sm font-medium text-[#222222] bg-[#f8f8f8] rounded-xl hover:bg-[#f2f2f2] transition-colors touch-manipulation"
+                className="btn btn-secondary"
               >
                 Volver
               </button>
@@ -475,7 +471,7 @@ export const StockAdjustmentModal = ({
                 type="button"
                 onClick={handleSubmit}
                 disabled={pending}
-                className="flex-1 py-3 min-h-[44px] brand-gradient brand-gradient-hover text-gray-800 font-medium rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
+                className="btn btn-primary flex-1"
               >
                 {pending
                   ? "Guardando…"

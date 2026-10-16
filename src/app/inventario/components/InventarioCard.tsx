@@ -233,16 +233,10 @@ export function InventarioCard({ product, dataProductId, isHighlighted, onViewMo
            </div>
 
            <div className="flex gap-2 pt-2">
-             <button
-               onClick={handleSave}
-               className="flex-1 py-2 px-3 text-sm font-medium text-white bg-[#22c55e] rounded-lg hover:bg-[#16a34a] transition-colors"
-             >
+             <button onClick={handleSave} className="btn btn-primary flex-1">
                Guardar
              </button>
-             <button
-               onClick={handleCancel}
-               className="flex-1 py-2 px-3 text-sm font-medium text-[#222222] bg-[#f2f2f2] rounded-lg hover:bg-[#e5e5e5] transition-colors"
-             >
+             <button onClick={handleCancel} className="btn btn-secondary flex-1">
                Cancelar
              </button>
            </div>
@@ -296,22 +290,13 @@ export function InventarioCard({ product, dataProductId, isHighlighted, onViewMo
 
        {/* Los botones se envuelven: en un celular chico no entran los tres en una fila. */}
        <div className="mt-3 flex flex-wrap gap-2 border-t border-gray-100 pt-3">
-         <button
-           onClick={handleEdit}
-           className="flex-1 whitespace-nowrap py-2 px-3 text-sm font-medium text-[#3f3f3f] bg-[#f2f2f2] rounded-lg hover:bg-[#e5e5e5] transition-colors"
-         >
+         <button onClick={handleEdit} className="btn btn-secondary flex-1 whitespace-nowrap">
            Editar
          </button>
-         <button
-           onClick={handleViewMovements}
-           className="flex-1 whitespace-nowrap py-2 px-3 text-sm font-medium text-white bg-[#8b5cf6] rounded-lg hover:#[7c3aed] transition-colors"
-         >
+         <button onClick={handleViewMovements} className="btn btn-primary flex-1 whitespace-nowrap">
            Ver Movimientos
          </button>
-          <button
-            onClick={handleDelete}
-            className="flex-1 whitespace-nowrap py-2 px-3 text-sm font-medium text-white bg-[#ef4444] rounded-lg hover:bg-[#dc2626] transition-colors"
-          >
+          <button onClick={handleDelete} className="btn btn-danger flex-1 whitespace-nowrap">
             Desactivar
           </button>
        </div>

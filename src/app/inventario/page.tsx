@@ -135,7 +135,7 @@ export default function InventarioPage() {
       showCancelButton: true,
       confirmButtonText: "Crear",
       cancelButtonText: "Cancelar",
-      confirmButtonColor: "#be185d",
+      confirmButtonColor: "#6d28d9",
       cancelButtonColor: "#6a6a6a",
       background: "#ffffff",
       color: "#222222",
@@ -158,7 +158,7 @@ export default function InventarioPage() {
         title: "Categoría creada",
         text: `Se creó "${result.data.name}"`,
         icon: "success",
-        confirmButtonColor: "#be185d",
+        confirmButtonColor: "#6d28d9",
         confirmButtonText: "Aceptar",
         background: "#ffffff",
         color: "#222222",
@@ -200,7 +200,7 @@ export default function InventarioPage() {
             <p className="text-red-700">{error}</p>
             <button
               onClick={() => window.location.reload()}
-              className="mt-2 px-3 py-1 bg-red-200 text-red-700 rounded hover:bg-red-300"
+              className="btn btn-secondary mt-2"
             >
               Reintentar
             </button>
@@ -231,21 +231,21 @@ export default function InventarioPage() {
                     setMoveStockProductId(null);
                     setMoveStockOpen(true);
                   }}
-                  className="px-4 min-h-[44px] rounded-xl brand-action text-sm font-medium touch-manipulation"
+                  className="btn btn-primary"
                 >
                   Mover Stock
                 </button>
                 <button
                   type="button"
                   onClick={() => setStockAdjustmentOpen(true)}
-                  className="px-4 min-h-[44px] rounded-xl brand-action text-sm font-medium touch-manipulation"
+                  className="btn btn-primary"
                 >
                   Entrada / Salida
                 </button>
                 <button
                   type="button"
                   onClick={() => setExportWizardOpen(true)}
-                  className="px-4 min-h-[44px] rounded-xl brand-action text-sm font-medium touch-manipulation"
+                  className="btn btn-primary"
                 >
                   Exportar
                 </button>

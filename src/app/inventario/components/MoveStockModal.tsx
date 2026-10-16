@@ -146,7 +146,7 @@ export const MoveStockModal = ({
       html: `<p>${summaryText}</p>`,
       icon: "warning",
       showCancelButton: true,
-      confirmButtonColor: "#be185d",
+      confirmButtonColor: "#6d28d9",
       cancelButtonColor: "#6a6a6a",
       background: "#ffffff",
       color: "#222222",
@@ -214,7 +214,7 @@ export const MoveStockModal = ({
           <button
             type="button"
             onClick={onClose}
-            className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full hover:bg-[#f2f2f2] transition-colors touch-manipulation"
+            className="btn btn-icon btn-round hover:bg-[#f2f2f2]"
             aria-label="Cerrar"
           >
             <svg
@@ -249,7 +249,7 @@ export const MoveStockModal = ({
               type="button"
               onClick={() => setStep(2)}
               disabled={sourceBranchId === null || loadingOrigin || error !== null || pending}
-              className="w-full min-h-[44px] mt-6 py-4 brand-gradient brand-gradient-hover text-gray-800 font-medium rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
+              className="btn btn-primary w-full mt-6"
             >
               Siguiente
             </button>
@@ -348,7 +348,7 @@ export const MoveStockModal = ({
               <button
                 type="button"
                 onClick={() => setStep(1)}
-                className="px-4 py-3 min-h-[44px] text-sm font-medium text-[#222222] bg-[#f8f8f8] rounded-xl hover:bg-[#f2f2f2] transition-colors touch-manipulation"
+                className="btn btn-secondary"
                 disabled={pending}
               >
                 Volver
@@ -357,7 +357,7 @@ export const MoveStockModal = ({
                 type="button"
                 onClick={handleSubmit}
                 disabled={!isValid || pending}
-                className="flex-1 py-4 min-h-[48px] brand-gradient brand-gradient-hover text-gray-800 font-medium rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
+                className="btn btn-primary flex-1"
               >
                 {pending ? "Moviendo…" : "Mover Stock"}
               </button>
