@@ -121,6 +121,23 @@ export interface SupabaseAuthAdminClient {
         error: { message: string } | null;
       }>;
       deleteUser(userId: string): Promise<{ error: { message: string } | null }>;
+      // Se usan para reusar el usuario de Auth que ya existía con ese email
+      // (el alta que quedó huérfana por una transacción revertida).
+      listUsers(params: { page: number; perPage: number }): Promise<{
+        data: { users?: { id: string; email?: string | null }[] } | null;
+        error: { message: string } | null;
+      }>;
+      updateUserById(
+        userId: string,
+        payload: {
+          password: string;
+          user_metadata: { name: string; branchId: number };
+          app_metadata: { role: "branch_user"; branchId: number };
+        }
+      ): Promise<{
+        data: { user?: { id: string } | null } | null;
+        error: { message: string } | null;
+      }>;
     };
   };
 }
@@ -141,11 +158,63 @@ export async function createBranchUser(
     app_metadata: { role: "branch_user", branchId },
   });
 
-  if (error || !data?.user?.id) {
+  if (data?.user?.id) {
+    return { id: data.user.id, error: null };
+  }
+
+  // Esta llamada ocurre dentro de la transacción de Prisma que crea la sucursal:
+  // si algo falla después, la transacción se revierte pero el usuario de Auth ya
+  // quedó creado en Supabase, así que el reintento choca con «a user with this
+  // email has already been registered». En vez de fallar, se **reusa** el usuario
+  // de ese email y se le corrigen la credencial y los metadatos: la contraseña
+  // temporal anterior nunca se le entregó a nadie.
+  const existenteId = await findBranchUserByEmail(client, email);
+  if (!existenteId) {
     return { id: null, error: error?.message ?? "No se pudo crear el usuario" };
   }
 
-  return { id: data.user.id, error: null };
+  const { data: preparado, error: errorPreparado } =
+    await client.auth.admin.updateUserById(existenteId, {
+      password,
+      user_metadata: { name, branchId },
+      app_metadata: { role: "branch_user", branchId },
+    });
+
+  if (errorPreparado || !preparado?.user?.id) {
+    return {
+      id: null,
+      error:
+        errorPreparado?.message ??
+        error?.message ??
+        "No se pudo preparar el usuario de la sucursal",
+    };
+  }
+
+  return { id: preparado.user.id, error: null };
+}
+
+/**
+ * Busca en Auth el usuario de ese email para poder reusarlo. `listUsers` pagina
+ * de a 200: se recorren las páginas hasta encontrarlo o hasta que no haya más.
+ */
+async function findBranchUserByEmail(
+  client: SupabaseAuthAdminClient,
+  email: string
+): Promise<string | null> {
+  const buscado = email.trim().toLowerCase();
+
+  for (let page = 1; page <= 20; page++) {
+    const { data, error } = await client.auth.admin.listUsers({ page, perPage: 200 });
+    if (error || !data?.users?.length) return null;
+
+    const encontrado = data.users.find(
+      (usuario) => usuario.email?.toLowerCase() === buscado
+    );
+    if (encontrado) return encontrado.id;
+    if (data.users.length < 200) return null;
+  }
+
+  return null;
 }
 
 /**
