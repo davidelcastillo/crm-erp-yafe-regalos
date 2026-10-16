@@ -11,9 +11,16 @@ export function AddClienteButton({ onAdd }: AddClienteButtonProps) {
   const handleAdd = async () => {
     const result = await Swal.fire({
       title: "Nuevo Cliente",
+      // Swal usa 32em de ancho por defecto: en un celular se sale de la pantalla.
+      width: 'min(92vw, 22rem)',
+      background: '#ffffff',
+      color: '#222222',
+      // Inputs propios (16px para que iOS no haga zoom al enfocar, 44px de alto).
       html: `
-        <input type="text" id="name" class="swal2-input" placeholder="Nombre">
-        <input type="text" id="surname" class="swal2-input" placeholder="Apellido">
+        <input type="text" id="name" placeholder="Nombre"
+          style="width:100%;min-height:44px;border-radius:0.75rem;background:#f8f8f8;border:1px solid #e5e5e5;padding:0.75rem;font-size:16px;color:#222222;" />
+        <input type="text" id="surname" placeholder="Apellido"
+          style="width:100%;min-height:44px;margin-top:0.75rem;border-radius:0.75rem;background:#f8f8f8;border:1px solid #e5e5e5;padding:0.75rem;font-size:16px;color:#222222;" />
       `,
       preConfirm: () => {
         const name = (document.getElementById("name") as HTMLInputElement)?.value;
