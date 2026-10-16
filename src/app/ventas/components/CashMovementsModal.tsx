@@ -220,7 +220,7 @@ export const CashMovementsModal = ({
             <div className="mt-4 grid grid-cols-3 gap-2 text-center">
               <div className="rounded-xl bg-[#f7f7f7] px-2 py-3">
                 <p className="text-xs text-[#6a6a6a]">Ingresos</p>
-                <p className="text-sm font-semibold text-[#008a05]">{plata(totales.ingresos)}</p>
+                <p className="text-sm font-semibold text-green-700">{plata(totales.ingresos)}</p>
               </div>
               <div className="rounded-xl bg-[#f7f7f7] px-2 py-3">
                 <p className="text-xs text-[#6a6a6a]">Egresos</p>
@@ -360,7 +360,7 @@ export const CashMovementsModal = ({
                     </div>
                     <span
                       className={`text-sm font-semibold whitespace-nowrap ${
-                        m.type === "INGRESO" ? "text-[#008a05]" : "text-[#c13515]"
+                        m.type === "INGRESO" ? "text-green-700" : "text-[#c13515]"
                       }`}
                     >
                       {m.type === "INGRESO" ? "+" : "-"}
