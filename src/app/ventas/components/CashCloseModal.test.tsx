@@ -83,8 +83,10 @@ describe("CashCloseModal", () => {
 
     await waitFor(() => expect(mockPreview).toHaveBeenCalledWith({ branchId: 1 }));
 
-    expect(await screen.findByText("$1200.00")).toBeInTheDocument();
-    expect(screen.getByText("$350.00")).toBeInTheDocument();
+    // El efectivo y la transferencia aparecen dos veces a propósito: en el detalle
+    // del corte y otra vez en el panel de «A retirar», que es lo que se lleva.
+    expect(await screen.findAllByText("$1200.00")).toHaveLength(2);
+    expect(screen.getAllByText("$350.00")).toHaveLength(2);
     expect(screen.getByText("$1550.00")).toBeInTheDocument();
     expect(screen.queryByText(/Mixto/)).not.toBeInTheDocument();
   });
@@ -170,8 +172,12 @@ describe("CashCloseModal — layout de escritorio", () => {
     const tarjeta = cerrar.closest('[class*="rounded-2xl"]');
     expect(tarjeta).not.toBeNull();
     expect(tarjeta).toHaveClass("rounded-2xl", "border-black/10", "bg-[#f7f7f7]", "p-4");
-    expect(tarjeta).toHaveTextContent("Principal");
-    expect(tarjeta).toHaveTextContent("Es el primer cierre de esta sucursal");
+    // El número que importa va en su propio panel, con la acción.
+    expect(tarjeta).toHaveTextContent("A retirar");
+    expect(tarjeta).toHaveTextContent("Efectivo del período");
+    // La sucursal y el período van arriba, para que las dos columnas arranquen alineadas.
+    const periodo = screen.getByText(/Es el primer cierre de esta sucursal/);
+    expect(periodo.parentElement).toHaveTextContent("Principal");
   });
 
   it("no estira «Continuar» a lo ancho del panel desde `md`", () => {

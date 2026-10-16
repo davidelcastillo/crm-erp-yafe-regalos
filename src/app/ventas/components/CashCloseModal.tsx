@@ -175,74 +175,105 @@ export const CashCloseModal = ({
         {/* Paso 2: en celular sigue siendo una sola columna con el botón al final;
             desde `md` los totales a la izquierda y la tarjeta del corte a la derecha. */}
         {resumen && !loading && (
-          <div className="mt-4 md:grid md:grid-cols-2 md:gap-6 md:items-start">
-            <div className="space-y-2">
-              {resumen.cashTotal > 0 && (
-                <div className="flex items-center justify-between gap-3 rounded-xl bg-[#f7f7f7] px-4 py-3">
-                  <span className="text-sm text-[#222222]">Efectivo a retirar</span>
-                  <span className="text-sm font-semibold text-green-700">
-                    {plata(resumen.cashTotal)}
-                  </span>
-                </div>
-              )}
-
-              {resumen.transferTotal > 0 && (
-                <div className="flex items-center justify-between gap-3 rounded-xl bg-[#f7f7f7] px-4 py-3">
-                  <span className="text-sm text-[#222222]">Transferencia a verificar</span>
-                  <span className="text-sm font-semibold text-green-700">
-                    {plata(resumen.transferTotal)}
-                  </span>
-                </div>
-              )}
-
-              {resumen.mixedTotal > 0 && (
-                <div className="rounded-xl bg-[#f7f7f7] px-4 py-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-sm text-[#222222]">Mixto</span>
-                    <span className="text-sm font-semibold text-green-700">
-                      {plata(resumen.mixedTotal)}
-                    </span>
-                  </div>
-                  <p className="mt-1 text-xs text-[#6a6a6a]">
-                    La venta no guarda cuánto fue de cada medio: verificá el total aparte.
-                  </p>
-                </div>
-              )}
-
-              <div className="flex items-center justify-between gap-3 rounded-xl bg-[#f2f2f2] px-4 py-3">
-                <span className="text-sm font-medium text-[#222222]">Total de ventas</span>
-                <span className="text-sm font-semibold text-[#222222]">
-                  {plata(resumen.total)}
-                </span>
-              </div>
-              <p className="text-xs text-[#6a6a6a]">
-                {resumen.salesCount} {resumen.salesCount === 1 ? "venta" : "ventas"} desde el
-                último cierre
-              </p>
-            </div>
-
-            {/* Dentro de un modal (blanco) el vidrio no se distingue: la tarjeta va
-                con fondo propio y un borde un poco más marcado. */}
-            <div className="mt-4 rounded-2xl border border-black/10 bg-[#f7f7f7] p-4 md:mt-0">
+          <>
+            {/* Contexto del corte, arriba de las columnas para que las dos
+                arranquen alineadas. */}
+            <div className="mt-4">
               <p className="text-sm font-semibold text-[#222222] break-words">
                 {resumen.branchName}
               </p>
-              <p className="mt-1 text-xs text-[#6a6a6a]">
+              <p className="mt-0.5 text-xs text-[#6a6a6a]">
                 {resumen.since
                   ? `Ventas desde el último cierre (${fechaCierre(resumen.since)})`
                   : "Es el primer cierre de esta sucursal"}
               </p>
-
-              <button
-                type="button"
-                onClick={handleConfirmar}
-                disabled={pending}
-                className="btn btn-primary mt-4 w-full md:mt-6"
-              >
-                {pending ? "Cerrando..." : "Cerrar caja"}
-              </button>
             </div>
-          </div>
+
+            <div className="mt-4 md:grid md:grid-cols-2 md:gap-5 md:items-start">
+              {/* Detalle del corte: etiqueta chica y montos alineados a la derecha. */}
+              <section className="rounded-2xl border border-black/10 bg-[#f7f7f7] p-4">
+                <h3 className="text-xs font-medium uppercase tracking-wide text-[#6a6a6a]">
+                  Detalle del corte
+                </h3>
+
+                <dl className="mt-3 space-y-2">
+                  {resumen.cashTotal > 0 && (
+                    <div className="flex items-baseline justify-between gap-4">
+                      <dt className="text-sm text-[#3f3f3f]">Efectivo</dt>
+                      <dd className="text-sm font-semibold text-[#222222] tabular-nums">
+                        {plata(resumen.cashTotal)}
+                      </dd>
+                    </div>
+                  )}
+
+                  {resumen.transferTotal > 0 && (
+                    <div className="flex items-baseline justify-between gap-4">
+                      <dt className="text-sm text-[#3f3f3f]">Transferencia</dt>
+                      <dd className="text-sm font-semibold text-[#222222] tabular-nums">
+                        {plata(resumen.transferTotal)}
+                      </dd>
+                    </div>
+                  )}
+
+                  {resumen.mixedTotal > 0 && (
+                    <div className="flex items-baseline justify-between gap-4">
+                      <dt className="text-sm text-[#3f3f3f]">
+                        Mixto
+                        <span className="block text-xs text-[#6a6a6a]">
+                          La venta no guarda cuánto fue de cada medio: verificá ese total aparte.
+                        </span>
+                      </dt>
+                      <dd className="text-sm font-semibold text-[#222222] tabular-nums">
+                        {plata(resumen.mixedTotal)}
+                      </dd>
+                    </div>
+                  )}
+                </dl>
+
+                <div className="mt-3 flex items-baseline justify-between gap-4 border-t border-black/10 pt-3">
+                  <span className="text-sm font-medium text-[#222222]">Total de ventas</span>
+                  <span className="text-base font-semibold text-[#222222] tabular-nums">
+                    {plata(resumen.total)}
+                  </span>
+                </div>
+
+                <p className="mt-2 text-xs text-[#6a6a6a]">
+                  {resumen.salesCount} {resumen.salesCount === 1 ? "venta" : "ventas"} desde el
+                  último cierre
+                </p>
+              </section>
+
+              {/* Lo que se retira: el número que importa, grande, y la acción. */}
+              <section className="mt-4 rounded-2xl border border-black/10 bg-[#f7f7f7] p-4 md:mt-0">
+                <h3 className="text-xs font-medium uppercase tracking-wide text-[#6a6a6a]">
+                  A retirar
+                </h3>
+                <p className="mt-1 text-3xl font-bold text-[#222222] tabular-nums">
+                  {plata(resumen.cashTotal)}
+                </p>
+                <p className="mt-1 text-xs text-[#6a6a6a]">Efectivo del período</p>
+
+                {resumen.transferTotal > 0 && (
+                  <p className="mt-3 text-sm text-[#3f3f3f]">
+                    Verificá{" "}
+                    <span className="font-semibold tabular-nums">
+                      {plata(resumen.transferTotal)}
+                    </span>{" "}
+                    por transferencia
+                  </p>
+                )}
+
+                <button
+                  type="button"
+                  onClick={handleConfirmar}
+                  disabled={pending}
+                  className="btn btn-primary mt-4 w-full"
+                >
+                  {pending ? "Cerrando..." : "Cerrar caja"}
+                </button>
+              </section>
+            </div>
+          </>
         )}
       </div>
     </div>
