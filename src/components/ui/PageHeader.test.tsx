@@ -12,13 +12,18 @@
  * fija es el contrato: el menú es un diálogo aparte que se abre, se cierra y
  * lleva el cierre de sesión.
  */
-import { render, screen, fireEvent, within } from "@testing-library/react";
+import { render, screen, fireEvent, within, waitFor } from "@testing-library/react";
 import { PageHeader } from "./PageHeader";
 
 const mockLogout = jest.fn();
 
-jest.mock("@/hooks/useAuth", () => ({
-  useAuth: () => ({ user: { email: "admin@feriaconexx.com" }, logout: mockLogout }),
+jest.mock("@/actions/auth", () => ({
+  logout: (...args: unknown[]) => mockLogout(...args),
+}));
+
+const mockPush = jest.fn();
+jest.mock("next/navigation", () => ({
+  useRouter: () => ({ push: mockPush, refresh: jest.fn() }),
 }));
 
 const renderHeader = () =>
@@ -27,7 +32,10 @@ const renderHeader = () =>
       title="Ventas"
       actions={<button type="button">Acción de escritorio</button>}
       right={<span>Sucursal activa</span>}
-      menuItems={[{ label: "Ver movimientos", onClick: jest.fn() }]}
+      menuItems={[
+        { label: "Ver movimientos", onClick: jest.fn() },
+        { label: "Inactivos", href: "/inventario/inactivos" },
+      ]}
     />
   );
 
@@ -67,14 +75,26 @@ describe("PageHeader", () => {
   });
 
   it("cerrar sesión llama a logout y cierra el menú", async () => {
-    mockLogout.mockResolvedValue(undefined);
+    mockLogout.mockResolvedValue({ success: true, redirectTo: "/login" });
     renderHeader();
 
     fireEvent.click(screen.getByLabelText("Abrir menú"));
     fireEvent.click(within(menu()).getByRole("button", { name: "Cerrar sesión" }));
 
-    expect(mockLogout).toHaveBeenCalled();
+    await waitFor(() => expect(mockLogout).toHaveBeenCalled());
+    expect(mockPush).toHaveBeenCalledWith("/login");
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("una fila de navegación es un link real al destino", () => {
+    renderHeader();
+
+    fireEvent.click(screen.getByLabelText("Abrir menú"));
+
+    expect(within(menu()).getByRole("link", { name: "Inactivos" })).toHaveAttribute(
+      "href",
+      "/inventario/inactivos"
+    );
   });
 
   it("una fila del menú se cierra al tocarla y dispara su acción", () => {

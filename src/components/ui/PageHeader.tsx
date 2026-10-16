@@ -1,7 +1,9 @@
 "use client";
 
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
-import { useAuth } from "@/hooks/useAuth";
+import { logout } from "@/actions/auth";
 
 /**
  * Encabezado de página del rebranding: una sola fila en mobile (botón ☰, título
@@ -14,8 +16,10 @@ import { useAuth } from "@/hooks/useAuth";
  */
 export interface PageMenuItem {
   label: string;
-  onClick: () => void;
   icon?: ReactNode;
+  /** Fila de navegación (link real) o de acción: se pasa una de las dos. */
+  href?: string;
+  onClick?: () => void;
 }
 
 export interface PageHeaderProps {
@@ -30,7 +34,7 @@ export interface PageHeaderProps {
 
 export const PageHeader = ({ title, actions, right, menuItems = [] }: PageHeaderProps) => {
   const [isOpen, setIsOpen] = useState(false);
-  const { logout } = useAuth();
+  const router = useRouter();
 
   // Escape cierra el menú, igual que los modales.
   useEffect(() => {
@@ -46,7 +50,11 @@ export const PageHeader = ({ title, actions, right, menuItems = [] }: PageHeader
   const handleLogout = async () => {
     setIsOpen(false);
     await logout();
+    router.push("/login");
   };
+
+  const menuItemClass =
+    "flex min-h-[48px] items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium text-[#222222] hover:bg-white/60 transition-colors touch-manipulation";
 
   return (
     <>
@@ -110,24 +118,40 @@ export const PageHeader = ({ title, actions, right, menuItems = [] }: PageHeader
             </div>
 
             <nav className="flex flex-col gap-1">
-              {menuItems.map((item) => (
-                <button
-                  key={item.label}
-                  type="button"
-                  onClick={() => {
-                    setIsOpen(false);
-                    item.onClick();
-                  }}
-                  className="flex min-h-[48px] items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium text-[#222222] hover:bg-white/60 transition-colors touch-manipulation"
-                >
-                  {item.icon && (
-                    <span className="text-[#6a6a6a]" aria-hidden="true">
-                      {item.icon}
-                    </span>
-                  )}
-                  {item.label}
-                </button>
-              ))}
+              {menuItems.map((item) =>
+                item.href ? (
+                  <Link
+                    key={item.label}
+                    href={item.href}
+                    onClick={() => setIsOpen(false)}
+                    className={menuItemClass}
+                  >
+                    {item.icon && (
+                      <span className="text-[#6a6a6a]" aria-hidden="true">
+                        {item.icon}
+                      </span>
+                    )}
+                    {item.label}
+                  </Link>
+                ) : (
+                  <button
+                    key={item.label}
+                    type="button"
+                    onClick={() => {
+                      setIsOpen(false);
+                      item.onClick?.();
+                    }}
+                    className={menuItemClass}
+                  >
+                    {item.icon && (
+                      <span className="text-[#6a6a6a]" aria-hidden="true">
+                        {item.icon}
+                      </span>
+                    )}
+                    {item.label}
+                  </button>
+                )
+              )}
 
               <button
                 type="button"
