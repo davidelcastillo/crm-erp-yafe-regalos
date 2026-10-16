@@ -26,15 +26,13 @@ export interface PageHeaderProps {
   title: string;
   /** Acciones de la página: visibles en la barra desde desktop. */
   actions?: ReactNode;
-  /** Contenido siempre visible a la derecha del título. */
+  /** Contenido a la derecha del título: en un celular baja a su propia línea. */
   right?: ReactNode;
-  /** Fila propia debajo del título: el lugar del selector de sucursal. */
-  below?: ReactNode;
   /** Filas extra del menú ☰ (el cierre de sesión va siempre al final). */
   menuItems?: PageMenuItem[];
 }
 
-export const PageHeader = ({ title, actions, right, below, menuItems = [] }: PageHeaderProps) => {
+export const PageHeader = ({ title, actions, right, menuItems = [] }: PageHeaderProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const router = useRouter();
 
@@ -61,7 +59,8 @@ export const PageHeader = ({ title, actions, right, below, menuItems = [] }: Pag
   return (
     <>
       <header className="px-3 pt-6">
-        <div className="flex items-center gap-3 rounded-2xl glass-strong px-4 py-3">
+        {/* En mobile el contenido de la derecha se envuelve a su propia línea. */}
+        <div className="flex flex-wrap items-center gap-3 rounded-2xl glass-strong px-4 py-3">
           <button
             type="button"
             onClick={() => setIsOpen(true)}
@@ -76,21 +75,18 @@ export const PageHeader = ({ title, actions, right, below, menuItems = [] }: Pag
 
           <h1 className="flex-1 text-2xl font-bold text-[#222222]">{title}</h1>
 
-          {right}
+          {right && <div className="w-full md:w-auto">{right}</div>}
 
           {actions && <div className="hidden md:flex items-center gap-2">{actions}</div>}
 
           <button
             type="button"
             onClick={handleLogout}
-            className="hidden md:flex px-4 min-h-[44px] items-center text-sm font-medium text-[#3f3f3f] bg-white/60 rounded-xl hover:bg-white/80 transition-colors touch-manipulation"
+            className="hidden md:flex px-4 min-h-[44px] items-center text-sm font-medium text-[#3f3f3f] bg-[#f2f2f2] rounded-xl hover:bg-[#e5e5e5] transition-colors touch-manipulation"
           >
             Cerrar sesión
           </button>
         </div>
-
-        {/* Fila propia: en un celular chico el selector no entra junto al título. */}
-        {below && <div className="mt-3">{below}</div>}
       </header>
 
       {isOpen && (

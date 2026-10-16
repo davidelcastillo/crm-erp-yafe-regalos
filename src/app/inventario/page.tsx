@@ -135,7 +135,7 @@ export default function InventarioPage() {
       showCancelButton: true,
       confirmButtonText: "Crear",
       cancelButtonText: "Cancelar",
-      confirmButtonColor: "#ff385c",
+      confirmButtonColor: "#be185d",
       cancelButtonColor: "#6a6a6a",
       background: "#ffffff",
       color: "#222222",
@@ -158,7 +158,7 @@ export default function InventarioPage() {
         title: "Categoría creada",
         text: `Se creó "${result.data.name}"`,
         icon: "success",
-        confirmButtonColor: "#ff385c",
+        confirmButtonColor: "#be185d",
         confirmButtonText: "Aceptar",
         background: "#ffffff",
         color: "#222222",
@@ -168,7 +168,7 @@ export default function InventarioPage() {
         title: "Error",
         text: result.error ?? "No se pudo crear la categoría",
         icon: "error",
-        confirmButtonColor: "#ff385c",
+        confirmButtonColor: "#dc2626",
         confirmButtonText: "Aceptar",
         background: "#ffffff",
         color: "#222222",
@@ -216,7 +216,7 @@ export default function InventarioPage() {
         <div className="pb-16 brand-gradient">
           <PageHeader
             title="Inventario"
-            below={
+            right={
               <BranchFilterDropdown
                 selectedId={branchId}
                 onValueChange={setBranchId}
@@ -231,21 +231,21 @@ export default function InventarioPage() {
                     setMoveStockProductId(null);
                     setMoveStockOpen(true);
                   }}
-                  className="px-4 min-h-[44px] rounded-xl brand-gradient brand-gradient-hover text-sm font-medium text-gray-800 touch-manipulation"
+                  className="px-4 min-h-[44px] rounded-xl brand-action text-sm font-medium touch-manipulation"
                 >
                   Mover Stock
                 </button>
                 <button
                   type="button"
                   onClick={() => setStockAdjustmentOpen(true)}
-                  className="px-4 min-h-[44px] rounded-xl brand-gradient brand-gradient-hover text-sm font-medium text-gray-800 touch-manipulation"
+                  className="px-4 min-h-[44px] rounded-xl brand-action text-sm font-medium touch-manipulation"
                 >
                   Entrada / Salida
                 </button>
                 <button
                   type="button"
                   onClick={() => setExportWizardOpen(true)}
-                  className="px-4 min-h-[44px] rounded-xl brand-gradient brand-gradient-hover text-sm font-medium text-gray-800 touch-manipulation"
+                  className="px-4 min-h-[44px] rounded-xl brand-action text-sm font-medium touch-manipulation"
                 >
                   Exportar
                 </button>

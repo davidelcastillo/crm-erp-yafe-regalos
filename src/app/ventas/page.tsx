@@ -128,7 +128,7 @@ export default function VentasPage() {
         <div className="pb-16 brand-gradient">
           <PageHeader
             title="Ventas"
-            below={
+            right={
               <BranchSelector
                 block
                 onChange={(id) => setBranchId(id)}
@@ -140,14 +140,14 @@ export default function VentasPage() {
                 <button
                   type="button"
                   onClick={() => setCashModalOpen(true)}
-                  className="px-4 min-h-[44px] rounded-xl brand-gradient brand-gradient-hover text-sm font-medium text-gray-800 touch-manipulation"
+                  className="px-4 min-h-[44px] rounded-xl brand-action text-sm font-medium touch-manipulation"
                 >
                   Caja
                 </button>
                 <button
                   type="button"
                   onClick={() => setCloseModalOpen(true)}
-                  className="px-4 min-h-[44px] rounded-xl brand-gradient brand-gradient-hover text-sm font-medium text-gray-800 touch-manipulation"
+                  className="px-4 min-h-[44px] rounded-xl brand-action text-sm font-medium touch-manipulation"
                 >
                   Cerrar caja
                 </button>
@@ -197,7 +197,7 @@ export default function VentasPage() {
                   placeholder="Buscar producto..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="w-full min-h-[44px] pl-12 pr-4 py-3 bg-[#f8f8f8] rounded-xl text-base text-[#222222] placeholder-[#929292] focus:outline-none focus:ring-2 focus:ring-[#ff385c]/20 touch-manipulation"
+                  className="w-full min-h-[44px] pl-12 pr-4 py-3 bg-[#f8f8f8] rounded-xl text-base text-[#222222] placeholder-[#929292] focus:outline-none focus:ring-2 focus:ring-[#ec4899]/30 touch-manipulation"
                   aria-label="Buscar producto"
                   autoComplete="off"
                 />
@@ -234,7 +234,7 @@ export default function VentasPage() {
                     type="button"
                     onClick={loadMore}
                     disabled={loadingMore}
-                    className="w-full sm:w-auto px-6 min-h-[44px] text-sm font-medium text-white bg-[#ff385c] rounded-xl hover:bg-[#e00b41] transition-colors touch-manipulation disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full sm:w-auto px-6 min-h-[44px] text-sm font-medium brand-action rounded-xl transition-colors touch-manipulation disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {loadingMore ? 'Cargando...' : 'Cargar más'}
                   </button>

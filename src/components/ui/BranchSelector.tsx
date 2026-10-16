@@ -15,7 +15,7 @@ type BranchSelectorProps = {
   label?: string;
   /** Controlled value (branchId). If provided, the component does not write to BranchContext. */
   value?: number | null;
-  /** Ocupa todo el ancho: para cuando va solo en su propia fila (mobile). */
+  /** Ocupa todo el ancho en mobile (su propia línea); en desktop se ajusta al contenido. */
   block?: boolean;
 };
 
@@ -76,12 +76,16 @@ export function BranchSelector({
   return (
     <div
       className={`relative inline-flex min-w-0 flex-col gap-1 ${
-        block ? "w-full" : "max-w-full"
+        block ? "w-full md:w-auto" : "max-w-full"
       }`}
       ref={ref}
     >
       {label && (
-        <span className={`text-xs text-[#6a6a6a] font-medium ${block ? "block" : "hidden sm:block"}`}>
+        <span
+          className={`text-xs text-[#6a6a6a] font-medium ${
+            block ? "block md:hidden" : "hidden sm:block"
+          }`}
+        >
           {label}
         </span>
       )}

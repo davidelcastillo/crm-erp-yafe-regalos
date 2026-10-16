@@ -61,7 +61,7 @@ export default function ComprasPage() {
         <div className="pb-16 brand-gradient">
         <PageHeader
           title="Compras"
-          below={
+          right={
             <BranchSelector
               block
               onChange={(id) => setBranchId(id)}
