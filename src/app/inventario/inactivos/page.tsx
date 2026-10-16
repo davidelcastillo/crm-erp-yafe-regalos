@@ -34,7 +34,7 @@ export default function InactivosPage() {
       } else {
         setError(result.error || 'Error loading products');
       }
-    } catch (err) {
+    } catch {
       setError('Error loading products');
     } finally {
       setLoading(false);

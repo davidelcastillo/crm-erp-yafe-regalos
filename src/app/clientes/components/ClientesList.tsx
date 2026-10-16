@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from "react";
 import { Customer } from "@prisma/client";
-import { createCustomer } from "@/app/actions/customer";
 import { ClienteCard } from "./ClienteCard";
 
 interface ClientesListProps {

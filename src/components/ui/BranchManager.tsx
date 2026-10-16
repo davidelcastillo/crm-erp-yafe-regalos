@@ -371,7 +371,7 @@ export function BranchManager({ branches }: { branches: Branch[] }) {
                           color: BRANCH_STATUS_TONES.principal.color,
                         }}
                       >
-                        Principal
+                        {BRANCH_STATUS_TONES.principal.label}
                       </span>
                     )}
                     {!branch.isActive && (
@@ -382,7 +382,7 @@ export function BranchManager({ branches }: { branches: Branch[] }) {
                           color: BRANCH_STATUS_TONES.inactive.color,
                         }}
                       >
-                        Inactiva
+                        {BRANCH_STATUS_TONES.inactive.label}
                       </span>
                     )}
                     {branch.isPublic === true && (
@@ -393,7 +393,7 @@ export function BranchManager({ branches }: { branches: Branch[] }) {
                           color: BRANCH_STATUS_TONES.public.color,
                         }}
                       >
-                        Pública
+                        {BRANCH_STATUS_TONES.public.label}
                       </span>
                     )}
                   </div>

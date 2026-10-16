@@ -1,4 +1,4 @@
-import { getCustomers, getCustomerById } from "../actions/customer";
+import { getCustomers } from "../actions/customer";
 import { ClientesList } from "./components/ClientesList";
 import { AddClienteButton } from "./components/AddClienteButton";
 import { PageHeader } from "@/components/ui/PageHeader";

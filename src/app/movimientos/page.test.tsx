@@ -66,13 +66,14 @@ describe('MovimientosPage', () => {
     expect(screen.queryByText('No hay movimientos')).not.toBeInTheDocument();
   });
 
-  it('muestra el error del servidor cuando falla la carga', async () => {
+  it('muestra el error del servidor cuando falla la carga, sin el vacío encima', async () => {
     mockGetBranchMovements.mockResolvedValue({ success: false, error: 'No se pudo conectar' });
 
     render(<MovimientosPage />);
 
-    // El error sigue visible arriba de la lista (el vacío actual también se
-    // muestra: es el comportamiento que ya tenía la página).
+    // Con el error no se muestra además «No hay movimientos»: serían dos mensajes
+    // contradictorios para la misma pantalla.
     expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo conectar');
+    expect(screen.queryByText('No hay movimientos')).not.toBeInTheDocument();
   });
 });

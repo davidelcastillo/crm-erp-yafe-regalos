@@ -2,7 +2,6 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { getBranchMovements } from '@/app/actions/inventory';
 import type { BranchMovement } from '@prisma/client';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -16,7 +15,6 @@ type MovementRow = BranchMovement & {
 };
 
 export default function MovementsPage() {
-  const router = useRouter();
   const [movements, setMovements] = useState<MovementRow[]>([]);
   // Arranca en carga para mostrar los esqueletos en el primer render, en vez de
   // un "No hay movimientos" que aparece y desaparece.
@@ -32,7 +30,7 @@ export default function MovementsPage() {
       } else {
         setError(result.error || 'Error loading movements');
       }
-    } catch (err) {
+    } catch {
       setError('Error loading movements');
     } finally {
       setLoading(false);
@@ -92,6 +90,7 @@ export default function MovementsPage() {
             </div>
           )}
 
+          {/* Con error no se encima el vacío: el alert de arriba ya explica la falla. */}
           {loading ? (
             <div className="pt-2">
               <Spinner label="Cargando movimientos..." />
@@ -101,7 +100,7 @@ export default function MovementsPage() {
                 <CardSkeleton />
               </div>
             </div>
-          ) : movements.length === 0 ? (
+          ) : error && movements.length === 0 ? null : movements.length === 0 ? (
             <div className="text-center py-12">
               <div className="w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center">
                 <svg
