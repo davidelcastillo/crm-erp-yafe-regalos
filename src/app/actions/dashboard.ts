@@ -27,12 +27,8 @@ async function fetchStats(where: Record<string, unknown> = {}) {
     where,
   });
 
-  // Get all customer debt (global - not branch-scoped, customer debt is per customer not per branch)
-  const customers = await prisma.customer.aggregate({
-    _sum: { totalBalance: true },
-  });
-
-  // Or get pending balance from sales (branch-scoped)
+  // Cuentas por cobrar: pendiente generado en el período y la sucursal filtrados.
+  // Antes sumaba la deuda global de clientes, que no sigue el filtro (bug 4).
   const pendingSales = await prisma.sale.aggregate({
     _sum: { pendingBalance: true },
     where,
@@ -42,7 +38,7 @@ async function fetchStats(where: Record<string, unknown> = {}) {
   const totalIncome = Number(sales._sum.totalAmount || 0);
   const totalExpense = Number(purchases._sum.totalAmount || 0);
   const netProfit = totalIncome - totalExpense;
-  const accountsReceivable = Number(customers._sum.totalBalance || 0) + Number(pendingSales._sum.pendingBalance || 0);
+  const accountsReceivable = Number(pendingSales._sum.pendingBalance || 0);
 
   return {
     totalIncome,

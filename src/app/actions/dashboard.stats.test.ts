@@ -23,7 +23,10 @@ const haceVeinteDias = aFechaLocal(new Date(Date.now() - 20 * 24 * 60 * 60 * 100
 
 const sufijo = Math.floor(1000 + Math.random() * 9000)
 let branchId = 0
+let customerId = 0
 const ventasIds: number[] = []
+
+const PENDIENTE_DE_HOY = 30
 
 const ingresos = async (parametros: Record<string, unknown>) => {
   const resultado = await getStats({ branchId, ...parametros })
@@ -44,9 +47,22 @@ describe('getStats por período (integración, base local)', () => {
     })
     branchId = branch.id
 
+    const cliente = await prisma.customer.create({
+      data: { name: 'QA dashboard', surname: `cobrar ${sufijo}`, totalBalance: 1000 },
+    })
+    customerId = cliente.id
+
     const ventas = await Promise.all([
+      // Venta de hoy cobrada a medias: genera deuda en el período.
       prisma.sale.create({
-        data: { branchId, totalAmount: 100, amountPaid: 100, paymentMethod: 'EFECTIVO' },
+        data: {
+          branchId,
+          customerId: cliente.id,
+          totalAmount: 100,
+          amountPaid: 100 - PENDIENTE_DE_HOY,
+          pendingBalance: PENDIENTE_DE_HOY,
+          paymentMethod: 'MIXTO',
+        },
       }),
       prisma.sale.create({
         data: {
@@ -63,6 +79,7 @@ describe('getStats por período (integración, base local)', () => {
 
   afterAll(async () => {
     await prisma.sale.deleteMany({ where: { id: { in: ventasIds } } })
+    await prisma.customer.deleteMany({ where: { id: customerId } })
     await prisma.branch.deleteMany({ where: { id: branchId } })
     await prisma.$disconnect()
   })
@@ -89,5 +106,19 @@ describe('getStats por período (integración, base local)', () => {
       endDate: hoy,
     })
     expect(resultado.success).toBe(false)
+  })
+
+  // Bug 4 del usuario: la tarjeta de cuentas por cobrar tambien sigue el filtro.
+  it('cuentas por cobrar cuenta el pendiente del período, no la deuda global', async () => {
+    const resultado = await getStats({
+      branchId,
+      type: 'custom',
+      startDate: hoy,
+      endDate: hoy,
+    })
+    expect(resultado.success).toBe(true)
+    expect((resultado.data as { accountsReceivable: number }).accountsReceivable).toBe(
+      PENDIENTE_DE_HOY
+    )
   })
 })
