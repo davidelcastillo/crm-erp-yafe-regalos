@@ -530,11 +530,36 @@ El rebranding reemplaza el rojo `#ff385c` (que sigue existiendo como legado, pen
 - Sobre el degradé fuerte, blanco da **3,5–3,9:1**: alcanza para texto grande en negrita o para íconos (piso 3:1), **no** para una etiqueta de 14 px.
 - Superficies de vidrio: `.glass` (blanco 70 % + blur 24 px) para el cuerpo de las páginas y las tarjetas; `.glass-strong` (blanco 80 % + blur 16 px) para barras y píldoras del encabezado. Van **sobre el degradé**, nunca sobre blanco puro: ahí no se distinguen del fondo.
 
+### Tonos con contraste verificado
+
+Estos son los tonos que ya se usan en el sistema y el contraste que alcanzan sobre las superficies claras del proyecto (`glass`, `#f2f2f2`, `#f8f8f8`). Se usan **estos**, no otros parecidos: cada uno está elegido por su ratio, no por gusto.
+
+| Uso | Tono | Contraste |
+|---|---|---|
+| Texto normal y títulos | `#222222` | 15:1 |
+| Texto secundario | `#6a6a6a` | 5,7:1 |
+| Saldo a favor / positivo | `#15803d` | 4,7:1 |
+| Deuda / negativo | `#b91c1c` | 4,8:1 |
+| Atención (stock bajo, «con deuda») | `#b45309` | 5,0:1 |
+| Error de formulario | `#c13515` | 5,2:1 |
+| Banner de error (fondo `#ffe4ea`) | `#8f0020` | 8,0:1 |
+| Confirmar en un diálogo | `#be185d` (o el `brand-action`) | 6,0:1 con blanco |
+| Error en un diálogo | `#dc2626` | 4,8:1 con blanco |
+
+- **Ningún verde ni ámbar brillante para texto**: `#22c55e` da 2,3:1 con texto blanco y `#f59e0b` 2,2:1 sobre claro. Si el diseño pide «más vivo», el color va en un **punto o ícono grande**, no en el texto.
+- Un estado nunca se comunica solo por color: siempre lleva su palabra.
+
+### Tablas en celular
+
+Una tabla de escritorio se reemplaza por **cards** en mobile (`md:hidden` para las cards, `hidden md:block` para la tabla) con los mismos datos. Si se mantiene la tabla, va dentro de un contenedor con `overflow-x-auto`; lo que **no** se permite es que la página entera haga scroll horizontal.
+
 ### Encabezado de página y acciones
 
 - Una sola fila en mobile: botón **☰**, título y, si hace falta, el selector de sucursal (`PageHeader`).
 - Las **acciones de la página** (por ejemplo «Caja» y «Cerrar caja») van como **tarjetas de vidrio** debajo del encabezado en mobile (`ActionCard`) y como botones dentro de la barra desde desktop (`actions`). No se esconden en el menú: son la razón por la que se entra a la página.
 - El **cierre de sesión** vive dentro del menú ☰ en mobile y visible en la barra en desktop; va en gris (`bg-[#f2f2f2]`), no compite con las acciones de marca.
+- **Ojo con las acciones del encabezado**: el slot `actions` se muestra **solo desde desktop** (es `hidden md:flex`). Toda acción que solo esté ahí es inalcanzable en el teléfono: o se duplica como `ActionCard` en la banda, o se pasa también en `menuItems`. Es el error más fácil de cometer al migrar una página.
+- En una **página de detalle o formulario** (no una lista) alcanza con el menú: las acciones van en `actions` (desktop) **y** en `menuItems` (mobile).
 - El **selector de sucursal** va en su propia línea en mobile (ancho completo) y **al nivel del título desde desktop**: la barra del encabezado envuelve (`flex-wrap`) y el contenido de la derecha es `w-full md:w-auto`.
 - Elegir una sucursal dentro de un modal se hace con **`BranchPicker`** (cards, `aria-pressed`, anillo de marca en la elegida, `disabledIds` para las excluidas), no con un `<select>`. Excepción: cuando la sucursal es **por línea** (una compra que se reparte entre sucursales, `AddPurchaseButton`) sigue siendo un `<select>` por ítem, porque una lista de cards por línea es peor de usar.
 - El menú es mobile-only (`md:hidden`) y se cierra con Escape, con el botón ✕ o tocando el fondo; sus filas tienen 48 px de alto.
@@ -544,6 +569,8 @@ El rebranding reemplaza el rojo `#ff385c` (que sigue existiendo como legado, pen
 - Mientras carga una página se muestra la banda de marca, la hoja de vidrio y **esqueletos** con la forma de lo que va a llegar (`Spinner` + `CardSkeleton`), para que la página no salte al terminar.
 - La ruedita es una sola en todo el sistema (`Spinner`, anillo rosa) y se anuncia como estado (`role="status"` con etiqueta). Los esqueletos son decorativos (`aria-hidden`).
 - Nada de spinners hechos a mano por página ni de `Cargando...` suelto: se usan los componentes compartidos.
+- En una página **cliente**, el estado de carga arranca en `true` (si arranca en `false`, el primer render muestra el vacío y la lista aparece después: la página salta). En una página **servidor**, el equivalente es un `loading.tsx` de la ruta, con la misma estructura de banda, hoja, ruedita y esqueletos.
+- El estado de error visible usa `role="alert"` y el par `#ffe4ea` / `#8f0020`.
 
 ### Listas y cards en celulares chicos
 
