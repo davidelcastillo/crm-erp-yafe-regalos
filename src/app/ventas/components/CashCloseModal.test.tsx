@@ -107,3 +107,32 @@ describe("CashCloseModal", () => {
     expect(onClose).toHaveBeenCalled();
   });
 });
+
+// Sistema de botones (`globals.css`): cada paso del modal tiene una sola acción
+// principal y el ✕ es el cuadrado de ícono del sistema.
+describe("CashCloseModal — variantes del sistema de botones", () => {
+  it("«Continuar» es el primario del primer paso y el ✕ el ícono redondo", () => {
+    renderModal();
+
+    expect(screen.getByRole("button", { name: "Continuar" })).toHaveClass(
+      "btn",
+      "btn-primary"
+    );
+    expect(screen.getByRole("button", { name: "Cerrar" })).toHaveClass(
+      "btn",
+      "btn-icon",
+      "btn-round"
+    );
+  });
+
+  it("«Cerrar caja» es el primario del paso de confirmación", async () => {
+    renderModal();
+
+    fireEvent.click(screen.getByRole("button", { name: "Principal" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
+
+    expect(
+      await screen.findByRole("button", { name: "Cerrar caja" })
+    ).toHaveClass("btn", "btn-primary");
+  });
+});

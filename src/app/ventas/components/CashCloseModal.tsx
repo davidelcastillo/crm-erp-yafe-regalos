@@ -95,7 +95,7 @@ export const CashCloseModal = ({
         title: "Caja cerrada",
         text: `Se guardó el corte de ${resumen?.branchName ?? "la sucursal"} por ${plata(resumen?.total ?? 0)}`,
         icon: "success",
-        confirmButtonColor: "#be185d",
+        confirmButtonColor: "#6d28d9",
         background: "#ffffff",
         color: "#222222",
       });
@@ -129,7 +129,7 @@ export const CashCloseModal = ({
           <button
             type="button"
             onClick={handleClose}
-            className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full hover:bg-[#f2f2f2] transition-colors touch-manipulation"
+            className="btn btn-icon btn-round hover:bg-[#f2f2f2]"
             aria-label="Cerrar"
           >
             <svg className="w-6 h-6 text-[#6a6a6a]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -160,7 +160,7 @@ export const CashCloseModal = ({
             type="button"
             onClick={handleContinuar}
             disabled={branchId === null}
-            className="w-full py-4 mt-6 min-h-[48px] brand-gradient brand-gradient-hover text-gray-800 font-medium rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
+            className="btn btn-primary w-full mt-6"
           >
             Continuar
           </button>
@@ -223,7 +223,7 @@ export const CashCloseModal = ({
               type="button"
               onClick={handleConfirmar}
               disabled={pending}
-              className="w-full py-4 mt-6 min-h-[48px] brand-gradient brand-gradient-hover text-gray-800 font-medium rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
+              className="btn btn-primary w-full mt-6"
             >
               {pending ? "Cerrando..." : "Cerrar caja"}
             </button>

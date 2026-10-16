@@ -127,7 +127,7 @@ export const CashMovementsModal = ({
         title: tipo === "INGRESO" ? "Ingreso registrado" : "Egreso registrado",
         text: `${plata(monto)} en la caja de la sucursal`,
         icon: "success",
-        confirmButtonColor: "#be185d",
+        confirmButtonColor: "#6d28d9",
         background: "#ffffff",
         color: "#222222",
       });
@@ -165,7 +165,7 @@ export const CashMovementsModal = ({
           <button
             type="button"
             onClick={handleClose}
-            className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full hover:bg-[#f2f2f2] transition-colors touch-manipulation"
+            className="btn btn-icon btn-round hover:bg-[#f2f2f2]"
             aria-label="Cerrar"
           >
             <svg className="w-6 h-6 text-[#6a6a6a]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -218,10 +218,8 @@ export const CashMovementsModal = ({
                     type="button"
                     onClick={() => setTipo(opcion.value)}
                     aria-pressed={tipo === opcion.value}
-                    className={`flex-1 py-3 min-h-[44px] px-3 rounded-xl text-sm transition-colors touch-manipulation ${
-                      tipo === opcion.value
-                        ? "bg-[#222222] text-white"
-                        : "bg-[#f7f7f7] text-[#222222] hover:bg-[#f2f2f2]"
+                    className={`btn flex-1 ${
+                      tipo === opcion.value ? "btn-active" : "btn-secondary"
                     }`}
                   >
                     {opcion.label}
@@ -301,7 +299,7 @@ export const CashMovementsModal = ({
               <button
                 type="submit"
                 disabled={pending}
-                className="mt-4 w-full py-3 min-h-[48px] rounded-xl brand-gradient brand-gradient-hover text-gray-800 font-medium transition-colors touch-manipulation disabled:opacity-50"
+                className="btn btn-primary mt-4 w-full"
               >
                 {pending ? "Registrando..." : `Registrar ${tipo === "INGRESO" ? "ingreso" : "egreso"}`}
               </button>

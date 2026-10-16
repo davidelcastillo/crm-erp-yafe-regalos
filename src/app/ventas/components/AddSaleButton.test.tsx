@@ -284,3 +284,73 @@ describe("AddSaleButton: pasos y medios de pago (pedido L30)", () => {
     nowSpy.mockRestore();
   });
 });
+
+// El sistema de botones vive en `globals.css`: el componente elige la variante y
+// el base pone la forma. Acá se fija qué variante usa cada acción del asistente.
+describe("AddSaleButton: variantes del sistema de botones", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockBranchId = 1;
+    (registerSale as jest.Mock).mockResolvedValue({ success: true });
+  });
+
+  it("«Siguiente» usa el primario del sistema y no repite la forma del base", () => {
+    setup();
+    fireEvent.click(screen.getByRole("button", { name: "Registrar venta" }));
+
+    const siguiente = screen.getByRole("button", { name: "Siguiente" });
+    expect(siguiente).toHaveClass("btn", "btn-primary");
+    // El alto táctil, las esquinas y la tipografía los da el base: no se repiten.
+    expect(siguiente).not.toHaveClass("min-h-[44px]");
+    expect(siguiente).not.toHaveClass("rounded-xl");
+    expect(siguiente).not.toHaveClass("brand-gradient");
+  });
+
+  it("«Registrar Venta» usa el primario del paso 2", () => {
+    setup();
+    abrirPaso2();
+
+    expect(screen.getByRole("button", { name: "Registrar Venta" })).toHaveClass(
+      "btn",
+      "btn-primary"
+    );
+  });
+
+  it("el medio de pago elegido va btn-active y el otro btn-secondary", () => {
+    setup();
+    abrirPaso2();
+
+    const efectivo = screen.getByRole("button", { name: "EFECTIVO" });
+    const transferencia = screen.getByRole("button", { name: "TRANSFERENCIA" });
+
+    expect(efectivo).toHaveClass("btn", "btn-active");
+    expect(transferencia).toHaveClass("btn", "btn-secondary");
+
+    fireEvent.click(transferencia);
+
+    expect(transferencia).toHaveClass("btn", "btn-active");
+    expect(efectivo).toHaveClass("btn", "btn-secondary");
+  });
+
+  it("«Eliminar» de una fila usa la variante destructiva", () => {
+    setup();
+    abrirPaso2();
+    fireEvent.click(screen.getByRole("button", { name: "Agregar otro producto" }));
+
+    expect(screen.getAllByRole("button", { name: "Eliminar" })[0]).toHaveClass(
+      "btn",
+      "btn-danger"
+    );
+  });
+
+  it("el ✕ del modal es el cuadrado redondo transparente del sistema", () => {
+    setup();
+    fireEvent.click(screen.getByRole("button", { name: "Registrar venta" }));
+
+    expect(screen.getByRole("button", { name: "Cerrar" })).toHaveClass(
+      "btn",
+      "btn-icon",
+      "btn-round"
+    );
+  });
+});

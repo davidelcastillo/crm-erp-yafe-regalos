@@ -194,14 +194,16 @@ it("updates selected product information when selection changes", () => {
   });
 
   // TESTS FOR renderCreateButton PROP
-  it("renders create button when renderCreateButton is true (default)", () => {
+  it("muestra el botón de crear cuando renderCreateButton es true (por defecto)", () => {
     render(<ProductAutocomplete products={mockProducts} value="" onChange={() => {}} />);
     
     // Should show the create button (+)
     const createButton = screen.getByRole("button", { name: /crear nuevo producto/i });
     expect(createButton).toBeInTheDocument();
-    // El botón «+» usa el degradé de marca con contenido oscuro (no el rojo viejo).
-    expect(createButton).toHaveClass("brand-gradient");
+    // El botón «+» usa el cuadrado de ícono del sistema con la variante neutra.
+    // Ya no el degradé claro: en un botón chico pierde presencia.
+    expect(createButton).toHaveClass("btn", "btn-icon", "btn-secondary");
+    expect(createButton).not.toHaveClass("brand-gradient");
     expect(createButton).not.toHaveClass("bg-[#ff385c]");
   });
 

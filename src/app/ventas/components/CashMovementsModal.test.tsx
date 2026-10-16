@@ -141,3 +141,40 @@ describe("CashMovementsModal", () => {
     );
   });
 });
+
+// Sistema de botones (`globals.css`): el control segmentado marca la opción
+// elegida con `btn-active` y la otra va neutra; el ✕ es el ícono cuadrado.
+describe("CashMovementsModal — variantes del sistema de botones", () => {
+  it("la opción elegida de «¿Entra o sale plata?» va btn-active y la otra btn-secondary", async () => {
+    renderModal();
+    await elegirSucursal();
+
+    const ingreso = screen.getByRole("button", { name: "Ingreso" });
+    const egreso = screen.getByRole("button", { name: "Egreso" });
+
+    expect(ingreso).toHaveClass("btn", "btn-active");
+    expect(egreso).toHaveClass("btn", "btn-secondary");
+
+    fireEvent.click(egreso);
+
+    expect(egreso).toHaveClass("btn", "btn-active");
+    expect(ingreso).toHaveClass("btn", "btn-secondary");
+  });
+
+  it("«Registrar ingreso» es el primario y el ✕ el ícono redondo", async () => {
+    renderModal();
+
+    expect(screen.getByRole("button", { name: "Cerrar" })).toHaveClass(
+      "btn",
+      "btn-icon",
+      "btn-round"
+    );
+
+    await elegirSucursal();
+
+    expect(screen.getByRole("button", { name: "Registrar ingreso" })).toHaveClass(
+      "btn",
+      "btn-primary"
+    );
+  });
+});

@@ -158,10 +158,9 @@ export default function DashboardPage() {
                       key={opt.value}
                       type="button"
                       onClick={() => setPeriod(opt.value)}
-                      className={`min-h-[44px] px-4 whitespace-nowrap rounded-xl text-sm transition-colors touch-manipulation ${
-                        period === opt.value
-                          ? "bg-[#222222] text-white"
-                          : "bg-[#f2f2f2] text-[#222222] hover:bg-[#e5e5e5]"
+                      aria-pressed={period === opt.value}
+                      className={`btn whitespace-nowrap ${
+                        period === opt.value ? "btn-active" : "btn-secondary"
                       }`}
                     >
                       {opt.label}

@@ -113,7 +113,7 @@ export function AddPurchaseButton({ products: initialProducts, onSuccess }: AddP
         title: "Compra registrada",
         text: `${totalItems} unidades agregadas al inventario`,
         icon: "success",
-        confirmButtonColor: "#be185d",
+        confirmButtonColor: "#6d28d9",
         confirmButtonText: "Aceptar",
         background: "#ffffff",
         color: "#222222",
@@ -156,7 +156,7 @@ export function AddPurchaseButton({ products: initialProducts, onSuccess }: AddP
     <>
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-24 right-6 w-14 h-14 brand-gradient brand-gradient-hover text-gray-800 rounded-full shadow-lg transition-colors duration-300 flex items-center justify-center z-40"
+        className="btn-fab fixed bottom-24 right-6 z-40"
         aria-label="Registrar compra"
       >
         <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -178,7 +178,7 @@ export function AddPurchaseButton({ products: initialProducts, onSuccess }: AddP
               <button
                 type="button"
                 onClick={() => setIsOpen(false)}
-                className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full hover:bg-[#f2f2f2] transition-colors touch-manipulation"
+                className="btn btn-icon btn-round hover:bg-[#f2f2f2]"
                 aria-label="Cerrar"
               >
                 <svg className="w-6 h-6 text-[#6a6a6a]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -208,7 +208,7 @@ export function AddPurchaseButton({ products: initialProducts, onSuccess }: AddP
                               text: 'Esta acción no se puede deshacer',
                               icon: 'warning',
                               showCancelButton: true,
-                              confirmButtonColor: '#be185d',
+                              confirmButtonColor: "#6d28d9",
                               cancelButtonColor: '#6a6a6a',
                               confirmButtonText: 'Sí, eliminar',
                               cancelButtonText: 'Cancelar',
@@ -220,7 +220,7 @@ export function AddPurchaseButton({ products: initialProducts, onSuccess }: AddP
                               }
                             });
                           }}
-                          className="min-w-[44px] min-h-[44px] px-4 py-2 text-red-500 text-sm font-medium rounded-lg hover:bg-red-50 active:bg-red-100 transition-colors touch-manipulation"
+                          className="btn btn-danger"
                           aria-label={`Eliminar producto ${index + 1}`}
                         >
                           Eliminar
@@ -309,7 +309,7 @@ export function AddPurchaseButton({ products: initialProducts, onSuccess }: AddP
                 <button
                   type="button"
                   onClick={addItem}
-                  className="w-full py-3 border-2 border-dashed border-gray-300 text-[#6a6a6a] rounded-xl hover:border-[#ec4899] hover:text-[#be185d] transition-colors flex items-center justify-center gap-2"
+                  className="btn btn-secondary w-full"
                 >
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -330,7 +330,7 @@ export function AddPurchaseButton({ products: initialProducts, onSuccess }: AddP
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full py-4 brand-action font-medium rounded-xl transition-colors disabled:opacity-50"
+                  className="btn btn-primary w-full"
                 >
                   {loading ? "Registrando..." : "Registrar Compra"}
                 </button>
@@ -363,7 +363,7 @@ export function AddPurchaseButton({ products: initialProducts, onSuccess }: AddP
                   setShowProductModal(false);
                   setEditingItemId(null);
                 }}
-                className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full hover:bg-[#f2f2f2] transition-colors touch-manipulation"
+                className="btn btn-icon btn-round hover:bg-[#f2f2f2]"
                 aria-label="Cerrar"
               >
                 <svg className="w-6 h-6 text-[#6a6a6a]" fill="none" viewBox="0 0 24 24" stroke="currentColor">

@@ -171,7 +171,7 @@ export function AddSaleButton({ products, onSuccess }: AddSaleButtonProps) {
          title: "Sucursal requerida",
          text: "Seleccioná una sucursal antes de registrar una venta",
          icon: "warning",
-         confirmButtonColor: "#be185d",
+         confirmButtonColor: "#6d28d9",
        });
        return;
      }
@@ -231,7 +231,7 @@ export function AddSaleButton({ products, onSuccess }: AddSaleButtonProps) {
          title: "Venta registrada",
          text: totalItems + " unidades vendidas por $" + calculateTotal().toFixed(2),
          icon: "success",
-         confirmButtonColor: "#be185d",
+         confirmButtonColor: "#6d28d9",
          confirmButtonText: "Aceptar",
          background: "#ffffff",
          color: "#222222",
@@ -256,17 +256,11 @@ export function AddSaleButton({ products, onSuccess }: AddSaleButtonProps) {
      setLoading(false);
    };
 
-  const paymentMethodColors: Record<PaymentMethodType, string> = {
-    EFECTIVO: "bg-green-100 text-green-800 border-green-200",
-    TRANSFERENCIA: "bg-blue-100 text-blue-800 border-blue-200",
-    MIXTO: "bg-purple-100 text-purple-800 border-purple-200",
-  };
-
   return (
     <>
        <button
          onClick={() => { setSaleBranchId(branchId ?? null); setPaso("sucursal"); setIsOpen(true); }}
-         className="fixed bottom-24 right-6 w-14 h-14 brand-gradient brand-gradient-hover text-gray-800 rounded-full shadow-lg transition-colors duration-300 flex items-center justify-center z-40"
+         className="btn-fab fixed bottom-24 right-6 z-40"
          aria-label="Registrar venta"
        >
          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -285,7 +279,7 @@ export function AddSaleButton({ products, onSuccess }: AddSaleButtonProps) {
                <button
                  type="button"
                  onClick={() => setIsOpen(false)}
-                 className="p-2 rounded-full hover:bg-[#f2f2f2] transition-colors"
+                 className="btn btn-icon btn-round hover:bg-[#f2f2f2]"
                  aria-label="Cerrar"
                >
                  <svg className="w-6 h-6 text-[#6a6a6a]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -310,7 +304,7 @@ export function AddSaleButton({ products, onSuccess }: AddSaleButtonProps) {
                   type="button"
                   onClick={() => setPaso("productos")}
                   disabled={!saleBranchId}
-                  className="w-full min-h-[44px] mt-6 py-4 brand-gradient brand-gradient-hover text-gray-800 font-medium rounded-xl transition-colors disabled:opacity-50 touch-manipulation"
+                  className="btn btn-primary w-full mt-6"
                 >
                   Siguiente
                 </button>
@@ -332,7 +326,7 @@ export function AddSaleButton({ products, onSuccess }: AddSaleButtonProps) {
                         <button
                           type="button"
                           onClick={() => removeItem(item.id)}
-                          className="text-red-500 text-sm hover:text-red-700"
+                          className="btn btn-danger"
                         >
                           Eliminar
                         </button>
@@ -390,7 +384,7 @@ export function AddSaleButton({ products, onSuccess }: AddSaleButtonProps) {
                 <button
                   type="button"
                   onClick={addItem}
-                  className="w-full py-3 border-2 border-dashed border-gray-300 text-[#6a6a6a] rounded-xl hover:border-[#ec4899] hover:text-[#be185d] transition-colors flex items-center justify-center gap-2"
+                  className="btn btn-secondary w-full"
                 >
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -401,16 +395,16 @@ export function AddSaleButton({ products, onSuccess }: AddSaleButtonProps) {
                 {/* Payment Method Selector */}
                 <div className="p-4 bg-[#f9f9f9] rounded-xl">
                   <label className="block text-sm font-medium text-[#222222] mb-3">Método de Pago</label>
+                  {/* Control segmentado: el medio elegido va `btn-active`, el otro `btn-secondary`. */}
                   <div className="flex gap-2 overflow-x-auto pb-2">
                     {MEDIOS_DE_PAGO.map((method) => (
                       <button
                         key={method}
                         type="button"
                         onClick={() => setPaymentMethod(method)}
-                        className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all border ${
-                          paymentMethod === method
-                            ? paymentMethodColors[method]
-                            : "bg-white text-[#6a6a6a] border-gray-200 hover:border-[#ec4899]"
+                        aria-pressed={paymentMethod === method}
+                        className={`btn whitespace-nowrap ${
+                          paymentMethod === method ? "btn-active" : "btn-secondary"
                         }`}
                       >
                         {method}
@@ -499,7 +493,7 @@ export function AddSaleButton({ products, onSuccess }: AddSaleButtonProps) {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full py-4 bg-[#222222] text-white font-medium rounded-xl hover:bg-[#3f3f3f] transition-colors disabled:opacity-50"
+                  className="btn btn-primary w-full"
                 >
                   {loading ? "Registrando..." : "Registrar Venta"}
                 </button>

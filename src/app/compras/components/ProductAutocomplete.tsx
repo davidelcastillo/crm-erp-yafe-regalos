@@ -98,7 +98,7 @@ const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         <button
           type="button"
           onClick={onCreateClick}
-          className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 flex items-center justify-center brand-gradient brand-gradient-hover text-gray-800 rounded-full transition-colors text-sm"
+          className="btn btn-sm btn-icon btn-secondary absolute right-2 top-1/2 -translate-y-1/2"
           aria-label="Crear nuevo producto"
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

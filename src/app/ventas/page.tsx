@@ -140,14 +140,14 @@ export default function VentasPage() {
                 <button
                   type="button"
                   onClick={() => setCashModalOpen(true)}
-                  className="px-4 min-h-[44px] rounded-xl brand-action text-sm font-medium touch-manipulation"
+                  className="btn btn-primary"
                 >
                   Caja
                 </button>
                 <button
                   type="button"
                   onClick={() => setCloseModalOpen(true)}
-                  className="px-4 min-h-[44px] rounded-xl brand-action text-sm font-medium touch-manipulation"
+                  className="btn btn-primary"
                 >
                   Cerrar caja
                 </button>
@@ -234,7 +234,7 @@ export default function VentasPage() {
                     type="button"
                     onClick={loadMore}
                     disabled={loadingMore}
-                    className="w-full sm:w-auto px-6 min-h-[44px] text-sm font-medium brand-action rounded-xl transition-colors touch-manipulation disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="btn btn-secondary w-full sm:w-auto"
                   >
                     {loadingMore ? 'Cargando...' : 'Cargar más'}
                   </button>

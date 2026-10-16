@@ -86,6 +86,25 @@ describe('DashboardPage — período del gráfico', () => {
   });
 });
 
+// Sistema de botones (`globals.css`): el período elegido del control segmentado
+// va `btn-active` y los otros `btn-secondary`.
+describe('DashboardPage — variantes del sistema de botones', () => {
+  it('el período elegido va btn-active y el resto btn-secondary', async () => {
+    render(<DashboardPage />);
+
+    expect(await screen.findByRole('button', { name: '30 días' })).toHaveClass(
+      'btn',
+      'btn-active'
+    );
+    expect(screen.getByRole('button', { name: '90 días' })).toHaveClass('btn', 'btn-secondary');
+
+    fireEvent.click(screen.getByRole('button', { name: '90 días' }));
+
+    expect(screen.getByRole('button', { name: '90 días' })).toHaveClass('btn', 'btn-active');
+    expect(screen.getByRole('button', { name: '30 días' })).toHaveClass('btn', 'btn-secondary');
+  });
+});
+
 describe('DashboardPage — carga', () => {
   it('mientras carga usa la ruedita compartida y los esqueletos', () => {
     render(<DashboardPage />);
