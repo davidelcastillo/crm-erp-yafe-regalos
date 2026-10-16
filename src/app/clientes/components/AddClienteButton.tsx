@@ -25,7 +25,7 @@ export function AddClienteButton({ onAdd }: AddClienteButtonProps) {
         return { name, surname };
       },
       confirmButtonText: "Crear Cliente",
-      confirmButtonColor: "#22c55e",
+      confirmButtonColor: "#15803d",
       showCancelButton: true,
       cancelButtonText: "Cancelar",
       cancelButtonColor: "#6b7280",
@@ -39,7 +39,7 @@ export function AddClienteButton({ onAdd }: AddClienteButtonProps) {
             title: "¡Cliente creado!",
             text: `${result.value.name} ${result.value.surname} fue agregado`,
             icon: "success",
-            confirmButtonColor: "#22c55e",
+            confirmButtonColor: "#15803d",
             timer: 1500,
             showConfirmButton: false,
           });
@@ -49,7 +49,7 @@ export function AddClienteButton({ onAdd }: AddClienteButtonProps) {
             title: "Error",
             text: res.error || "No se pudo crear el cliente",
             icon: "error",
-            confirmButtonColor: "#ef4444",
+            confirmButtonColor: "#dc2626",
           });
         }
       } catch (error) {
@@ -58,7 +58,7 @@ export function AddClienteButton({ onAdd }: AddClienteButtonProps) {
           title: "Error",
           text: "Error al crear el cliente",
           icon: "error",
-          confirmButtonColor: "#ef4444",
+          confirmButtonColor: "#dc2626",
         });
       }
     }
@@ -71,7 +71,7 @@ export function AddClienteButton({ onAdd }: AddClienteButtonProps) {
       aria-label="Agregar cliente"
     >
       <svg
-        className="w-6 h-6 text-white"
+        className="w-6 h-6 text-gray-800"
         fill="none"
         viewBox="0 0 24 24"
         stroke="currentColor"

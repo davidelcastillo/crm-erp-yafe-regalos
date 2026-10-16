@@ -55,7 +55,7 @@ export function ClienteCard({ customer }: ClienteCardProps) {
       title: "Registrar Pago",
       html: `
         <p class="text-sm text-[#6a6a6a] mb-2">Cliente: <strong>${customer.name} ${customer.surname}</strong></p>
-        <p class="text-lg font-bold text-[#ef4444] mb-4">Deuda actual: $${balance.toFixed(2)}</p>
+        <p class="text-lg font-bold text-[#b91c1c] mb-4">Deuda actual: $${balance.toFixed(2)}</p>
         <input type="number" id="paymentAmount" name="amount" class="swal2-input" placeholder="Monto a pagar" min="0" step="0.01">
       `,
       preConfirm: () => {
@@ -86,7 +86,7 @@ export function ClienteCard({ customer }: ClienteCardProps) {
         return amount;
       },
       confirmButtonText: "Registrar Pago",
-      confirmButtonColor: "#22c55e",
+      confirmButtonColor: "#15803d",
       showCancelButton: true,
       cancelButtonText: "Cancelar",
       cancelButtonColor: "#6b7280",
@@ -112,7 +112,7 @@ export function ClienteCard({ customer }: ClienteCardProps) {
             title: "¡Pago registrado!",
             text: `Se registraron $${amount.toFixed(2)} de deuda`,
             icon: "success",
-            confirmButtonColor: "#22c55e",
+            confirmButtonColor: "#15803d",
             timer: 1500,
             showConfirmButton: false,
           });
@@ -122,7 +122,7 @@ export function ClienteCard({ customer }: ClienteCardProps) {
             title: "Error",
             text: res.error || "No se pudo registrar el pago",
             icon: "error",
-            confirmButtonColor: "#ef4444",
+            confirmButtonColor: "#dc2626",
           });
         }
       } catch (error) {
@@ -131,7 +131,7 @@ export function ClienteCard({ customer }: ClienteCardProps) {
           title: "Error",
           text: "Error al registrar el pago",
           icon: "error",
-          confirmButtonColor: "#ef4444",
+          confirmButtonColor: "#dc2626",
         });
       }
     }
@@ -147,40 +147,40 @@ export function ClienteCard({ customer }: ClienteCardProps) {
   };
 
   return (
-    <div className="bg-white rounded-2xl p-4 shadow-sm">
-      <div className="flex justify-between items-start">
-        <div className="flex-1">
-          <h3 className="text-base font-semibold text-[#222222]">
+    <div className="glass rounded-2xl border border-black/5 p-4">
+      <div className="flex justify-between items-start gap-3">
+        <div className="min-w-0 flex-1">
+          <h3 className="text-base font-semibold text-[#222222] break-words">
             {customer.name} {customer.surname}
           </h3>
           <p className="text-sm text-[#6a6a6a]">
             Deuda:{" "}
-            <span className={hasDebt ? "text-[#ef4444] font-medium" : "text-[#22c55e]"}>
+            <span className={hasDebt ? "text-[#b91c1c] font-medium" : "text-[#15803d]"}>
               ${balance.toFixed(2)}
             </span>
           </p>
         </div>
         <div
-          className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium text-white ${
-            hasDebt ? "bg-[#ef4444]" : "bg-[#22c55e]"
+          className={`shrink-0 inline-flex items-center px-3 py-1 rounded-full text-sm font-medium text-white ${
+            hasDebt ? "bg-[#b91c1c]" : "bg-[#15803d]"
           }`}
         >
           {hasDebt ? "Deudor" : "Al día"}
         </div>
       </div>
 
-      <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100">
+      <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-black/5">
         <button
           onClick={handleToggleHistory}
           disabled={loadingHistory}
-          className="flex-1 py-2 px-3 text-sm font-medium text-[#3f3f3f] bg-[#f2f2f2] rounded-lg hover:bg-[#e5e5e5] transition-colors disabled:opacity-50"
+          className="flex-1 whitespace-nowrap py-2 px-3 text-sm font-medium text-[#3f3f3f] bg-[#f2f2f2] rounded-lg hover:bg-[#e5e5e5] transition-colors disabled:opacity-50"
         >
           {loadingHistory ? "Cargando..." : showHistory ? "Ocultar" : "Ver Historial"}
         </button>
         {hasDebt && (
           <button
             onClick={handlePayment}
-            className="flex-1 py-2 px-3 text-sm font-medium text-white bg-[#22c55e] rounded-lg hover:bg-[#16a34a] transition-colors"
+            className="flex-1 whitespace-nowrap py-2 px-3 text-sm font-medium text-white bg-[#15803d] rounded-lg hover:bg-[#16a34a] transition-colors"
           >
             Registrar Pago
           </button>
@@ -188,7 +188,7 @@ export function ClienteCard({ customer }: ClienteCardProps) {
       </div>
 
       {showHistory && historyData && (
-        <div className="mt-3 pt-3 border-t border-gray-100">
+        <div className="mt-3 pt-3 border-t border-black/5">
           <div className="flex gap-1 mb-3">
             <button
               onClick={() => setActiveTab("sales")}
@@ -224,18 +224,18 @@ export function ClienteCard({ customer }: ClienteCardProps) {
                     key={sale.id}
                     className="p-2 bg-[#f9f9f9] rounded-lg text-sm"
                   >
-                    <div className="flex justify-between items-center">
+                    <div className="flex justify-between items-center gap-2">
                       <span className="text-[#6a6a6a]">{formatDate(sale.date)}</span>
-                      <span className="font-medium">${sale.totalAmount.toFixed(2)}</span>
+                      <span className="font-medium shrink-0">${sale.totalAmount.toFixed(2)}</span>
                     </div>
-                    <div className="flex justify-between items-center text-xs text-[#6a6a6a]">
+                    <div className="flex justify-between items-center gap-2 text-xs text-[#6a6a6a]">
                       <span>Pagado: ${sale.amountPaid.toFixed(2)}</span>
                       <span
-                        className={
+                        className={`shrink-0 ${
                           sale.pendingBalance > 0
-                            ? "text-[#ef4444]"
-                            : "text-[#22c55e]"
-                        }
+                            ? "text-[#b91c1c]"
+                            : "text-[#15803d]"
+                        }`}
                       >
                         Pendiente: ${sale.pendingBalance.toFixed(2)}
                       </span>
@@ -256,12 +256,12 @@ export function ClienteCard({ customer }: ClienteCardProps) {
                 historyData.payments.map((payment) => (
                   <div
                     key={payment.id}
-                    className="p-2 bg-[#f9f9f9] rounded-lg text-sm flex justify-between items-center"
+                    className="p-2 bg-[#f9f9f9] rounded-lg text-sm flex justify-between items-center gap-2"
                   >
                     <span className="text-[#6a6a6a]">
                       {formatDate(payment.date)}
                     </span>
-                    <span className="font-medium text-[#22c55e]">
+                    <span className="font-medium text-[#15803d] shrink-0">
                       +${payment.amount.toFixed(2)}
                     </span>
                   </div>
