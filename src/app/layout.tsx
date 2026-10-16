@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import BottomNav from "../components/BottomNav";
-import Navbar from "../components/Navbar";
 import { BranchProviderWrapper } from "@/lib/context/BranchProviderWrapper";
 
 const geistSans = Geist({
@@ -38,7 +37,6 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col bg-[#ffffff]">
         <BranchProviderWrapper>
-          {/* <Navbar /> */}
           <main className="flex-1">{children}</main>
           <BottomNav />
         </BranchProviderWrapper>
