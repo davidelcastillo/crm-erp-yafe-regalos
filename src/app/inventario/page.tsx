@@ -8,6 +8,7 @@ import { getCategoryOptions, createCategory } from "../actions/category";
 import { InventarioList } from "./components/InventarioList";
 import { InventoryFilters } from "./components/InventoryFilters";
 import { MoveStockModal } from "./components/MoveStockModal";
+import { StockAdjustmentModal } from "./components/StockAdjustmentModal";
 import { ExportWizard } from "./components/ExportWizard";
 import { LabelSelector } from "@/components/ui/LabelSelector";
 import { MovementsModal } from "@/components/ui/MovementsModal";
@@ -39,6 +40,7 @@ export default function InventarioPage() {
   const [moveStockOpen, setMoveStockOpen] = useState(false);
   const [moveStockProductId, setMoveStockProductId] = useState<number | null>(null);
   const [exportWizardOpen, setExportWizardOpen] = useState(false);
+  const [stockAdjustmentOpen, setStockAdjustmentOpen] = useState(false);
   const [productFormOpen, setProductFormOpen] = useState(false);
 
   // Task 4.6: unified search (debounce 300 ms) that drives the server-side
@@ -238,6 +240,13 @@ export default function InventarioPage() {
             </button>
             <button
               type="button"
+              onClick={() => setStockAdjustmentOpen(true)}
+              className="px-4 py-2 min-h-[44px] text-sm font-medium text-white bg-[#ff385c] rounded-xl hover:bg-[#e00b41] transition-colors touch-manipulation"
+            >
+              Entrada / Salida
+            </button>
+            <button
+              type="button"
               onClick={() => setExportWizardOpen(true)}
               className="px-4 py-2 min-h-[44px] text-sm font-medium text-white bg-[#ff385c] rounded-xl hover:bg-[#e00b41] transition-colors touch-manipulation"
             >
@@ -305,6 +314,26 @@ export default function InventarioPage() {
               setMoveStockProductId(null);
             }}
             productId={moveStockProductId ?? 0}
+            branches={branches}
+            onConfirm={() => {
+              fetchProducts(branchId, selectedCategoryId, debouncedSearch)
+                .then((data) => {
+                  setProducts(data);
+                  setError(null);
+                })
+                .catch((err) =>
+                  setError(err instanceof Error ? err.message : 'Error al cargar productos')
+                );
+            }}
+          />
+        )}
+
+        {/* Entrada/salida de stock por lote: la forma auditable de corregir
+            stock (hermana de Mover Stock, que mueve entre dos sucursales). */}
+        {stockAdjustmentOpen && (
+          <StockAdjustmentModal
+            open={stockAdjustmentOpen}
+            onClose={() => setStockAdjustmentOpen(false)}
             branches={branches}
             onConfirm={() => {
               fetchProducts(branchId, selectedCategoryId, debouncedSearch)

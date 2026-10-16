@@ -8,6 +8,7 @@ import { z } from "zod";
 import { 
   moveStockSchema,
   moveStockBatchSchema,
+  adjustStockBatchSchema,
   assignStockSchema,
   getMovementsFiltersSchema,
 } from "@/lib/validations/branchMovement";
@@ -640,6 +641,119 @@ export async function moveStockBatchBetweenBranches(data: unknown) {
     }
     console.error("Error moving stock batch between branches:", error);
     return { success: false, error: "Error al mover stock entre sucursales" };
+  }
+}
+
+/**
+ * ENTRADA o SALIDA de stock de un lote de productos en UNA sucursal: la forma
+ * auditable de corregir stock, porque cada línea deja su `BranchMovement`
+ * (`ENTRY`/`EXIT`) y el historial del producto lo muestra.
+ *
+ * Hermana de `moveStockBatchBetweenBranches`, que mueve entre dos sucursales
+ * (`TRANSFER_OUT` + `TRANSFER_IN`): acá la sucursal es una sola y el sentido lo
+ * da `movementType`.
+ */
+export async function adjustBranchStockBatch(data: unknown) {
+  try {
+    const { branchId, movementType, items, reference, performedBy } =
+      adjustStockBatchSchema.parse(data);
+
+    const result = await prisma.$transaction(async (tx) => {
+      const branch = await tx.branch.findFirst({
+        where: { id: branchId, isActive: true },
+        select: { id: true },
+      });
+      if (!branch) {
+        throw new Error("Sucursal inválida o inactiva");
+      }
+
+      for (const item of items) {
+        if (movementType === "ENTRY") {
+          await tx.branchInventory.upsert({
+            where: { branchId_productId: { branchId, productId: item.productId } },
+            create: { branchId, productId: item.productId, stock: item.quantity },
+            update: { stock: { increment: item.quantity } },
+          });
+          continue;
+        }
+
+        // EXIT: decremento condicional, mismo criterio que registerSale: solo
+        // descuenta si hay stock suficiente, así no queda stock negativo.
+        const actualizado = await tx.branchInventory.updateMany({
+          where: {
+            branchId,
+            productId: item.productId,
+            stock: { gte: item.quantity },
+          },
+          data: { stock: { decrement: item.quantity } },
+        });
+        if (actualizado.count === 0) {
+          const producto = await tx.product.findUnique({
+            where: { id: item.productId },
+            select: { name: true },
+          });
+          throw new Error(
+            `Stock insuficiente para "${producto?.name ?? item.productId}" en la sucursal seleccionada`
+          );
+        }
+      }
+
+      // Motivo: la nota del usuario manda; si no hay, se usa el sentido (queda
+      // visible en el historial del producto).
+      const motivo = reference?.trim()
+        ? reference.trim()
+        : movementType === "ENTRY"
+          ? "ENTRADA"
+          : "SALIDA";
+
+      await tx.branchMovement.createMany({
+        data: items.map((item) => ({
+          productId: item.productId,
+          branchId,
+          movementType,
+          quantity: item.quantity,
+          reference: motivo,
+          performedBy,
+        })),
+      });
+
+      // Stock resultante de todo el lote en una sola lectura (sin N+1).
+      const stockFinal = await tx.branchInventory.findMany({
+        where: { branchId, productId: { in: items.map((i) => i.productId) } },
+        select: { productId: true, stock: true },
+      });
+      const stockPorProducto = new Map(stockFinal.map((f) => [f.productId, f.stock]));
+
+      return {
+        branchId,
+        movementType,
+        reference: motivo,
+        items: items.map((item) => ({
+          productId: item.productId,
+          quantity: item.quantity,
+          newStock: stockPorProducto.get(item.productId) ?? 0,
+        })),
+      };
+    });
+
+    revalidatePath("/inventario");
+    revalidatePath("/movimientos");
+    return { success: true, data: parseObject(result) };
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return {
+        success: false,
+        error: error.issues.map((e) => e.message).join(", "),
+      };
+    }
+    if (error instanceof Error && error.message.includes("Stock insuficiente")) {
+      return { success: false, error: error.message };
+    }
+    if (error instanceof Error && error.message.includes("inactiva")) {
+      return { success: false, error: error.message };
+    }
+    console.error("Error adjusting branch stock batch:", error);
+    return { success: false, error: "Error al ajustar el stock de la sucursal" };
   }
 }
 

@@ -65,6 +65,21 @@ En `/inventario`, **Ver Movimientos** abre el historial del producto. La lista c
 - Las entradas `ENTRY` que escribe la compra (`reference` `PURCHASE-<id>`) **no** se listan aparte: la compra ya es una fila, así que la misma operación no se duplica.
 - Las ventas todavía **no** escriben `BranchMovement`: su efecto en el stock queda en `BranchInventory` (`src/app/actions/sale.ts`), y el historial las muestra desde el `SaleItem`.
 
+### Entrada / salida de stock por lote
+
+En `/inventario`, **Entrada / Salida** abre el wizard hermano de **Mover Stock**. Las dos operaciones escriben en el mismo libro, con alcances distintos:
+
+| Operación | Alcance | Movimientos que escribe |
+|-----------|---------|-------------------------|
+| Mover Stock | entre **dos** sucursales (origen → destino) | `TRANSFER_OUT` en origen + `TRANSFER_IN` en destino |
+| Entrada / Salida | **una** sucursal | `ENTRY` o `EXIT`, uno por producto |
+
+- Tres pasos: sucursal y sentido → productos con su cantidad → motivo (opcional) y confirmación.
+- **Entrada** lista todos los productos activos, incluso los que no tienen fila de inventario en esa sucursal (el ajuste la crea). **Salida** lista solo los que tienen stock y no deja restar más que el disponible.
+- El motivo se guarda en `reference` del movimiento (si no se escribe, queda `ENTRADA` o `SALIDA`) y el actor es el email del usuario.
+- Todo el lote va en una transacción: si una línea falla, no se aplica ninguna.
+- Server Action: `adjustBranchStockBatch({ branchId, movementType, items, reference?, performedBy })` (`src/app/actions/inventory.ts`).
+
 ## Búsquedas
 
 - **Ventas**: buscador con **debounce de 300 ms** + paginación **"Cargar más"**.
@@ -79,3 +94,4 @@ En `/inventario`, **Ver Movimientos** abre el historial del producto. La lista c
 - [ ] El dashboard reacciona a cambios de periodo y sucursal y muestra la etiqueta correcta.
 - [ ] El historial de un producto muestra las transferencias y los ajustes con su sucursal, y no repite la compra como entrada.
 - [ ] El gráfico de ingresos vs egresos muestra el período elegido (7 / 30 / 90 días o el rango personalizado) y cada día con el total de sus movimientos.
+- [ ] Entrada / Salida ajusta el stock de la sucursal elegida (y de ninguna otra) y deja un movimiento por producto con su motivo y su actor.
