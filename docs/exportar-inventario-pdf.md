@@ -6,7 +6,7 @@ Desde **Inventario** → botón **"Exportar productos"** el admin genera un PDF 
 
 1. En `/inventario`, tocar **"Exportar productos"** → se abre el asistente.
 2. **Paso 1 — Elegir sucursal.** Obligatorio; el botón *Continuar* queda deshabilitado hasta elegir una.
-3. **Paso 2 — Seleccionar productos.** Aparecen solo los productos **con stock** en esa sucursal (checkbox + contador de seleccionados).
+3. **Paso 2 — Seleccionar productos.** Aparecen solo los productos **con stock** en esa sucursal (checkbox + contador de seleccionados). El checkbox **"Todos"** selecciona de una vez todos los productos con stock de la sucursal, y vuelve a destildarlos; queda marcado también cuando se seleccionan a mano todos los de la lista.
 4. **Paso 3 — Generar PDF.** El botón *Generar PDF* queda deshabilitado si no hay nada seleccionado. La descarga arranca automáticamente.
 
 ## Detalles
@@ -29,6 +29,7 @@ Desde **Inventario** → botón **"Exportar productos"** el admin genera un PDF 
 ## Checklist de verificación
 
 - [ ] Sin sucursal elegida, el paso 1 bloquea el avance.
+- [ ] El checkbox "Todos" del paso 2 selecciona todos los productos con stock de la sucursal (y ninguno sin stock), y lo destilda al volver a tocarlo.
 - [ ] Sin productos seleccionados, el paso 3 deshabilita *Generar PDF*.
 - [ ] El PDF muestra Código, Nombre, Stock y Precio.
 - [ ] Con más productos de los que entran en una página, la tabla continúa en la siguiente sin truncarse.

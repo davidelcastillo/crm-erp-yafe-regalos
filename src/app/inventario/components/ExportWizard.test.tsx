@@ -1,7 +1,7 @@
 /**
  * @jest-environment jsdom
  */
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { ExportWizard } from "./ExportWizard";
 
 jest.mock("@/app/actions/inventory", () => ({
@@ -70,6 +70,12 @@ async function goToStep2() {
   });
 }
 
+/** Checkboxes de la lista de productos (sin contar el selector Todos). */
+const checkboxesDeProductos = () =>
+  within(screen.getByRole("group", { name: /productos con stock/i })).getAllByRole(
+    "checkbox"
+  );
+
 beforeEach(() => {
   jest.clearAllMocks();
   mockGetBranchProductsForExport.mockResolvedValue({
@@ -107,7 +113,7 @@ describe("ExportWizard", () => {
     await goToStep2();
 
     // 3 productos en el mock, uno con stock 0 → sólo 2 checkboxes.
-    const checkboxes = screen.getAllByRole("checkbox");
+    const checkboxes = checkboxesDeProductos();
     expect(checkboxes).toHaveLength(2);
     expect(mockGetBranchProductsForExport).toHaveBeenCalledWith({
       branchId: 1,
@@ -119,6 +125,32 @@ describe("ExportWizard", () => {
 
     fireEvent.click(checkboxes[1]);
     expect(screen.getByText(/2 seleccionados/i)).toBeInTheDocument();
+  });
+
+  it("selects every product with stock from the TODOS selector", async () => {
+    await goToStep2();
+
+    const todos = screen.getByRole("checkbox", { name: /todos/i });
+    expect(todos).not.toBeChecked();
+
+    fireEvent.click(todos);
+
+    // Los 2 productos con stock, y ninguno de los que tienen stock 0.
+    expect(screen.getByText(/2 seleccionados/i)).toBeInTheDocument();
+    checkboxesDeProductos().forEach((checkbox) => expect(checkbox).toBeChecked());
+
+    fireEvent.click(todos);
+
+    expect(screen.getByText(/0 seleccionados/i)).toBeInTheDocument();
+    checkboxesDeProductos().forEach((checkbox) => expect(checkbox).not.toBeChecked());
+  });
+
+  it("marks the TODOS selector when every product is selected by hand", async () => {
+    await goToStep2();
+
+    checkboxesDeProductos().forEach((checkbox) => fireEvent.click(checkbox));
+
+    expect(screen.getByRole("checkbox", { name: /todos/i })).toBeChecked();
   });
 
   it("disables Generar PDF on step 3 when nothing is selected and enables it after selection", async () => {
@@ -135,7 +167,7 @@ describe("ExportWizard", () => {
     await waitFor(() => {
       expect(screen.queryByText(/cargando productos/i)).not.toBeInTheDocument();
     });
-    const checkboxes = screen.getAllByRole("checkbox");
+    const checkboxes = checkboxesDeProductos();
     fireEvent.click(checkboxes[0]);
     fireEvent.click(screen.getByRole("button", { name: /siguiente/i }));
 
@@ -149,7 +181,7 @@ describe("ExportWizard", () => {
     });
 
     await goToStep2();
-    fireEvent.click(screen.getAllByRole("checkbox")[0]);
+    fireEvent.click(checkboxesDeProductos()[0]);
     fireEvent.click(screen.getByRole("button", { name: /siguiente/i }));
 
     fireEvent.click(screen.getByRole("button", { name: /generar pdf/i }));
@@ -179,7 +211,7 @@ describe("ExportWizard", () => {
 
     try {
       await goToStep2();
-      fireEvent.click(screen.getAllByRole("checkbox")[0]);
+      fireEvent.click(checkboxesDeProductos()[0]);
       fireEvent.click(screen.getByRole("button", { name: /siguiente/i }));
       fireEvent.click(screen.getByRole("button", { name: /generar pdf/i }));
 

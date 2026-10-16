@@ -72,6 +72,12 @@ export function ExportWizard({ open, onClose, branches }: ExportWizardProps) {
 
   const selectedCount = selectedIds.length;
 
+  const allSelected =
+    availableProducts.length > 0 && selectedIds.length === availableProducts.length;
+
+  const toggleAll = () =>
+    setSelectedIds(allSelected ? [] : availableProducts.map((row) => row.id));
+
   const handleContinue = () => {
     if (branchId === null) {
       setBranchError("Seleccioná una sucursal para continuar");
@@ -278,6 +284,22 @@ export function ExportWizard({ open, onClose, branches }: ExportWizardProps) {
               </span>
             </div>
 
+            {!productsLoading &&
+              !productsError &&
+              availableProducts.length > 0 && (
+                <label className="flex items-center gap-3 p-3 mb-2 min-h-[44px] rounded-xl bg-[#f8f8f8] cursor-pointer touch-manipulation">
+                  <input
+                    type="checkbox"
+                    checked={allSelected}
+                    onChange={toggleAll}
+                    className="w-5 h-5 accent-[#ff385c]"
+                  />
+                  <span className="text-sm font-medium text-[#222222]">
+                    Todos
+                  </span>
+                </label>
+              )}
+
             {productsLoading && (
               <div className="flex items-center justify-center py-10">
                 <div className="flex items-center gap-2">
@@ -335,7 +357,11 @@ export function ExportWizard({ open, onClose, branches }: ExportWizardProps) {
             {!productsLoading &&
               !productsError &&
               availableProducts.length > 0 && (
-                <div className="space-y-2 max-h-60 overflow-y-auto">
+                <div
+                  role="group"
+                  aria-label="Productos con stock"
+                  className="space-y-2 max-h-60 overflow-y-auto"
+                >
                   {availableProducts.map((row) => (
                     <label
                       key={row.id}
