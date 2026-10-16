@@ -8,6 +8,8 @@ import { SalesList } from './components/SalesList';
 import { AddSaleButton } from './components/AddSaleButton';
 import { CashMovementsModal } from './components/CashMovementsModal';
 import { CashCloseModal } from './components/CashCloseModal';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { ActionCard } from '@/components/ui/ActionCard';
 import { BranchSelector } from '@/components/ui/BranchSelector';
 import { useReloadKey } from '@/lib/hooks/useReloadKey';
 import { useEffect, useState } from 'react';
@@ -118,82 +120,114 @@ export default function VentasPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#ffffff] pb-20">
-      <main className="px-6">
-        <div className="mb-6 flex items-center justify-between flex-wrap gap-3">
-          <h1 className="text-2xl font-bold text-[#222222]">Ventas</h1>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setCashModalOpen(true)}
-              className="px-4 py-2 min-h-[44px] text-sm font-medium text-white bg-[#ff385c] rounded-xl hover:bg-[#e00b41] transition-colors touch-manipulation"
-            >
-              Caja
-            </button>
-            <button
-              type="button"
-              onClick={() => setCloseModalOpen(true)}
-              className="px-4 py-2 min-h-[44px] text-sm font-medium text-white bg-[#ff385c] rounded-xl hover:bg-[#e00b41] transition-colors touch-manipulation"
-            >
-              Cerrar caja
-            </button>
-            <BranchSelector
-              onChange={(id) => setBranchId(id)}
-              label="Filtrar por sucursal"
-            />
-          </div>
-        </div>
-
-        <div className="mb-4">
-          <div className="relative">
-            <svg className="w-5 h-5 text-[#6a6a6a] absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
-            </svg>
-            <input
-              type="text"
-              placeholder="Buscar producto..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full min-h-[44px] pl-12 pr-4 py-3 bg-[#f8f8f8] rounded-xl text-base text-[#222222] placeholder-[#929292] focus:outline-none focus:ring-2 focus:ring-[#ff385c]/20 touch-manipulation"
-              aria-label="Buscar producto"
-              autoComplete="off"
-            />
-          </div>
-        </div>
-
-        {sales.length === 0 ? (
-          <div className="text-center py-12">
-            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[#f2f2f2] flex items-center justify-center">
-              <svg className="w-8 h-8 text-[#6a6a6a]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 3s1.343 3 3 3 3 .895 3 3-1.343 3-3 3-3 .895-3 3zm0 8c1.11 0 2.08-.402 2.599-1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <p className="text-[#6a6a6a]">
-              {debouncedSearch ? 'No se encontraron ventas' : 'No hay ventas registradas'}
-            </p>
-            <p className="text-sm text-[#6a6a6a] mt-1">
-              {debouncedSearch
-                ? 'Probá con otro producto o código'
-                : 'Toca el botón + para registrar una venta'}
-            </p>
-          </div>
-        ) : (
-          <>
-            <SalesList sales={sales} />
-            {sales.length < total && (
-              <div className="mt-6 flex justify-center">
+    <div className="min-h-screen bg-white pb-20 relative">
+      <main className="">
+        <div className="pb-10 brand-gradient">
+          <PageHeader
+            title="Ventas"
+            right={
+              <BranchSelector
+                onChange={(id) => setBranchId(id)}
+                label="Filtrar por sucursal"
+              />
+            }
+            actions={
+              <>
                 <button
                   type="button"
-                  onClick={loadMore}
-                  disabled={loadingMore}
-                  className="w-full sm:w-auto px-6 min-h-[44px] text-sm font-medium text-white bg-[#ff385c] rounded-xl hover:bg-[#e00b41] transition-colors touch-manipulation disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={() => setCashModalOpen(true)}
+                  className="px-4 min-h-[44px] rounded-xl brand-gradient brand-gradient-hover text-sm font-medium text-gray-800 touch-manipulation"
                 >
-                  {loadingMore ? 'Cargando...' : 'Cargar más'}
+                  Caja
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setCloseModalOpen(true)}
+                  className="px-4 min-h-[44px] rounded-xl brand-gradient brand-gradient-hover text-sm font-medium text-gray-800 touch-manipulation"
+                >
+                  Cerrar caja
+                </button>
+              </>
+            }
+          />
+
+          <div className="mb-6 flex items-center justify-between flex-wrap gap-3 rounded-2xl bg-white/80 px-4 py-3">
+            <div className="relative w-full sm:w-auto">
+              <svg className="w-5 h-5 text-[#6a6a6a] absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
+              </svg>
+              <input
+                type="text"
+                placeholder="Buscar producto..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full min-h-[44px] pl-12 pr-4 py-3 bg-[#f8f8f8] rounded-xl text-base text-[#222222] placeholder-[#929292] focus:outline-none focus:ring-2 focus:ring-[#ff385c]/20 touch-manipulation"
+                aria-label="Buscar producto"
+                autoComplete="off"
+              />
+            </div>
+          </div>
+       </div>
+
+        <div className="flex-1 glass border-t border-white/80 rounded-t-[2.5rem] -mt-12 px-5 pt-8 pb-0 relative z-10 shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
+          {/* Acciones de la pagina en mobile: en la barra solo entran desde desktop. */}
+          <div className="md:hidden mb-5 flex gap-3">
+            <ActionCard
+              label="Caja"
+              hint="Ingresos y egresos"
+              onClick={() => setCashModalOpen(true)}
+              icon={
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 3s1.343 3 3 3 3 .895 3 3-1.343 3-3 3-3 .895-3 3zm0 8c1.11 0 2.08-.402 2.599-1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              }
+            />
+            <ActionCard
+              label="Cerrar caja"
+              hint="Corte por sucursal"
+              onClick={() => setCloseModalOpen(true)}
+              icon={
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+              }
+            />
+          </div>
+
+          {sales.length === 0 ? (
+            <div className="text-center py-12">
+              <div className="w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center">
+                <svg className="w-8 h-8 text-[#6a6a6a]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 3s1.343 3 3 3 3 .895 3 3-1.343 3-3 3-3 .895-3 3zm0 8c1.11 0 2.08-.402 2.599-1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
               </div>
-            )}
-          </>
-        )}
+              <p className="text-[#6a6a6a]">
+                {debouncedSearch ? 'No se encontraron ventas' : 'No hay ventas registradas'}
+              </p>
+              <p className="text-sm text-[#6a6a6a] mt-1">
+                {debouncedSearch
+                  ? 'Probá con otro producto o código'
+                  : 'Toca el botón + para registrar una venta'}
+              </p>
+            </div>
+          ) : (
+            <>
+              <SalesList sales={sales} />
+              {sales.length < total && (
+                <div className="mt-6 flex justify-center">
+                  <button
+                    type="button"
+                    onClick={loadMore}
+                    disabled={loadingMore}
+                    className="w-full sm:w-auto px-6 min-h-[44px] text-sm font-medium text-white bg-[#ff385c] rounded-xl hover:bg-[#e00b41] transition-colors touch-manipulation disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {loadingMore ? 'Cargando...' : 'Cargar más'}
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
       </main>
       <AddSaleButton products={products} onSuccess={bump} />
       <CashMovementsModal
