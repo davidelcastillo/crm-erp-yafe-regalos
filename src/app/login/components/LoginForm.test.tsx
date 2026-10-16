@@ -22,8 +22,10 @@ describe('LoginForm', () => {
   it('mantiene los campos, el recordarme y el botón de ingreso', () => {
     render(<LoginForm />);
 
-    expect(screen.getByLabelText(/correo electrónico/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/contraseña/i)).toBeInTheDocument();
+    // Exactos: el botón del ojo también se llama «…contraseña» y un regex suelto
+    // encontraría dos elementos.
+    expect(screen.getByLabelText(/^correo electrónico$/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^contraseña$/i)).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: /recordarme/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /iniciar sesión/i })).toBeInTheDocument();
   });
