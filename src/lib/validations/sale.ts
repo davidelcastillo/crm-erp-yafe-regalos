@@ -5,9 +5,8 @@ import { PaymentMethod, computePayment } from "@/lib/utils/payment";
 /**
  * Export del schema de venta que ya existía inline en `src/app/actions/sale.ts`.
  *
- * Exportado aquí para que el `SaleForm` pueda reutilizarlo para validación
- * client-side (refactor opcional — el inline en `sale.ts` se mantiene para
- * no romper callers existentes; ambos deben mantenerse en sync).
+ * Se mantiene también el schema inline en `src/app/actions/sale.ts` (es el que
+ * valida el alta de venta): si cambia uno, el otro tiene que cambiar también.
  */
 export const saleItemSchema = z.object({
   productId: z.number().int().positive("Producto inválido"),
@@ -38,5 +37,5 @@ export const registerSaleSchema = z
 export type SaleItem = z.infer<typeof saleItemSchema>;
 export type RegisterSaleValues = z.infer<typeof registerSaleSchema>;
 
-// Re-export los tipos de utilidades de pago para uso del SaleForm
+// Re-export de las utilidades de pago
 export { PaymentMethod, computePayment };
