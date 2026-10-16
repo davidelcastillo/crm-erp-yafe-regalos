@@ -22,10 +22,10 @@ jest.mock('./components/PurchasesList', () => ({ PurchasesList: () => null }));
 jest.mock('./components/AddPurchaseButton', () => ({ AddPurchaseButton: () => null }));
 jest.mock('@/lib/hooks/useReloadKey', () => ({ useReloadKey: () => [0, jest.fn()] }));
 
-// El encabezado compartido cierra sesión con `useAuth`; acá solo importa el
-// filtrado de productos, así que se mockea (sin sesión server en jsdom).
-jest.mock('@/hooks/useAuth', () => ({
-  useAuth: () => ({ user: null, logout: jest.fn() }),
+// El encabezado compartido cierra sesión con la acción y navega con el router.
+jest.mock('@/actions/auth', () => ({ logout: jest.fn() }));
+jest.mock('next/navigation', () => ({
+  useRouter: () => ({ push: jest.fn(), refresh: jest.fn() }),
 }));
 
 jest.mock('@/components/ui/BranchSelector', () => ({

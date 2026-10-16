@@ -122,7 +122,7 @@ export default function VentasPage() {
   return (
     <div className="min-h-screen bg-white pb-20 relative">
       <main className="">
-        <div className="pb-10 brand-gradient">
+        <div className="pb-8 brand-gradient">
           <PageHeader
             title="Ventas"
             right={
@@ -151,54 +151,65 @@ export default function VentasPage() {
             }
           />
 
-          <div className="mb-6 flex items-center justify-between flex-wrap gap-3 rounded-2xl bg-white/80 px-4 py-3">
-            <div className="relative w-full sm:w-auto">
-              <svg className="w-5 h-5 text-[#6a6a6a] absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
-              </svg>
-              <input
-                type="text"
-                placeholder="Buscar producto..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full min-h-[44px] pl-12 pr-4 py-3 bg-[#f8f8f8] rounded-xl text-base text-[#222222] placeholder-[#929292] focus:outline-none focus:ring-2 focus:ring-[#ff385c]/20 touch-manipulation"
-                aria-label="Buscar producto"
-                autoComplete="off"
+          {/* Acciones de la pagina: en su propio div, como el del buscador, con el
+              fondo de marca a la vista. En desktop pasan a la barra. */}
+          <div className="mt-4 px-3 md:hidden">
+            <div className="flex gap-3">
+              <ActionCard
+                label="Caja"
+                hint="Ingresos y egresos"
+                onClick={() => setCashModalOpen(true)}
+                icon={
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <rect x="2.5" y="6.5" width="19" height="11" rx="2" strokeWidth={2} />
+                    <circle cx="12" cy="12" r="2.5" strokeWidth={2} />
+                    <path strokeLinecap="round" strokeWidth={2} d="M6.5 12h.01M17.5 12h.01" />
+                  </svg>
+                }
+              />
+              <ActionCard
+                label="Cerrar caja"
+                hint="Corte por sucursal"
+                onClick={() => setCloseModalOpen(true)}
+                icon={
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <rect x="3" y="7" width="18" height="13" rx="2" strokeWidth={2} />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 11h18M9.5 15.5l1.75 1.75L15 13.5" />
+                  </svg>
+                }
               />
             </div>
           </div>
-       </div>
 
-        <div className="flex-1 glass border-t border-white/80 rounded-t-[2.5rem] -mt-12 px-5 pt-8 pb-0 relative z-10 shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
-          {/* Acciones de la pagina en mobile: en la barra solo entran desde desktop. */}
-          <div className="md:hidden mb-5 flex gap-3">
-            <ActionCard
-              label="Caja"
-              hint="Ingresos y egresos"
-              onClick={() => setCashModalOpen(true)}
-              icon={
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 3s1.343 3 3 3 3 .895 3 3-1.343 3-3 3-3 .895-3 3zm0 8c1.11 0 2.08-.402 2.599-1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          {/* Buscador: su propio div, separado del encabezado. */}
+          <div className="mt-4 px-3">
+            <div className="rounded-2xl glass-strong px-4 py-3">
+              <div className="relative w-full">
+                <svg className="w-5 h-5 text-[#6a6a6a] absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
                 </svg>
-              }
-            />
-            <ActionCard
-              label="Cerrar caja"
-              hint="Corte por sucursal"
-              onClick={() => setCloseModalOpen(true)}
-              icon={
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                </svg>
-              }
-            />
+                <input
+                  type="text"
+                  placeholder="Buscar producto..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full min-h-[44px] pl-12 pr-4 py-3 bg-[#f8f8f8] rounded-xl text-base text-[#222222] placeholder-[#929292] focus:outline-none focus:ring-2 focus:ring-[#ff385c]/20 touch-manipulation"
+                  aria-label="Buscar producto"
+                  autoComplete="off"
+                />
+              </div>
+            </div>
           </div>
+        </div>
 
+        <div className="glass border-t border-white/80 rounded-t-[2.5rem] -mt-6 px-5 pt-8 shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
           {sales.length === 0 ? (
             <div className="text-center py-12">
               <div className="w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center">
-                <svg className="w-8 h-8 text-[#6a6a6a]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 3s1.343 3 3 3 3 .895 3 3-1.343 3-3 3-3 .895-3 3zm0 8c1.11 0 2.08-.402 2.599-1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                <svg className="w-8 h-8 text-[#6a6a6a]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <rect x="2.5" y="6.5" width="19" height="11" rx="2" strokeWidth={2} />
+                  <circle cx="12" cy="12" r="2.5" strokeWidth={2} />
+                  <path strokeLinecap="round" strokeWidth={2} d="M6.5 12h.01M17.5 12h.01" />
                 </svg>
               </div>
               <p className="text-[#6a6a6a]">
