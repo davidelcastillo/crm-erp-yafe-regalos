@@ -58,7 +58,10 @@ export const PageHeader = ({ title, actions, right, menuItems = [] }: PageHeader
 
   return (
     <>
-      <header className="px-3 pt-6">
+      {/* `relative z-20`: la píldora usa `backdrop-filter` y eso crea un contexto de
+          apilado propio; sin este z-index, la hoja de vidrio de abajo (que también
+          lo crea) se pinta encima y tapa los desplegables del encabezado. */}
+      <header className="relative z-20 px-3 pt-6">
         {/* En mobile el contenido de la derecha se envuelve a su propia línea. */}
         <div className="flex flex-wrap items-center gap-3 rounded-2xl glass-strong px-4 py-3">
           <button
