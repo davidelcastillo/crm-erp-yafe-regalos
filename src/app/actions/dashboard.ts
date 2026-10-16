@@ -72,9 +72,10 @@ async function fetchStats(
   where: Record<string, unknown> = {},
   cajaWhere: Record<string, unknown> = {}
 ) {
-  // Las ventas y la plata son la caja: llevan el piso del último cierre (S17).
-  // Las compras no: no son la caja y siguen el período elegido. El `AND` solo
-  // aparece cuando hay un cierre; sin cierres la consulta queda como estaba.
+  // Ventas, plata y compras se miden desde el último cierre (S21): las tarjetas
+  // por defecto comparan el mismo tramo, así el neto no enfrenta el ingreso de
+  // la caja nueva con todos los egresos del período. El `AND` solo aparece
+  // cuando hay un cierre; sin cierres la consulta queda como estaba.
   const hayPiso = Object.keys(cajaWhere).length > 0;
   const deCaja = hayPiso ? { AND: [where, cajaWhere] } : where;
 
@@ -87,7 +88,7 @@ async function fetchStats(
   // Get all purchases
   const purchases = await prisma.purchase.aggregate({
     _sum: { totalAmount: true },
-    where,
+    where: deCaja,
   });
 
   // Cuentas por cobrar: pendiente generado en el período y la sucursal filtrados.
@@ -215,8 +216,7 @@ export async function getPerformanceData(data?: unknown) {
     const purchases = await prisma.purchase.groupBy({
       by: ["date"],
       where: {
-        date: dateFilter,
-        ...branchWhere,
+        AND: [{ date: dateFilter }, branchWhere, caja],
       },
       _sum: {
         totalAmount: true,

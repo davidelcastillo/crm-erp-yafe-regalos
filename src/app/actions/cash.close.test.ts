@@ -14,7 +14,7 @@
  */
 import { prisma } from '@/lib/prisma'
 import { closeCash, getCashClosePreview } from './cash'
-import { getStats } from './dashboard'
+import { getStats, getPerformanceData } from './dashboard'
 
 jest.setTimeout(30000)
 
@@ -34,6 +34,7 @@ const VENTA_NUEVA = 70
 const INGRESO_ANTERIOR = 999
 const INGRESO_POSTERIOR = 40
 const COMPRA_DEL_PERIODO = 500
+const COMPRA_ANTERIOR = 700
 
 let branchId = 0
 let branchInactivaId = 0
@@ -195,6 +196,17 @@ describe('cierre de caja (integración, base local)', () => {
     })
     comprasIds.push(compra.id)
 
+    // Compra anterior al cierre: S21 (L26) pide que las tarjetas por defecto
+    // midan los egresos desde el cierre, asi el neto compara el mismo tramo.
+    const compraAnterior = await prisma.purchase.create({
+      data: {
+        branchId,
+        totalAmount: COMPRA_ANTERIOR,
+        date: new Date(closedAt.getTime() - 60_000),
+      },
+    })
+    comprasIds.push(compraAnterior.id)
+
     const preview = await getCashClosePreview({ branchId })
     if (!preview.success) throw new Error(preview.error)
     expect(preview.data).toMatchObject({
@@ -211,6 +223,14 @@ describe('cierre de caja (integración, base local)', () => {
     // Solo la venta nueva más la plata posterior al cierre; la anterior no cuenta.
     expect(stats.data!.totalIncome).toBe(VENTA_NUEVA + INGRESO_POSTERIOR)
     expect(stats.data!.totalExpense).toBe(COMPRA_DEL_PERIODO)
+
+    const grafico = await getPerformanceData({ days: 7, branchId })
+    if (!grafico.success) throw new Error(grafico.error)
+    const egresosDelGrafico = grafico.data!.reduce(
+      (acc, dia) => acc + dia.expense,
+      0
+    )
+    expect(egresosDelGrafico).toBe(COMPRA_DEL_PERIODO)
   })
 
   it('(d) rechaza el cierre de una sucursal inactiva sin dejar corte', async () => {
