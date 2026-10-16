@@ -515,6 +515,27 @@ There are no progressive elevation tiers — the system either has the one shado
 
 **`legal-band`** — A bottom strip beneath the footer columns carrying the copyright line, language picker (globe icon + "English (US)" link), currency picker, and social icons (Facebook, X, Instagram). All text in muted `{colors.muted}` at `{typography.caption-sm}`.
 
+### Marca: degradés, superficies y contraste
+
+El rebranding reemplaza el rojo `#ff385c` (que sigue existiendo como legado, pendiente de migrar componente por componente) por dos degradés, cada uno con su uso:
+
+| Nombre | Clases | Uso |
+|---|---|---|
+| **Degradé claro** | `.brand-gradient` (celeste `#bfdbfe` → rosa `#f472b6`) | Bandas de encabezado y botones de acción. **Texto oscuro** (`text-gray-800` / `#222222`). |
+| **Degradé fuerte** | `.brand-gradient-strong` (violeta `#a855f7` → rosa fuerte `#ec4899`) | Solo decorativo o texto grande en negrita (≥ 18,66 px). |
+| Interacción | `.brand-gradient-hover` | Sobre el degradé claro: oscurece un poco en vez de cambiar de tono, así el texto oscuro conserva el contraste. |
+
+- **Sobre el degradé claro el texto va oscuro.** `text-gray-800` da **10,2:1** en el extremo celeste y **5,5:1** en el rosa: AA cumplido con margen. **Blanco sobre el mismo degradé da ~1,9:1 en el celeste: falla.** Es el error más fácil de cometer al copiar un botón viejo (los del rojo usaban texto blanco).
+- Sobre el degradé fuerte, blanco da **3,5–3,9:1**: alcanza para texto grande en negrita o para íconos (piso 3:1), **no** para una etiqueta de 14 px.
+- Superficies de vidrio: `.glass` (blanco 70 % + blur 24 px) para el cuerpo de las páginas y las tarjetas; `.glass-strong` (blanco 80 % + blur 16 px) para barras y píldoras del encabezado. Van **sobre el degradé**, nunca sobre blanco puro: ahí no se distinguen del fondo.
+
+### Encabezado de página y acciones
+
+- Una sola fila en mobile: botón **☰**, título y, si hace falta, el selector de sucursal (`PageHeader`).
+- Las **acciones de la página** (por ejemplo «Caja» y «Cerrar caja») van como **tarjetas de vidrio** debajo del encabezado en mobile (`ActionCard`) y como botones dentro de la barra desde desktop (`actions`). No se esconden en el menú: son la razón por la que se entra a la página.
+- El **cierre de sesión** vive dentro del menú ☰ en mobile y visible en la barra en desktop.
+- El menú es mobile-only (`md:hidden`) y se cierra con Escape, con el botón ✕ o tocando el fondo; sus filas tienen 48 px de alto.
+
 ### Badges de estado
 
 Un badge por caso, con un color propio y contraste medido:

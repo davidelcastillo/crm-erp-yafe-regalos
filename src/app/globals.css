@@ -12,6 +12,14 @@
   /* Brand accent */
   --palette-rausch-red: #ff385c;
   --palette-deep-rausch: #e00b41;
+
+  /* Rebranding: degradé celeste -> rosa (superficies y botones) y violeta -> rosa
+     fuerte (decorativo). El degradé claro lleva TEXTO OSCURO: blanco sobre el
+     celeste no llega a 4.5:1 (regla y números en STYLE.md). */
+  --palette-brand-celeste: #bfdbfe;
+  --palette-brand-rosa: #f472b6;
+  --palette-brand-violeta: #a855f7;
+  --palette-brand-rosa-fuerte: #ec4899;
   
   /* Shadows */
   --shadow-card: rgba(0,0,0,0.02) 0px 0px 0px 1px, rgba(0,0,0,0.04) 0px 2px 6px, rgba(0,0,0,0.1) 0px 4px 8px;
@@ -36,6 +44,10 @@
   --color-light-surface: var(--palette-light-surface);
   --color-rausch-red: var(--palette-rausch-red);
   --color-deep-rausch: var(--palette-deep-rausch);
+  --color-brand-celeste: var(--palette-brand-celeste);
+  --color-brand-rosa: var(--palette-brand-rosa);
+  --color-brand-violeta: var(--palette-brand-violeta);
+  --color-brand-rosa-fuerte: var(--palette-brand-rosa-fuerte);
   
   /* Shadows */
   --shadow-card: var(--shadow-card);
@@ -45,6 +57,8 @@
 /* Entrance animation for centered modals: soft fade + scale (mobile-first). */
 @theme {
   --animate-scale-in: scale-in 0.2s ease-out;
+  --animate-fade-in: fade-in 0.2s ease-out;
+  --animate-fade-in-right: fade-in-right 0.25s ease-out;
 
   @keyframes scale-in {
     from {
@@ -56,6 +70,70 @@
       transform: scale(1);
     }
   }
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  /* Menú lateral: entra desde la izquierda, que es donde está el botón que lo abre. */
+  @keyframes fade-in-right {
+    from {
+      opacity: 0;
+      transform: translateX(-1rem);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+}
+
+/* Marca: dos degradés con usos distintos (reglas de contraste en STYLE.md).
+   - `brand-gradient` (claro): encabezados y botones de acción, con texto oscuro.
+   - `brand-gradient-strong`: decorativo o texto grande en negrita. */
+.brand-gradient {
+  background-image: linear-gradient(
+    to right,
+    var(--palette-brand-celeste),
+    var(--palette-brand-rosa)
+  );
+}
+
+.brand-gradient-strong {
+  background-image: linear-gradient(
+    to right,
+    var(--palette-brand-violeta),
+    var(--palette-brand-rosa-fuerte)
+  );
+}
+
+/* Interacción sobre el degradé claro: se oscurece un poco en vez de cambiar de
+   tono, así el texto oscuro conserva el contraste (ver STYLE.md). */
+.brand-gradient-hover {
+  transition: filter 200ms ease;
+}
+
+.brand-gradient-hover:hover {
+  filter: brightness(0.96) saturate(1.05);
+}
+
+/* Superficies de vidrio del rebranding: siempre sobre el degradé o una imagen,
+   nunca sobre blanco puro (ahí no se distingue del fondo). */
+.glass {
+  background-color: rgb(255 255 255 / 0.7);
+  -webkit-backdrop-filter: blur(24px);
+  backdrop-filter: blur(24px);
+}
+
+.glass-strong {
+  background-color: rgb(255 255 255 / 0.8);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
 }
 
 /* Native <select> <option> best-effort styling (browser rendering varies). */
@@ -70,7 +148,9 @@ select option:checked {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .animate-scale-in {
+  .animate-scale-in,
+  .animate-fade-in,
+  .animate-fade-in-right {
     animation: none;
   }
 }

@@ -1,0 +1,92 @@
+/**
+ * @jest-environment jsdom
+ */
+
+/**
+ * Encabezado de página compartido: en mobile la barra tiene el botón ☰ (que
+ * esconde las filas del menú y el cierre de sesión) y en desktop las acciones y
+ * el cierre de sesión quedan a la vista.
+ *
+ * Nota: jsdom no aplica CSS, así que el `hidden md:flex` de los controles de
+ * escritorio y el `md:hidden` del menú no se pueden comprobar acá. Lo que sí se
+ * fija es el contrato: el menú es un diálogo aparte que se abre, se cierra y
+ * lleva el cierre de sesión.
+ */
+import { render, screen, fireEvent, within } from "@testing-library/react";
+import { PageHeader } from "./PageHeader";
+
+const mockLogout = jest.fn();
+
+jest.mock("@/hooks/useAuth", () => ({
+  useAuth: () => ({ user: { email: "admin@feriaconexx.com" }, logout: mockLogout }),
+}));
+
+const renderHeader = () =>
+  render(
+    <PageHeader
+      title="Ventas"
+      actions={<button type="button">Acción de escritorio</button>}
+      right={<span>Sucursal activa</span>}
+      menuItems={[{ label: "Ver movimientos", onClick: jest.fn() }]}
+    />
+  );
+
+const menu = () => screen.getByRole("dialog");
+
+beforeEach(() => {
+  jest.clearAllMocks();
+});
+
+describe("PageHeader", () => {
+  it("muestra el título, el contenido de la derecha y las acciones, con el menú cerrado", () => {
+    renderHeader();
+
+    expect(screen.getByRole("heading", { name: "Ventas" })).toBeInTheDocument();
+    expect(screen.getByText("Sucursal activa")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Acción de escritorio" })).toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("el botón ☰ abre el menú con sus filas y el cierre de sesión", () => {
+    renderHeader();
+
+    fireEvent.click(screen.getByLabelText("Abrir menú"));
+
+    expect(within(menu()).getByRole("button", { name: "Ver movimientos" })).toBeInTheDocument();
+    expect(within(menu()).getByRole("button", { name: "Cerrar sesión" })).toBeInTheDocument();
+  });
+
+  it("Escape cierra el menú", () => {
+    renderHeader();
+    fireEvent.click(screen.getByLabelText("Abrir menú"));
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+
+    fireEvent.keyDown(window, { key: "Escape" });
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("cerrar sesión llama a logout y cierra el menú", async () => {
+    mockLogout.mockResolvedValue(undefined);
+    renderHeader();
+
+    fireEvent.click(screen.getByLabelText("Abrir menú"));
+    fireEvent.click(within(menu()).getByRole("button", { name: "Cerrar sesión" }));
+
+    expect(mockLogout).toHaveBeenCalled();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("una fila del menú se cierra al tocarla y dispara su acción", () => {
+    const onClick = jest.fn();
+    render(
+      <PageHeader title="Ventas" menuItems={[{ label: "Ver movimientos", onClick }]} />
+    );
+
+    fireEvent.click(screen.getByLabelText("Abrir menú"));
+    fireEvent.click(within(menu()).getByRole("button", { name: "Ver movimientos" }));
+
+    expect(onClick).toHaveBeenCalled();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+});
