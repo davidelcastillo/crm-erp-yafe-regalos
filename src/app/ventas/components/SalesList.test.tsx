@@ -44,10 +44,12 @@ describe("SalesList: marca de la caja anterior (S17)", () => {
     expect(cardDe(container).className).toContain("bg-[#f2f2f2]");
   });
 
-  it("no muestra el rótulo y deja el fondo blanco en una venta sin caja anterior", () => {
+  it("no muestra el rótulo y deja el fondo claro en una venta sin caja anterior", () => {
     const { container } = render(<SalesList sales={[ventaBase]} />);
 
     expect(screen.queryByText("Caja anterior")).not.toBeInTheDocument();
-    expect(cardDe(container).className).toContain("bg-white");
+    // Superficie normal (token `glass`), no la oscurecida de la caja anterior.
+    expect(cardDe(container).className).toContain("glass");
+    expect(cardDe(container).className).not.toContain("bg-[#f2f2f2]");
   });
 });

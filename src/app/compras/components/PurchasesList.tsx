@@ -41,30 +41,30 @@ export function PurchaseCard({ purchase, onExpand, expanded }: PurchaseCardProps
   const total = purchase.totalAmount;
 
     return (
-    <div className="bg-white/70 backdrop-blur-2xl rounded-2xl ">
+    <div className="glass rounded-2xl">
       <div className="p-4 cursor-pointer" onClick={onExpand}>
-        <div className="flex justify-between items-start">
-          <div className="flex-1">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
             <h3 className="text-base font-semibold text-[#222222]">{itemCount} {itemCount === 1 ? 'producto' : 'productos'}</h3>
-            <p className="text-sm text-[#6a6a6a] mt-1">
+            <p className="text-sm text-[#6a6a6a] mt-1 break-words">
               {purchase.items.map(item => item.product.name).join(', ')}
             </p>
             {purchase.branch && (
-              <span className="inline-block mt-1 px-2 py-0.5 bg-[#3b82f6]/10 text-[#3b82f6] rounded text-xs font-medium">
+              <span className="inline-block max-w-full truncate align-top mt-1 px-2 py-0.5 bg-[#3b82f6]/10 text-[#3b82f6] rounded text-xs font-medium">
                 {purchase.branch.name}
               </span>
             )}
           </div>
-          <div className="flex flex-col items-end gap-2">
+          <div className="flex shrink-0 flex-col items-end gap-2">
             <span className="text-lg font-bold text-red-800">- ${total.toFixed(2)}</span>
             <svg className={`w-5 h-5 text-[#6a6a6a] transition-transform ${expanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
             </svg>
           </div>
         </div>
-        <div className="mt-3 pt-3 border-t border-gray-100 flex justify-between items-center">
+        <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between gap-3">
           <p className="text-xs text-[#6a6a6a]">{formattedDate}</p>
-          <span className="text-xs text-[#6a6a6a]">Toca para ver detalles</span>
+          <span className="text-xs text-[#6a6a6a] shrink-0">Toca para ver detalles</span>
         </div>
       </div>
 
@@ -72,12 +72,12 @@ export function PurchaseCard({ purchase, onExpand, expanded }: PurchaseCardProps
         <div className="px-4 pb-4 border-t border-gray-100">
           <div className="mt-3 space-y-3">
             {purchase.items.map((item) => (
-              <div key={item.id} className="flex justify-between items-center text-sm">
-                <div>
-                  <p className="text-[#222222] font-medium">{item.product.name}</p>
+              <div key={item.id} className="flex items-center justify-between gap-3 text-sm">
+                <div className="min-w-0">
+                  <p className="text-[#222222] font-medium break-words">{item.product.name}</p>
                   <p className="text-[#6a6a6a] text-xs">{item.quantity} x ${item.price.toFixed(2)}</p>
                 </div>
-                <div className="text-right">
+                <div className="shrink-0 text-right">
                   <p className="text-[#222222] font-medium">${item.subtotal.toFixed(2)}</p>
                   <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-50 text-green-700">+{item.quantity}</span>
                 </div>
