@@ -311,7 +311,10 @@ export async function getProductMovements(productId: number) {
     const branchMovements = await prisma.branchMovement.findMany({
       where: {
         productId,
-        NOT: { movementType: 'ENTRY', reference: { startsWith: 'PURCHASE-' } },
+        NOT: [
+          { movementType: 'ENTRY', reference: { startsWith: 'PURCHASE-' } },
+          { movementType: 'EXIT', reference: { startsWith: 'SALE-' } },
+        ],
       },
       include: { branch: { select: { name: true } } },
       orderBy: { createdAt: 'desc' },

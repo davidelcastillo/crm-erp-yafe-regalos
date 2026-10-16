@@ -25,6 +25,8 @@ const registerSaleSchema = z.object({
   // MIXTO manual inputs
   cashAmount: z.number().min(0).optional(),
   transferAmount: z.number().min(0).optional(),
+  // Actor del libro de la sucursal (audit trail del movimiento EXIT).
+  performedBy: z.string().min(1).max(100).optional(),
 }).refine(
   (data) =>
     data.paymentMethod !== PaymentMethod.MIXTO ||
@@ -66,6 +68,7 @@ export async function registerSale(data: unknown) {
     const totalAmount = validatedData.items.reduce((sum, item) => {
       return sum + item.price * item.quantity;
     }, 0);
+    const { performedBy } = validatedData;
 
     // Calcular payment allocation
     // If paymentMethod provided, use computePayment (overrides amountPaid)
@@ -153,6 +156,22 @@ export async function registerSale(data: unknown) {
       await tx.saleItem.createMany({
         data: itemsData,
       });
+
+      // 2.5. Libro de la sucursal: la venta saca stock de esa sucursal. Antes solo
+      //      bajaba BranchInventory, así que el historial del producto y la
+      //      auditoría de stock no veían la venta (hallazgo de T10.1).
+      if (performedBy) {
+        await tx.branchMovement.createMany({
+          data: validatedData.items.map((item) => ({
+            productId: item.productId,
+            branchId: validatedData.branchId,
+            movementType: "EXIT",
+            quantity: item.quantity,
+            reference: `SALE-${sale.id}`,
+            performedBy,
+          })),
+        });
+      }
 
       // 3. Obtener los items creados para retornar
       const createdItems = await tx.saleItem.findMany({

@@ -135,6 +135,17 @@ describe('getProductMovements con movimientos de sucursal (integración, base lo
           performedBy: 'qa',
         },
       }),
+      // El EXIT que deja la venta: tampoco se lista aparte, la venta ya es una fila.
+      prisma.branchMovement.create({
+        data: {
+          productId,
+          branchId: branchAId,
+          movementType: 'EXIT',
+          quantity: 2,
+          reference: `SALE-${venta.id}`,
+          performedBy: 'qa',
+        },
+      }),
       // De otro producto: no tiene que aparecer.
       prisma.branchMovement.create({
         data: {
@@ -198,5 +209,7 @@ describe('getProductMovements con movimientos de sucursal (integración, base lo
     const ventas = porTipo(datos, 'SALE')
     expect(ventas).toHaveLength(1)
     expect(ventas[0]).toMatchObject({ quantity: 2, referenceId: saleId, branchName: nombreA })
+
+    expect(porTipo(datos, 'EXIT')).toHaveLength(0)
   })
 })

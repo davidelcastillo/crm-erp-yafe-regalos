@@ -14,6 +14,7 @@ import React from "react";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { AddSaleButton } from "./AddSaleButton";
 import { registerSale } from "@/app/actions/sale";
+import { getUser } from "@/actions/auth";
 import Swal from "sweetalert2";
 import { Product } from "@prisma/client";
 
@@ -29,7 +30,11 @@ jest.mock("@/app/actions/customer", () => ({
   getCustomers: jest.fn().mockResolvedValue({ success: true, data: [] }),
 }));
 
+jest.mock("@/actions/auth", () => ({ getUser: jest.fn() }));
+
 let mockBranchId: number | null = 1;
+
+const mockGetUser = getUser as jest.MockedFunction<typeof getUser>;
 
 jest.mock("@/lib/context/BranchContext", () => ({
   useBranch: () => ({
@@ -133,6 +138,21 @@ describe("AddSaleButton MIXTO (mejoras-f3-f4 item 4)", () => {
           paymentMethod: "TRANSFERENCIA",
           amountPaid: 200,
         })
+      );
+    });
+  });
+
+  // T15: el movimiento de la venta en el libro de la sucursal necesita el actor.
+  it("manda performedBy (de getUser) con la venta", async () => {
+    mockGetUser.mockResolvedValue({ email: "admin@feriaconexx.com" });
+    setup();
+    await openAndFillSale();
+
+    fireEvent.click(screen.getByRole("button", { name: "Registrar Venta" }));
+
+    await waitFor(() => {
+      expect(registerSale).toHaveBeenCalledWith(
+        expect.objectContaining({ performedBy: "admin@feriaconexx.com" })
       );
     });
   });

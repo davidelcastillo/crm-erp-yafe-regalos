@@ -3,6 +3,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { registerSale } from "../../actions/sale";
+import { getUser } from "@/actions/auth";
 import { getCustomers } from "../../actions/customer";
 import { useRouter } from "next/navigation";
 import { Product } from "@prisma/client";
@@ -193,6 +194,9 @@ export function AddSaleButton({ products, onSuccess }: AddSaleButtonProps) {
 
      setLoading(true);
 
+     // performedBy: email del usuario autenticado (libro de movimientos de la sucursal)
+     const user = await getUser();
+
      const result = await registerSale({
        items: validItems.map(item => ({
          productId: parseInt(item.productId),
@@ -202,6 +206,7 @@ export function AddSaleButton({ products, onSuccess }: AddSaleButtonProps) {
        branchId: saleBranchId,
        customerId: selectedCustomerId ? parseInt(selectedCustomerId) : undefined,
        paymentMethod: paymentMethod,
+       ...(user?.email ? { performedBy: user.email } : {}),
        ...(paymentMethod === "MIXTO"
          ? {
              cashAmount: parseFloat(cashAmount) || 0,
