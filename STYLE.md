@@ -515,6 +515,28 @@ There are no progressive elevation tiers — the system either has the one shado
 
 **`legal-band`** — A bottom strip beneath the footer columns carrying the copyright line, language picker (globe icon + "English (US)" link), currency picker, and social icons (Facebook, X, Instagram). All text in muted `{colors.muted}` at `{typography.caption-sm}`.
 
+### Botones
+
+Todo botón del sistema sale de estas clases (definidas en `src/app/globals.css`): en el componente se elige la variante, y el **layout** (ancho, `w-full`, `flex-1`) lo sigue decidiendo el componente.
+
+| Clase | Uso | Color |
+|---|---|---|
+| `btn` (base) | Forma, altura táctil de 44 px, foco, estado deshabilitado y el hundido al tocar. **No se repite en los componentes.** | — |
+| `btn btn-primary` | La acción principal de una pantalla o de un modal. **Una sola por pantalla.** | Violeta `#6d28d9` + blanco (**7,1:1**) |
+| `btn btn-secondary` | Neutra: cancelar, volver, alternativa. | Gris claro `#f2f2f2` + texto oscuro |
+| `btn btn-danger` | Destructiva o irreversible (eliminar, desactivar). | Rojo `#dc2626` + blanco (**4,8:1**) |
+| `btn btn-ghost` | Terciaria sobre superficie clara, con borde. | Blanco + borde |
+| `btn btn-active` | Estado **elegido** de un control segmentado (filtros, sí/no, períodos). | Casi negro + blanco |
+| `btn btn-icon` | Cuadrado de 44 px para acciones con ícono; se suma a la variante de color. **Solo `btn btn-icon` (sin variante) queda transparente**: es lo correcto para un ícono sobre una barra o un modal. | — |
+| `btn btn-icon btn-round` | Lo mismo pero circular: el **cerrar (✕)** de un modal. (El radio del base le gana a `rounded-full` de Tailwind porque este CSS no está en una capa: por eso existe la clase.) | — |
+| `btn btn-sm` | Chico (36 px): controles **dentro** de un campo —el «+» de un buscador— o filas muy densas. | — |
+| `.btn-fab` | Círculo flotante de «agregar»: la única excepción que conserva el degradé claro. | Degradé claro + **texto oscuro** |
+
+- **Nada de colores de botón escritos a mano en un componente.** Si falta una variante, se agrega acá y se usa en todos lados.
+- **El sistema vive en `@layer components`**: así las utilidades de Tailwind (`hidden`, `md:inline-flex`, `justify-between`, `rounded-full`) le ganan en el componente, que es lo que se espera. Si se saca de la capa, hay que parchear con `!` cada vez.
+- **Una sola acción principal por pantalla o modal** (regla por defecto). Si dos acciones compiten, la más frecuente es primaria y la otra secundaria. **Excepción pedida por el usuario**: en el encabezado de `/ventas`, «Caja» y «Cerrar caja» van las dos en `btn btn-primary`, porque se ven solo desde desktop y son las dos acciones de la pantalla.
+- Los `btn-fab` son la única superficie que conserva el degradé claro.
+
 ### Marca: degradés, superficies y contraste
 
 El rebranding reemplaza el rojo `#ff385c` (que sigue existiendo como legado, pendiente de migrar componente por componente) por dos degradés, cada uno con su uso:

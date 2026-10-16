@@ -97,6 +97,13 @@
   }
 }
 
+/* Las clases del sistema viven en la capa `components` a propósito: así las
+   utilidades de Tailwind (`hidden`, `md:inline-flex`, `justify-between`,
+   `rounded-full`) pueden ganarles en el componente, que es lo que se espera. Si
+   quedaran fuera de las capas, le ganarían a las utilidades y habría que
+   parchear con `!` cada vez. */
+@layer components {
+
 /* Marca: dos degradés con usos distintos (reglas de contraste en STYLE.md).
    - `brand-gradient` (claro): encabezados y botones de acción, con texto oscuro.
    - `brand-gradient-strong`: decorativo o texto grande en negrita. */
@@ -126,21 +133,149 @@
   filter: brightness(0.96) saturate(1.05);
 }
 
-/* Botón de acción. Sólido en los dos tamaños de pantalla: el degradé claro del
-   resto de la marca pierde presencia en un botón chico y con texto blanco no
-   llega al contraste. El violeta de marca es el que más aguanta (7.1:1). */
-.brand-action {
-  background-color: var(--palette-brand-action);
-  color: #ffffff;
-  transition: filter 200ms ease;
+/* ============================================================================
+   BOTONES DEL SISTEMA
+
+   Toda la forma y el color de un botón viven acá: en el componente se elige la
+   variante (`className="btn btn-primary"`) y el layout (ancho, `flex-1`) lo sigue
+   decidiendo el componente. Los colores están elegidos por contraste medido: cada
+   texto blanco llega a 4.5:1 (tabla completa en STYLE.md).
+   ============================================================================ */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 44px;
+  padding: 0.5rem 1rem;
+  border: 0;
+  border-radius: 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  font-weight: 500;
+  text-align: center;
+  cursor: pointer;
+  transition: background-color 150ms ease, filter 150ms ease, transform 100ms ease;
+  touch-action: manipulation;
 }
 
-.brand-action:hover {
+.btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--palette-brand-rosa-fuerte);
+  outline-offset: 2px;
+}
+
+/* Acción principal de una pantalla o de un modal. */
+.btn-primary {
+  background-color: var(--palette-brand-action);
+  color: #ffffff;
+}
+
+.btn-primary:hover:not(:disabled) {
   filter: brightness(1.12);
 }
 
-.brand-action:active {
-  filter: brightness(0.94);
+/* Acción neutra: cancelar, volver, alternativas. */
+.btn-secondary {
+  background-color: var(--palette-light-surface);
+  color: var(--palette-near-black);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background-color: #e5e5e5;
+}
+
+/* Acción destructiva o irreversible. */
+.btn-danger {
+  background-color: #dc2626;
+  color: #ffffff;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background-color: #b91c1c;
+}
+
+/* Terciaria: sobre superficie clara, con borde. */
+.btn-ghost {
+  background-color: #ffffff;
+  color: var(--palette-near-black);
+  border: 1px solid rgb(0 0 0 / 0.1);
+}
+
+.btn-ghost:hover:not(:disabled) {
+  background-color: #f7f7f7;
+}
+
+/* Estado elegido de un control segmentado (filtros, sí/no, períodos). */
+.btn-active {
+  background-color: var(--palette-near-black);
+  color: #ffffff;
+}
+
+/* Cuadrado de 44px para acciones con ícono (editar, eliminar, cerrar). */
+.btn-icon {
+  padding: 0;
+  width: 2.75rem;
+  height: 2.75rem;
+}
+
+/* Círculo: para el cerrar de un modal, donde el cuadrado se ve pesado.
+   Va después de `.btn` a propósito: este CSS no está en una capa, así que el
+   radio del base pisa la utilidad `rounded-full` de Tailwind y hay que ganarle
+   con otra clase del sistema. */
+.btn-round {
+  border-radius: 9999px;
+}
+
+/* Botón flotante de "agregar": el único que conserva el degradé claro, porque es
+   un círculo grande y el texto oscuro sostiene el contraste. */
+.btn-fab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.5rem;
+  height: 3.5rem;
+  border: 0;
+  border-radius: 9999px;
+  background-image: linear-gradient(
+    to right,
+    var(--palette-brand-celeste),
+    var(--palette-brand-rosa)
+  );
+  color: var(--palette-near-black);
+  box-shadow: var(--shadow-card);
+  cursor: pointer;
+  transition: filter 200ms ease, transform 100ms ease;
+  touch-action: manipulation;
+}
+
+.btn-fab:hover {
+  filter: brightness(0.96) saturate(1.05);
+}
+
+.btn-fab:active {
+  transform: scale(0.96);
+}
+
+/* Cuadrado chico para controles que van dentro de un campo (el «+» de un
+   buscador) o en filas muy densas: 36 px en vez de 44. */
+.btn-sm {
+  min-height: 36px;
+  padding: 0.25rem 0.625rem;
+  font-size: 0.8125rem;
+}
+
+.btn-sm.btn-icon {
+  width: 2.25rem;
+  height: 2.25rem;
 }
 
 /* Superficies de vidrio del rebranding: siempre sobre el degradé o una imagen,
@@ -156,6 +291,8 @@
   -webkit-backdrop-filter: blur(16px);
   backdrop-filter: blur(16px);
 }
+
+} /* fin de @layer components */
 
 /* Native <select> <option> best-effort styling (browser rendering varies). */
 select option {
