@@ -67,7 +67,7 @@ export function AddClienteButton({ onAdd }: AddClienteButtonProps) {
   return (
     <button
       onClick={handleAdd}
-      className="fixed bottom-24 right-6 w-14 h-14 bg-[#222222] rounded-full shadow-lg flex items-center justify-center hover:bg-[#333] transition-colors z-40"
+      className="fixed bottom-24 right-6 w-14 h-14 brand-gradient brand-gradient-hover text-gray-800 rounded-full shadow-lg flex items-center justify-center transition-colors z-40"
       aria-label="Agregar cliente"
     >
       <svg
