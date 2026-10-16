@@ -9,6 +9,7 @@ import {
   deleteBranch,
   getBranches,
 } from "@/app/actions/branch";
+import { BRANCH_STATUS_TONES } from "@/lib/status-tones";
 import type {
   CreateBranchValues,
   UpdateBranchValues,
@@ -357,17 +358,35 @@ export function BranchManager({ branches }: { branches: Branch[] }) {
                       {branch.name}
                     </h3>
                     {branch.id === 1 && (
-                      <span className="px-2 py-0.5 bg-[#3b82f6]/10 text-[#3b82f6] rounded text-xs font-medium">
+                      <span
+                        className="px-2 py-0.5 rounded text-xs font-medium"
+                        style={{
+                          backgroundColor: BRANCH_STATUS_TONES.principal.background,
+                          color: BRANCH_STATUS_TONES.principal.color,
+                        }}
+                      >
                         Principal
                       </span>
                     )}
                     {!branch.isActive && (
-                      <span className="px-2 py-0.5 bg-gray-100 text-[#6a6a6a] rounded text-xs">
+                      <span
+                        className="px-2 py-0.5 rounded text-xs"
+                        style={{
+                          backgroundColor: BRANCH_STATUS_TONES.inactive.background,
+                          color: BRANCH_STATUS_TONES.inactive.color,
+                        }}
+                      >
                         Inactiva
                       </span>
                     )}
                     {branch.isPublic === true && (
-                      <span className="px-2 py-0.5 bg-[#ff385c]/10 text-[#ff385c] rounded-full text-[11px] font-semibold">
+                      <span
+                        className="px-2 py-0.5 rounded-full text-[11px] font-semibold"
+                        style={{
+                          backgroundColor: BRANCH_STATUS_TONES.public.background,
+                          color: BRANCH_STATUS_TONES.public.color,
+                        }}
+                      >
                         Pública
                       </span>
                     )}

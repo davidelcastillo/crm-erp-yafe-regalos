@@ -515,6 +515,20 @@ There are no progressive elevation tiers — the system either has the one shado
 
 **`legal-band`** — A bottom strip beneath the footer columns carrying the copyright line, language picker (globe icon + "English (US)" link), currency picker, and social icons (Facebook, X, Instagram). All text in muted `{colors.muted}` at `{typography.caption-sm}`.
 
+### Badges de estado
+
+Un badge por caso, con un color propio y contraste medido:
+
+| Caso | Fondo | Texto | Contraste |
+|------|-------|-------|-----------|
+| Principal | `#e0ecff` | `#16408a` | 8.25:1 |
+| Inactiva | `#f2f2f2` | `#4a4a4a` | 7.92:1 |
+| Pública | `#ffe4ea` | `#8f0020` | 8.01:1 |
+
+- El texto de un badge es chico (11–12px), así que exige **4.5:1** (WCAG 2.1 AA para texto normal). El piso de **3:1** aplica a texto grande y a lo **no textual** (bordes, íconos, indicadores).
+- Un color por caso: no se repite el fondo entre estados y el estado nunca se comunica **solo** por color — el badge siempre lleva su palabra.
+- Los valores viven en `src/lib/status-tones.ts` y se aplican con `style={{ backgroundColor, color }}`: las clases dinámicas de Tailwind (`bg-[${hex}]`) no las genera el JIT. La regla queda fijada por `src/lib/status-tones.test.ts`.
+
 ## Responsive Behavior
 
 | Name | Width | Key Changes |
