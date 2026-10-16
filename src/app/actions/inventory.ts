@@ -56,6 +56,7 @@ export async function getBranchInventory(data: unknown) {
       select: {
         id: true,
         name: true,
+        code: true,
         active: true,
         inventory: {
           where: {
@@ -72,6 +73,7 @@ export async function getBranchInventory(data: unknown) {
     const result = productsWithInventory.map(p => ({
       id: p.id,
       name: p.name,
+      code: p.code,
       stock: p.inventory[0]?.stock ?? 0,
       active: p.active,
     }));

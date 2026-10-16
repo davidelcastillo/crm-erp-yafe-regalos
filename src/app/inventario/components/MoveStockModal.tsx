@@ -6,6 +6,7 @@ import {
   getBranchInventory,
 } from "@/app/actions/inventory";
 import Swal from "sweetalert2";
+import { BranchPicker } from "@/components/ui/BranchPicker";
 
 export interface MoveStockModalProps {
   open: boolean;
@@ -15,7 +16,7 @@ export interface MoveStockModalProps {
   onConfirm: () => void;
 }
 
-type MovableProduct = { id: number; name: string; stock: number };
+type MovableProduct = { id: number; name: string; code?: string; stock: number };
 type Step = 1 | 2;
 
 export const MoveStockModal = ({
@@ -29,15 +30,27 @@ export const MoveStockModal = ({
   const [sourceBranchId, setSourceBranchId] = useState<number | null>(null);
   const [destBranchId, setDestBranchId] = useState<number | null>(null);
   const [productOptions, setProductOptions] = useState<MovableProduct[]>([]);
+  const [busqueda, setBusqueda] = useState("");
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [quantities, setQuantities] = useState<Record<number, string>>({});
   const [pending, setPending] = useState(false);
+  const [loadingOrigin, setLoadingOrigin] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const selectedRows = useMemo(
-    () => productOptions.filter((p) => selectedIds.includes(p.id)),
-    [productOptions, selectedIds]
+    () => productOptions.filter((p) => selectedIds.includes(p.id)),    [productOptions, selectedIds]
   );
+
+  /** Filtro local del paso 2: por nombre o por código, como en Entrada/Salida. */
+  const visibles = useMemo(() => {
+    const texto = busqueda.trim().toLowerCase();
+    if (!texto) return productOptions;
+    return productOptions.filter(
+      (p) =>
+        p.name.toLowerCase().includes(texto) ||
+        (p.code ?? "").toLowerCase().includes(texto)
+    );
+  }, [productOptions, busqueda]);
 
   const summary = useMemo(
     () => ({
@@ -79,6 +92,7 @@ export const MoveStockModal = ({
     selectedRows.length > 0 &&
     selectedRows.every((p) => !rowErrors[p.id]);
 
+  /** Carga los productos de la sucursal origen; el avance al paso 2 lo confirma «Siguiente». */
   const handleOriginChange = async (branchId: number | null) => {
     setSourceBranchId(branchId);
     setError(null);
@@ -86,17 +100,23 @@ export const MoveStockModal = ({
       setProductOptions([]);
       setSelectedIds([]);
       setQuantities({});
+      setBusqueda("");
       setStep(1);
       return;
     }
-    const res = await getBranchInventory({ branchId });
-    if (res.success) {
-      setProductOptions(res.data as MovableProduct[]);
-      setSelectedIds([]);
-      setQuantities({});
-      setStep(2);
-    } else {
-      setError(res.error || "Error al cargar productos");
+    setLoadingOrigin(true);
+    try {
+      const res = await getBranchInventory({ branchId });
+      if (res.success) {
+        setProductOptions(res.data as MovableProduct[]);
+        setSelectedIds([]);
+        setQuantities({});
+        setBusqueda("");
+      } else {
+        setError(res.error || "Error al cargar productos");
+      }
+    } finally {
+      setLoadingOrigin(false);
     }
   };
 
@@ -126,7 +146,7 @@ export const MoveStockModal = ({
       html: `<p>${summaryText}</p>`,
       icon: "warning",
       showCancelButton: true,
-      confirmButtonColor: "#ff385c",
+      confirmButtonColor: "#be185d",
       cancelButtonColor: "#6a6a6a",
       background: "#ffffff",
       color: "#222222",
@@ -156,7 +176,7 @@ export const MoveStockModal = ({
           title: "Error",
           text: res.error || "Error al mover stock",
           icon: "error",
-          confirmButtonColor: "#ff385c",
+          confirmButtonColor: "#dc2626",
           background: "#ffffff",
           color: "#222222",
         });
@@ -171,9 +191,6 @@ export const MoveStockModal = ({
   if (!open) {
     return null;
   }
-
-  const selectClass =
-    "w-full px-3 py-3 min-h-[48px] rounded-xl border border-gray-200 bg-white focus:border-[#ff385c] focus:ring-2 focus:ring-[#ff385c]/20 outline-none transition-all text-sm touch-manipulation appearance-none cursor-pointer";
 
   return (
     <div
@@ -220,115 +237,62 @@ export const MoveStockModal = ({
 
         {step === 1 && (
           <div>
-            <label
-              htmlFor="ms-origen"
-              className="block text-xs text-[#6a6a6a] mb-2"
+            <p className="block text-xs text-[#6a6a6a] mb-2">Sucursal origen</p>
+            <BranchPicker
+              branches={branches}
+              value={sourceBranchId}
+              onChange={handleOriginChange}
+              label="Sucursal origen"
+              emptyLabel="No hay sucursales activas"
+            />
+            <button
+              type="button"
+              onClick={() => setStep(2)}
+              disabled={sourceBranchId === null || loadingOrigin || error !== null || pending}
+              className="w-full min-h-[44px] mt-6 py-4 brand-gradient brand-gradient-hover text-gray-800 font-medium rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
             >
-              Sucursal origen
-            </label>
-            <div className="relative">
-              <select
-                id="ms-origen"
-                value={sourceBranchId ?? ""}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  handleOriginChange(val === "" ? null : Number(val));
-                }}
-                className={`${selectClass} pr-10`}
-                disabled={pending}
-              >
-                <option value="" className="bg-white text-[#222222]">
-                  Seleccionar origen
-                </option>
-                {branches.map((b) => (
-                  <option
-                    key={b.id}
-                    value={b.id}
-                    className="bg-white text-[#222222]"
-                  >
-                    {b.name}
-                  </option>
-                ))}
-              </select>
-              <svg
-                className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[#6a6a6a] pointer-events-none"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                aria-hidden="true"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M19 9l-7 7-7-7"
-                />
-              </svg>
-            </div>
+              Siguiente
+            </button>
           </div>
         )}
 
         {step === 2 && (
           <div>
-            <label
-              htmlFor="ms-destino"
-              className="block text-xs text-[#6a6a6a] mb-2"
-            >
-              Sucursal destino
-            </label>
-            <div className="relative">
-              <select
-                id="ms-destino"
-                value={destBranchId ?? ""}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setDestBranchId(val === "" ? null : Number(val));
-                }}
-                className={`${selectClass} pr-10`}
-                disabled={pending}
-              >
-                <option value="" className="bg-white text-[#222222]">
-                  Seleccionar destino
-                </option>
-                {branches
-                  .filter((b) => b.id !== sourceBranchId)
-                  .map((b) => (
-                    <option
-                      key={b.id}
-                      value={b.id}
-                      className="bg-white text-[#222222]"
-                    >
-                      {b.name}
-                    </option>
-                  ))}
-              </select>
-              <svg
-                className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[#6a6a6a] pointer-events-none"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                aria-hidden="true"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M19 9l-7 7-7-7"
-                />
-              </svg>
-            </div>
+            <p className="block text-xs text-[#6a6a6a] mb-2">Sucursal destino</p>
+            <BranchPicker
+              branches={branches}
+              value={destBranchId}
+              onChange={setDestBranchId}
+              disabledIds={sourceBranchId === null ? [] : [sourceBranchId]}
+              label="Sucursal destino"
+              emptyLabel="No hay sucursales activas"
+              columns={2}
+            />
 
             <p className="block text-xs text-[#6a6a6a] mt-4 mb-2">
               Productos con stock en la sucursal de origen
             </p>
 
+            <input
+              type="search"
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              placeholder="Buscar por nombre o código"
+              aria-label="Buscar producto"
+              className="mb-3 min-h-[48px] w-full rounded-xl border border-gray-200 px-3 py-3 text-sm outline-none transition-all focus:border-[#ec4899] focus:ring-2 focus:ring-[#ec4899]/30 touch-manipulation"
+            />
+
             {productOptions.length === 0 ? (
               <p className="py-8 text-center text-sm text-[#6a6a6a]">
                 No hay productos con stock en esta sucursal
               </p>
+            ) : visibles.length === 0 ? (
+              <p className="py-8 text-center text-sm text-[#6a6a6a]">
+                No encontramos productos con ese nombre o código
+              </p>
             ) : (
               <div className="space-y-2 max-h-60 overflow-y-auto">
-                {productOptions.map((p) => (
+                {visibles.map((p) => (
                   <div
                     key={p.id}
                     className="flex items-center gap-3 p-3 min-h-[44px] rounded-xl hover:bg-[#f8f8f8] transition-colors"
@@ -339,7 +303,7 @@ export const MoveStockModal = ({
                       checked={selectedIds.includes(p.id)}
                       onChange={() => toggleSelection(p.id)}
                       aria-label={`Seleccionar ${p.name}`}
-                      className="w-5 h-5 accent-[#ff385c]"
+                      className="w-5 h-5 accent-[#ec4899]"
                     />
                     <div className="flex-1 min-w-0">
                       <label
@@ -367,7 +331,7 @@ export const MoveStockModal = ({
                       }
                       disabled={!selectedIds.includes(p.id) || pending}
                       aria-label={`Cantidad ${p.name}`}
-                      className="w-20 px-3 py-2 rounded-xl border border-gray-200 focus:border-[#ff385c] focus:ring-2 focus:ring-[#ff385c]/20 outline-none transition-all text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                      className="w-20 px-3 py-2 rounded-xl border border-gray-200 focus:border-[#ec4899] focus:ring-2 focus:ring-[#ec4899]/30 outline-none transition-all text-sm disabled:opacity-40 disabled:cursor-not-allowed"
                     />
                   </div>
                 ))}
@@ -393,7 +357,7 @@ export const MoveStockModal = ({
                 type="button"
                 onClick={handleSubmit}
                 disabled={!isValid || pending}
-                className="flex-1 py-4 min-h-[48px] bg-[#ff385c] text-white font-medium rounded-xl hover:bg-[#e00b41] transition-colors disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
+                className="flex-1 py-4 min-h-[48px] brand-gradient brand-gradient-hover text-gray-800 font-medium rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
               >
                 {pending ? "Moviendo…" : "Mover Stock"}
               </button>
