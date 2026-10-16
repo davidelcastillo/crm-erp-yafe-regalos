@@ -43,6 +43,8 @@ model Branch {
   purchases     Purchase[]              @relation("BranchPurchases")
   sales         Sale[]                  @relation("BranchSales")
   movements     BranchMovement[]        @relation("BranchMovements")
+  cashMovements CashMovement[]          @relation("BranchCashMovements")
+  cashCloses    CashClose[]             @relation("BranchCashCloses")
 
   @@index([isActive])
   @@index([authUserId])
@@ -175,4 +177,44 @@ enum MovementType {
   TRANSFER_IN
   TRANSFER_OUT
   ADJUSTMENT
+}
+
+// Plata que entra o sale de la caja de una sucursal fuera de una venta
+// (correcciones de dinero). Reusa PaymentMethod para el medio.
+model CashMovement {
+  id          Int           @id @default(autoincrement())
+  branchId    Int
+  branch      Branch        @relation("BranchCashMovements", fields: [branchId], references: [id], onDelete: Cascade)
+  type        CashMovementType
+  method      PaymentMethod @default(EFECTIVO)
+  amount      Decimal       @db.Decimal(10, 2)
+  // Fecha propia del movimiento (elegible), distinta de la de carga.
+  date        DateTime      @default(now())
+  description String?
+  performedBy String
+  createdAt   DateTime      @default(now())
+
+  @@index([branchId])
+  @@index([date])
+}
+
+enum CashMovementType {
+  INGRESO
+  EGRESO
+}
+
+// Cierre de caja por sucursal: guarda el corte para que las ventas anteriores
+// queden como caja cerrada y los indicadores se puedan resetear.
+model CashClose {
+  id            Int      @id @default(autoincrement())
+  branchId      Int
+  branch        Branch   @relation("BranchCashCloses", fields: [branchId], references: [id], onDelete: Cascade)
+  closedAt      DateTime @default(now())
+  closedBy      String
+  cashTotal     Decimal  @default(0) @db.Decimal(10, 2)
+  transferTotal Decimal  @default(0) @db.Decimal(10, 2)
+  mixedTotal    Decimal  @default(0) @db.Decimal(10, 2)
+  total         Decimal  @default(0) @db.Decimal(10, 2)
+
+  @@index([branchId, closedAt])
 }
