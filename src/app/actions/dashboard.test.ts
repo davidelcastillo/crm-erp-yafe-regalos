@@ -9,6 +9,7 @@ import { getStats } from "./dashboard";
 const mockSaleAggregate = jest.fn();
 const mockPurchaseAggregate = jest.fn();
 const mockCustomerAggregate = jest.fn();
+const mockCashGroupBy = jest.fn();
 
 jest.mock("@/lib/prisma", () => ({
   prisma: {
@@ -21,6 +22,10 @@ jest.mock("@/lib/prisma", () => ({
     customer: {
       aggregate: (...args: unknown[]) => mockCustomerAggregate(...args),
     },
+    // Plata de caja: entra en el balance (S18).
+    cashMovement: {
+      groupBy: (...args: unknown[]) => mockCashGroupBy(...args),
+    },
   },
 }));
 
@@ -30,6 +35,7 @@ function mockEmptyAggregates() {
   });
   mockPurchaseAggregate.mockResolvedValue({ _sum: { totalAmount: 0 } });
   mockCustomerAggregate.mockResolvedValue({ _sum: { totalBalance: 0 } });
+  mockCashGroupBy.mockResolvedValue([]);
 }
 
 describe("getStats (dashboard period + range + branch)", () => {

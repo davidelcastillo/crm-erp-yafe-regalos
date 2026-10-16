@@ -11,6 +11,12 @@ export const toLocalDateKey = (date: Date) =>
     date.getDate()
   ).padStart(2, "0")}`;
 
+/** "2026-10-15" -> 2026-10-15 00:00:00 local (nunca medianoche UTC). */
+export const inicioDelDia = (fecha: string) => new Date(`${fecha}T00:00:00`);
+
+/** "2026-10-15" -> 2026-10-15 23:59:59.999 local (el día entero entra al rango). */
+export const finDelDia = (fecha: string) => new Date(`${fecha}T23:59:59.999`);
+
 /** "2026-10-15" -> "15/10" */
 export const toShortLabel = (dateKey: string) => {
   const [, month, day] = dateKey.split("-");

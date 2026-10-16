@@ -3,14 +3,18 @@
 
 import { getProducts } from '../actions/product';
 import { getSales } from '../actions/sale';
+import { getBranchOptions } from '../actions/branch';
 import { SalesList } from './components/SalesList';
 import { AddSaleButton } from './components/AddSaleButton';
+import { CashMovementsModal } from './components/CashMovementsModal';
 import { BranchSelector } from '@/components/ui/BranchSelector';
 import { useReloadKey } from '@/lib/hooks/useReloadKey';
 import { useEffect, useState } from 'react';
 
 const PAGE_SIZE = 20;
 const DEBOUNCE_MS = 300;
+
+type BranchOption = { id: number; name: string };
 
 export default function VentasPage() {
   const [reloadKey, bump] = useReloadKey();
@@ -22,6 +26,22 @@ export default function VentasPage() {
   const [branchId, setBranchId] = useState<number | null>(null);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  // Sucursales y acceso a la caja (plata), pedidos en S14.
+  const [branches, setBranches] = useState<BranchOption[]>([]);
+  const [cashModalOpen, setCashModalOpen] = useState(false);
+
+  // Las sucursales se cargan una vez: las necesita el modal de caja.
+  useEffect(() => {
+    let cancelled = false;
+    getBranchOptions().then((result) => {
+      if (!cancelled && result.success && result.data) {
+        setBranches(result.data as BranchOption[]);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [reloadKey]);
 
   // Debounce the search input (300 ms) before hitting getSales.
   useEffect(() => {
@@ -100,10 +120,19 @@ export default function VentasPage() {
       <main className="px-6">
         <div className="mb-6 flex items-center justify-between flex-wrap gap-3">
           <h1 className="text-2xl font-bold text-[#222222]">Ventas</h1>
-          <BranchSelector
-            onChange={(id) => setBranchId(id)}
-            label="Filtrar por sucursal"
-          />
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setCashModalOpen(true)}
+              className="px-4 py-2 min-h-[44px] text-sm font-medium text-white bg-[#ff385c] rounded-xl hover:bg-[#e00b41] transition-colors touch-manipulation"
+            >
+              Caja
+            </button>
+            <BranchSelector
+              onChange={(id) => setBranchId(id)}
+              label="Filtrar por sucursal"
+            />
+          </div>
         </div>
 
         <div className="mb-4">
@@ -158,6 +187,12 @@ export default function VentasPage() {
         )}
       </main>
       <AddSaleButton products={products} onSuccess={bump} />
+      <CashMovementsModal
+        open={cashModalOpen}
+        onClose={() => setCashModalOpen(false)}
+        branches={branches}
+        onConfirm={bump}
+      />
     </div>
   );
 }

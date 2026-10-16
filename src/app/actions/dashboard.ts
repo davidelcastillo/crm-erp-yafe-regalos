@@ -1,14 +1,12 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { toLocalDateKey } from "@/lib/dates";
+import { finDelDia, inicioDelDia, toLocalDateKey } from "@/lib/dates";
 import { z } from "zod";
 
 // Días calendario locales: `new Date("YYYY-MM-DD")` da medianoche UTC, así que el
 // día final quedaba afuera y, en hora local (UTC-3), un rango de un solo día
 // quedaba vacío (bug 4 del usuario).
-const inicioDelDia = (fecha: string) => new Date(`${fecha}T00:00:00`);
-const finDelDia = (fecha: string) => new Date(`${fecha}T23:59:59.999`);
 
 // Días del rango, en orden, como claves de día local.
 const diasDelRango = (desde: Date, hasta: Date) => {
@@ -89,9 +87,18 @@ async function fetchStats(where: Record<string, unknown> = {}) {
     where,
   });
 
+  // Plata de caja (correcciones): también es balance del tablero (S18).
+  const cashMovements = await prisma.cashMovement.groupBy({
+    by: ["type"],
+    where,
+    _sum: { amount: true },
+  });
+  const caja = (tipo: "INGRESO" | "EGRESO") =>
+    Number(cashMovements.find((c) => c.type === tipo)?._sum.amount ?? 0);
+
   // Parse Decimal to number
-  const totalIncome = Number(sales._sum.totalAmount || 0);
-  const totalExpense = Number(purchases._sum.totalAmount || 0);
+  const totalIncome = Number(sales._sum.totalAmount || 0) + caja("INGRESO");
+  const totalExpense = Number(purchases._sum.totalAmount || 0) + caja("EGRESO");
   const netProfit = totalIncome - totalExpense;
   const accountsReceivable = Number(pendingSales._sum.pendingBalance || 0);
 
@@ -213,6 +220,21 @@ export async function getPerformanceData(data?: unknown) {
 
     purchases.forEach((p) => {
       bucket(toLocalDateKey(new Date(p.date))).expense += Number(p._sum.totalAmount || 0);
+    });
+
+    // La plata de caja entra en el mismo gráfico que las tarjetas (S18): si no,
+    // los dos indicadores del tablero contarían cosas distintas.
+    const cashMovements = await prisma.cashMovement.groupBy({
+      by: ["date", "type"],
+      where: { date: dateFilter, ...branchWhere },
+      _sum: { amount: true },
+    });
+
+    cashMovements.forEach((c) => {
+      const dia = bucket(toLocalDateKey(new Date(c.date)));
+      const monto = Number(c._sum.amount || 0);
+      if (c.type === "INGRESO") dia.income += monto;
+      else dia.expense += monto;
     });
 
     // Un punto por día del rango, en orden, incluso los días sin movimientos.
