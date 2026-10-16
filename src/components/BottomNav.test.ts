@@ -40,7 +40,10 @@ describe("BottomNav", () => {
     (usePathname as jest.Mock).mockReturnValue("/inventario");
     render(React.createElement(BottomNav));
     const activo = screen.getByRole("link", { name: /inventario/i });
-    expect(activo).toHaveClass("text-[#ff385c]"); // active color
+    // El activo se marca con el circulo de marca detras del icono, no con el rojo viejo.
+    expect(activo.querySelector(".brand-gradient")).toBeInTheDocument();
+    expect(activo).toHaveAttribute("aria-current", "page");
+    expect(activo.className).not.toContain("#ff385c");
   });
 
   it("renders nothing on branch portal routes", () => {

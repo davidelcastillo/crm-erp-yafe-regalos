@@ -69,11 +69,23 @@ export default function BottomNav() {
            {navItems.map((item) => {
              const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
              const Icon = item.icon;
-             const linkClassName = `flex flex-col items-center justify-center flex-1 h-full transition-all duration-200 ease-in-out ${isActive ? "text-[#ff385c]" : "text-[#6a6a6a] hover:text-[#3f3f3f]"}`;
-             const spanClassName = `text-xs mt-1 font-medium ${isActive ? "text-[#ff385c]" : "text-[#6a6a6a]"}`;
+             // El activo se marca con el circulo de marca detras del icono (texto oscuro sobre el degradé claro).
+             const linkClassName = `flex flex-col items-center justify-center flex-1 h-full transition-all duration-200 ease-in-out ${isActive ? "text-[#222222]" : "text-[#6a6a6a] hover:text-[#3f3f3f]"}`;
+             const spanClassName = `text-xs mt-1 font-medium ${isActive ? "text-[#222222]" : "text-[#6a6a6a]"}`;
              return (
-               <Link key={item.href} href={item.href} className={linkClassName}>
-                 <Icon active={isActive} />
+               <Link
+                 key={item.href}
+                 href={item.href}
+                 className={linkClassName}
+                 aria-current={isActive ? "page" : undefined}
+               >
+                 <span
+                   className={`flex h-8 w-8 items-center justify-center rounded-full ${
+                     isActive ? "brand-gradient" : ""
+                   }`}
+                 >
+                   <Icon active={isActive} />
+                 </span>
                  <span className={spanClassName}>
                    {item.label}
                  </span>

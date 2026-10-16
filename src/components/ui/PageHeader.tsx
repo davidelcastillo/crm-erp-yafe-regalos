@@ -28,11 +28,13 @@ export interface PageHeaderProps {
   actions?: ReactNode;
   /** Contenido siempre visible a la derecha del título. */
   right?: ReactNode;
+  /** Fila propia debajo del título: el lugar del selector de sucursal. */
+  below?: ReactNode;
   /** Filas extra del menú ☰ (el cierre de sesión va siempre al final). */
   menuItems?: PageMenuItem[];
 }
 
-export const PageHeader = ({ title, actions, right, menuItems = [] }: PageHeaderProps) => {
+export const PageHeader = ({ title, actions, right, below, menuItems = [] }: PageHeaderProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const router = useRouter();
 
@@ -86,6 +88,9 @@ export const PageHeader = ({ title, actions, right, menuItems = [] }: PageHeader
             Cerrar sesión
           </button>
         </div>
+
+        {/* Fila propia: en un celular chico el selector no entra junto al título. */}
+        {below && <div className="mt-3">{below}</div>}
       </header>
 
       {isOpen && (

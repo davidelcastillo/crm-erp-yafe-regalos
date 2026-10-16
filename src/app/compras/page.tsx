@@ -43,7 +43,7 @@ export default function ComprasPage() {
     return (
       <div className="min-h-screen bg-white pb-20">
         <div className="h-28 brand-gradient" />
-        <div className="glass rounded-t-[2.5rem] -mt-6 px-5 pt-8">
+        <div className="glass rounded-t-[2.5rem] -mt-12 px-5 pt-8">
           <Spinner label="Cargando compras..." />
           <div className="mt-6 space-y-4">
             <CardSkeleton />
@@ -58,11 +58,12 @@ export default function ComprasPage() {
  return (
     <div className="min-h-screen bg-white pb-20 relative">
       <main className="">
-        <div className="pb-8 brand-gradient">
+        <div className="pb-16 brand-gradient">
         <PageHeader
           title="Compras"
-          right={
+          below={
             <BranchSelector
+              block
               onChange={(id) => setBranchId(id)}
               label="Filtrar por sucursal"
             />
@@ -70,7 +71,7 @@ export default function ComprasPage() {
         />
       </div>
 
-        <div className="glass border-t border-white/80 rounded-t-[2.5rem] -mt-6 px-5 pt-8 shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
+        <div className="glass border-t border-white/80 rounded-t-[2.5rem] -mt-12 px-5 pt-8 shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
           {purchases.length === 0 ? (
             <div className="text-center py-12">
               <div className="w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center">

@@ -180,7 +180,7 @@ export default function InventarioPage() {
     return (
       <div className="min-h-screen bg-white pb-20">
         <div className="h-28 brand-gradient" />
-        <div className="glass rounded-t-[2.5rem] -mt-6 px-5 pt-8">
+        <div className="glass rounded-t-[2.5rem] -mt-12 px-5 pt-8">
           <Spinner label="Cargando inventario..." />
           <div className="mt-6 space-y-4">
             <CardSkeleton />
@@ -213,10 +213,10 @@ export default function InventarioPage() {
   return (
     <div className="min-h-screen bg-white pb-20">
       <main>
-        <div className="pb-8 brand-gradient">
+        <div className="pb-16 brand-gradient">
           <PageHeader
             title="Inventario"
-            right={
+            below={
               <BranchFilterDropdown
                 selectedId={branchId}
                 onValueChange={setBranchId}
@@ -307,7 +307,7 @@ export default function InventarioPage() {
           </div>
         </div>
 
-        <div className="glass border-t border-white/80 rounded-t-[2.5rem] -mt-6 px-5 pt-6 pb-8 shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
+        <div className="glass border-t border-white/80 rounded-t-[2.5rem] -mt-12 px-5 pt-6 pb-8 shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
 
         {/* Phase 3: branch + category filters (the BranchSelector above keeps the
             HU2 single-branch view; this adds the category filter and reflects the
