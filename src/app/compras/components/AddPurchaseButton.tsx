@@ -156,7 +156,7 @@ export function AddPurchaseButton({ products: initialProducts, onSuccess }: AddP
     <>
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-24 right-6 w-14 h-14 bg-[#ff385c] text-white rounded-full shadow-lg hover:bg-[#e00b41] transition-colors flex items-center justify-center z-40"
+        className="fixed bottom-24 right-6 w-14 h-14 bg-gradient-to-r from-blue-200 to-pink-400 text-gray-800 rounded-full shadow-lg hover:bg-gradient-to-r hover:from-purple-400 hover:to-pink-400 transition-colors duration-300 flex items-center justify-center z-40"
         aria-label="Registrar compra"
       >
         <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">

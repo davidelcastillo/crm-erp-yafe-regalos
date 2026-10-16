@@ -28,7 +28,7 @@ export default function Navbar() {
   };
 
   return (
-    <nav className="bg-white border-gray-200 px-2 sm:px-4 py-2.5 flex items-center justify-between">
+    <nav className="bg-white/70 backdrop-blur-2xl border-t border-white/80 px-2 sm:px-4 py-2.5 flex items-center justify-between">
       <div className="flex items-center space-x-4">
         <Link href="/" className="text-xl font-semibold text-indigo-600">
           Seguimientos Compras

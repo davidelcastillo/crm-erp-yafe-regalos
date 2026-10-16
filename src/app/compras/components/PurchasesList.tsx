@@ -41,7 +41,7 @@ export function PurchaseCard({ purchase, onExpand, expanded }: PurchaseCardProps
   const total = purchase.totalAmount;
 
     return (
-    <div className="bg-white rounded-2xl shadow-[rgba(0,0,0,0.02)_0px_0px_0px_1px,rgba(0,0,0,0.04)_0px_2px_6px,rgba(0,0,0,0.1)_0px_4px_8px]">
+    <div className="bg-white/70 backdrop-blur-2xl rounded-2xl ">
       <div className="p-4 cursor-pointer" onClick={onExpand}>
         <div className="flex justify-between items-start">
           <div className="flex-1">

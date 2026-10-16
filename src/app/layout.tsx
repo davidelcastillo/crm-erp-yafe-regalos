@@ -38,8 +38,8 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col bg-[#ffffff]">
         <BranchProviderWrapper>
-          <Navbar />
-          <main className="flex-1 pb-20 mt-5">{children}</main>
+          {/* <Navbar /> */}
+          <main className="flex-1">{children}</main>
           <BottomNav />
         </BranchProviderWrapper>
       </body>
