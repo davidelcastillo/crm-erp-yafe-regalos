@@ -136,3 +136,50 @@ describe("CashCloseModal — variantes del sistema de botones", () => {
     ).toHaveClass("btn", "btn-primary");
   });
 });
+
+// Layout: en celular el modal queda apilado en una columna y táctil (sin
+// utilidades de grid); recién desde `md` el panel crece y el resumen abre en dos
+// columnas. Es la unidad de referencia que se copia a los otros modales.
+describe("CashCloseModal — layout de escritorio", () => {
+  const abrirResumen = async () => {
+    fireEvent.click(screen.getByRole("button", { name: "Principal" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
+    return await screen.findByText("$1550.00");
+  };
+
+  it("deja una sola columna en celular y abre dos columnas desde `md`", async () => {
+    const { container } = renderModal();
+
+    const panel = container.querySelector('[class*="md:max-w-3xl"]');
+    expect(panel).not.toBeNull();
+    expect(panel).toHaveClass("max-w-xl");
+
+    const total = await abrirResumen();
+    const resumen = total.closest('[class*="md:grid-cols-2"]');
+    expect(resumen).not.toBeNull();
+    // Celular: sigue apilado, sin grid.
+    expect(resumen?.className).not.toMatch(/(^|\s)grid(\s|$)/);
+    expect(resumen?.className).toContain("md:grid");
+  });
+
+  it("la tarjeta de la derecha lleva sucursal, período y el cierre", async () => {
+    renderModal();
+    await abrirResumen();
+
+    const cerrar = screen.getByRole("button", { name: "Cerrar caja" });
+    const tarjeta = cerrar.closest('[class*="rounded-2xl"]');
+    expect(tarjeta).not.toBeNull();
+    expect(tarjeta).toHaveClass("rounded-2xl", "border-black/10", "bg-[#f7f7f7]", "p-4");
+    expect(tarjeta).toHaveTextContent("Principal");
+    expect(tarjeta).toHaveTextContent("Es el primer cierre de esta sucursal");
+  });
+
+  it("no estira «Continuar» a lo ancho del panel desde `md`", () => {
+    renderModal();
+
+    expect(screen.getByRole("button", { name: "Continuar" })).toHaveClass(
+      "w-full",
+      "md:w-auto"
+    );
+  });
+});

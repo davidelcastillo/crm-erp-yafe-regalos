@@ -575,6 +575,17 @@ Estos son los tonos que ya se usan en el sistema y el contraste que alcanzan sob
 
 Una tabla de escritorio se reemplaza por **cards** en mobile (`md:hidden` para las cards, `hidden md:block` para la tabla) con los mismos datos. Si se mantiene la tabla, va dentro de un contenedor con `overflow-x-auto`; lo que **no** se permite es que la página entera haga scroll horizontal.
 
+### Modales en escritorio
+
+El modal se diseña primero para el pulgar y se **adapta** desde `md:`, así que en celular no cambia nada.
+
+- **Panel**: `max-w-xl md:max-w-3xl` (y `md:max-w-4xl` cuando tiene listas largas, como venta o compra), con `md:max-h-[85vh]`.
+- **Cuerpo**: desde `md` en **dos columnas** (`md:grid md:grid-cols-2 md:gap-6 md:items-start`): a la izquierda lo que se opera (listas, totales) y a la derecha el resumen con la acción principal.
+- Cuando un paso tiene un solo bloque, se **acota** (`md:max-w-md`) en vez de estirarlo a lo ancho del panel.
+- **Acciones**: `w-full` en celular y `md:w-auto` (o dentro de la tarjeta de la derecha) desde desktop; nunca un botón estirado a 768 px.
+- **Dentro de un modal (que es blanco) las tarjetas no usan `glass`**: el vidrio necesita el degradé detrás. Ahí van `bg-[#f7f7f7] border border-black/10`.
+- Referencia implementada: `CashCloseModal`.
+
 ### Encabezado de página y acciones
 
 - Una sola fila en mobile: botón **☰**, título y, si hace falta, el selector de sucursal (`PageHeader`).

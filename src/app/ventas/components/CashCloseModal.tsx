@@ -119,7 +119,7 @@ export const CashCloseModal = ({
       aria-labelledby="cash-close-title"
     >
       <div
-        className="bg-white w-full max-w-xl rounded-2xl p-6 animate-scale-in max-h-[90vh] overflow-y-auto"
+        className="bg-white w-full max-w-xl md:max-w-3xl rounded-2xl p-6 animate-scale-in max-h-[90vh] md:max-h-[85vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-between items-center mb-4">
@@ -138,43 +138,45 @@ export const CashCloseModal = ({
           </button>
         </div>
 
-        <p className="block text-xs text-[#6a6a6a] mb-2">Sucursal a cerrar</p>
-        <BranchPicker
-          branches={branches}
-          value={branchId}
-          onChange={(id) => {
-            setBranchId(id);
-            setResumen(null);
-            setError(null);
-          }}
-          label="Sucursal a cerrar"
-          emptyLabel="No hay sucursales activas para elegir."
-        />
+        {/* Paso 1: en celular el mismo bloque táctil a ancho completo; desde `md`
+            la lista de sucursales se limita para que no se estire a 768 px. */}
+        <div className="md:max-w-md">
+          <p className="block text-xs text-[#6a6a6a] mb-2">Sucursal a cerrar</p>
+          <BranchPicker
+            branches={branches}
+            value={branchId}
+            onChange={(id) => {
+              setBranchId(id);
+              setResumen(null);
+              setError(null);
+            }}
+            label="Sucursal a cerrar"
+            emptyLabel="No hay sucursales activas para elegir."
+          />
 
-        {error && <p className="mt-3 text-sm text-[#c13515]">{error}</p>}
+          {error && <p className="mt-3 text-sm text-[#c13515]">{error}</p>}
 
-        {loading && <p className="mt-4 text-sm text-[#6a6a6a]">Calculando el cierre...</p>}
+          {loading && <p className="mt-4 text-sm text-[#6a6a6a]">Calculando el cierre...</p>}
 
-        {!resumen && !loading && (
-          <button
-            type="button"
-            onClick={handleContinuar}
-            disabled={branchId === null}
-            className="btn btn-primary w-full mt-6"
-          >
-            Continuar
-          </button>
-        )}
+          {!resumen && !loading && (
+            <div className="md:flex md:justify-end">
+              <button
+                type="button"
+                onClick={handleContinuar}
+                disabled={branchId === null}
+                className="btn btn-primary w-full mt-6 md:w-auto"
+              >
+                Continuar
+              </button>
+            </div>
+          )}
+        </div>
 
+        {/* Paso 2: en celular sigue siendo una sola columna con el botón al final;
+            desde `md` los totales a la izquierda y la tarjeta del corte a la derecha. */}
         {resumen && !loading && (
-          <>
-            <p className="mt-4 text-sm text-[#6a6a6a]">
-              {resumen.since
-                ? `Ventas desde el último cierre (${fechaCierre(resumen.since)})`
-                : "Es el primer cierre de esta sucursal"}
-            </p>
-
-            <div className="mt-3 space-y-2">
+          <div className="mt-4 md:grid md:grid-cols-2 md:gap-6 md:items-start">
+            <div className="space-y-2">
               {resumen.cashTotal > 0 && (
                 <div className="flex items-center justify-between gap-3 rounded-xl bg-[#f7f7f7] px-4 py-3">
                   <span className="text-sm text-[#222222]">Efectivo a retirar</span>
@@ -219,15 +221,28 @@ export const CashCloseModal = ({
               </p>
             </div>
 
-            <button
-              type="button"
-              onClick={handleConfirmar}
-              disabled={pending}
-              className="btn btn-primary w-full mt-6"
-            >
-              {pending ? "Cerrando..." : "Cerrar caja"}
-            </button>
-          </>
+            {/* Dentro de un modal (blanco) el vidrio no se distingue: la tarjeta va
+                con fondo propio y un borde un poco más marcado. */}
+            <div className="mt-4 rounded-2xl border border-black/10 bg-[#f7f7f7] p-4 md:mt-0">
+              <p className="text-sm font-semibold text-[#222222] break-words">
+                {resumen.branchName}
+              </p>
+              <p className="mt-1 text-xs text-[#6a6a6a]">
+                {resumen.since
+                  ? `Ventas desde el último cierre (${fechaCierre(resumen.since)})`
+                  : "Es el primer cierre de esta sucursal"}
+              </p>
+
+              <button
+                type="button"
+                onClick={handleConfirmar}
+                disabled={pending}
+                className="btn btn-primary mt-4 w-full md:mt-6"
+              >
+                {pending ? "Cerrando..." : "Cerrar caja"}
+              </button>
+            </div>
+          </div>
         )}
       </div>
     </div>
