@@ -51,6 +51,20 @@ El dashboard ahora es configurable:
 - Los rangos se arman con **días calendario locales** (00:00:00 del día inicial a 23:59:59.999 del final). `new Date("YYYY-MM-DD")` es medianoche UTC y dejaba el día elegido afuera en UTC-3; el mismo criterio se usa para rotular el eje del gráfico (helper `src/lib/dates.ts`).
 - La Server Action `getStats(type, startDate, endDate, branchId?)` rechaza rangos inválidos (fecha de inicio después de la de fin); `getPerformanceData({ days | startDate+endDate, branchId })` usa el mismo criterio: un rango de fechas manda sobre `days` y un rango incompleto o inválido devuelve error.
 
+## Historial de movimientos de un producto
+
+En `/inventario`, **Ver Movimientos** abre el historial del producto. La lista combina tres orígenes:
+
+| Origen | Filas | Referencia que muestra |
+|--------|-------|------------------------|
+| Compra | `PurchaseItem`, una por línea | `#<id>` de la compra |
+| Venta | `SaleItem`, una por línea | `#<id>` de la venta |
+| Libro de sucursal | `BranchMovement`: entradas, salidas, transferencias entre sucursales (`TRANSFER_IN` / `TRANSFER_OUT`) y ajustes de stock | `MOVE-<ms>`, `ADJUSTMENT`, … |
+
+- Cada fila muestra la **sucursal** donde se registró el movimiento.
+- Las entradas `ENTRY` que escribe la compra (`reference` `PURCHASE-<id>`) **no** se listan aparte: la compra ya es una fila, así que la misma operación no se duplica.
+- Las ventas todavía **no** escriben `BranchMovement`: su efecto en el stock queda en `BranchInventory` (`src/app/actions/sale.ts`), y el historial las muestra desde el `SaleItem`.
+
 ## Búsquedas
 
 - **Ventas**: buscador con **debounce de 300 ms** + paginación **"Cargar más"**.
@@ -63,4 +77,5 @@ El dashboard ahora es configurable:
 - [ ] Eliminar la sucursal por defecto, con compras/ventas o con stock se bloquea con su guard correspondiente.
 - [ ] El catálogo de una sucursal activa y publicada es accesible sin login; una no publicada, inactiva o inexistente no devuelve inventario.
 - [ ] El dashboard reacciona a cambios de periodo y sucursal y muestra la etiqueta correcta.
+- [ ] El historial de un producto muestra las transferencias y los ajustes con su sucursal, y no repite la compra como entrada.
 - [ ] El gráfico de ingresos vs egresos muestra el período elegido (7 / 30 / 90 días o el rango personalizado) y cada día con el total de sus movimientos.
