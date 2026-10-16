@@ -170,7 +170,7 @@ export function ExportWizard({ open, onClose, branches }: ExportWizardProps) {
       aria-labelledby="export-wizard-title"
     >
       <div
-        className="bg-white w-full max-w-xl rounded-2xl p-6 animate-scale-in max-h-[90vh] overflow-y-auto"
+        className="bg-white w-full max-w-xl md:max-w-4xl rounded-2xl p-6 animate-scale-in max-h-[90vh] md:max-h-[85vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-between items-center mb-4">
@@ -219,144 +219,157 @@ export function ExportWizard({ open, onClose, branches }: ExportWizardProps) {
                 setBranchId(id);
                 setBranchError(null);
               }}
+              columns={2}
               label="Sucursal a exportar"
             />
             {branchError && (
               <p className="mt-2 text-sm text-red-600">{branchError}</p>
             )}
-            <button
-              type="button"
-              onClick={handleContinue}
-              disabled={branchId === null}
-              className="btn btn-primary w-full mt-6"
-            >
-              Continuar
-            </button>
+            <div className="md:flex md:justify-end">
+              <button
+                type="button"
+                onClick={handleContinue}
+                disabled={branchId === null}
+                className="btn btn-primary w-full mt-6 md:w-auto"
+              >
+                Continuar
+              </button>
+            </div>
           </div>
         )}
 
         {step === 2 && (
           <div>
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-base font-semibold text-[#222222]">
-                Seleccionar productos
-              </h3>
-              <span className="text-sm font-medium text-[#be185d]">
-                {selectedCount} seleccionados
-              </span>
-            </div>
+            <h3 className="text-base font-semibold text-[#222222] mb-3">
+              Seleccionar productos
+            </h3>
 
-            {!productsLoading &&
-              !productsError &&
-              availableProducts.length > 0 && (
-                <label className="flex items-center gap-3 p-3 mb-2 min-h-[44px] rounded-xl bg-[#f8f8f8] cursor-pointer touch-manipulation">
-                  <input
-                    type="checkbox"
-                    checked={allSelected}
-                    onChange={toggleAll}
-                    className="w-5 h-5 accent-[#ec4899]"
-                  />
-                  <span className="text-sm font-medium text-[#222222]">
-                    Todos
-                  </span>
-                </label>
-              )}
-
-            {productsLoading && (
-              <div className="flex items-center justify-center py-10">
-                <div className="flex items-center gap-2">
-                  <svg
-                    className="w-5 h-5 text-[#3b82f6] animate-spin"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    fill="none"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      strokeWidth="4"
-                    />
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                    />
-                  </svg>
-                  <span className="text-sm text-[#6a6a6a]">
-                    Cargando productos...
-                  </span>
-                </div>
-              </div>
-            )}
-
-            {!productsLoading && productsError && (
-              <div className="text-center py-8">
-                <p className="text-sm text-red-600 mb-4">{productsError}</p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setProductsLoading(true);
-                    setProductsError(null);
-                    setLoadAttempt((attempt) => attempt + 1);
-                  }}
-                  className="btn btn-secondary"
-                >
-                  Reintentar
-                </button>
-              </div>
-            )}
-
-            {!productsLoading &&
-              !productsError &&
-              availableProducts.length === 0 && (
-                <p className="py-8 text-center text-sm text-[#6a6a6a]">
-                  No hay productos con stock en esta sucursal
-                </p>
-              )}
-
-            {!productsLoading &&
-              !productsError &&
-              availableProducts.length > 0 && (
-                <div
-                  role="group"
-                  aria-label="Productos con stock"
-                  className="space-y-2 max-h-60 overflow-y-auto"
-                >
-                  {availableProducts.map((row) => (
-                    <label
-                      key={row.id}
-                      className="flex items-center gap-3 p-3 min-h-[44px] rounded-xl hover:bg-[#f8f8f8] transition-colors cursor-pointer touch-manipulation"
-                    >
+            <div className="md:grid md:grid-cols-2 md:gap-5 md:items-start">
+              <div className="min-w-0">
+                {!productsLoading &&
+                  !productsError &&
+                  availableProducts.length > 0 && (
+                    <label className="flex items-center gap-3 p-3 mb-2 min-h-[44px] rounded-xl bg-[#f8f8f8] cursor-pointer touch-manipulation">
                       <input
                         type="checkbox"
-                        checked={selectedIds.includes(row.id)}
-                        onChange={() => toggleProduct(row.id)}
+                        checked={allSelected}
+                        onChange={toggleAll}
                         className="w-5 h-5 accent-[#ec4899]"
                       />
-                      <span className="flex-1 min-w-0">
-                        <span className="block text-sm font-medium text-[#222222] truncate">
-                          {row.name}
-                        </span>
-                        <span className="block text-xs text-[#6a6a6a]">
-                          {row.code} · Stock: {row.stock}
-                        </span>
-                      </span>
-                      <span className="text-sm font-medium text-[#6a6a6a]">
-                        ${row.price.toFixed(2)}
+                      <span className="text-sm font-medium text-[#222222]">
+                        Todos
                       </span>
                     </label>
-                  ))}
-                </div>
-              )}
+                  )}
 
-            <div className="flex items-center justify-between gap-3 mt-6">
+                {productsLoading && (
+                  <div className="flex items-center justify-center py-10">
+                    <div className="flex items-center gap-2">
+                      <svg
+                        className="w-5 h-5 text-[#3b82f6] animate-spin"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        fill="none"
+                      >
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          strokeWidth="4"
+                        />
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                        />
+                      </svg>
+                      <span className="text-sm text-[#6a6a6a]">
+                        Cargando productos...
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {!productsLoading && productsError && (
+                  <div className="text-center py-8">
+                    <p className="text-sm text-red-600 mb-4">{productsError}</p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setProductsLoading(true);
+                        setProductsError(null);
+                        setLoadAttempt((attempt) => attempt + 1);
+                      }}
+                      className="btn btn-secondary"
+                    >
+                      Reintentar
+                    </button>
+                  </div>
+                )}
+
+                {!productsLoading &&
+                  !productsError &&
+                  availableProducts.length === 0 && (
+                    <p className="py-8 text-center text-sm text-[#6a6a6a]">
+                      No hay productos con stock en esta sucursal
+                    </p>
+                  )}
+
+                {!productsLoading &&
+                  !productsError &&
+                  availableProducts.length > 0 && (
+                    <div
+                      role="group"
+                      aria-label="Productos con stock"
+                      className="space-y-2 max-h-60 overflow-y-auto"
+                    >
+                      {availableProducts.map((row) => (
+                        <label
+                          key={row.id}
+                          className="flex items-center gap-3 p-3 min-h-[44px] rounded-xl hover:bg-[#f8f8f8] transition-colors cursor-pointer touch-manipulation"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.includes(row.id)}
+                            onChange={() => toggleProduct(row.id)}
+                            className="w-5 h-5 accent-[#ec4899]"
+                          />
+                          <span className="flex-1 min-w-0">
+                            <span className="block text-sm font-medium text-[#222222] truncate">
+                              {row.name}
+                            </span>
+                            <span className="block text-xs text-[#6a6a6a]">
+                              {row.code} · Stock: {row.stock}
+                            </span>
+                          </span>
+                          <span className="shrink-0 text-sm font-medium text-[#6a6a6a] tabular-nums">
+                            ${row.price.toFixed(2)}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+              </div>
+
+              {/* Resumen de lo seleccionado: en celular cae debajo de la lista;
+                  desde `md` va a la derecha. */}
+              <aside className="mt-4 rounded-2xl border border-black/10 bg-[#f7f7f7] p-4 md:mt-0">
+                <h3 className="text-xs font-medium uppercase tracking-wide text-[#6a6a6a]">
+                  Selección
+                </h3>
+                <p className="mt-2 text-sm font-semibold text-[#be185d] tabular-nums">
+                  {selectedCount} seleccionados
+                </p>
+              </aside>
+            </div>
+
+            <div className="flex items-center justify-between gap-3 mt-6 md:justify-end">
               {backButton(1)}
               <button
                 type="button"
                 onClick={() => setStep(3)}
-                className="btn btn-primary flex-1"
+                className="btn btn-primary flex-1 md:flex-none md:w-auto"
               >
                 Siguiente
               </button>
@@ -365,33 +378,36 @@ export function ExportWizard({ open, onClose, branches }: ExportWizardProps) {
         )}
 
         {step === 3 && (
-          <div>
+          <div className="md:max-w-md">
             <h3 className="text-base font-semibold text-[#222222] mb-3">
               Generar PDF
             </h3>
 
-            <div className="p-4 bg-[#f8f8f8] rounded-xl space-y-3">
-              <div className="flex justify-between items-center">
+            <div className="rounded-2xl border border-black/10 bg-[#f7f7f7] p-4 space-y-3">
+              <h3 className="text-xs font-medium uppercase tracking-wide text-[#6a6a6a]">
+                Resumen
+              </h3>
+              <div className="flex justify-between items-baseline gap-4">
                 <span className="text-sm text-[#6a6a6a]">Sucursal</span>
-                <span className="text-sm font-semibold text-[#222222]">
+                <span className="text-sm font-semibold text-[#222222] break-words">
                   {selectedBranch?.name ?? "-"}
                 </span>
               </div>
-              <div className="flex justify-between items-center">
+              <div className="flex justify-between items-baseline gap-4">
                 <span className="text-sm text-[#6a6a6a]">Seleccionados</span>
-                <span className="text-sm font-semibold text-[#222222]">
+                <span className="text-sm font-semibold text-[#222222] tabular-nums">
                   {selectedCount} seleccionados
                 </span>
               </div>
             </div>
 
-            <div className="flex items-center justify-between gap-3 mt-6">
+            <div className="flex items-center justify-between gap-3 mt-6 md:justify-end">
               {backButton(2)}
               <button
                 type="button"
                 onClick={handleGenerate}
                 disabled={selectedCount === 0 || generating}
-                className="btn btn-primary flex-1"
+                className="btn btn-primary flex-1 md:flex-none md:w-auto"
               >
                 {generating ? "Generando..." : "Generar PDF"}
               </button>

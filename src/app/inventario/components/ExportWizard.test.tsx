@@ -231,3 +231,56 @@ describe("ExportWizard", () => {
     }
   });
 });
+
+// Layout: en celular el wizard queda apilado en una columna; recién desde `md`
+// el panel crece, la sucursal y los productos usan el ancho en dos columnas y el
+// resumen toma la tarjeta del sistema. Es el patrón de CashCloseModal aplicado
+// al inventario.
+describe("ExportWizard — layout de escritorio", () => {
+  it("deja el panel a una columna en celular y lo agranda desde `md`", () => {
+    const { container } = renderWizard();
+
+    const panel = container.querySelector('[class*="md:max-w-4xl"]');
+    expect(panel).not.toBeNull();
+    expect(panel).toHaveClass("max-w-xl", "max-h-[90vh]", "md:max-h-[85vh]");
+  });
+
+  it("abre el paso de productos en dos columnas desde `md` y lo apila en celular", async () => {
+    await goToStep2();
+
+    const lista = screen.getByRole("group", { name: /productos con stock/i });
+    const columnas = lista.closest('[class*="md:grid-cols-2"]') as HTMLElement | null;
+    expect(columnas).not.toBeNull();
+    // Celular: sin grid; el `md:grid` recién aplica desde `md`.
+    expect(columnas?.className).not.toMatch(/(^|\s)grid(\s|$)/);
+    expect(columnas?.className).toContain("md:grid");
+    // La lista queda a la izquierda y el resumen de lo seleccionado a la derecha.
+    expect(columnas?.firstElementChild as HTMLElement).toContainElement(lista);
+    expect(columnas?.lastElementChild as HTMLElement).toHaveTextContent(/seleccionados/i);
+  });
+
+  it("el resumen del paso 3 usa la tarjeta del sistema", async () => {
+    await goToStep2();
+    fireEvent.click(screen.getByRole("button", { name: /siguiente/i }));
+
+    const resumen = screen
+      .getByText("Sucursal")
+      .closest("[class*='rounded-2xl']") as HTMLElement | null;
+    expect(resumen).not.toBeNull();
+    expect(resumen).toHaveClass("rounded-2xl", "border-black/10", "bg-[#f7f7f7]", "p-4");
+  });
+
+  it("no estira la acción principal a lo ancho del panel desde `md`", async () => {
+    await goToStep2();
+
+    const siguiente = screen.getByRole("button", { name: /siguiente/i });
+    expect(siguiente).toHaveClass("flex-1", "md:flex-none", "md:w-auto");
+
+    fireEvent.click(siguiente);
+    expect(screen.getByRole("button", { name: /generar pdf/i })).toHaveClass(
+      "flex-1",
+      "md:flex-none",
+      "md:w-auto"
+    );
+  });
+});

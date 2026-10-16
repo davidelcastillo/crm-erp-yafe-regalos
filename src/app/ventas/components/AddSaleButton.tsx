@@ -269,9 +269,9 @@ export function AddSaleButton({ products, onSuccess }: AddSaleButtonProps) {
        </button>
 
 {isOpen && (
-         <div className="fixed inset-0 bg-black/30 backdrop-blur-md z-[60] flex items-end justify-center">
+         <div className="fixed inset-0 bg-black/30 backdrop-blur-md z-[60] flex items-end justify-center md:items-center">
           <div
-            className="bg-white w-full max-w-lg rounded-t-3xl p-6 animate-slide-up max-h-[90vh] overflow-y-auto"
+            className="bg-white w-full max-w-lg md:max-w-4xl rounded-t-3xl md:rounded-2xl p-6 animate-slide-up md:animate-scale-in max-h-[90vh] md:max-h-[85vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
              <div className="flex justify-between items-center mb-6">
@@ -296,18 +296,22 @@ export function AddSaleButton({ products, onSuccess }: AddSaleButtonProps) {
                   branches={branches}
                   value={saleBranchId}
                   onChange={setSaleBranchId}
+                  columns={2}
                   label="Sucursal de la venta"
                   emptyLabel="No hay sucursales activas para elegir."
                 />
 
-                <button
-                  type="button"
-                  onClick={() => setPaso("productos")}
-                  disabled={!saleBranchId}
-                  className="btn btn-primary w-full mt-6"
-                >
-                  Siguiente
-                </button>
+                {/* En celular la acción ocupa el ancho; desde `md` no se estira al ancho del panel. */}
+                <div className="md:flex md:justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setPaso("productos")}
+                    disabled={!saleBranchId}
+                    className="btn btn-primary w-full mt-6 md:w-auto"
+                  >
+                    Siguiente
+                  </button>
+                </div>
               </div>
             ) : products.length === 0 ? (
               <div className="text-center py-8">
@@ -318,185 +322,201 @@ export function AddSaleButton({ products, onSuccess }: AddSaleButtonProps) {
               <form onSubmit={handleSubmit} className="space-y-4">
                 {/* La sucursal se eligió en el paso 1: acá va como etiqueta, no como selector. */}
                 <p className="text-sm text-[#6a6a6a]">Sucursal: {sucursalNombre}</p>
-                {items.map((item, index) => (
-                  <div key={item.id} className="p-4 bg-[#f9f9f9] rounded-xl space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium text-[#222222]">Producto {index + 1}</span>
-                      {items.length > 1 && (
+
+                {/* Desde `md` el paso 2 abre en dos columnas: a la izquierda el
+                    buscador y los productos agregados, a la derecha el pago, el
+                    cliente y la acción. En celular se apila en el orden de siempre. */}
+                <div className="md:grid md:grid-cols-2 md:gap-5 md:items-start">
+                  <div className="space-y-4">
+                    {items.map((item, index) => (
+                      <div key={item.id} className="rounded-2xl border border-black/10 bg-[#f7f7f7] p-4 space-y-3">
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs font-medium uppercase tracking-wide text-[#6a6a6a]">
+                            Producto {index + 1}
+                          </span>
+                          {items.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => removeItem(item.id)}
+                              className="btn btn-danger"
+                            >
+                              Eliminar
+                            </button>
+                          )}
+                        </div>
+
                         <button
                           type="button"
-                          onClick={() => removeItem(item.id)}
-                          className="btn btn-danger"
+                          onClick={() => openProductSearch(item.id)}
+                          className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-[#ec4899] focus:ring-2 focus:ring-[#ec4899]/30 outline-none transition-all bg-white text-left hover:bg-[#f8f8f8]"
                         >
-                          Eliminar
+                          {getProductDisplay(item)}
                         </button>
-                      )}
-                    </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-xs text-[#6a6a6a] mb-1">Precio</label>
+                            <div className="relative">
+                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6a6a6a] text-sm">$</span>
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={item.price}
+                                onChange={(e) => updateItem(item.id, "price", e.target.value)}
+                                className="w-full pl-7 pr-3 py-2 rounded-lg border border-gray-200 focus:border-[#ec4899] outline-none transition-all text-sm tabular-nums text-right"
+                                placeholder="0.00"
+                                required
+                              />
+                            </div>
+                          </div>
+                          <div>
+                            <label className="block text-xs text-[#6a6a6a] mb-1">Cantidad</label>
+                            <input
+                              type="number"
+                              min="1"
+                              value={item.quantity}
+                              onChange={(e) => updateItem(item.id, "quantity", e.target.value)}
+                              className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:border-[#ec4899] outline-none transition-all text-sm tabular-nums text-right"
+                              placeholder="0"
+                              required
+                            />
+                          </div>
+                        </div>
+
+                        <div className="flex justify-between items-center pt-2 border-t border-gray-200">
+                          <span className="text-sm text-[#6a6a6a]">Subtotal</span>
+                          <span className="font-medium text-[#222222] tabular-nums">
+                            ${calculateSubtotal(item.price, item.quantity).toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
 
                     <button
                       type="button"
-                      onClick={() => openProductSearch(item.id)}
-                      className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-[#ec4899] focus:ring-2 focus:ring-[#ec4899]/30 outline-none transition-all bg-white text-left hover:bg-[#f8f8f8]"
+                      onClick={addItem}
+                      className="btn btn-secondary w-full md:w-auto"
                     >
-                      {getProductDisplay(item)}
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      </svg>
+                      Agregar otro producto
                     </button>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs text-[#6a6a6a] mb-1">Precio</label>
-                        <div className="relative">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6a6a6a] text-sm">$</span>
-                          <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            value={item.price}
-                            onChange={(e) => updateItem(item.id, "price", e.target.value)}
-                            className="w-full pl-7 pr-3 py-2 rounded-lg border border-gray-200 focus:border-[#ec4899] outline-none transition-all text-sm"
-                            placeholder="0.00"
-                            required
-                          />
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-xs text-[#6a6a6a] mb-1">Cantidad</label>
-                        <input
-                          type="number"
-                          min="1"
-                          value={item.quantity}
-                          onChange={(e) => updateItem(item.id, "quantity", e.target.value)}
-                          className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:border-[#ec4899] outline-none transition-all text-sm"
-                          placeholder="0"
-                          required
-                        />
-                      </div>
-                    </div>
-
-                    <div className="flex justify-between items-center pt-2 border-t border-gray-200">
-                      <span className="text-sm text-[#6a6a6a]">Subtotal</span>
-                      <span className="font-medium text-[#222222]">
-                        ${calculateSubtotal(item.price, item.quantity).toFixed(2)}
-                      </span>
-                    </div>
                   </div>
-                ))}
 
-                <button
-                  type="button"
-                  onClick={addItem}
-                  className="btn btn-secondary w-full"
-                >
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                  </svg>
-                  Agregar otro producto
-                </button>
+                  <div className="mt-4 space-y-4 md:mt-0">
+                    {/* Payment Method Selector */}
+                    <div className="rounded-2xl border border-black/10 bg-[#f7f7f7] p-4">
+                      <label className="block text-xs font-medium uppercase tracking-wide text-[#6a6a6a] mb-3">
+                        Método de Pago
+                      </label>
+                      {/* Control segmentado: el medio elegido va `btn-active`, el otro `btn-secondary`. */}
+                      <div className="flex gap-2 overflow-x-auto pb-2">
+                        {MEDIOS_DE_PAGO.map((method) => (
+                          <button
+                            key={method}
+                            type="button"
+                            onClick={() => setPaymentMethod(method)}
+                            aria-pressed={paymentMethod === method}
+                            className={`btn whitespace-nowrap ${
+                              paymentMethod === method ? "btn-active" : "btn-secondary"
+                            }`}
+                          >
+                            {method}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
 
-                {/* Payment Method Selector */}
-                <div className="p-4 bg-[#f9f9f9] rounded-xl">
-                  <label className="block text-sm font-medium text-[#222222] mb-3">Método de Pago</label>
-                  {/* Control segmentado: el medio elegido va `btn-active`, el otro `btn-secondary`. */}
-                  <div className="flex gap-2 overflow-x-auto pb-2">
-                    {MEDIOS_DE_PAGO.map((method) => (
-                      <button
-                        key={method}
-                        type="button"
-                        onClick={() => setPaymentMethod(method)}
-                        aria-pressed={paymentMethod === method}
-                        className={`btn whitespace-nowrap ${
-                          paymentMethod === method ? "btn-active" : "btn-secondary"
-                        }`}
+                    {/* Customer Selection */}
+                    <div className="rounded-2xl border border-black/10 bg-[#f7f7f7] p-4">
+                      <label className="block text-xs font-medium uppercase tracking-wide text-[#6a6a6a] mb-2">
+                        Cliente (opcional)
+                      </label>
+                      <select
+                        value={selectedCustomerId}
+                        onChange={(e) => setSelectedCustomerId(e.target.value)}
+                        className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-[#ec4899] focus:ring-2 focus:ring-[#ec4899]/30 outline-none transition-all bg-white"
                       >
-                        {method}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                        <option value="">Cliente Anónimo</option>
+                        {customers.map((customer) => (
+                          <option key={customer.id} value={customer.id}>
+                            {customer.name} {customer.surname}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
 
-                {/* Customer Selection */}
-                <div className="p-4 bg-[#f9f9f9] rounded-xl">
-                  <label className="block text-sm font-medium text-[#222222] mb-2">Cliente (opcional)</label>
-                  <select
-                    value={selectedCustomerId}
-                    onChange={(e) => setSelectedCustomerId(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-[#ec4899] focus:ring-2 focus:ring-[#ec4899]/30 outline-none transition-all bg-white"
-                  >
-                    <option value="">Cliente Anónimo</option>
-                    {customers.map((customer) => (
-                      <option key={customer.id} value={customer.id}>
-                        {customer.name} {customer.surname}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Amount Paid (for all payment methods) */}
-                {paymentMethod === "MIXTO" && (
-                  <div className="p-4 bg-[#f9f9f9] rounded-xl">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label htmlFor="cashAmount" className="block text-sm font-medium text-[#222222] mb-2">Efectivo</label>
-                        <div className="relative">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6a6a6a] text-sm">$</span>
-                          <input
-                            id="cashAmount"
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            value={cashAmount}
-                            onChange={(e) => setCashAmount(e.target.value)}
-                            className="w-full pl-7 pr-3 py-3 rounded-xl border border-gray-200 focus:border-[#ec4899] focus:ring-2 focus:ring-[#ec4899]/30 outline-none transition-all"
-                            placeholder="0.00"
-                          />
+                    {/* Amount Paid (for all payment methods) */}
+                    {paymentMethod === "MIXTO" && (
+                      <div className="rounded-2xl border border-black/10 bg-[#f7f7f7] p-4">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label htmlFor="cashAmount" className="block text-sm font-medium text-[#222222] mb-2">Efectivo</label>
+                            <div className="relative">
+                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6a6a6a] text-sm">$</span>
+                              <input
+                                id="cashAmount"
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={cashAmount}
+                                onChange={(e) => setCashAmount(e.target.value)}
+                                className="w-full pl-7 pr-3 py-3 rounded-xl border border-gray-200 focus:border-[#ec4899] focus:ring-2 focus:ring-[#ec4899]/30 outline-none transition-all tabular-nums text-right"
+                                placeholder="0.00"
+                              />
+                            </div>
+                          </div>
+                          <div>
+                            <label htmlFor="transferAmount" className="block text-sm font-medium text-[#222222] mb-2">Transferencia</label>
+                            <div className="relative">
+                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6a6a6a] text-sm">$</span>
+                              <input
+                                id="transferAmount"
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={transferAmount}
+                                onChange={(e) => setTransferAmount(e.target.value)}
+                                className="w-full pl-7 pr-3 py-3 rounded-xl border border-gray-200 focus:border-[#ec4899] focus:ring-2 focus:ring-[#ec4899]/30 outline-none transition-all tabular-nums text-right"
+                                placeholder="0.00"
+                              />
+                            </div>
+                          </div>
                         </div>
                       </div>
-                      <div>
-                        <label htmlFor="transferAmount" className="block text-sm font-medium text-[#222222] mb-2">Transferencia</label>
-                        <div className="relative">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6a6a6a] text-sm">$</span>
-                          <input
-                            id="transferAmount"
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            value={transferAmount}
-                            onChange={(e) => setTransferAmount(e.target.value)}
-                            className="w-full pl-7 pr-3 py-3 rounded-xl border border-gray-200 focus:border-[#ec4899] focus:ring-2 focus:ring-[#ec4899]/30 outline-none transition-all"
-                            placeholder="0.00"
-                          />
-                        </div>
+                    )}
+
+                    {/* Totals */}
+                    <div className="p-4 bg-green-50 rounded-xl border border-green-200">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-green-800 font-medium">Total Venta</span>
+                        <span className="text-green-700 font-bold tabular-nums">
+                          ${calculateTotal().toFixed(2)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-green-800">Monto Pagado</span>
+                        <span className="text-green-600 tabular-nums">-${calcularPago().amountPaid.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between items-center pt-2 border-t border-green-200">
+                        <span className="text-green-800 font-medium">Saldo Pendiente</span>
+                        <span className="text-green-700 text-xl font-bold tabular-nums">
+                          ${calcularPago().pendingBalance.toFixed(2)}
+                        </span>
                       </div>
                     </div>
-                  </div>
-                )}
 
-                {/* Totals */}
-                <div className="p-4 bg-green-50 rounded-xl border border-green-200">
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-green-800 font-medium">Total Venta</span>
-                    <span className="text-green-700 font-bold">
-                      ${calculateTotal().toFixed(2)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-green-800">Monto Pagado</span>
-                    <span className="text-green-600">-${calcularPago().amountPaid.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between items-center pt-2 border-t border-green-200">
-                    <span className="text-green-800 font-medium">Saldo Pendiente</span>
-                    <span className="text-green-700 text-xl font-bold">
-                      ${calcularPago().pendingBalance.toFixed(2)}
-                    </span>
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="btn btn-primary w-full"
+                    >
+                      {loading ? "Registrando..." : "Registrar Venta"}
+                    </button>
                   </div>
                 </div>
-
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="btn btn-primary w-full"
-                >
-                  {loading ? "Registrando..." : "Registrar Venta"}
-                </button>
               </form>
             )}
           </div>

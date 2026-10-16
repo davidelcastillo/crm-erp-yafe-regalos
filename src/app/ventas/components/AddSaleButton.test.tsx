@@ -354,3 +354,55 @@ describe("AddSaleButton: variantes del sistema de botones", () => {
     );
   });
 });
+
+// Layout de escritorio: en celular el modal sigue siendo la hoja de una columna;
+// recién desde `md` el panel crece, el paso 1 reparte las sucursales en dos
+// columnas y el paso 2 abre buscador | pago. Es el patrón de `CashCloseModal`.
+describe("AddSaleButton — layout de escritorio", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockBranchId = 1;
+    (registerSale as jest.Mock).mockResolvedValue({ success: true });
+  });
+
+  it("el panel se acota en celular y crece desde `md`", () => {
+    const { container } = setup();
+    fireEvent.click(screen.getByRole("button", { name: "Registrar venta" }));
+
+    const panel = container.querySelector('[class*="md:max-w-4xl"]');
+    expect(panel).not.toBeNull();
+    expect(panel).toHaveClass("max-w-lg", "max-h-[90vh]", "md:max-h-[85vh]");
+  });
+
+  it("el paso 1 usa una columna de sucursales en celular y dos desde `md`", () => {
+    setup();
+    fireEvent.click(screen.getByRole("button", { name: "Registrar venta" }));
+
+    expect(
+      screen.getByRole("group", { name: "Sucursal de la venta" })
+    ).toHaveClass("grid-cols-1", "md:grid-cols-2");
+  });
+
+  it("el paso 2 apila en celular y abre dos columnas desde `md`", () => {
+    const { container } = setup();
+    abrirPaso2();
+
+    const dosColumnas = container.querySelector('[class*="md:grid-cols-2"]');
+    expect(dosColumnas).not.toBeNull();
+    // Celular: sigue apilado, sin grid.
+    expect(dosColumnas?.className).not.toMatch(/(^|\s)grid(\s|$)/);
+    expect(dosColumnas?.className).toContain("md:grid");
+  });
+
+  it("el paso 2 no deja visible el contenido del paso 1", () => {
+    setup();
+    abrirPaso2();
+
+    expect(
+      screen.queryByText(/primero elegí la sucursal/i)
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Siguiente" })
+    ).not.toBeInTheDocument();
+  });
+});
