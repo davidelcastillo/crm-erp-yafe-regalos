@@ -20,8 +20,6 @@
   --palette-brand-rosa: #f472b6;
   --palette-brand-violeta: #a855f7;
   --palette-brand-rosa-fuerte: #ec4899;
-  /* Tono sólido de marca: es el más claro que llega a 4.5:1 con texto blanco. */
-  --palette-brand-solid: #be185d;
   
   /* Shadows */
   --shadow-card: rgba(0,0,0,0.02) 0px 0px 0px 1px, rgba(0,0,0,0.04) 0px 2px 6px, rgba(0,0,0,0.1) 0px 4px 8px;
@@ -124,10 +122,10 @@
   filter: brightness(0.96) saturate(1.05);
 }
 
-/* Botón de acción de marca. En mobile es el degradé claro con texto oscuro; desde
-   desktop se vuelve **sólido** con texto blanco, porque el degradé claro pierde
-   presencia en una pantalla grande. Es el tono de marca más claro que llega a
-   4.5:1 con texto blanco. */
+/* Botón de acción. En mobile es el degradé claro con texto oscuro; desde desktop
+   se vuelve **sólido gris oscuro** con texto blanco: el tono de marca sólido se
+   leía como rojo en pantalla grande (pedido del usuario). El gris `#3f3f3f` da
+   10:1 con texto blanco. */
 .brand-action {
   background-image: linear-gradient(
     to right,
@@ -145,7 +143,7 @@
 @media (min-width: 768px) {
   .brand-action {
     background-image: none;
-    background-color: var(--palette-brand-solid);
+    background-color: var(--palette-focused-gray);
     color: #ffffff;
   }
 }
