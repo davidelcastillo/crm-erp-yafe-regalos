@@ -585,6 +585,7 @@ El modal se diseña primero para el pulgar y se **adapta** desde `md:`, así que
 - **Acciones**: `w-full` en celular y `md:w-auto` (o dentro de la tarjeta de la derecha) desde desktop; nunca un botón estirado a 768 px.
 - **Dentro de un modal (que es blanco) las tarjetas no usan `glass`**: el vidrio necesita el degradé detrás. Ahí van `bg-[#f7f7f7] border border-black/10`.
 - **Dentro de un panel gris, un botón secundario va `btn-ghost`** (blanco con borde), no `btn-secondary`: el gris sobre gris no se distingue.
+- **La columna del resumen es pegajosa desde `md`** (`md:sticky md:top-4`): cuando la lista de la izquierda crece (una compra o una venta de muchos productos), el total y la acción siguen a la vista en lugar de quedar una pantalla en blanco al lado. Vale para todos los modales de dos columnas.
 - **El orden en celular no cambia**: el patrón es «primero el contexto, después la acción», y en celular se apila ese orden. Cuando en desktop el bloque que se opera queda a la izquierda (y por lo tanto primero en el DOM), usá `order-2 md:order-1` / `order-1 md:order-2` para que en celular siga leyéndose contexto → acción.
 - Referencia implementada: `CashCloseModal`.
 
