@@ -39,48 +39,55 @@ describe('branchAdminService', () => {
   describe('populateAuthUserIds', () => {
     it('should update branches without authUserId', async () => {
       // Create test branches without authUserId
-      await prisma.branch.createMany({
-        data: [
-          { name: 'Test Branch 1', isActive: true, code: 'TST001' },
-          { name: 'Test Branch 2', isActive: true, code: 'TST002' },
-        ],
-      })
+      const creadas = await Promise.all([
+        prisma.branch.create({
+          data: { name: 'Test Branch 1', isActive: true, code: 'TST001' },
+        }),
+        prisma.branch.create({
+          data: { name: 'Test Branch 2', isActive: true, code: 'TST002' },
+        }),
+      ])
+      const ids = creadas.map((b) => b.id)
 
       // Execute the service
       const updatedCount = await branchAdminService.populateAuthUserIds()
 
-      // Should have updated 2 branches (the ones without authUserId)
-      expect(updatedCount).toBe(2)
+      // El servicio actualiza TODAS las sucursales sin authUserId de la base, así
+      // que se afirma sobre las propias: contar el total lo rompe cualquier otra
+      // suite que cree una sucursal sin usuario en paralelo.
+      expect(updatedCount).toBeGreaterThanOrEqual(2)
 
-      // Verify the branches now have authUserId
-      const branches = await prisma.branch.findMany({
-        where: {
-          name: {
-            startsWith: 'Test Branch',
-          },
-        },
+      const propias = await prisma.branch.findMany({
+        where: { id: { in: ids } },
         select: { authUserId: true },
       })
-
-      // Count branches with authUserId
-      const branchesWithAuthUserId = branches.filter(b => b.authUserId !== null)
-      expect(branchesWithAuthUserId.length).toBe(2) // Both should now have authUserId
+      expect(propias).toHaveLength(2)
+      expect(propias.every((b) => b.authUserId !== null)).toBe(true)
     }, 10000) // Increase timeout to 10 seconds
 
-    it('should return 0 when all branches already have authUserId', async () => {
+    it('should not touch branches that already have authUserId', async () => {
       // Create test branches with authUserId
-      await prisma.branch.createMany({
-        data: [
-          { name: 'Test Branch 3', isActive: true, code: 'TST003', authUserId: 'test-uuid-1' },
-          { name: 'Test Branch 4', isActive: true, code: 'TST004', authUserId: 'test-uuid-2' },
-        ],
-      })
+      const creadas = await Promise.all([
+        prisma.branch.create({
+          data: { name: 'Test Branch 3', isActive: true, code: 'TST003', authUserId: 'test-uuid-1' },
+        }),
+        prisma.branch.create({
+          data: { name: 'Test Branch 4', isActive: true, code: 'TST004', authUserId: 'test-uuid-2' },
+        }),
+      ])
+      const ids = creadas.map((b) => b.id)
 
       // Execute the service
-      const updatedCount = await branchAdminService.populateAuthUserIds()
+      await branchAdminService.populateAuthUserIds()
 
-      // Should have updated 0 branches
-      expect(updatedCount).toBe(0)
+      const propias = await prisma.branch.findMany({
+        where: { id: { in: ids } },
+        select: { authUserId: true },
+      })
+      expect(propias.map((b) => b.authUserId).sort()).toEqual([
+        'test-uuid-1',
+        'test-uuid-2',
+      ])
     }, 10000) // Increase timeout to 10 seconds
   })
 
