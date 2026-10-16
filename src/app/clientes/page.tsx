@@ -1,5 +1,6 @@
 import { getCustomers, getCustomerById } from "../actions/customer";
 import { ClientesList } from "./components/ClientesList";
+import { AddClienteButton } from "./components/AddClienteButton";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Customer } from "@prisma/client";
 
@@ -20,6 +21,11 @@ export default async function ClientesPage() {
           <ClientesList initialCustomers={customers} />
         </div>
       </main>
+
+      {/* El FAB va fuera de la hoja de vidrio: `backdrop-filter` convierte a la hoja
+          en el contenedor de los elementos `fixed`, y adentro quedaba a otra altura
+          que en el resto de las páginas. */}
+      <AddClienteButton />
     </div>
   );
 }

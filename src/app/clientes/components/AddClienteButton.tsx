@@ -4,7 +4,8 @@ import { createCustomer } from "@/app/actions/customer";
 import Swal from "sweetalert2";
 
 interface AddClienteButtonProps {
-  onAdd: () => void;
+  /** Opcional: si no se pasa, refresca la página al terminar. */
+  onAdd?: () => void;
 }
 
 export function AddClienteButton({ onAdd }: AddClienteButtonProps) {
@@ -70,7 +71,8 @@ export function AddClienteButton({ onAdd }: AddClienteButtonProps) {
             timer: 1500,
             showConfirmButton: false,
           });
-          onAdd();
+          if (onAdd) onAdd();
+          else window.location.reload();
         } else {
           await Swal.fire({
             ...estiloError,

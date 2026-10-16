@@ -1,10 +1,9 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Customer } from "@prisma/client";
 import { createCustomer } from "@/app/actions/customer";
 import { ClienteCard } from "./ClienteCard";
-import { AddClienteButton } from "./AddClienteButton";
 
 interface ClientesListProps {
   initialCustomers: Customer[];
@@ -34,10 +33,6 @@ export function ClientesList({ initialCustomers }: ClientesListProps) {
     );
     return { total, withDebt, totalDebt };
   }, [customers]);
-
-  const refreshCustomers = () => {
-    window.location.reload();
-  };
 
   return (
     <div className="flex flex-col gap-4">
@@ -85,9 +80,6 @@ export function ClientesList({ initialCustomers }: ClientesListProps) {
           ))
         )}
       </div>
-
-      {/* FAB */}
-      <AddClienteButton onAdd={refreshCustomers} />
     </div>
   );
 }
