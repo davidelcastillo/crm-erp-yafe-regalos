@@ -219,7 +219,7 @@ export const StockAdjustmentModal = ({
       aria-labelledby="stock-adjustment-title"
     >
       <div
-        className="bg-white w-full max-w-xl rounded-2xl p-6 animate-scale-in max-h-[90vh] overflow-y-auto"
+        className="bg-white w-full max-w-xl md:max-w-3xl rounded-2xl p-6 animate-scale-in max-h-[90vh] md:max-h-[85vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-between items-center mb-4">
@@ -255,210 +255,248 @@ export const StockAdjustmentModal = ({
           Paso {step} de 3
         </p>
 
+        {/* Paso 1: la sucursal a la izquierda y el sentido con la acción a la
+            derecha desde `md`; en celular se apilan en ese mismo orden. */}
         {step === 1 && (
-          <div>
-            <p className="block text-xs text-[#6a6a6a] mb-2">Sucursal</p>
-            <BranchPicker
-              branches={branches}
-              value={branchId}
-              onChange={(id) => {
-                setBranchId(id);
-                setError(null);
-              }}
-              label="Sucursal"
-            />
+          <div className="md:grid md:grid-cols-2 md:gap-5 md:items-start">
+            <section>
+              <p className="block text-xs text-[#6a6a6a] mb-2">Sucursal</p>
+              <BranchPicker
+                branches={branches}
+                value={branchId}
+                onChange={(id) => {
+                  setBranchId(id);
+                  setError(null);
+                }}
+                label="Sucursal"
+              />
+            </section>
 
-            <p className="block text-xs text-[#6a6a6a] mt-4 mb-2">
-              ¿Suma o resta stock?
-            </p>
-            <div className="flex gap-2">
-              {TIPOS.map((opcion) => (
-                <button
-                  key={opcion.value}
-                  type="button"
-                  onClick={() => setTipo(opcion.value)}
-                  aria-pressed={tipo === opcion.value}
-                  className={`btn ${tipo === opcion.value ? "btn-active" : "btn-secondary"} flex-1`}
-                >
-                  {opcion.label}
-                </button>
-              ))}
-            </div>
-            <p className="mt-2 text-xs text-[#6a6a6a]">
-              {TIPOS.find((t) => t.value === tipo)?.ayuda}
-            </p>
-
-            {error && <p className="mt-2 text-sm text-[#c13515]">{error}</p>}
-
-            <button
-              type="button"
-              onClick={handleContinue}
-              disabled={branchId === null}
-              className="btn btn-primary w-full mt-6"
-            >
-              Continuar
-            </button>
-          </div>
-        )}
-
-        {step === 2 && (
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-base font-semibold text-[#222222]">
-                {tipo === "ENTRY" ? "Productos que entran" : "Productos que salen"}
+            <section className="mt-4 rounded-2xl border border-black/10 bg-[#f7f7f7] p-4 md:mt-0">
+              <h3 className="text-xs font-medium uppercase tracking-wide text-[#6a6a6a]">
+                ¿Suma o resta stock?
               </h3>
-              <span className="text-sm font-medium text-[#be185d]">
-                {seleccionadas.length} seleccionados
-              </span>
-            </div>
 
-            <input
-              type="search"
-              value={busqueda}
-              onChange={(e) => setBusqueda(e.target.value)}
-              placeholder="Buscar por nombre o código"
-              aria-label="Buscar producto"
-              className="w-full px-3 py-3 mb-3 min-h-[48px] rounded-xl border border-gray-200 focus:border-[#ec4899] focus:ring-2 focus:ring-[#ec4899]/30 outline-none transition-all text-sm touch-manipulation"
-            />
-
-            {loading && (
-              <p className="py-8 text-center text-sm text-[#6a6a6a]">
-                Cargando productos...
-              </p>
-            )}
-
-            {!loading && error && (
-              <p className="py-8 text-center text-sm text-[#c13515]">{error}</p>
-            )}
-
-            {!loading && !error && visibles.length === 0 && (
-              <p className="py-8 text-center text-sm text-[#6a6a6a]">
-                {tipo === "EXIT"
-                  ? "No hay productos con stock en esta sucursal"
-                  : "No hay productos activos"}
-              </p>
-            )}
-
-            {!loading && !error && visibles.length > 0 && (
-              <div
-                role="group"
-                aria-label="Productos"
-                className="space-y-2 max-h-60 overflow-y-auto"
-              >
-                {visibles.map((fila) => (
-                  <div
-                    key={fila.id}
-                    className="flex items-center gap-3 p-3 min-h-[44px] rounded-xl hover:bg-[#f8f8f8] transition-colors"
+              <div className="mt-3 flex gap-2">
+                {TIPOS.map((opcion) => (
+                  <button
+                    key={opcion.value}
+                    type="button"
+                    onClick={() => setTipo(opcion.value)}
+                    aria-pressed={tipo === opcion.value}
+                    className={`btn ${tipo === opcion.value ? "btn-active" : "btn-secondary"} flex-1`}
                   >
-                    <input
-                      type="checkbox"
-                      id={`sa-check-${fila.id}`}
-                      checked={selectedIds.includes(fila.id)}
-                      onChange={() => toggleSelection(fila.id)}
-                      aria-label={`Seleccionar ${fila.name}`}
-                      className="w-5 h-5 accent-[#ec4899]"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <label
-                        htmlFor={`sa-check-${fila.id}`}
-                        className="block text-sm font-medium text-[#222222] truncate cursor-pointer"
-                      >
-                        {fila.name}
-                      </label>
-                      <span className="block text-xs text-[#6a6a6a]">
-                        {fila.code} · Stock: {fila.stock}
-                      </span>
-                      {rowErrors[fila.id] && (
-                        <span className="block text-xs text-[#c13515] mt-1">
-                          {rowErrors[fila.id]}
-                        </span>
-                      )}
-                    </div>
-                    <input
-                      type="number"
-                      min={1}
-                      max={tipo === "EXIT" ? fila.stock : undefined}
-                      value={quantities[fila.id] ?? ""}
-                      onChange={(e) => handleQuantityChange(fila.id, e.target.value)}
-                      disabled={!selectedIds.includes(fila.id) || pending}
-                      aria-label={`Cantidad ${fila.name}`}
-                      placeholder="0"
-                      className="w-20 px-3 py-2 rounded-xl border border-gray-200 focus:border-[#ec4899] focus:ring-2 focus:ring-[#ec4899]/30 outline-none transition-all text-sm disabled:opacity-40 disabled:cursor-not-allowed"
-                    />
-                  </div>
+                    {opcion.label}
+                  </button>
                 ))}
               </div>
-            )}
+              <p className="mt-2 text-xs text-[#6a6a6a]">
+                {TIPOS.find((t) => t.value === tipo)?.ayuda}
+              </p>
 
-            <div className="flex items-center justify-between gap-3 mt-6">
+              {error && <p className="mt-2 text-sm text-[#c13515]">{error}</p>}
+
               <button
                 type="button"
-                onClick={() => setStep(1)}
-                className="btn btn-secondary"
+                onClick={handleContinue}
+                disabled={branchId === null}
+                className="btn btn-primary mt-4 w-full md:w-auto"
               >
-                Volver
+                Continuar
               </button>
-              <button
-                type="button"
-                onClick={() => setStep(3)}
-                disabled={!isValid}
-                className="btn btn-primary flex-1"
-              >
-                Siguiente
-              </button>
-            </div>
+            </section>
           </div>
         )}
 
+        {/* Paso 2: la lista se opera a la izquierda y el resumen con la acción va
+            a la derecha desde `md`; en celular se apilan en ese mismo orden. */}
+        {step === 2 && (
+          <div className="md:grid md:grid-cols-2 md:gap-5 md:items-start">
+            <section>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-base font-semibold text-[#222222]">
+                  {tipo === "ENTRY" ? "Productos que entran" : "Productos que salen"}
+                </h3>
+                <span className="text-sm font-medium text-[#be185d]">
+                  {seleccionadas.length} seleccionados
+                </span>
+              </div>
+
+              <input
+                type="search"
+                value={busqueda}
+                onChange={(e) => setBusqueda(e.target.value)}
+                placeholder="Buscar por nombre o código"
+                aria-label="Buscar producto"
+                className="w-full px-3 py-3 mb-3 min-h-[48px] rounded-xl border border-gray-200 focus:border-[#ec4899] focus:ring-2 focus:ring-[#ec4899]/30 outline-none transition-all text-sm touch-manipulation"
+              />
+
+              {loading && (
+                <p className="py-8 text-center text-sm text-[#6a6a6a]">
+                  Cargando productos...
+                </p>
+              )}
+
+              {!loading && error && (
+                <p className="py-8 text-center text-sm text-[#c13515]">{error}</p>
+              )}
+
+              {!loading && !error && visibles.length === 0 && (
+                <p className="py-8 text-center text-sm text-[#6a6a6a]">
+                  {tipo === "EXIT"
+                    ? "No hay productos con stock en esta sucursal"
+                    : "No hay productos activos"}
+                </p>
+              )}
+
+              {!loading && !error && visibles.length > 0 && (
+                <div
+                  role="group"
+                  aria-label="Productos"
+                  className="space-y-2 max-h-60 overflow-y-auto"
+                >
+                  {visibles.map((fila) => (
+                    <div
+                      key={fila.id}
+                      className="flex items-center gap-3 p-3 min-h-[44px] rounded-xl hover:bg-[#f8f8f8] transition-colors"
+                    >
+                      <input
+                        type="checkbox"
+                        id={`sa-check-${fila.id}`}
+                        checked={selectedIds.includes(fila.id)}
+                        onChange={() => toggleSelection(fila.id)}
+                        aria-label={`Seleccionar ${fila.name}`}
+                        className="w-5 h-5 accent-[#ec4899]"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <label
+                          htmlFor={`sa-check-${fila.id}`}
+                          className="block text-sm font-medium text-[#222222] truncate cursor-pointer"
+                        >
+                          {fila.name}
+                        </label>
+                        <span className="block text-xs text-[#6a6a6a]">
+                          {fila.code} · Stock: {fila.stock}
+                        </span>
+                        {rowErrors[fila.id] && (
+                          <span className="block text-xs text-[#c13515] mt-1">
+                            {rowErrors[fila.id]}
+                          </span>
+                        )}
+                      </div>
+                      <input
+                        type="number"
+                        min={1}
+                        max={tipo === "EXIT" ? fila.stock : undefined}
+                        value={quantities[fila.id] ?? ""}
+                        onChange={(e) => handleQuantityChange(fila.id, e.target.value)}
+                        disabled={!selectedIds.includes(fila.id) || pending}
+                        aria-label={`Cantidad ${fila.name}`}
+                        placeholder="0"
+                        className="w-20 px-3 py-3 rounded-xl border border-gray-200 focus:border-[#ec4899] focus:ring-2 focus:ring-[#ec4899]/30 outline-none transition-all text-sm disabled:opacity-40 disabled:cursor-not-allowed tabular-nums text-right"
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            <section className="mt-6 rounded-2xl border border-black/10 bg-[#f7f7f7] p-4 md:mt-0">
+              <h3 className="text-xs font-medium uppercase tracking-wide text-[#6a6a6a]">
+                Resumen
+              </h3>
+
+              <div className="mt-3 flex items-baseline justify-between gap-4">
+                <span className="text-sm text-[#3f3f3f]">Unidades</span>
+                <span className="text-2xl font-bold text-[#222222] tabular-nums">
+                  {totalUnidades}
+                </span>
+              </div>
+
+              <div className="mt-4 flex items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={() => setStep(1)}
+                  className="btn btn-secondary"
+                >
+                  Volver
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStep(3)}
+                  disabled={!isValid}
+                  className="btn btn-primary flex-1 md:flex-none"
+                >
+                  Siguiente
+                </button>
+              </div>
+            </section>
+          </div>
+        )}
+
+        {/* Paso 3: el motivo a la izquierda y el detalle con el total de unidades
+            a la derecha desde `md`; en celular se apilan en ese mismo orden. */}
         {step === 3 && (
           <div>
             <h3 className="text-base font-semibold text-[#222222] mb-3">
               Confirmar {tipo === "ENTRY" ? "entrada" : "salida"}
             </h3>
 
-            <label className="block text-xs text-[#6a6a6a] mb-2" htmlFor="sa-motivo">
-              Motivo (opcional)
-            </label>
-            <input
-              id="sa-motivo"
-              type="text"
-              value={motivo}
-              onChange={(e) => setMotivo(e.target.value)}
-              maxLength={200}
-              placeholder="Ej.: conteo físico, rotura, corrección"
-              className="w-full px-3 py-3 min-h-[48px] rounded-xl border border-gray-200 focus:border-[#ec4899] focus:ring-2 focus:ring-[#ec4899]/30 outline-none transition-all text-sm touch-manipulation"
-            />
+            <div className="md:grid md:grid-cols-2 md:gap-5 md:items-start">
+              <section>
+                <label className="block text-xs text-[#6a6a6a] mb-2" htmlFor="sa-motivo">
+                  Motivo (opcional)
+                </label>
+                <input
+                  id="sa-motivo"
+                  type="text"
+                  value={motivo}
+                  onChange={(e) => setMotivo(e.target.value)}
+                  maxLength={200}
+                  placeholder="Ej.: conteo físico, rotura, corrección"
+                  className="w-full px-3 py-3 min-h-[48px] rounded-xl border border-gray-200 focus:border-[#ec4899] focus:ring-2 focus:ring-[#ec4899]/30 outline-none transition-all text-sm touch-manipulation"
+                />
 
-            <div className="mt-4 p-4 bg-[#f8f8f8] rounded-xl space-y-3">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-[#6a6a6a]">Sucursal</span>
-                <span className="text-sm font-semibold text-[#222222]">
-                  {selectedBranchName}
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-[#6a6a6a]">Movimiento</span>
-                <span className="text-sm font-semibold text-[#222222]">
-                  {tipo === "ENTRY" ? "Entrada" : "Salida"}
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-[#6a6a6a]">Productos</span>
-                <span className="text-sm font-semibold text-[#222222]">
-                  {seleccionadas.length}
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-[#6a6a6a]">Unidades</span>
-                <span className="text-sm font-semibold text-[#222222]">
-                  {totalUnidades}
-                </span>
-              </div>
+                {error && <p className="mt-3 text-sm text-[#c13515]">{error}</p>}
+              </section>
+
+              <section className="mt-4 rounded-2xl border border-black/10 bg-[#f7f7f7] p-4 md:mt-0">
+                <h3 className="text-xs font-medium uppercase tracking-wide text-[#6a6a6a]">
+                  Detalle
+                </h3>
+
+                <dl className="mt-3 space-y-2">
+                  <div className="flex items-baseline justify-between gap-4">
+                    <dt className="text-sm text-[#6a6a6a]">Sucursal</dt>
+                    <dd className="text-sm font-semibold text-[#222222] break-words">
+                      {selectedBranchName}
+                    </dd>
+                  </div>
+                  <div className="flex items-baseline justify-between gap-4">
+                    <dt className="text-sm text-[#6a6a6a]">Movimiento</dt>
+                    <dd className="text-sm font-semibold text-[#222222]">
+                      {tipo === "ENTRY" ? "Entrada" : "Salida"}
+                    </dd>
+                  </div>
+                  <div className="flex items-baseline justify-between gap-4">
+                    <dt className="text-sm text-[#6a6a6a]">Productos</dt>
+                    <dd className="text-sm font-semibold text-[#222222] tabular-nums">
+                      {seleccionadas.length}
+                    </dd>
+                  </div>
+                </dl>
+
+                {/* El número que importa: el total de unidades, más grande. */}
+                <div className="mt-3 flex items-baseline justify-between gap-4 border-t border-black/10 pt-3">
+                  <span className="text-sm font-medium text-[#222222]">Unidades</span>
+                  <span className="text-2xl font-bold text-[#222222] tabular-nums">
+                    {totalUnidades}
+                  </span>
+                </div>
+              </section>
             </div>
 
-            {error && <p className="mt-3 text-sm text-[#c13515]">{error}</p>}
-
-            <div className="flex items-center justify-between gap-3 mt-6">
+            <div className="flex items-center justify-between gap-3 mt-6 md:justify-end">
               <button
                 type="button"
                 onClick={() => setStep(2)}
@@ -471,7 +509,7 @@ export const StockAdjustmentModal = ({
                 type="button"
                 onClick={handleSubmit}
                 disabled={pending}
-                className="btn btn-primary flex-1"
+                className="btn btn-primary flex-1 md:flex-none"
               >
                 {pending
                   ? "Guardando…"

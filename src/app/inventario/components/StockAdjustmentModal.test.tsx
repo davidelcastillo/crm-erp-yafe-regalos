@@ -98,6 +98,15 @@ describe("StockAdjustmentModal", () => {
     expect(screen.getByText(/PR003 · Stock: 0/)).toBeInTheDocument();
   });
 
+  it("al pasar al paso 2 el bloque del paso 1 ya no se renderiza", async () => {
+    renderModal();
+    await irAlPaso2();
+
+    expect(screen.queryByRole("group", { name: "Sucursal" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Principal" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Entrada" })).not.toBeInTheDocument();
+  });
+
   it("en salida pide solo los que tienen stock en la sucursal", async () => {
     renderModal();
     await irAlPaso2("Salida");
