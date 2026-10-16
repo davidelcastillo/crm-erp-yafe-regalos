@@ -201,7 +201,7 @@ it("closes purchase modal when clicking outside", async () => {
         title: '¿Eliminar item?',
         icon: 'warning',
         showCancelButton: true,
-        confirmButtonColor: '#ff385c',
+        confirmButtonColor: '#be185d',
         cancelButtonColor: '#6a6a6a',
         confirmButtonText: 'Sí, eliminar',
         cancelButtonText: 'Cancelar',
@@ -248,7 +248,7 @@ it("closes purchase modal when clicking outside", async () => {
         title: '¿Eliminar item?',
         icon: 'warning',
         showCancelButton: true,
-        confirmButtonColor: '#ff385c',
+        confirmButtonColor: '#be185d',
         cancelButtonColor: '#6a6a6a',
         confirmButtonText: 'Sí, eliminar',
         cancelButtonText: 'Cancelar',
@@ -333,7 +333,7 @@ it("closes purchase modal when clicking outside", async () => {
           title: 'Error',
           text: 'Por favor agregá al menos un producto',
           icon: 'error',
-          confirmButtonColor: '#ff385c',
+          confirmButtonColor: '#dc2626',
         })
       );
     });
@@ -386,7 +386,7 @@ it("closes purchase modal when clicking outside", async () => {
           title: 'Compra registrada',
           text: expect.stringMatching(/2 unidades agregadas al inventario/),
           icon: 'success',
-          confirmButtonColor: '#ff385c',
+          confirmButtonColor: '#be185d',
           confirmButtonText: 'Aceptar',
           background: '#ffffff',
           color: '#222222',

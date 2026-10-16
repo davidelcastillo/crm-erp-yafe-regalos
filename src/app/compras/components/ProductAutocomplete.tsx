@@ -91,14 +91,14 @@ const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         onChange={handleInputChange}
         onFocus={() => setIsOpen(true)}
         placeholder="Buscar producto..."
-        className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-[#ff385c] focus:ring-2 focus:ring-[#ff385c]/20 outline-none transition-all bg-white"
+        className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-[#ec4899] focus:ring-2 focus:ring-[#ec4899]/30 outline-none transition-all bg-white"
       />
       
       {renderCreateButton && (
         <button
           type="button"
           onClick={onCreateClick}
-          className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 flex items-center justify-center bg-[#ff385c] text-white rounded-full hover:bg-[#e00b41] transition-colors text-sm"
+          className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 flex items-center justify-center brand-gradient brand-gradient-hover text-gray-800 rounded-full transition-colors text-sm"
           aria-label="Crear nuevo producto"
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

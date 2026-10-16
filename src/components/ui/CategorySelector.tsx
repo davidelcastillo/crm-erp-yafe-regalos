@@ -40,7 +40,7 @@ type Option = { id: number; name: string } | { id: number; name: string };
  *
  * Design tokens (Airbnb-inspired, see STYLE.md):
  *  - White canvas, ink (#222222) text, muted (#6a6a6a) helper.
- *  - Rausch (#ff385c) accent on the "+ Nueva" pill and selected row.
+ *  - Acento de marca (#ec4899) en la píldora «+ Nueva» y en la fila elegida (texto #be185d, AA).
  *  - 44px minimum tap targets, full-width select on mobile.
  *  - Bottom-sheet (`rounded-t-3xl`) modal for creating a new category.
  */
@@ -107,7 +107,7 @@ export function CategorySelector({
       showCancelButton: true,
       confirmButtonText: "Crear",
       cancelButtonText: "Cancelar",
-      confirmButtonColor: "#ff385c",
+      confirmButtonColor: "#be185d",
       cancelButtonColor: "#6a6a6a",
       background: "#ffffff",
       color: "#222222",
@@ -136,7 +136,7 @@ export function CategorySelector({
           title: "Categoría creada",
           text: `Se creó "${created.name}"`,
           icon: "success" as const,
-          confirmButtonColor: "#ff385c",
+          confirmButtonColor: "#be185d",
           confirmButtonText: "Aceptar",
           background: "#ffffff",
           color: "#222222",
@@ -146,7 +146,7 @@ export function CategorySelector({
           title: "Error",
           text: result.error ?? "No se pudo crear la categoría",
           icon: "error" as const,
-          confirmButtonColor: "#ff385c",
+          confirmButtonColor: "#dc2626",
           confirmButtonText: "Aceptar",
           background: "#ffffff",
           color: "#222222",
@@ -194,7 +194,7 @@ export function CategorySelector({
           type="button"
           disabled={disabled || creating}
           onClick={handleCreateNew}
-          className="inline-flex items-center gap-1 px-3 min-h-[44px] whitespace-nowrap rounded-xl bg-[#ff385c] text-white text-sm font-medium hover:bg-[#e00b41] transition-colors disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
+          className="inline-flex items-center gap-1 px-3 min-h-[44px] whitespace-nowrap rounded-xl brand-gradient brand-gradient-hover text-gray-800 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
           aria-label="Crear nueva categoría"
         >
           {creating ? "Creando…" : (
@@ -218,7 +218,7 @@ export function CategorySelector({
             type="button"
             onClick={() => handleClick(null)}
             className={`w-full text-left px-4 py-3 min-h-[44px] text-sm hover:bg-[#f8f8f8] transition-colors ${
-              selectedId === null ? "bg-[#ff385c]/10 text-[#ff385c] font-medium" : "text-[#222222]"
+              selectedId === null ? "bg-[#ec4899]/10 text-[#be185d] font-medium" : "text-[#222222]"
             }`}
             role="option"
             aria-selected={selectedId === null}
@@ -231,7 +231,7 @@ export function CategorySelector({
               type="button"
               onClick={() => handleClick(o.id)}
               className={`w-full text-left px-4 py-3 min-h-[44px] text-sm hover:bg-[#f8f8f8] transition-colors ${
-                o.id === selectedId ? "bg-[#ff385c]/10 text-[#ff385c] font-medium" : "text-[#222222]"
+                o.id === selectedId ? "bg-[#ec4899]/10 text-[#be185d] font-medium" : "text-[#222222]"
               }`}
               role="option"
               aria-selected={o.id === selectedId}

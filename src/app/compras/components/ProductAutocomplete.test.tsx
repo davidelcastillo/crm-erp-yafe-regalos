@@ -200,7 +200,9 @@ it("updates selected product information when selection changes", () => {
     // Should show the create button (+)
     const createButton = screen.getByRole("button", { name: /crear nuevo producto/i });
     expect(createButton).toBeInTheDocument();
-    expect(createButton).toHaveClass("bg-[#ff385c]");
+    // El botón «+» usa el degradé de marca con contenido oscuro (no el rojo viejo).
+    expect(createButton).toHaveClass("brand-gradient");
+    expect(createButton).not.toHaveClass("bg-[#ff385c]");
   });
 
   it("does not render create button when renderCreateButton is false", () => {

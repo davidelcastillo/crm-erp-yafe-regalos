@@ -40,7 +40,7 @@ export default function InactivosPage() {
       text: 'El producto volverá a estar disponible en los selectores de compras y ventas.',
       icon: 'question',
       showCancelButton: true,
-      confirmButtonColor: '#ff385c',
+      confirmButtonColor: '#be185d',
       cancelButtonColor: '#6a6a6a',
       confirmButtonText: 'Sí, reactivar',
     });
@@ -52,7 +52,7 @@ export default function InactivosPage() {
         title: 'Producto reactivado',
         text: 'El producto ha sido reactivado correctamente.',
         icon: 'success',
-        confirmButtonColor: '#ff385c',
+        confirmButtonColor: '#be185d',
       });
       await loadProducts();
     } else {
@@ -60,7 +60,7 @@ export default function InactivosPage() {
         title: 'Error',
         text: result.error || 'Error al reactivar el producto',
         icon: 'error',
-        confirmButtonColor: '#ff385c',
+        confirmButtonColor: '#dc2626',
       });
     }
   };
@@ -90,7 +90,7 @@ export default function InactivosPage() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-center h-[60vh]">
             <div className="flex items-center gap-2 animate-spin">
-              <svg className="w-8 h-8 text-[#ff385c]" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="w-8 h-8 text-[#ec4899]" viewBox="0 0 24 24" stroke="currentColor">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
               </svg>
@@ -175,7 +175,7 @@ export default function InactivosPage() {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 flex space-x-2">
                       <button
                         onClick={() => handleReactivate(product.id)}
-                        className="px-3 py-1 text-sm font-medium text-white bg-[#ff385c] rounded hover:bg-[#e00b41] transition-colors"
+                        className="px-3 py-1 text-sm font-medium brand-gradient brand-gradient-hover text-gray-800 rounded transition-colors"
                       >
                         Activar
                       </button>

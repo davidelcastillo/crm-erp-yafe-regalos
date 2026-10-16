@@ -87,7 +87,7 @@ export function AddPurchaseButton({ products: initialProducts, onSuccess }: AddP
         title: "Error",
         text: "Por favor agregá al menos un producto",
         icon: "error",
-        confirmButtonColor: "#ff385c",
+        confirmButtonColor: "#dc2626",
       });
       return;
     }
@@ -113,7 +113,7 @@ export function AddPurchaseButton({ products: initialProducts, onSuccess }: AddP
         title: "Compra registrada",
         text: `${totalItems} unidades agregadas al inventario`,
         icon: "success",
-        confirmButtonColor: "#ff385c",
+        confirmButtonColor: "#be185d",
         confirmButtonText: "Aceptar",
         background: "#ffffff",
         color: "#222222",
@@ -127,7 +127,7 @@ export function AddPurchaseButton({ products: initialProducts, onSuccess }: AddP
         title: "Error",
         text: result.error || "Error al registrar la compra",
         icon: "error",
-        confirmButtonColor: "#ff385c",
+        confirmButtonColor: "#dc2626",
         background: "#ffffff",
         color: "#222222",
       });
@@ -208,7 +208,7 @@ export function AddPurchaseButton({ products: initialProducts, onSuccess }: AddP
                               text: 'Esta acción no se puede deshacer',
                               icon: 'warning',
                               showCancelButton: true,
-                              confirmButtonColor: '#ff385c',
+                              confirmButtonColor: '#be185d',
                               cancelButtonColor: '#6a6a6a',
                               confirmButtonText: 'Sí, eliminar',
                               cancelButtonText: 'Cancelar',
@@ -247,7 +247,7 @@ export function AddPurchaseButton({ products: initialProducts, onSuccess }: AddP
                         id={`branch-${item.id}`}
                         value={item.branchId}
                         onChange={(e) => updateItem(item.id, "branchId", e.target.value)}
-                        className="w-full px-3 py-3 min-h-[48px] rounded-lg border border-gray-200 focus:border-[#ff385c] outline-none transition-all text-sm touch-manipulation"
+                        className="w-full px-3 py-3 min-h-[48px] rounded-lg border border-gray-200 focus:border-[#ec4899] outline-none transition-all text-sm touch-manipulation"
                         required
                       >
                         <option value="">Seleccionar sucursal</option>
@@ -273,7 +273,7 @@ export function AddPurchaseButton({ products: initialProducts, onSuccess }: AddP
                             min="0"
                             value={item.price}
                             onChange={(e) => updateItem(item.id, "price", e.target.value)}
-                            className="w-full pl-7 pr-3 py-3 min-h-[48px] rounded-lg border border-gray-200 focus:border-[#ff385c] outline-none transition-all text-sm touch-manipulation"
+                            className="w-full pl-7 pr-3 py-3 min-h-[48px] rounded-lg border border-gray-200 focus:border-[#ec4899] outline-none transition-all text-sm touch-manipulation"
                             placeholder="0.00"
                             required
                           />
@@ -289,7 +289,7 @@ export function AddPurchaseButton({ products: initialProducts, onSuccess }: AddP
                           min="1"
                           value={item.quantity}
                           onChange={(e) => updateItem(item.id, "quantity", e.target.value)}
-                          className="w-full px-3 py-3 min-h-[48px] rounded-lg border border-gray-200 focus:border-[#ff385c] outline-none transition-all text-sm touch-manipulation"
+                          className="w-full px-3 py-3 min-h-[48px] rounded-lg border border-gray-200 focus:border-[#ec4899] outline-none transition-all text-sm touch-manipulation"
                           placeholder="0"
                           required
                         />
@@ -309,7 +309,7 @@ export function AddPurchaseButton({ products: initialProducts, onSuccess }: AddP
                 <button
                   type="button"
                   onClick={addItem}
-                  className="w-full py-3 border-2 border-dashed border-gray-300 text-[#6a6a6a] rounded-xl hover:border-[#ff385c] hover:text-[#ff385c] transition-colors flex items-center justify-center gap-2"
+                  className="w-full py-3 border-2 border-dashed border-gray-300 text-[#6a6a6a] rounded-xl hover:border-[#ec4899] hover:text-[#be185d] transition-colors flex items-center justify-center gap-2"
                 >
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -330,7 +330,7 @@ export function AddPurchaseButton({ products: initialProducts, onSuccess }: AddP
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full py-4 bg-[#ff385c] text-white font-medium rounded-xl hover:bg-[#e00b41] transition-colors disabled:opacity-50"
+                  className="w-full py-4 brand-action font-medium rounded-xl transition-colors disabled:opacity-50"
                 >
                   {loading ? "Registrando..." : "Registrar Compra"}
                 </button>

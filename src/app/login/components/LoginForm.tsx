@@ -64,7 +64,7 @@ export default function LoginForm() {
             type="email"
             autoComplete="email"
             required
-            className="block w-full h-14 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-[#222222] placeholder:text-[#6a6a6a] focus:border-[#ff385c] focus:ring-2 focus:ring-[#ff385c]/20 focus:outline-none transition-all sm:text-sm sm:leading-6"
+            className="block w-full h-14 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-[#222222] placeholder:text-[#6a6a6a] focus:border-[#ec4899] focus:ring-2 focus:ring-[#ec4899]/30 focus:outline-none transition-all sm:text-sm sm:leading-6"
             value={formState.email}
             onChange={handleChange}
           />
@@ -80,7 +80,7 @@ export default function LoginForm() {
             type="password"
             autoComplete="current-password"
             required
-            className="block w-full h-14 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-[#222222] placeholder:text-[#6a6a6a] focus:border-[#ff385c] focus:ring-2 focus:ring-[#ff385c]/20 focus:outline-none transition-all sm:text-sm sm:leading-6"
+            className="block w-full h-14 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-[#222222] placeholder:text-[#6a6a6a] focus:border-[#ec4899] focus:ring-2 focus:ring-[#ec4899]/30 focus:outline-none transition-all sm:text-sm sm:leading-6"
             value={formState.password}
             onChange={handleChange}
           />
@@ -101,7 +101,7 @@ export default function LoginForm() {
                 id="remember-me"
                 name="remember-me"
                 type="checkbox"
-                className="h-5 w-5 text-[#ff385c] focus:ring-[#ff385c] border-gray-300 rounded"
+                className="h-5 w-5 text-[#ec4899] focus:ring-[#ec4899] border-gray-300 rounded"
               />
             </div>
             <div className="ml-3 text-sm">
@@ -116,7 +116,7 @@ export default function LoginForm() {
           <button
             type="submit"
             disabled={pending}
-            className="w-full h-12 flex justify-center items-center border border-transparent text-sm font-medium rounded-xl shadow-sm text-white bg-[#ff385c] hover:bg-[#e00b41] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#ff385c]/50 disabled:bg-[#ffd1da] disabled:cursor-not-allowed disabled:opacity-100 transition-colors"
+            className="w-full h-12 flex justify-center items-center border border-transparent text-sm font-medium rounded-xl shadow-sm brand-gradient brand-gradient-hover text-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#ec4899]/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {pending ? 'Iniciando sesión...' : 'Iniciar sesión'}
           </button>
