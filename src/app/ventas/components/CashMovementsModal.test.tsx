@@ -178,3 +178,58 @@ describe("CashMovementsModal — variantes del sistema de botones", () => {
     );
   });
 });
+
+// Layout: en celular el modal queda apilado en una columna; recién desde `md` el
+// panel crece y el registro y el libro de la sucursal van en dos columnas
+// (`STYLE.md`, «Modales en escritorio»).
+describe("CashMovementsModal — layout de escritorio", () => {
+  it("deja una sola columna en celular y abre dos columnas desde `md`", async () => {
+    const { container } = renderModal();
+
+    const panel = container.querySelector('[class*="md:max-w-3xl"]');
+    expect(panel).not.toBeNull();
+    expect(panel).toHaveClass("max-w-xl", "max-h-[90vh]", "md:max-h-[85vh]");
+
+    await elegirSucursal();
+
+    const columnas = screen
+      .getByRole("button", { name: "Registrar ingreso" })
+      .closest("form")?.parentElement;
+    expect(columnas).not.toBeUndefined();
+    // Celular: sigue apilado, sin grid.
+    expect(columnas?.className).not.toMatch(/(^|\s)grid(\s|$)/);
+    expect(columnas).toHaveClass("md:grid", "md:grid-cols-2", "md:gap-5", "md:items-start");
+  });
+
+  it("el registro y el libro van cada uno en su panel, sin `glass`", async () => {
+    const { container } = renderModal();
+    await elegirSucursal();
+
+    const registro = screen
+      .getByRole("button", { name: "Registrar ingreso" })
+      .closest("form");
+    expect(registro).toHaveClass("rounded-2xl", "border-black/10", "bg-[#f7f7f7]", "p-4");
+
+    const libro = screen.getByText(/Últimos movimientos de Principal/).closest("section");
+    expect(libro).toHaveClass(
+      "rounded-2xl",
+      "border-black/10",
+      "bg-[#f7f7f7]",
+      "p-4",
+      "md:mt-0"
+    );
+
+    // El vidrio necesita el degradé detrás: sobre el modal blanco no se distingue.
+    expect(container.querySelector(".glass")).toBeNull();
+  });
+
+  it("«Registrar ingreso» no se estira a lo ancho del panel desde `md`", async () => {
+    renderModal();
+    await elegirSucursal();
+
+    expect(screen.getByRole("button", { name: "Registrar ingreso" })).toHaveClass(
+      "w-full",
+      "md:w-auto"
+    );
+  });
+});

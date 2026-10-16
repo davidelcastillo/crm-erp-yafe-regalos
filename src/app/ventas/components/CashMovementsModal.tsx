@@ -155,7 +155,7 @@ export const CashMovementsModal = ({
       aria-labelledby="cash-movements-title"
     >
       <div
-        className="bg-white w-full max-w-xl rounded-2xl p-6 animate-scale-in max-h-[90vh] overflow-y-auto"
+        className="bg-white w-full max-w-xl md:max-w-3xl rounded-2xl p-6 animate-scale-in max-h-[90vh] md:max-h-[85vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-between items-center mb-4">
@@ -192,26 +192,20 @@ export const CashMovementsModal = ({
           </p>
         )}
 
+        {/* Desde `md` el registro va a la izquierda y el libro de la sucursal con
+            sus totales a la derecha. En celular se apila en el orden de siempre:
+            primero el contexto (los totales del libro) y después la acción, por eso
+            el `order` invertido. */}
         {branchId !== null && (
-          <>
-            <div className="mt-4 grid grid-cols-3 gap-2 text-center">
-              <div className="rounded-xl bg-[#f7f7f7] px-2 py-3">
-                <p className="text-xs text-[#6a6a6a]">Ingresos</p>
-                <p className="text-sm font-semibold text-green-700">{plata(totales.ingresos)}</p>
-              </div>
-              <div className="rounded-xl bg-[#f7f7f7] px-2 py-3">
-                <p className="text-xs text-[#6a6a6a]">Egresos</p>
-                <p className="text-sm font-semibold text-[#c13515]">{plata(totales.egresos)}</p>
-              </div>
-              <div className="rounded-xl bg-[#f7f7f7] px-2 py-3">
-                <p className="text-xs text-[#6a6a6a]">Saldo</p>
-                <p className="text-sm font-semibold text-[#222222]">{plata(totales.balance)}</p>
-              </div>
-            </div>
-
-            <form onSubmit={handleSubmit} className="mt-5 border-t border-gray-100 pt-4">
-              <p className="block text-xs text-[#6a6a6a] mb-2">¿Entra o sale plata?</p>
-              <div className="flex gap-2">
+          <div className="mt-4 md:grid md:grid-cols-2 md:gap-5 md:items-start">
+            <form
+              onSubmit={handleSubmit}
+              className="order-2 rounded-2xl border border-black/10 bg-[#f7f7f7] p-4 md:order-1"
+            >
+              <h3 className="text-xs font-medium uppercase tracking-wide text-[#6a6a6a]">
+                ¿Entra o sale plata?
+              </h3>
+              <div className="mt-3 flex gap-2">
                 {TIPOS.map((opcion) => (
                   <button
                     key={opcion.value}
@@ -299,30 +293,55 @@ export const CashMovementsModal = ({
               <button
                 type="submit"
                 disabled={pending}
-                className="btn btn-primary mt-4 w-full"
+                className="btn btn-primary mt-4 w-full md:w-auto"
               >
                 {pending ? "Registrando..." : `Registrar ${tipo === "INGRESO" ? "ingreso" : "egreso"}`}
               </button>
             </form>
 
-            <div className="mt-5 border-t border-gray-100 pt-4">
-              <p className="text-xs font-medium uppercase tracking-wide text-[#6a6a6a] mb-3">
+            <section className="order-1 mt-4 rounded-2xl border border-black/10 bg-[#f7f7f7] p-4 md:order-2 md:mt-0">
+              <h3 className="text-xs font-medium uppercase tracking-wide text-[#6a6a6a]">
                 Últimos movimientos de {sucursalElegida?.name ?? "la sucursal"}
-              </p>
+              </h3>
 
-              {loading && <p className="text-sm text-[#6a6a6a]">Cargando movimientos...</p>}
+              {/* Totales del libro: etiqueta a la izquierda, monto a la derecha. */}
+              <dl className="mt-3 space-y-2">
+                <div className="flex items-baseline justify-between gap-4">
+                  <dt className="text-sm text-[#3f3f3f]">Ingresos</dt>
+                  <dd className="text-sm font-semibold text-green-700 tabular-nums">
+                    {plata(totales.ingresos)}
+                  </dd>
+                </div>
+                <div className="flex items-baseline justify-between gap-4">
+                  <dt className="text-sm text-[#3f3f3f]">Egresos</dt>
+                  <dd className="text-sm font-semibold text-[#c13515] tabular-nums">
+                    {plata(totales.egresos)}
+                  </dd>
+                </div>
+              </dl>
+
+              <div className="mt-3 flex items-baseline justify-between gap-4 border-t border-black/10 pt-3">
+                <span className="text-sm font-medium text-[#222222]">Saldo</span>
+                <span className="text-sm font-semibold text-[#222222] tabular-nums">
+                  {plata(totales.balance)}
+                </span>
+              </div>
+
+              {loading && (
+                <p className="mt-3 text-sm text-[#6a6a6a]">Cargando movimientos...</p>
+              )}
 
               {!loading && movimientos.length === 0 && (
-                <p className="text-sm text-[#6a6a6a]">
+                <p className="mt-3 text-sm text-[#6a6a6a]">
                   Todavía no hay movimientos de caja en esta sucursal.
                 </p>
               )}
 
-              <ul className="space-y-2">
+              <ul className="mt-3 space-y-2">
                 {movimientos.map((m) => (
                   <li
                     key={m.id}
-                    className="flex items-start justify-between gap-3 rounded-xl bg-[#f7f7f7] px-3 py-2"
+                    className="flex items-start justify-between gap-3 rounded-xl border border-black/10 bg-white px-3 py-2"
                   >
                     <div className="min-w-0">
                       <p className="text-sm text-[#222222]">
@@ -334,7 +353,7 @@ export const CashMovementsModal = ({
                       )}
                     </div>
                     <span
-                      className={`text-sm font-semibold whitespace-nowrap ${
+                      className={`text-sm font-semibold whitespace-nowrap tabular-nums ${
                         m.type === "INGRESO" ? "text-green-700" : "text-[#c13515]"
                       }`}
                     >
@@ -344,8 +363,8 @@ export const CashMovementsModal = ({
                   </li>
                 ))}
               </ul>
-            </div>
-          </>
+            </section>
+          </div>
         )}
       </div>
     </div>

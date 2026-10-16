@@ -81,14 +81,14 @@ export function MovementsModal({ product, isOpen, onClose }: MovementsModalProps
 
   return (
     <div
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-end justify-center"
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-end md:items-center justify-center"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
       aria-labelledby="movements-modal-title"
     >
       <div
-        className="bg-white w-full max-w-xl rounded-t-3xl p-6 animate-slide-up max-h-[90vh] overflow-y-auto"
+        className="bg-white w-full max-w-xl md:max-w-2xl rounded-t-3xl md:rounded-b-3xl p-6 animate-slide-up max-h-[90vh] md:max-h-[85vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-between items-center mb-6">
@@ -148,7 +148,7 @@ export function MovementsModal({ product, isOpen, onClose }: MovementsModalProps
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-[#6a6a6a] uppercase">
                       Tipo
                     </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-[#6a6a6a] uppercase">
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-[#6a6a6a] uppercase md:text-right">
                       Cantidad
                     </th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-[#6a6a6a] uppercase">
@@ -174,7 +174,7 @@ export function MovementsModal({ product, isOpen, onClose }: MovementsModalProps
                           </span>
                         )}
                       </td>
-                      <td className="px-6 py-4 text-sm text-[#222222] whitespace-nowrap">
+                      <td className="px-6 py-4 text-sm text-[#222222] whitespace-nowrap tabular-nums md:text-right">
                         {formatAmount(movement.quantity)}
                       </td>
                       <td className="px-6 py-4 text-sm text-[#222222] whitespace-nowrap">

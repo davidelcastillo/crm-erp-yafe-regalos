@@ -98,3 +98,39 @@ describe('MovementsModal con movimientos de sucursal', () => {
     expect(screen.getByText('#4')).toBeInTheDocument();
   });
 });
+
+// Layout: la lista es cronológica y de una sola cosa, así que solo el panel se
+// acota desde `md` (`STYLE.md`, «Modales en escritorio»).
+describe('MovementsModal — layout de escritorio', () => {
+  it('acota el panel y lo centra desde `md`, sin tocar la columna de celular', () => {
+    const { container } = renderModal();
+
+    const panel = container.querySelector('[class*="md:max-w-2xl"]');
+    expect(panel).not.toBeNull();
+    expect(panel).toHaveClass(
+      'max-w-xl',
+      'max-h-[90vh]',
+      'md:max-h-[85vh]',
+      'md:rounded-b-3xl'
+    );
+    expect(screen.getByRole('dialog')).toHaveClass('md:items-center');
+  });
+
+  it('la cantidad va numérica y se alinea a la derecha desde `md`', async () => {
+    responder([
+      {
+        id: 'movement-1',
+        type: 'SALE',
+        date: '2026-10-15T10:00:00.000Z',
+        quantity: 3,
+        referenceId: 4,
+        reference: null,
+        branchName: 'Centro',
+      },
+    ]);
+
+    renderModal();
+
+    expect(await screen.findByText('3 uds')).toHaveClass('tabular-nums', 'md:text-right');
+  });
+});
