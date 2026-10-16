@@ -198,9 +198,12 @@ export const CashMovementsModal = ({
             el `order` invertido. */}
         {branchId !== null && (
           <div className="mt-4 md:grid md:grid-cols-2 md:gap-5 md:items-start">
+            {/* En este modal la lista larga es el libro de la derecha, así que la
+                columna que se pega es la del registro: la acción queda a la vista
+                en lugar de la franja en blanco debajo del formulario. */}
             <form
               onSubmit={handleSubmit}
-              className="order-2 rounded-2xl border border-black/10 bg-[#f7f7f7] p-4 md:order-1"
+              className="order-2 rounded-2xl border border-black/10 bg-[#f7f7f7] p-4 md:order-1 md:sticky md:top-4"
             >
               <h3 className="text-xs font-medium uppercase tracking-wide text-[#6a6a6a]">
                 ¿Entra o sale plata?
@@ -213,7 +216,7 @@ export const CashMovementsModal = ({
                     onClick={() => setTipo(opcion.value)}
                     aria-pressed={tipo === opcion.value}
                     className={`btn flex-1 ${
-                      tipo === opcion.value ? "btn-active" : "btn-secondary"
+                      tipo === opcion.value ? "btn-active" : "btn-ghost"
                     }`}
                   >
                     {opcion.label}

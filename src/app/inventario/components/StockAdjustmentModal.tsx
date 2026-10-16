@@ -272,7 +272,7 @@ export const StockAdjustmentModal = ({
               />
             </section>
 
-            <section className="mt-4 rounded-2xl border border-black/10 bg-[#f7f7f7] p-4 md:mt-0">
+            <section className="mt-4 rounded-2xl border border-black/10 bg-[#f7f7f7] p-4 md:mt-0 md:sticky md:top-4">
               <h3 className="text-xs font-medium uppercase tracking-wide text-[#6a6a6a]">
                 ¿Suma o resta stock?
               </h3>
@@ -284,7 +284,7 @@ export const StockAdjustmentModal = ({
                     type="button"
                     onClick={() => setTipo(opcion.value)}
                     aria-pressed={tipo === opcion.value}
-                    className={`btn ${tipo === opcion.value ? "btn-active" : "btn-secondary"} flex-1`}
+                    className={`btn ${tipo === opcion.value ? "btn-active" : "btn-ghost"} flex-1`}
                   >
                     {opcion.label}
                   </button>
@@ -401,7 +401,7 @@ export const StockAdjustmentModal = ({
               )}
             </section>
 
-            <section className="mt-6 rounded-2xl border border-black/10 bg-[#f7f7f7] p-4 md:mt-0">
+            <section className="mt-6 rounded-2xl border border-black/10 bg-[#f7f7f7] p-4 md:mt-0 md:sticky md:top-4">
               <h3 className="text-xs font-medium uppercase tracking-wide text-[#6a6a6a]">
                 Resumen
               </h3>
@@ -460,7 +460,7 @@ export const StockAdjustmentModal = ({
                 {error && <p className="mt-3 text-sm text-[#c13515]">{error}</p>}
               </section>
 
-              <section className="mt-4 rounded-2xl border border-black/10 bg-[#f7f7f7] p-4 md:mt-0">
+              <section className="mt-4 rounded-2xl border border-black/10 bg-[#f7f7f7] p-4 md:mt-0 md:sticky md:top-4">
                 <h3 className="text-xs font-medium uppercase tracking-wide text-[#6a6a6a]">
                   Detalle
                 </h3>

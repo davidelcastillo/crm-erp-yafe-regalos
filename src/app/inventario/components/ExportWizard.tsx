@@ -354,7 +354,7 @@ export function ExportWizard({ open, onClose, branches }: ExportWizardProps) {
 
               {/* Resumen de lo seleccionado: en celular cae debajo de la lista;
                   desde `md` va a la derecha. */}
-              <aside className="mt-4 rounded-2xl border border-black/10 bg-[#f7f7f7] p-4 md:mt-0">
+              <aside className="mt-4 rounded-2xl border border-black/10 bg-[#f7f7f7] p-4 md:mt-0 md:sticky md:top-4">
                 <h3 className="text-xs font-medium uppercase tracking-wide text-[#6a6a6a]">
                   Selección
                 </h3>

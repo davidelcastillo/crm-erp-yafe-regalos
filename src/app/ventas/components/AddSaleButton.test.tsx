@@ -316,7 +316,7 @@ describe("AddSaleButton: variantes del sistema de botones", () => {
     );
   });
 
-  it("el medio de pago elegido va btn-active y el otro btn-secondary", () => {
+  it("el medio de pago elegido va btn-active y el otro btn-ghost", () => {
     setup();
     abrirPaso2();
 
@@ -324,12 +324,12 @@ describe("AddSaleButton: variantes del sistema de botones", () => {
     const transferencia = screen.getByRole("button", { name: "TRANSFERENCIA" });
 
     expect(efectivo).toHaveClass("btn", "btn-active");
-    expect(transferencia).toHaveClass("btn", "btn-secondary");
+    expect(transferencia).toHaveClass("btn", "btn-ghost");
 
     fireEvent.click(transferencia);
 
     expect(transferencia).toHaveClass("btn", "btn-active");
-    expect(efectivo).toHaveClass("btn", "btn-secondary");
+    expect(efectivo).toHaveClass("btn", "btn-ghost");
   });
 
   it("«Eliminar» de una fila usa la variante destructiva", () => {

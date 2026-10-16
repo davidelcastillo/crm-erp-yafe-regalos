@@ -334,7 +334,7 @@ export function AddPurchaseButton({ products: initialProducts, onSuccess }: AddP
                 {/* Columna derecha: el total y la acción. En celular queda debajo de los
                     ítems, en el orden de siempre. El total conserva su fondo oscuro:
                     el gris de las tarjetas no se leería con texto blanco. */}
-                <div className="mt-4 space-y-4 md:mt-0">
+                <div className="mt-4 space-y-4 md:mt-0 md:sticky md:top-4">
                   {/* Total */}
                   <div className="p-4 bg-[#222222] rounded-xl">
                     <div className="flex justify-between items-center">

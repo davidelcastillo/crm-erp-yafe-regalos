@@ -143,9 +143,10 @@ describe("CashMovementsModal", () => {
 });
 
 // Sistema de botones (`globals.css`): el control segmentado marca la opción
-// elegida con `btn-active` y la otra va neutra; el ✕ es el ícono cuadrado.
+// elegida con `btn-active` y la otra va `btn-ghost` (blanco con borde, porque el control vive
+// dentro de un panel gris); el ✕ es el ícono cuadrado.
 describe("CashMovementsModal — variantes del sistema de botones", () => {
-  it("la opción elegida de «¿Entra o sale plata?» va btn-active y la otra btn-secondary", async () => {
+  it("la opción elegida de «¿Entra o sale plata?» va btn-active y la otra btn-ghost", async () => {
     renderModal();
     await elegirSucursal();
 
@@ -153,12 +154,12 @@ describe("CashMovementsModal — variantes del sistema de botones", () => {
     const egreso = screen.getByRole("button", { name: "Egreso" });
 
     expect(ingreso).toHaveClass("btn", "btn-active");
-    expect(egreso).toHaveClass("btn", "btn-secondary");
+    expect(egreso).toHaveClass("btn", "btn-ghost");
 
     fireEvent.click(egreso);
 
     expect(egreso).toHaveClass("btn", "btn-active");
-    expect(ingreso).toHaveClass("btn", "btn-secondary");
+    expect(ingreso).toHaveClass("btn", "btn-ghost");
   });
 
   it("«Registrar ingreso» es el primario y el ✕ el ícono redondo", async () => {

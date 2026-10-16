@@ -405,13 +405,13 @@ export function AddSaleButton({ products, onSuccess }: AddSaleButtonProps) {
                     </button>
                   </div>
 
-                  <div className="mt-4 space-y-4 md:mt-0">
+                  <div className="mt-4 space-y-4 md:mt-0 md:sticky md:top-4">
                     {/* Payment Method Selector */}
                     <div className="rounded-2xl border border-black/10 bg-[#f7f7f7] p-4">
                       <label className="block text-xs font-medium uppercase tracking-wide text-[#6a6a6a] mb-3">
                         Método de Pago
                       </label>
-                      {/* Control segmentado: el medio elegido va `btn-active`, el otro `btn-secondary`. */}
+                      {/* Control segmentado: el medio elegido va `btn-active`, el otro `btn-ghost` (blanco con borde, porque este control vive dentro de un panel gris). */}
                       <div className="flex gap-2 overflow-x-auto pb-2">
                         {MEDIOS_DE_PAGO.map((method) => (
                           <button
@@ -420,7 +420,7 @@ export function AddSaleButton({ products, onSuccess }: AddSaleButtonProps) {
                             onClick={() => setPaymentMethod(method)}
                             aria-pressed={paymentMethod === method}
                             className={`btn whitespace-nowrap ${
-                              paymentMethod === method ? "btn-active" : "btn-secondary"
+                              paymentMethod === method ? "btn-active" : "btn-ghost"
                             }`}
                           >
                             {method}

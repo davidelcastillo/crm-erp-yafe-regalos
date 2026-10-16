@@ -348,7 +348,7 @@ export const MoveStockModal = ({
                 )}
               </section>
 
-              <section className="mt-4 rounded-2xl border border-black/10 bg-[#f7f7f7] p-4">
+              <section className="mt-4 rounded-2xl border border-black/10 bg-[#f7f7f7] p-4 md:sticky md:top-4">
                 <h3 className="text-xs font-medium uppercase tracking-wide text-[#6a6a6a]">
                   Resumen
                 </h3>
