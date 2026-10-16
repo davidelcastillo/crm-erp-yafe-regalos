@@ -48,7 +48,7 @@ export default function MovementsPage() {
       <main>
         <div className="pb-16 brand-gradient">
           <PageHeader
-            title="Movimientos"
+            title="Movimientos de Stock"
             actions={
               <Link
                 href="/inventario"
