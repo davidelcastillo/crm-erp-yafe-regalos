@@ -536,6 +536,22 @@ El rebranding reemplaza el rojo `#ff385c` (que sigue existiendo como legado, pen
 - El **cierre de sesión** vive dentro del menú ☰ en mobile y visible en la barra en desktop.
 - El menú es mobile-only (`md:hidden`) y se cierra con Escape, con el botón ✕ o tocando el fondo; sus filas tienen 48 px de alto.
 
+### Carga y estados vacíos
+
+- Mientras carga una página se muestra la banda de marca, la hoja de vidrio y **esqueletos** con la forma de lo que va a llegar (`Spinner` + `CardSkeleton`), para que la página no salte al terminar.
+- La ruedita es una sola en todo el sistema (`Spinner`, anillo rosa) y se anuncia como estado (`role="status"` con etiqueta). Los esqueletos son decorativos (`aria-hidden`).
+- Nada de spinners hechos a mano por página ni de `Cargando...` suelto: se usan los componentes compartidos.
+
+### Listas y cards en celulares chicos
+
+El ancho de un celular chico es el caso de prueba, no un caso raro. Reglas que evitan el desborde horizontal:
+
+- La columna de texto de una card va con **`min-w-0`** además de `flex-1`: sin `min-w-0` un nombre largo empuja afuera la columna del precio.
+- La columna de la derecha (precio, estado, chevron) va con **`shrink-0`**.
+- Los textos largos que vienen de datos (nombre de producto, de sucursal) llevan `break-words` o `truncate` con `max-w-full`.
+- Una fila de tres botones no entra: `flex-wrap` + `whitespace-nowrap`, o un grid de dos columnas.
+- Un grid de acciones cierra **2x2**: si quedan tres tarjetas, se busca la cuarta o se cambia el layout; nunca 2+1.
+
 ### Badges de estado
 
 Un badge por caso, con un color propio y contraste medido:
