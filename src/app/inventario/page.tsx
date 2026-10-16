@@ -278,7 +278,6 @@ export default function InventarioPage() {
 
         <InventarioList 
           products={products} 
-          branchId={branchId}
           searchActive={debouncedSearch !== ''}
           categories={categories}
           onViewMovements={(product) => {

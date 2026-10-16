@@ -8,7 +8,6 @@ import { sumStock, type StockSource } from "@/lib/inventory-stock";
 interface InventarioListProps {
   products: Product[];
   onViewMovements?: (product: Product) => void;
-  branchId?: number | null;
   /** True when the unified (server-side) search is active, to tweak empty states. */
   searchActive?: boolean;
   /** Category options hoisted from the page (shared by all cards, avoids N+1). */
@@ -22,7 +21,7 @@ function readStock(p: Product): number {
   return sumStock(p as unknown as StockSource);
 }
 
-export function InventarioList({ products, onViewMovements, branchId, searchActive = false, categories = [] }: InventarioListProps) {
+export function InventarioList({ products, onViewMovements, searchActive = false, categories = [] }: InventarioListProps) {
   const [sortBy, setSortBy] = useState<SortOption>("recent");
   const [showOnlyLowStock, setShowOnlyLowStock] = useState(false);
 
@@ -127,7 +126,6 @@ export function InventarioList({ products, onViewMovements, branchId, searchActi
               product={product} 
               data-product-id={product.id}
               onViewMovements={onViewMovements}
-              branchId={branchId}
               categories={categories}
             />
           ))
