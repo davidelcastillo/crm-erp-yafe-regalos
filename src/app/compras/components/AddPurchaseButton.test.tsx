@@ -50,7 +50,6 @@ import { registerPurchase, createPurchaseWithBranchSplit } from "../../actions/p
 import { getProducts, createProduct, updateProduct } from "../../actions/product";
 import { getUser } from "@/actions/auth";
 import { useRouter } from "next/navigation";
-import { ProductForm } from "@/app/productos/components/ProductForm";
 import Swal from "sweetalert2";
 
 const mockRegisterPurchase = registerPurchase as jest.MockedFunction<typeof registerPurchase>;
@@ -564,13 +563,13 @@ it("closes product creation modal when clicking outside", () => {
     // Wait for option and click it - FIXED: look for the button with product info using a function matcher
     await waitFor(() => {
       expect(
-        screen.getByRole("button", { name: (content, element) => 
+        screen.getByRole("button", { name: (content) => 
           /producto 1/i.test(content)
         })
       ).toBeInTheDocument();
     });
     const producto1Option = screen.getByRole("button", { 
-      name: (content, element) => 
+      name: (content) => 
         /producto 1/i.test(content)
     });
     fireEvent.click(producto1Option);

@@ -1,7 +1,5 @@
 "use client";
 
-import { useState } from "react";
-
 interface PurchaseItem {
   id: number;
   productId: number;

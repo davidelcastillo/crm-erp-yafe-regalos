@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { registerPurchase, createPurchaseWithBranchSplit } from "../../actions/purchase";
+import { createPurchaseWithBranchSplit } from "../../actions/purchase";
 import { getProducts } from "../../actions/product";
 import { getUser } from "@/actions/auth";
 import { useRouter } from "next/navigation";
@@ -27,7 +27,7 @@ interface PurchaseItem {
 
 export function AddPurchaseButton({ products: initialProducts, onSuccess }: AddPurchaseButtonProps) {
   const router = useRouter();
-  const { branchId, branch, branches, ready } = useBranch();
+  const { branches } = useBranch();
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<PurchaseItem[]>([

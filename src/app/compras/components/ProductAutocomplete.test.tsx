@@ -253,7 +253,7 @@ it("updates selected product information when selection changes", () => {
   it("positions create button correctly", () => {
     render(<ProductAutocomplete products={mockProducts} value="" onChange={() => {}} />);
     
-    const input = screen.getByPlaceholderText(/buscar producto/i);
+    screen.getByPlaceholderText(/buscar producto/i);
     const createButton = screen.getByRole("button", { name: /crear nuevo producto/i });
     
     // Button should be to the right of input
