@@ -1,7 +1,7 @@
 /**
  * @jest-environment jsdom
  */
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import ExternalInventoryTable, {
   InventoryItem,
 } from "./ExternalInventoryTable";
@@ -16,6 +16,39 @@ const items: InventoryItem[] = [
 ];
 
 describe("ExternalInventoryTable", () => {
+  it("busca coincidencias por nombre o código y restaura la lista al limpiar", () => {
+    render(<ExternalInventoryTable inventoryData={[
+      ...items, { code: "OT002", name: "Otro artículo", stock: 2, price: 10 },
+    ]} />);
+    const search = screen.getByRole("searchbox", { name: "Buscar productos por código o nombre" });
+    fireEvent.change(search, { target: { value: " pr001 " } });
+    expect(screen.getAllByText(items[0].name)).toHaveLength(2);
+    expect(screen.queryByText("Otro artículo")).not.toBeInTheDocument();
+    fireEvent.change(search, { target: { value: "OTRO" } });
+    expect(screen.getAllByText("Otro artículo")).toHaveLength(2);
+    expect(screen.queryByText(items[0].name)).not.toBeInTheDocument();
+    fireEvent.change(search, { target: { value: "" } });
+    expect(screen.getAllByText(items[0].name)).toHaveLength(2);
+    expect(screen.getAllByText("Otro artículo")).toHaveLength(2);
+  });
+
+  it("trata HTML, SQL y expresiones regulares como texto literal", () => {
+    const malicious = '<img src=x onerror=alert(1)>';
+    const { container } = render(<ExternalInventoryTable inventoryData={[
+      ...items, { code: "TXT", name: malicious, stock: 1, price: 1 },
+    ]} />);
+    const search = screen.getByRole("searchbox");
+    for (const value of [".*", "' OR 1=1 --", "(a+)+$"]) {
+      fireEvent.change(search, { target: { value } });
+      expect(screen.getByText("No se encontraron productos para esta búsqueda")).toBeInTheDocument();
+      expect(container.querySelectorAll("tbody tr")).toHaveLength(0);
+    }
+    fireEvent.change(search, { target: { value: malicious } });
+    expect(screen.getAllByText(malicious)).toHaveLength(2);
+    expect(container.querySelector("img")).toBeNull();
+    expect(container.querySelector("script")).toBeNull();
+  });
+
   it("muestra el estado vacío cuando no hay productos", () => {
     render(<ExternalInventoryTable inventoryData={[]} />);
     expect(screen.getByText(/no hay productos/i)).toBeInTheDocument();

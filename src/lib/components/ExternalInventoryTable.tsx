@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 export interface InventoryItem {
   code: string;
   name: string;
@@ -16,6 +18,12 @@ export default function ExternalInventoryTable({
   inventoryData,
   showHeaders = true,
 }: ExternalInventoryTableProps) {
+  const [search, setSearch] = useState("");
+  const query = search.trim().toLowerCase();
+  const visible = inventoryData.filter((item) =>
+    item.name.toLowerCase().includes(query) || item.code.toLowerCase().includes(query)
+  );
+
   if (inventoryData.length === 0) {
     return (
       <div className="text-center py-12 text-[#6a6a6a]">
@@ -26,11 +34,27 @@ export default function ExternalInventoryTable({
 
   return (
     <div className="space-y-4">
+      <label className="block text-sm font-medium text-[#222222]">
+        Buscar productos por código o nombre
+        <input
+          type="search"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          maxLength={200}
+          placeholder="Código o nombre"
+          className="mt-2 w-full min-h-12 rounded-xl border border-black/10 bg-white px-4 text-base focus-visible:outline-2 focus-visible:outline-pink-500"
+        />
+      </label>
+      {visible.length === 0 && (
+        <p role="status" className="py-6 text-center text-[#6a6a6a]">
+          No se encontraron productos para esta búsqueda
+        </p>
+      )}
       {/* Mobile: una card de vidrio por producto, con la misma forma que las
           listas (nombre, código, stock y precio). */}
       <div className="space-y-4 md:hidden">
-        {inventoryData.map((item, index) => (
-          <div key={index} className="rounded-2xl glass p-4">
+        {visible.map((item) => (
+          <div key={item.code} className="rounded-2xl glass p-4">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
                 <h3 className="text-base font-semibold text-[#222222] break-words">
@@ -68,8 +92,8 @@ export default function ExternalInventoryTable({
             </thead>
           )}
           <tbody className="divide-y divide-gray-200">
-            {inventoryData.map((item, index) => (
-              <tr key={index} className="hover:bg-gray-50">
+            {visible.map((item) => (
+              <tr key={item.code} className="hover:bg-gray-50">
                 <td className="px-4 py-3 font-mono">{item.code}</td>
                 <td className="px-4 py-3 break-words text-[#222222]">
                   {item.name}

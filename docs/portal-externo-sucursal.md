@@ -23,7 +23,11 @@ Una sucursal inexistente, inactiva o no publicada produce la misma respuesta de 
 
 ## Qué muestra
 
-Productos activos que tienen un registro de inventario en esa sucursal, con código, nombre, stock y precio. El catálogo puede incluir stock cero; no confundirlo con el asistente PDF, cuya selección exige stock positivo.
+Productos activos con **stock mayor a cero en esa sucursal**, con código, nombre, stock y precio. El servidor excluye stock cero y negativo antes de enviar los datos al visitante.
+
+El buscador encuentra coincidencias por código o nombre, sin distinguir mayúsculas y quitando espacios de los extremos. Filtra localmente solo los productos de ese catálogo; no consulta otras sucursales. Al limpiar la búsqueda vuelve a mostrar la lista completa. Si no hay coincidencias, muestra «No se encontraron productos para esta búsqueda».
+
+La búsqueda se trata como texto literal (`includes`), no como HTML, SQL ni expresión regular. Los valores se renderizan como texto de React; no se inyecta HTML ni se evalúa código. El campo admite hasta 200 caracteres. Esto no sustituye los controles de publicación ni certifica la seguridad de la Data API.
 
 ## Troubleshooting
 

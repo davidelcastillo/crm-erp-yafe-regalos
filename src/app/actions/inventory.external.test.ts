@@ -35,11 +35,11 @@ jest.mock("@/lib/prisma", () => ({
 type ProductFindManyArgs = {
   where?: {
     active?: boolean;
-    inventory?: { some?: { branchId?: number } };
+    inventory?: { some?: { branchId?: number; stock?: { gt: number } } };
   };
   select?: Record<string, unknown> & {
     id?: boolean;
-    inventory?: { where?: { branchId?: number }; select?: { stock?: boolean } };
+    inventory?: { where?: { branchId?: number; stock?: { gt: number } }; select?: { stock?: boolean } };
   };
   orderBy?: unknown;
 };
@@ -99,8 +99,8 @@ describe("getExternalBranchInventory visibility checks", () => {
     // branch, ordered by name asc, and no id in the root select
     const call = mockProductFindMany.mock.calls[0][0] as ProductFindManyArgs;
     expect(call.where?.active).toBe(true);
-    expect(call.where?.inventory?.some?.branchId).toBe(39);
-    expect(call.select?.inventory?.where?.branchId).toBe(39);
+    expect(call.where?.inventory?.some).toEqual({ branchId: 39, stock: { gt: 0 } });
+    expect(call.select?.inventory?.where).toEqual({ branchId: 39, stock: { gt: 0 } });
     expect(call.select?.inventory?.select).toEqual({ stock: true });
     expect(call.select?.id).toBeUndefined();
     expect(call.orderBy).toEqual({ name: "asc" });
