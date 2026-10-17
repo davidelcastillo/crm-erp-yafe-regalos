@@ -32,8 +32,12 @@ jest.mock("next/headers", () => ({
 }));
 
 import { createServerClient } from "@/lib/supabase/server";
-
-const REMEMBER_ME_MAX_AGE = 7 * 24 * 60 * 60; // 604800
+import {
+  DEFAULT_SESSION_MAX_AGE,
+  REMEMBER_ME_COOKIE,
+  REMEMBER_ME_COOKIE_VALUE,
+  REMEMBER_ME_MAX_AGE,
+} from "@/lib/supabase/session";
 
 function makeFormData(
   overrides: { email?: string; password?: string; remember?: string } = {}
@@ -73,10 +77,32 @@ describe("login", () => {
     expect(createServerClient).toHaveBeenCalledWith(REMEMBER_ME_MAX_AGE);
   });
 
-  it("passes no override when the remember-me checkbox is absent (default 1h)", async () => {
+  it("passes the 1-hour default when the box is absent (a stale mark can't extend it)", async () => {
     await login(makeFormData());
 
-    expect(createServerClient).toHaveBeenCalledWith(undefined);
+    expect(createServerClient).toHaveBeenCalledWith(DEFAULT_SESSION_MAX_AGE);
+  });
+
+  // El bug: la elección vivía solo en el maxAge de esta escritura y el refresh
+  // del proxy (createServerClient() sin override) la bajaba a 1 hora.
+  it("leaves the remember-me mark so later session writes keep the 7 days", async () => {
+    await login(makeFormData({ remember: "on" }));
+
+    expect(mockCookieSet).toHaveBeenCalledWith(
+      REMEMBER_ME_COOKIE,
+      REMEMBER_ME_COOKIE_VALUE,
+      expect.objectContaining({ path: "/", maxAge: REMEMBER_ME_MAX_AGE, httpOnly: true })
+    );
+  });
+
+  it("clears a stale remember-me mark when the box is absent", async () => {
+    await login(makeFormData());
+
+    expect(mockCookieSet).toHaveBeenCalledWith(
+      REMEMBER_ME_COOKIE,
+      "",
+      expect.objectContaining({ path: "/", maxAge: 0 })
+    );
   });
 
   it("still validates credentials before calling Supabase", async () => {
@@ -108,6 +134,16 @@ describe("logout", () => {
 
     expect(mockSignOut).toHaveBeenCalledTimes(1);
     expect(result).toEqual({ success: true, redirectTo: "/login" });
+  });
+
+  it("clears the remember-me mark on logout", async () => {
+    await logout();
+
+    expect(mockCookieSet).toHaveBeenCalledWith(
+      REMEMBER_ME_COOKIE,
+      "",
+      expect.objectContaining({ path: "/", maxAge: 0 })
+    );
   });
 
   it("does not write the dead sb-token cookie", async () => {
