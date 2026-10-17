@@ -515,6 +515,124 @@ There are no progressive elevation tiers — the system either has the one shado
 
 **`legal-band`** — A bottom strip beneath the footer columns carrying the copyright line, language picker (globe icon + "English (US)" link), currency picker, and social icons (Facebook, X, Instagram). All text in muted `{colors.muted}` at `{typography.caption-sm}`.
 
+### Botones
+
+Todo botón del sistema sale de estas clases (definidas en `src/app/globals.css`): en el componente se elige la variante, y el **layout** (ancho, `w-full`, `flex-1`) lo sigue decidiendo el componente.
+
+| Clase | Uso | Color |
+|---|---|---|
+| `btn` (base) | Forma, altura táctil de 44 px, foco, estado deshabilitado y el hundido al tocar. **No se repite en los componentes.** | — |
+| `btn btn-primary` | La acción principal de una pantalla o de un modal. **Una sola por pantalla.** | Violeta `#6d28d9` + blanco (**7,1:1**) |
+| `btn btn-secondary` | Neutra: cancelar, volver, alternativa. | Gris claro `#f2f2f2` + texto oscuro |
+| `btn btn-danger` | Destructiva o irreversible (eliminar, desactivar). | Rojo `#dc2626` + blanco (**4,8:1**) |
+| `btn btn-ghost` | Terciaria sobre superficie clara, con borde. | Blanco + borde |
+| `btn btn-active` | Estado **elegido** de un control segmentado (filtros, sí/no, períodos). | Casi negro + blanco |
+| `btn btn-icon` | Cuadrado de 44 px para acciones con ícono; se suma a la variante de color. **Solo `btn btn-icon` (sin variante) queda transparente**: es lo correcto para un ícono sobre una barra o un modal. | — |
+| `btn btn-icon btn-round` | Lo mismo pero circular: el **cerrar (✕)** de un modal. (El radio del base le gana a `rounded-full` de Tailwind porque este CSS no está en una capa: por eso existe la clase.) | — |
+| `btn btn-sm` | Chico (36 px): controles **dentro** de un campo —el «+» de un buscador— o filas muy densas. | — |
+| `.btn-fab` | Círculo flotante de «agregar»: la única excepción que conserva el degradé claro. | Degradé claro + **texto oscuro** |
+
+- **Nada de colores de botón escritos a mano en un componente.** Si falta una variante, se agrega acá y se usa en todos lados.
+- **El sistema vive en `@layer components`**: así las utilidades de Tailwind (`hidden`, `md:inline-flex`, `justify-between`, `rounded-full`) le ganan en el componente, que es lo que se espera. Si se saca de la capa, hay que parchear con `!` cada vez.
+- **Una sola acción principal por pantalla o modal** (regla por defecto). Si dos acciones compiten, la más frecuente es primaria y la otra secundaria. **Excepción pedida por el usuario**: en el encabezado de `/ventas`, «Caja» y «Cerrar caja» van las dos en `btn btn-primary`, porque se ven solo desde desktop y son las dos acciones de la pantalla.
+- Los `btn-fab` son la única superficie que conserva el degradé claro.
+
+### Marca: degradés, superficies y contraste
+
+El rebranding reemplaza el rojo `#ff385c` (que sigue existiendo como legado, pendiente de migrar componente por componente) por dos degradés, cada uno con su uso:
+
+| Nombre | Clases | Uso |
+|---|---|---|
+| **Degradé claro** | `.brand-gradient` (celeste `#bfdbfe` → rosa `#f472b6`) | Bandas de encabezado y botones de acción. **Texto oscuro** (`text-gray-800` / `#222222`). |
+| **Degradé fuerte** | `.brand-gradient-strong` (violeta `#a855f7` → rosa fuerte `#ec4899`) | Solo decorativo o texto grande en negrita (≥ 18,66 px). |
+| **Rosa de texto** | `text-brand-rosa-texto` (`#be185d`) | Texto chico sobre superficies claras: llega a **4,5:1** tanto sobre blanco como sobre el tinte rosa al 10 %. El `#ec4899` del degradé fuerte **no** alcanza para texto chico. |
+| Interacción | `.brand-gradient-hover` | Sobre el degradé claro: oscurece un poco en vez de cambiar de tono, así el texto oscuro conserva el contraste. |
+| **Acción de marca** | `.brand-action` | Botones que ejecutan la acción principal: **sólido violeta `#6d28d9` con texto blanco (7,1:1)**, igual en celular y en escritorio. No usar el degradé claro acá: en un botón chico pierde presencia y con texto blanco no llega al contraste. |
+
+- **Sobre el degradé claro el texto va oscuro.** `text-gray-800` da **10,2:1** en el extremo celeste y **5,5:1** en el rosa: AA cumplido con margen. **Blanco sobre el mismo degradé da ~1,9:1 en el celeste: falla.** Es el error más fácil de cometer al copiar un botón viejo (los del rojo usaban texto blanco).
+- Sobre el degradé fuerte, blanco da **3,5–3,9:1**: alcanza para texto grande en negrita o para íconos (piso 3:1), **no** para una etiqueta de 14 px.
+- Superficies de vidrio: `.glass` (blanco 70 % + blur 24 px) para el cuerpo de las páginas y las tarjetas; `.glass-strong` (blanco 80 % + blur 16 px) para barras y píldoras del encabezado. Van **sobre el degradé**, nunca sobre blanco puro: ahí no se distinguen del fondo.
+
+### Tonos con contraste verificado
+
+Estos son los tonos que ya se usan en el sistema y el contraste que alcanzan sobre las superficies claras del proyecto (`glass`, `#f2f2f2`, `#f8f8f8`). Se usan **estos**, no otros parecidos: cada uno está elegido por su ratio, no por gusto.
+
+| Uso | Tono | Contraste |
+|---|---|---|
+| Texto normal y títulos | `#222222` | 15:1 |
+| Texto secundario | `#6a6a6a` | 5,7:1 |
+| Saldo a favor / positivo | `#15803d` | 4,7:1 |
+| Deuda / negativo | `#b91c1c` | 4,8:1 |
+| Atención (stock bajo, «con deuda») | `#b45309` | 5,0:1 |
+| Error de formulario | `#c13515` | 5,2:1 |
+| Banner de error (fondo `#ffe4ea`) | `#8f0020` | 8,0:1 |
+| Confirmar en un diálogo | `#6d28d9` (la clase `brand-action`) | 7,1:1 con blanco |
+| Error en un diálogo | `#dc2626` | 4,8:1 con blanco |
+
+- **Ningún verde ni ámbar brillante para texto**: `#22c55e` da 2,3:1 con texto blanco y `#f59e0b` 2,2:1 sobre claro. Si el diseño pide «más vivo», el color va en un **punto o ícono grande**, no en el texto.
+- Un estado nunca se comunica solo por color: siempre lleva su palabra.
+
+### Tablas en celular
+
+Una tabla de escritorio se reemplaza por **cards** en mobile (`md:hidden` para las cards, `hidden md:block` para la tabla) con los mismos datos. Si se mantiene la tabla, va dentro de un contenedor con `overflow-x-auto`; lo que **no** se permite es que la página entera haga scroll horizontal.
+
+### Modales en escritorio
+
+El modal se diseña primero para el pulgar y se **adapta** desde `md:`, así que en celular no cambia nada.
+
+- **Panel**: `max-w-xl md:max-w-3xl` (y `md:max-w-4xl` cuando tiene listas largas, como venta o compra), con `md:max-h-[85vh]`.
+- **Cuerpo**: desde `md` en **dos columnas** (`md:grid md:grid-cols-2 md:gap-6 md:items-start`): a la izquierda lo que se opera (listas, totales) y a la derecha el resumen con la acción principal.
+- Cuando un paso tiene un solo bloque, se **acota** (`md:max-w-md`) en vez de estirarlo a lo ancho del panel.
+- **Acciones**: `w-full` en celular y `md:w-auto` (o dentro de la tarjeta de la derecha) desde desktop; nunca un botón estirado a 768 px.
+- **Dentro de un modal (que es blanco) las tarjetas no usan `glass`**: el vidrio necesita el degradé detrás. Ahí van `bg-[#f7f7f7] border border-black/10`.
+- **Dentro de un panel gris, un botón secundario va `btn-ghost`** (blanco con borde), no `btn-secondary`: el gris sobre gris no se distingue.
+- **La columna del resumen es pegajosa desde `md`** (`md:sticky md:top-4`): cuando la lista de la izquierda crece (una compra o una venta de muchos productos), el total y la acción siguen a la vista en lugar de quedar una pantalla en blanco al lado. Vale para todos los modales de dos columnas.
+- **El orden en celular no cambia**: el patrón es «primero el contexto, después la acción», y en celular se apila ese orden. Cuando en desktop el bloque que se opera queda a la izquierda (y por lo tanto primero en el DOM), usá `order-2 md:order-1` / `order-1 md:order-2` para que en celular siga leyéndose contexto → acción.
+- Referencia implementada: `CashCloseModal`.
+
+### Encabezado de página y acciones
+
+- Una sola fila en mobile: botón **☰**, título y, si hace falta, el selector de sucursal (`PageHeader`).
+- Las **acciones de la página** (por ejemplo «Caja» y «Cerrar caja») van como **tarjetas de vidrio** debajo del encabezado en mobile (`ActionCard`) y como botones dentro de la barra desde desktop (`actions`). No se esconden en el menú: son la razón por la que se entra a la página.
+- El **cierre de sesión** vive dentro del menú ☰ en mobile y visible en la barra en desktop; va en gris (`bg-[#f2f2f2]`), no compite con las acciones de marca.
+- **Ojo con las acciones del encabezado**: el slot `actions` se muestra **solo desde desktop** (es `hidden md:flex`). Toda acción que solo esté ahí es inalcanzable en el teléfono: o se duplica como `ActionCard` en la banda, o se pasa también en `menuItems`. Es el error más fácil de cometer al migrar una página.
+- En una **página de detalle o formulario** (no una lista) alcanza con el menú: las acciones van en `actions` (desktop) **y** en `menuItems` (mobile).
+- El **selector de sucursal** va en su propia línea en mobile (ancho completo) y **al nivel del título desde desktop**: la barra del encabezado envuelve (`flex-wrap`) y el contenido de la derecha es `w-full md:w-auto`.
+- Elegir una sucursal dentro de un modal se hace con **`BranchPicker`** (cards, `aria-pressed`, anillo de marca en la elegida, `disabledIds` para las excluidas), no con un `<select>`. Excepción: cuando la sucursal es **por línea** (una compra que se reparte entre sucursales, `AddPurchaseButton`) sigue siendo un `<select>` por ítem, porque una lista de cards por línea es peor de usar.
+- El menú es mobile-only (`md:hidden`) y se cierra con Escape, con el botón ✕ o tocando el fondo; sus filas tienen 48 px de alto.
+
+### Carga y estados vacíos
+
+- Mientras carga una página se muestra la banda de marca, la hoja de vidrio y **esqueletos** con la forma de lo que va a llegar (`Spinner` + `CardSkeleton`), para que la página no salte al terminar.
+- La ruedita es una sola en todo el sistema (`Spinner`, anillo rosa) y se anuncia como estado (`role="status"` con etiqueta). Los esqueletos son decorativos (`aria-hidden`).
+- Nada de spinners hechos a mano por página ni de `Cargando...` suelto: se usan los componentes compartidos.
+- En una página **cliente**, el estado de carga arranca en `true` (si arranca en `false`, el primer render muestra el vacío y la lista aparece después: la página salta). En una página **servidor**, el equivalente es un `loading.tsx` de la ruta, con la misma estructura de banda, hoja, ruedita y esqueletos.
+- El estado de error visible usa `role="alert"` y el par `#ffe4ea` / `#8f0020`.
+
+### Listas y cards en celulares chicos
+
+El ancho de un celular chico es el caso de prueba, no un caso raro. Reglas que evitan el desborde horizontal:
+
+- La columna de texto de una card va con **`min-w-0`** además de `flex-1`: sin `min-w-0` un nombre largo empuja afuera la columna del precio.
+- La columna de la derecha (precio, estado, chevron) va con **`shrink-0`**.
+- Los textos largos que vienen de datos (nombre de producto, de sucursal) llevan `break-words` o `truncate` con `max-w-full`.
+- Una fila de tres botones no entra: `flex-wrap` + `whitespace-nowrap`, o un grid de dos columnas.
+- Un grid de acciones cierra **2x2**: si quedan tres tarjetas, se busca la cuarta o se cambia el layout; nunca 2+1.
+
+### Badges de estado
+
+Un badge por caso, con un color propio y contraste medido:
+
+| Caso | Fondo | Texto | Contraste |
+|------|-------|-------|-----------|
+| Principal | `#e0ecff` | `#16408a` | 8.25:1 |
+| Inactiva | `#f2f2f2` | `#4a4a4a` | 7.92:1 |
+| Pública | `#ffe4ea` | `#8f0020` | 8.01:1 |
+
+- El texto de un badge es chico (11–12px), así que exige **4.5:1** (WCAG 2.1 AA para texto normal). El piso de **3:1** aplica a texto grande y a lo **no textual** (bordes, íconos, indicadores).
+- Un color por caso: no se repite el fondo entre estados y el estado nunca se comunica **solo** por color — el badge siempre lleva su palabra.
+- Los valores viven en `src/lib/status-tones.ts` y se aplican con `style={{ backgroundColor, color }}`: las clases dinámicas de Tailwind (`bg-[${hex}]`) no las genera el JIT. La regla queda fijada por `src/lib/status-tones.test.ts`.
+
 ## Responsive Behavior
 
 | Name | Width | Key Changes |

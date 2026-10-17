@@ -36,6 +36,42 @@ describe("ProductAutocomplete Component", () => {
     expect(screen.queryByText(/otro producto/i)).not.toBeInTheDocument();
   });
 
+  it("filters products by code", () => {
+    render(<ProductAutocomplete products={mockProducts} value="" onChange={() => {}} />);
+
+    const input = screen.getByPlaceholderText(/buscar producto/i);
+    fireEvent.change(input, { target: { value: "PR002" } });
+
+    expect(screen.getByText(/producto dos/i)).toBeInTheDocument();
+    expect(screen.queryByText(/producto uno/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/otro producto/i)).not.toBeInTheDocument();
+  });
+
+  it("filters products by code prefix", () => {
+    // Datos propios: el prefijo "CA" no aparece en el nombre, así que solo lo
+    // encuentra la búsqueda por código/prefijo.
+    const conPrefijo = [
+      { id: 9, name: "Cinta Adhesiva", description: null, stock: 1, price: 10, code: "CA001", codePrefix: "CA", createdAt: new Date(), updatedAt: new Date() },
+    ] as unknown as Product[];
+
+    render(<ProductAutocomplete products={conPrefijo} value="" onChange={() => {}} />);
+
+    const input = screen.getByPlaceholderText(/buscar producto/i);
+    fireEvent.change(input, { target: { value: "CA" } });
+
+    expect(screen.getByText(/cinta adhesiva/i)).toBeInTheDocument();
+  });
+
+  it("selects the product when the exact code is typed", () => {
+    const onChangeMock = jest.fn();
+    render(<ProductAutocomplete products={mockProducts} value="" onChange={onChangeMock} />);
+
+    const input = screen.getByPlaceholderText(/buscar producto/i);
+    fireEvent.change(input, { target: { value: "PR001" } });
+
+    expect(onChangeMock).toHaveBeenCalledWith("1");
+  });
+
 it("selects product when clicked from dropdown", () => {
       const onChangeMock = jest.fn();
       render(<ProductAutocomplete products={mockProducts} value="" onChange={onChangeMock} />);
@@ -158,13 +194,17 @@ it("updates selected product information when selection changes", () => {
   });
 
   // TESTS FOR renderCreateButton PROP
-  it("renders create button when renderCreateButton is true (default)", () => {
+  it("muestra el botón de crear cuando renderCreateButton es true (por defecto)", () => {
     render(<ProductAutocomplete products={mockProducts} value="" onChange={() => {}} />);
     
     // Should show the create button (+)
     const createButton = screen.getByRole("button", { name: /crear nuevo producto/i });
     expect(createButton).toBeInTheDocument();
-    expect(createButton).toHaveClass("bg-[#ff385c]");
+    // El botón «+» usa el cuadrado de ícono del sistema con la variante neutra.
+    // Ya no el degradé claro: en un botón chico pierde presencia.
+    expect(createButton).toHaveClass("btn", "btn-icon", "btn-secondary");
+    expect(createButton).not.toHaveClass("brand-gradient");
+    expect(createButton).not.toHaveClass("bg-[#ff385c]");
   });
 
   it("does not render create button when renderCreateButton is false", () => {
@@ -213,7 +253,7 @@ it("updates selected product information when selection changes", () => {
   it("positions create button correctly", () => {
     render(<ProductAutocomplete products={mockProducts} value="" onChange={() => {}} />);
     
-    const input = screen.getByPlaceholderText(/buscar producto/i);
+    screen.getByPlaceholderText(/buscar producto/i);
     const createButton = screen.getByRole("button", { name: /crear nuevo producto/i });
     
     // Button should be to the right of input

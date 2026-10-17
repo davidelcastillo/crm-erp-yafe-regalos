@@ -73,3 +73,29 @@ export const moveStockBatchSchema = z
   });
 
 export type MoveStockBatchValues = z.infer<typeof moveStockBatchSchema>;
+
+/**
+ * Schema para registrar ENTRADA o SALIDA de stock de un LOTE de productos en UNA
+ * sucursal (ajuste auditable). Hermana de `moveStockBatchSchema`: acá no hay
+ * sucursal destino, el sentido lo da `movementType`.
+ */
+export const adjustStockBatchSchema = z.object({
+  branchId: z.number().int().positive("Sucursal inválida"),
+  movementType: z.enum(["ENTRY", "EXIT"]),
+  items: z
+    .array(
+      z.object({
+        productId: z.number().int().positive("Producto inválido"),
+        quantity: z.number().int().positive("La cantidad debe ser mayor a 0"),
+      })
+    )
+    .min(1, "Seleccioná al menos un producto")
+    .refine(
+      (items) => new Set(items.map((i) => i.productId)).size === items.length,
+      { message: "No se permiten productos duplicados en el lote" }
+    ),
+  reference: z.string().trim().max(200).optional(),
+  performedBy: z.string().min(1, "El responsable es requerido").max(100),
+});
+
+export type AdjustStockBatchValues = z.infer<typeof adjustStockBatchSchema>;

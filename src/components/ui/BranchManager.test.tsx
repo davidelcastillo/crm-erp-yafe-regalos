@@ -148,6 +148,25 @@ describe("BranchManager (delta branch-management-ui)", () => {
     );
   });
 
+  it("muestra cada sucursal como un ítem de la lista, con su nombre y su estado", () => {
+    render(
+      <BranchManager
+        branches={[
+          branch({ id: 1, name: "Central", isActive: true }),
+          branch({ id: 9, name: "Depósito", isActive: false }),
+        ]}
+      />
+    );
+
+    // Una card por sucursal: la lista se lee como lista, no como divs sueltos.
+    const items = screen.getAllByRole("listitem");
+    expect(items).toHaveLength(2);
+    expect(items[0]).toHaveTextContent("Central");
+    expect(items[0]).toHaveTextContent("Principal");
+    expect(items[1]).toHaveTextContent("Depósito");
+    expect(items[1]).toHaveTextContent("Inactiva");
+  });
+
   it("sends isPublic: false in the update payload when a public branch is un-checked", async () => {
     mockUpdateBranch.mockResolvedValue({
       success: false,

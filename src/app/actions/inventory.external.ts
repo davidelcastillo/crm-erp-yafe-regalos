@@ -23,7 +23,7 @@ export async function getExternalBranchInventory(data: unknown) {
     // reason is never leaked. This applies to every role (admin included).
     const branch = await prisma.branch.findUnique({
       where: { id: branchId },
-      select: { isPublic: true, isActive: true },
+      select: { name: true, isPublic: true, isActive: true },
     });
 
     if (!branch || !branch.isPublic || !branch.isActive) {
@@ -71,7 +71,9 @@ export async function getExternalBranchInventory(data: unknown) {
       })
       .filter((item): item is NonNullable<typeof item> => item !== null);
 
-    return { success: true, data: parseArray(inventoryData) };
+    // El nombre va al lado de los datos: la página lo usa en el título (el id no
+    // le dice nada a quien mira el catálogo).
+    return { success: true, data: parseArray(inventoryData), branchName: branch.name };
   } catch (error) {
     if (error instanceof z.ZodError) {
       return {

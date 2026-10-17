@@ -7,6 +7,21 @@ import { Category } from '@prisma/client';
 import { useFormStatus } from 'react-dom';
 import Link from 'next/link';
 import Swal from 'sweetalert2';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { Spinner } from '@/components/ui/Spinner';
+import { CardSkeleton } from '@/components/ui/Skeleton';
+
+/** Envoltorio de la pagina: banda de marca con el encabezado y hoja de vidrio. */
+const PageShell = ({ children }: { children: React.ReactNode }) => (
+  <div className="min-h-screen bg-white pb-20">
+    <div className="pb-16 brand-gradient">
+      <PageHeader title="Editar categoría" />
+    </div>
+    <div className="glass rounded-t-[2.5rem] border-t border-white/80 -mt-12 px-5 pt-6 pb-8 shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
+      {children}
+    </div>
+  </div>
+);
 
 export default function CategoryEditPage() {
   const { id } = useParams<{ id: string }>();
@@ -46,7 +61,7 @@ export default function CategoryEditPage() {
       text: 'Esta acción no se puede deshacer. Si tiene productos asociados, se bloqueará.',
       icon: 'warning',
       showCancelButton: true,
-      confirmButtonColor: '#ff385c',
+      confirmButtonColor: "#6d28d9",
       cancelButtonColor: '#6a6a6a',
       confirmButtonText: 'Sí, eliminar',
       cancelButtonText: 'Cancelar',
@@ -59,7 +74,7 @@ export default function CategoryEditPage() {
       await Swal.fire({
         title: 'Categoría eliminada',
         icon: 'success',
-        confirmButtonColor: '#ff385c',
+        confirmButtonColor: "#6d28d9",
         confirmButtonText: 'Aceptar',
         background: '#ffffff',
         color: '#222222',
@@ -70,7 +85,7 @@ export default function CategoryEditPage() {
         title: 'Error',
         text: result.error || 'No se pudo eliminar la categoría',
         icon: 'error',
-        confirmButtonColor: '#ff385c',
+        confirmButtonColor: '#dc2626',
         confirmButtonText: 'Aceptar',
         background: '#ffffff',
         color: '#222222',
@@ -89,7 +104,7 @@ export default function CategoryEditPage() {
           title: 'Categoría actualizada',
           text: 'La categoría se ha actualizado correctamente',
           icon: 'success',
-          confirmButtonColor: '#ff385c',
+          confirmButtonColor: "#6d28d9",
           confirmButtonText: 'Aceptar',
           background: '#ffffff',
           color: '#222222',
@@ -106,48 +121,74 @@ export default function CategoryEditPage() {
   };
 
   if (loading) {
-    return <div className="min-h-[calc(100vh-4rem)] pb-20 pt-12 flex items-center justify-center">Cargando...</div>;
+    return (
+      <PageShell>
+        <Spinner label="Cargando categoría..." />
+        <div className="mt-6 space-y-4">
+          <CardSkeleton />
+          <CardSkeleton />
+        </div>
+      </PageShell>
+    );
   }
 
   if (!category) {
-    return <div className="min-h-[calc(100vh-4rem)] pb-20 pt-12 flex items-center justify-center">Categoría no encontrada</div>;
+    return (
+      <PageShell>
+        <p className="py-6 text-center text-sm text-[#6a6a6a]">Categoría no encontrada</p>
+        <Link
+          href="/categorias"
+          className="btn btn-secondary mx-auto w-fit"
+        >
+          Volver a la lista
+        </Link>
+      </PageShell>
+    );
   }
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] pb-20 pt-12">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">Editar Categoría</h1>
-          <div className="flex space-x-3">
-            <Link href="/categorias" className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300">
-              Volver a la lista
-            </Link>
-            <button
-              type="button"
-              onClick={handleDelete}
-              className="px-4 py-2 text-red-600 hover:text-red-500"
-            >
-              Eliminar
-            </button>
-          </div>
-        </div>
+    <div className="min-h-screen bg-white pb-20">
+      <div className="pb-16 brand-gradient">
+        <PageHeader
+          title="Editar categoría"
+          actions={
+            <>
+              <Link href="/categorias" className="btn btn-secondary">
+                Volver a la lista
+              </Link>
+              <button type="button" onClick={handleDelete} className="btn btn-danger">
+                Eliminar
+              </button>
+            </>
+          }
+          menuItems={[
+            { label: "Volver a la lista", href: "/categorias" },
+            { label: "Eliminar categoría", onClick: handleDelete },
+          ]}
+        />
+      </div>
 
+      <div className="glass rounded-t-[2.5rem] border-t border-white/80 -mt-12 px-5 pt-6 pb-8 shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
         {error && (
-          <div className="mb-4 p-4 bg-red-50 text-red-800 rounded">
+          <div role="alert" className="mb-4 rounded-xl bg-[#ffe4ea] p-4 text-sm text-[#8f0020]">
             {error}
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label
+              htmlFor="categoria-nombre"
+              className="mb-1 block text-sm font-medium text-[#3f3f3f]"
+            >
               Nombre
             </label>
             <input
+              id="categoria-nombre"
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="block w-full pl-3 pr-3 py-2 text-base border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 sm:text-sm"
+              className="min-h-[44px] w-full rounded-xl bg-[#f8f8f8] px-3 py-2.5 text-base text-[#222222] focus:outline-none focus:ring-2 focus:ring-[#ec4899]/30"
               disabled={formPending}
               required
             />
@@ -157,7 +198,7 @@ export default function CategoryEditPage() {
             <button
               type="submit"
               disabled={saving || formPending}
-              className="w-full py-3 bg-indigo-600 text-white font-medium rounded-md hover:bg-indigo-700 disabled:opacity-50"
+              className="btn btn-primary w-full"
             >
               {saving ? 'Guardando...' : 'Guardar cambios'}
             </button>

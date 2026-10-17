@@ -47,6 +47,8 @@ type ProductFindManyArgs = {
 type BranchInventoryResult = {
   success: boolean;
   data?: { code: string; name: string; stock: number; price: number }[];
+  /** Nombre de la sucursal: la página lo usa en el título del catálogo. */
+  branchName?: string;
   error?: string;
 };
 
@@ -73,13 +75,15 @@ beforeEach(() => {
 // ===========================================================================
 describe("getExternalBranchInventory visibility checks", () => {
   it("returns the catalog for a public and active branch (code, name, stock, price; no id)", async () => {
-    mockBranchFindUnique.mockResolvedValue({ isPublic: true, isActive: true });
+    mockBranchFindUnique.mockResolvedValue({ name: "Centro", isPublic: true, isActive: true });
 
     const result = (await getExternalBranchInventory({
       branchId: 39,
     })) as BranchInventoryResult;
 
     expect(result.success).toBe(true);
+    // El nombre de la sucursal se devuelve aparte: la página lo usa en el título.
+    expect(result.branchName).toBe("Centro");
     // Exact contract: no id, no authUserId, no email in the payload
     expect(result.data).toEqual([
       { code: "A1", name: "Prod A", stock: 5, price: 150.5 },
@@ -88,7 +92,7 @@ describe("getExternalBranchInventory visibility checks", () => {
     // Visibility check runs first with a minimal select
     expect(mockBranchFindUnique).toHaveBeenCalledWith({
       where: { id: 39 },
-      select: { isPublic: true, isActive: true },
+      select: { name: true, isPublic: true, isActive: true },
     });
 
     // Query contract: active filter at the root, inventory scoped to the

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useRef, useEffect, useCallback } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { Product } from "@prisma/client";
 
 interface ProductAutocompleteProps {
@@ -28,7 +28,14 @@ export function ProductAutocomplete({
   const filteredProducts = useMemo(() => {
     if (!search.trim()) return products.slice(0, 20); // Show max 20 initially
     const lower = search.toLowerCase();
-    return products.filter((p) => p.name.toLowerCase().includes(lower)).slice(0, 20);
+    return products
+      .filter(
+        (p) =>
+          p.name.toLowerCase().includes(lower) ||
+          p.code.toLowerCase().includes(lower) ||
+          (p.codePrefix ?? "").toLowerCase().includes(lower)
+      )
+      .slice(0, 20);
   }, [products, search]);
 
   // Find selected product
@@ -60,8 +67,12 @@ const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     // Update input to what user typed
     setSearch(newValue);
 
-    // Auto-select if exact match
-    const match = products.find(p => p.name.toLowerCase() === newValue.toLowerCase());
+    // Auto-select if exact match (por nombre o por código)
+    const match = products.find(
+      (p) =>
+        p.name.toLowerCase() === newValue.toLowerCase() ||
+        p.code.toLowerCase() === newValue.toLowerCase()
+    );
     if (match) {
       onChange(match.id.toString());
       // Optionally, correct the casing of the input
@@ -80,14 +91,14 @@ const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         onChange={handleInputChange}
         onFocus={() => setIsOpen(true)}
         placeholder="Buscar producto..."
-        className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-[#ff385c] focus:ring-2 focus:ring-[#ff385c]/20 outline-none transition-all bg-white"
+        className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-[#ec4899] focus:ring-2 focus:ring-[#ec4899]/30 outline-none transition-all bg-white"
       />
       
       {renderCreateButton && (
         <button
           type="button"
           onClick={onCreateClick}
-          className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 flex items-center justify-center bg-[#ff385c] text-white rounded-full hover:bg-[#e00b41] transition-colors text-sm"
+          className="btn btn-sm btn-icon btn-secondary absolute right-2 top-1/2 -translate-y-1/2"
           aria-label="Crear nuevo producto"
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

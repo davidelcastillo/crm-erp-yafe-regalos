@@ -390,7 +390,8 @@ describe("ProductForm Component", () => {
         expect.objectContaining({
           title: "¿Desactivar producto?",
           showCancelButton: true,
-          confirmButtonColor: "#ff385c",
+          // Swal pinta su botón con texto blanco: #be185d es el único rosa de marca que llega a 4.5:1.
+          confirmButtonColor: "#6d28d9",
           confirmButtonText: "Sí, desactivar",
         })
       );

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Product } from "@prisma/client";
 import { getProductAnalytics } from "../../actions/dashboard";
+import { Spinner } from "@/components/ui/Spinner";
 
 interface ProductAnalyticsProps {
   products: Product[];
@@ -49,7 +50,7 @@ export function ProductAnalytics({ products }: ProductAnalyticsProps) {
   };
 
   return (
-    <div className="bg-white rounded-2xl p-4 shadow-sm">
+    <div className="glass rounded-2xl border border-black/5 p-4">
       <h2 className="text-lg font-semibold text-[#222222] mb-4">
         Análisis por Producto
       </h2>
@@ -58,7 +59,8 @@ export function ProductAnalytics({ products }: ProductAnalyticsProps) {
       <select
         value={selectedProductId || ""}
         onChange={(e) => handleProductChange(Number(e.target.value))}
-        className="w-full px-4 py-3 bg-[#f8f8f8] rounded-xl text-base text-[#222222] focus:outline-none focus:ring-2 focus:ring-[#3b82f6]/20 mb-4"
+        aria-label="Elegir producto"
+        className="mb-4 min-h-[44px] w-full rounded-xl bg-[#f8f8f8] px-3 py-2.5 text-base text-[#222222] focus:outline-none focus:ring-2 focus:ring-[#ec4899]/30"
       >
         <option value="">Seleccionar producto...</option>
         {products.map((product) => (
@@ -70,7 +72,7 @@ export function ProductAnalytics({ products }: ProductAnalyticsProps) {
 
       {/* Analytics Display */}
       {loading ? (
-        <div className="text-center py-4 text-[#6a6a6a]">Cargando...</div>
+        <Spinner size="sm" label="Cargando análisis..." className="py-4" />
       ) : analytics ? (
         <div className="space-y-4">
           {/* Purchase Stats */}
@@ -120,7 +122,7 @@ export function ProductAnalytics({ products }: ProductAnalyticsProps) {
             <div className="text-sm text-[#6a6a6a]">Rentabilidad del Producto</div>
             <div
               className={`text-2xl font-bold ${
-                analytics.profit >= 0 ? "text-[#22c55e]" : "text-[#ef4444]"
+                analytics.profit >= 0 ? "text-[#15803d]" : "text-[#dc2626]"
               }`}
             >
               {formatCurrency(analytics.profit)}

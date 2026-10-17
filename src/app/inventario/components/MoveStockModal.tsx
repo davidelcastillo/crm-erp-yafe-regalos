@@ -6,6 +6,7 @@ import {
   getBranchInventory,
 } from "@/app/actions/inventory";
 import Swal from "sweetalert2";
+import { BranchPicker } from "@/components/ui/BranchPicker";
 
 export interface MoveStockModalProps {
   open: boolean;
@@ -15,7 +16,7 @@ export interface MoveStockModalProps {
   onConfirm: () => void;
 }
 
-type MovableProduct = { id: number; name: string; stock: number };
+type MovableProduct = { id: number; name: string; code?: string; stock: number };
 type Step = 1 | 2;
 
 export const MoveStockModal = ({
@@ -29,15 +30,27 @@ export const MoveStockModal = ({
   const [sourceBranchId, setSourceBranchId] = useState<number | null>(null);
   const [destBranchId, setDestBranchId] = useState<number | null>(null);
   const [productOptions, setProductOptions] = useState<MovableProduct[]>([]);
+  const [busqueda, setBusqueda] = useState("");
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [quantities, setQuantities] = useState<Record<number, string>>({});
   const [pending, setPending] = useState(false);
+  const [loadingOrigin, setLoadingOrigin] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const selectedRows = useMemo(
-    () => productOptions.filter((p) => selectedIds.includes(p.id)),
-    [productOptions, selectedIds]
+    () => productOptions.filter((p) => selectedIds.includes(p.id)),    [productOptions, selectedIds]
   );
+
+  /** Filtro local del paso 2: por nombre o por código, como en Entrada/Salida. */
+  const visibles = useMemo(() => {
+    const texto = busqueda.trim().toLowerCase();
+    if (!texto) return productOptions;
+    return productOptions.filter(
+      (p) =>
+        p.name.toLowerCase().includes(texto) ||
+        (p.code ?? "").toLowerCase().includes(texto)
+    );
+  }, [productOptions, busqueda]);
 
   const summary = useMemo(
     () => ({
@@ -79,6 +92,7 @@ export const MoveStockModal = ({
     selectedRows.length > 0 &&
     selectedRows.every((p) => !rowErrors[p.id]);
 
+  /** Carga los productos de la sucursal origen; el avance al paso 2 lo confirma «Siguiente». */
   const handleOriginChange = async (branchId: number | null) => {
     setSourceBranchId(branchId);
     setError(null);
@@ -86,17 +100,23 @@ export const MoveStockModal = ({
       setProductOptions([]);
       setSelectedIds([]);
       setQuantities({});
+      setBusqueda("");
       setStep(1);
       return;
     }
-    const res = await getBranchInventory({ branchId });
-    if (res.success) {
-      setProductOptions(res.data as MovableProduct[]);
-      setSelectedIds([]);
-      setQuantities({});
-      setStep(2);
-    } else {
-      setError(res.error || "Error al cargar productos");
+    setLoadingOrigin(true);
+    try {
+      const res = await getBranchInventory({ branchId });
+      if (res.success) {
+        setProductOptions(res.data as MovableProduct[]);
+        setSelectedIds([]);
+        setQuantities({});
+        setBusqueda("");
+      } else {
+        setError(res.error || "Error al cargar productos");
+      }
+    } finally {
+      setLoadingOrigin(false);
     }
   };
 
@@ -126,7 +146,7 @@ export const MoveStockModal = ({
       html: `<p>${summaryText}</p>`,
       icon: "warning",
       showCancelButton: true,
-      confirmButtonColor: "#ff385c",
+      confirmButtonColor: "#6d28d9",
       cancelButtonColor: "#6a6a6a",
       background: "#ffffff",
       color: "#222222",
@@ -156,7 +176,7 @@ export const MoveStockModal = ({
           title: "Error",
           text: res.error || "Error al mover stock",
           icon: "error",
-          confirmButtonColor: "#ff385c",
+          confirmButtonColor: "#dc2626",
           background: "#ffffff",
           color: "#222222",
         });
@@ -172,9 +192,6 @@ export const MoveStockModal = ({
     return null;
   }
 
-  const selectClass =
-    "w-full px-3 py-3 min-h-[48px] rounded-xl border border-gray-200 bg-white focus:border-[#ff385c] focus:ring-2 focus:ring-[#ff385c]/20 outline-none transition-all text-sm touch-manipulation appearance-none cursor-pointer";
-
   return (
     <div
       className="fixed inset-0 bg-black/30 backdrop-blur-md z-[60] flex items-center justify-center"
@@ -184,7 +201,7 @@ export const MoveStockModal = ({
       aria-labelledby="move-stock-title"
     >
       <div
-        className="bg-white w-full max-w-lg rounded-2xl p-6 animate-scale-in max-h-[90vh] overflow-y-auto"
+        className="bg-white w-full max-w-xl md:max-w-3xl rounded-2xl p-6 animate-scale-in max-h-[90vh] md:max-h-[85vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-between items-center mb-4">
@@ -197,7 +214,7 @@ export const MoveStockModal = ({
           <button
             type="button"
             onClick={onClose}
-            className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full hover:bg-[#f2f2f2] transition-colors touch-manipulation"
+            className="btn btn-icon btn-round hover:bg-[#f2f2f2]"
             aria-label="Cerrar"
           >
             <svg
@@ -218,185 +235,155 @@ export const MoveStockModal = ({
 
         {error && <p className="mb-4 text-sm text-[#c13515]">{error}</p>}
 
+        {/* Paso 1: es un solo bloque, así que desde `md` las cards de sucursal van
+            en dos columnas y la acción deja de estirarse a lo ancho del panel. */}
         {step === 1 && (
           <div>
-            <label
-              htmlFor="ms-origen"
-              className="block text-xs text-[#6a6a6a] mb-2"
-            >
-              Sucursal origen
-            </label>
-            <div className="relative">
-              <select
-                id="ms-origen"
-                value={sourceBranchId ?? ""}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  handleOriginChange(val === "" ? null : Number(val));
-                }}
-                className={`${selectClass} pr-10`}
-                disabled={pending}
+            <p className="block text-xs text-[#6a6a6a] mb-2">Sucursal origen</p>
+            <BranchPicker
+              branches={branches}
+              value={sourceBranchId}
+              onChange={handleOriginChange}
+              label="Sucursal origen"
+              emptyLabel="No hay sucursales activas"
+              columns={2}
+            />
+            <div className="md:flex md:justify-end">
+              <button
+                type="button"
+                onClick={() => setStep(2)}
+                disabled={sourceBranchId === null || loadingOrigin || error !== null || pending}
+                className="btn btn-primary w-full mt-6 md:w-auto"
               >
-                <option value="" className="bg-white text-[#222222]">
-                  Seleccionar origen
-                </option>
-                {branches.map((b) => (
-                  <option
-                    key={b.id}
-                    value={b.id}
-                    className="bg-white text-[#222222]"
-                  >
-                    {b.name}
-                  </option>
-                ))}
-              </select>
-              <svg
-                className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[#6a6a6a] pointer-events-none"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                aria-hidden="true"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M19 9l-7 7-7-7"
-                />
-              </svg>
+                Siguiente
+              </button>
             </div>
           </div>
         )}
 
+        {/* Desde `md` la lista se opera a la izquierda y el resumen con la acción
+            va a la derecha; en celular se apilan en ese mismo orden. */}
         {step === 2 && (
           <div>
-            <label
-              htmlFor="ms-destino"
-              className="block text-xs text-[#6a6a6a] mb-2"
-            >
-              Sucursal destino
-            </label>
-            <div className="relative">
-              <select
-                id="ms-destino"
-                value={destBranchId ?? ""}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setDestBranchId(val === "" ? null : Number(val));
-                }}
-                className={`${selectClass} pr-10`}
-                disabled={pending}
-              >
-                <option value="" className="bg-white text-[#222222]">
-                  Seleccionar destino
-                </option>
-                {branches
-                  .filter((b) => b.id !== sourceBranchId)
-                  .map((b) => (
-                    <option
-                      key={b.id}
-                      value={b.id}
-                      className="bg-white text-[#222222]"
-                    >
-                      {b.name}
-                    </option>
-                  ))}
-              </select>
-              <svg
-                className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[#6a6a6a] pointer-events-none"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                aria-hidden="true"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M19 9l-7 7-7-7"
+            <p className="block text-xs text-[#6a6a6a] mb-2">Sucursal destino</p>
+            <BranchPicker
+              branches={branches}
+              value={destBranchId}
+              onChange={setDestBranchId}
+              disabledIds={sourceBranchId === null ? [] : [sourceBranchId]}
+              label="Sucursal destino"
+              emptyLabel="No hay sucursales activas"
+              columns={2}
+            />
+
+            <div className="md:grid md:grid-cols-2 md:gap-5 md:items-start">
+              <section className="mt-4">
+                <p className="block text-xs text-[#6a6a6a] mb-2">
+                  Productos con stock en la sucursal de origen
+                </p>
+
+                <input
+                  type="search"
+                  value={busqueda}
+                  onChange={(e) => setBusqueda(e.target.value)}
+                  placeholder="Buscar por nombre o código"
+                  aria-label="Buscar producto"
+                  className="mb-3 min-h-[48px] w-full rounded-xl border border-gray-200 px-3 py-3 text-sm outline-none transition-all focus:border-[#ec4899] focus:ring-2 focus:ring-[#ec4899]/30 touch-manipulation"
                 />
-              </svg>
-            </div>
 
-            <p className="block text-xs text-[#6a6a6a] mt-4 mb-2">
-              Productos con stock en la sucursal de origen
-            </p>
-
-            {productOptions.length === 0 ? (
-              <p className="py-8 text-center text-sm text-[#6a6a6a]">
-                No hay productos con stock en esta sucursal
-              </p>
-            ) : (
-              <div className="space-y-2 max-h-60 overflow-y-auto">
-                {productOptions.map((p) => (
-                  <div
-                    key={p.id}
-                    className="flex items-center gap-3 p-3 min-h-[44px] rounded-xl hover:bg-[#f8f8f8] transition-colors"
-                  >
-                    <input
-                      type="checkbox"
-                      id={`ms-check-${p.id}`}
-                      checked={selectedIds.includes(p.id)}
-                      onChange={() => toggleSelection(p.id)}
-                      aria-label={`Seleccionar ${p.name}`}
-                      className="w-5 h-5 accent-[#ff385c]"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <label
-                        htmlFor={`ms-check-${p.id}`}
-                        className="block text-sm font-medium text-[#222222] truncate cursor-pointer"
+                {productOptions.length === 0 ? (
+                  <p className="py-8 text-center text-sm text-[#6a6a6a]">
+                    No hay productos con stock en esta sucursal
+                  </p>
+                ) : visibles.length === 0 ? (
+                  <p className="py-8 text-center text-sm text-[#6a6a6a]">
+                    No encontramos productos con ese nombre o código
+                  </p>
+                ) : (
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {visibles.map((p) => (
+                      <div
+                        key={p.id}
+                        className="flex items-center gap-3 p-3 min-h-[44px] rounded-xl hover:bg-[#f8f8f8] transition-colors"
                       >
-                        {p.name}
-                      </label>
-                      <span className="block text-xs text-[#6a6a6a]">
-                        Stock: {p.stock}
-                      </span>
-                      {rowErrors[p.id] && (
-                        <span className="block text-xs text-[#c13515] mt-1">
-                          {rowErrors[p.id]}
-                        </span>
-                      )}
-                    </div>
-                    <input
-                      type="number"
-                      min={1}
-                      max={p.stock}
-                      value={quantities[p.id] ?? ""}
-                      onChange={(e) =>
-                        handleQuantityChange(p.id, e.target.value)
-                      }
-                      disabled={!selectedIds.includes(p.id) || pending}
-                      aria-label={`Cantidad ${p.name}`}
-                      className="w-20 px-3 py-2 rounded-xl border border-gray-200 focus:border-[#ff385c] focus:ring-2 focus:ring-[#ff385c]/20 outline-none transition-all text-sm disabled:opacity-40 disabled:cursor-not-allowed"
-                    />
+                        <input
+                          type="checkbox"
+                          id={`ms-check-${p.id}`}
+                          checked={selectedIds.includes(p.id)}
+                          onChange={() => toggleSelection(p.id)}
+                          aria-label={`Seleccionar ${p.name}`}
+                          className="w-5 h-5 accent-[#ec4899]"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <label
+                            htmlFor={`ms-check-${p.id}`}
+                            className="block text-sm font-medium text-[#222222] truncate cursor-pointer"
+                          >
+                            {p.name}
+                          </label>
+                          <span className="block text-xs text-[#6a6a6a]">
+                            Stock: {p.stock}
+                          </span>
+                          {rowErrors[p.id] && (
+                            <span className="block text-xs text-[#c13515] mt-1">
+                              {rowErrors[p.id]}
+                            </span>
+                          )}
+                        </div>
+                        <input
+                          type="number"
+                          min={1}
+                          max={p.stock}
+                          value={quantities[p.id] ?? ""}
+                          onChange={(e) =>
+                            handleQuantityChange(p.id, e.target.value)
+                          }
+                          disabled={!selectedIds.includes(p.id) || pending}
+                          aria-label={`Cantidad ${p.name}`}
+                          className="w-20 px-3 py-3 rounded-xl border border-gray-200 focus:border-[#ec4899] focus:ring-2 focus:ring-[#ec4899]/30 outline-none transition-all text-sm disabled:opacity-40 disabled:cursor-not-allowed tabular-nums text-right"
+                        />
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            )}
+                )}
+              </section>
 
-            <div className="sticky bottom-0 bg-white/95 backdrop-blur-sm border-t border-[#ebebeb] py-3 flex items-center justify-between z-10">
-              <span className="text-sm font-semibold text-[#222222]">
-                {summaryText}
-              </span>
-            </div>
+              <section className="mt-4 rounded-2xl border border-black/10 bg-[#f7f7f7] p-4 md:sticky md:top-4">
+                <h3 className="text-xs font-medium uppercase tracking-wide text-[#6a6a6a]">
+                  Resumen
+                </h3>
+                <p className="mt-2 text-sm text-[#3f3f3f] tabular-nums">
+                  {summaryText}
+                </p>
 
-            <div className="flex items-center justify-between gap-3 mt-2">
-              <button
-                type="button"
-                onClick={() => setStep(1)}
-                className="px-4 py-3 min-h-[44px] text-sm font-medium text-[#222222] bg-[#f8f8f8] rounded-xl hover:bg-[#f2f2f2] transition-colors touch-manipulation"
-                disabled={pending}
-              >
-                Volver
-              </button>
-              <button
-                type="button"
-                onClick={handleSubmit}
-                disabled={!isValid || pending}
-                className="flex-1 py-4 min-h-[48px] bg-[#ff385c] text-white font-medium rounded-xl hover:bg-[#e00b41] transition-colors disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
-              >
-                {pending ? "Moviendo…" : "Mover Stock"}
-              </button>
+                <div className="mt-3 flex items-baseline justify-between gap-4 border-t border-black/10 pt-3">
+                  <span className="text-sm font-medium text-[#222222]">
+                    Unidades a mover
+                  </span>
+                  <span className="text-2xl font-bold text-[#222222] tabular-nums">
+                    {summary.total}
+                  </span>
+                </div>
+
+                <div className="mt-4 flex items-center justify-between gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setStep(1)}
+                    className="btn btn-secondary"
+                    disabled={pending}
+                  >
+                    Volver
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSubmit}
+                    disabled={!isValid || pending}
+                    className="btn btn-primary flex-1 md:flex-none"
+                  >
+                    {pending ? "Moviendo…" : "Mover Stock"}
+                  </button>
+                </div>
+              </section>
             </div>
           </div>
         )}

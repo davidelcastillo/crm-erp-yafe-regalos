@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { Product } from "@prisma/client";
 import { updateProduct, deleteProduct, toggleProductActive, updateProductExtended } from "@/app/actions/product";
-import { adjustProductStock } from "@/app/actions/inventory";
 import { sumStock, type StockSource } from "@/lib/inventory-stock";
 import Swal from "sweetalert2";
 
@@ -12,8 +11,6 @@ interface InventarioCardProps {
   dataProductId?: string;
   isHighlighted?: boolean;
   onViewMovements?: (product: Product) => void;
-  /** Current branch id; when provided, stock edits target BranchInventory. */
-  branchId?: number | null;
   /** Category options hoisted from the page (shared by all cards, avoids N+1). */
   categories?: Array<{ id: number; name: string }>;
 }
@@ -37,11 +34,10 @@ function getStockStatus(stock: number): {
   return { color: "text-white", bgColor: "bg-[#22c55e]", label: "En stock" };
 }
 
-export function InventarioCard({ product, dataProductId, isHighlighted, onViewMovements, branchId, categories = [] }: InventarioCardProps) {
+export function InventarioCard({ product, dataProductId, isHighlighted, onViewMovements, categories = [] }: InventarioCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   // Sum stock across all branch rows: correct for "Todas" and for a single branch.
   const displayStock = sumStock(product as unknown as StockSource);
-  const [localStock, setLocalStock] = useState(displayStock);
   const [localName, setLocalName] = useState(product.name);
   const [localDescription, setLocalDescription] = useState(product.description || "");
   const [localPrice, setLocalPrice] = useState(product.price ? Number(product.price) : 0);
@@ -56,7 +52,6 @@ export function InventarioCard({ product, dataProductId, isHighlighted, onViewMo
 
   const handleCancel = () => {
     setIsEditing(false);
-    setLocalStock(displayStock);
     setLocalName(product.name);
     setLocalDescription(product.description || "");
     setLocalPrice(product.price ? Number(product.price) : 0);
@@ -65,7 +60,9 @@ export function InventarioCard({ product, dataProductId, isHighlighted, onViewMo
 
    const handleSave = async () => {
      try {
-       // 1. Update product fields (name, description, price, categoryId) - stock no longer lives here
+       // 1. Update product fields (name, description, price, categoryId).
+       //    El stock NO se toca acá: se cambia solo por movimientos auditables
+       //    (Entrada/Salida, Mover Stock) o por compras y ventas (S20).
        const result = await updateProductExtended({
          id: product.id,
          name: localName,
@@ -83,27 +80,6 @@ export function InventarioCard({ product, dataProductId, isHighlighted, onViewMo
            confirmButtonColor: "#ef4444",
          });
          return;
-       }
-
-       // 2. Adjust branch stock via BranchInventory (only if a branch is selected)
-       if (branchId) {
-         const delta = localStock - displayStock;
-         if (delta !== 0) {
-           const stockResult = await adjustProductStock({
-             productId: product.id,
-             branchId,
-             change: delta,
-           });
-           if (!stockResult.success) {
-             await Swal.fire({
-               title: "Error",
-               text: stockResult.error || "No se pudo actualizar el stock",
-               icon: "error",
-               confirmButtonColor: "#ef4444",
-             });
-             return;
-           }
-         }
        }
 
        await Swal.fire({
@@ -223,17 +199,6 @@ export function InventarioCard({ product, dataProductId, isHighlighted, onViewMo
            </div>
 
            <div>
-             <label className="block text-xs text-[#6a6a6a] mb-1">Stock</label>
-             <input
-               type="number"
-               value={localStock}
-               onChange={(e) => setLocalStock(parseInt(e.target.value) || 0)}
-               min={0}
-               className="w-full px-3 py-2 bg-[#f8f8f8] rounded-lg text-[#222222] focus:outline-none focus:ring-2 focus:ring-[#3b82f6]/20"
-             />
-           </div>
-
-           <div>
              <label className="block text-xs text-[#6a6a6a] mb-1">Código</label>
              <input
                type="text"
@@ -268,16 +233,10 @@ export function InventarioCard({ product, dataProductId, isHighlighted, onViewMo
            </div>
 
            <div className="flex gap-2 pt-2">
-             <button
-               onClick={handleSave}
-               className="flex-1 py-2 px-3 text-sm font-medium text-white bg-[#22c55e] rounded-lg hover:bg-[#16a34a] transition-colors"
-             >
+             <button onClick={handleSave} className="btn btn-primary flex-1">
                Guardar
              </button>
-             <button
-               onClick={handleCancel}
-               className="flex-1 py-2 px-3 text-sm font-medium text-[#222222] bg-[#f2f2f2] rounded-lg hover:bg-[#e5e5e5] transition-colors"
-             >
+             <button onClick={handleCancel} className="btn btn-secondary flex-1">
                Cancelar
              </button>
            </div>
@@ -303,12 +262,12 @@ export function InventarioCard({ product, dataProductId, isHighlighted, onViewMo
 
 // View mode - show product info
    return (
-     <div className={`bg-white rounded-2xl p-4 shadow-sm ${isHighlighted ? "ring-2 ring-[#3b82f6]" : ""}`} data-product-id={dataProductId}>
-       <div className="flex justify-between items-start">
-         <div className="flex-1">
+     <div className={`glass rounded-2xl border border-black/5 p-4 ${isHighlighted ? "ring-2 ring-[#3b82f6]" : ""}`} data-product-id={dataProductId}>
+       <div className="flex items-start justify-between gap-3">
+         <div className="min-w-0 flex-1">
            <div className="flex items-center gap-2 mb-1">
-             <h3 className="text-base font-semibold text-[#222222]">{product.name}</h3>
-             <code className="px-2 py-0.5 bg-[#f2f2f2] rounded text-xs font-mono text-[#6a6a6a]">
+             <h3 className="text-base font-semibold text-[#222222] break-words">{product.name}</h3>
+             <code className="shrink-0 px-2 py-0.5 bg-[#f2f2f2] rounded text-xs font-mono text-[#6a6a6a]">
                {product.code}
              </code>
            </div>
@@ -318,7 +277,7 @@ export function InventarioCard({ product, dataProductId, isHighlighted, onViewMo
              </p>
            )}
          </div>
-         <div className="flex flex-col items-end gap-2">
+         <div className="flex shrink-0 flex-col items-end gap-2">
             <span
               className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${status.color} ${status.bgColor}`}
             >
@@ -329,23 +288,15 @@ export function InventarioCard({ product, dataProductId, isHighlighted, onViewMo
          </div>
        </div>
 
-       <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100">
-         <button
-           onClick={handleEdit}
-           className="flex-1 py-2 px-3 text-sm font-medium text-[#3f3f3f] bg-[#f2f2f2] rounded-lg hover:bg-[#e5e5e5] transition-colors"
-         >
+       {/* Los botones se envuelven: en un celular chico no entran los tres en una fila. */}
+       <div className="mt-3 flex flex-wrap gap-2 border-t border-gray-100 pt-3">
+         <button onClick={handleEdit} className="btn btn-secondary flex-1 whitespace-nowrap">
            Editar
          </button>
-         <button
-           onClick={handleViewMovements}
-           className="flex-1 py-2 px-3 text-sm font-medium text-white bg-[#8b5cf6] rounded-lg hover:#[7c3aed] transition-colors"
-         >
+         <button onClick={handleViewMovements} className="btn btn-primary flex-1 whitespace-nowrap">
            Ver Movimientos
          </button>
-          <button
-            onClick={handleDelete}
-            className="flex-1 py-2 px-3 text-sm font-medium text-white bg-[#ef4444] rounded-lg hover:bg-[#dc2626] transition-colors"
-          >
+          <button onClick={handleDelete} className="btn btn-danger flex-1 whitespace-nowrap">
             Desactivar
           </button>
        </div>

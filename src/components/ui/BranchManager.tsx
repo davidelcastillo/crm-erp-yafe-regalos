@@ -9,6 +9,7 @@ import {
   deleteBranch,
   getBranches,
 } from "@/app/actions/branch";
+import { BRANCH_STATUS_TONES } from "@/lib/status-tones";
 import type {
   CreateBranchValues,
   UpdateBranchValues,
@@ -47,6 +48,10 @@ const EMPTY_FORM: BranchForm = {
   isPublic: false,
   code: "",
 };
+
+// 16px (`text-base`) es obligatorio: por debajo, iOS hace zoom al enfocar.
+const INPUT_CLASS =
+  "w-full min-h-[44px] px-4 py-3 bg-[#f8f8f8] rounded-xl text-base text-[#222222] focus:outline-none focus:ring-2 focus:ring-[#ec4899]/30";
 
 function escapeHtml(value: string) {
   return value
@@ -140,7 +145,7 @@ export function BranchManager({ branches }: { branches: Branch[] }) {
             </div>
           `,
           icon: "success",
-          confirmButtonColor: "#ff385c",
+          confirmButtonColor: "#6d28d9",
           background: "#ffffff",
           color: "#222222",
           confirmButtonText: "Entendido",
@@ -181,10 +186,10 @@ export function BranchManager({ branches }: { branches: Branch[] }) {
   // ---- Create/Edit Form ----
   if (mode === "create" || mode === "edit") {
     return (
-      <div className="px-6 pb-8">
-        <div className="max-w-lg">
-          <div className="flex items-center mb-6">
-            <h2 className="text-2xl font-bold text-[#222222]">
+      <div className="max-w-lg">
+        <div className="min-w-0">
+          <div className="mb-5">
+            <h2 className="text-xl font-semibold text-[#222222]">
               {mode === "create" ? "Nueva sucursal" : "Editar sucursal"}
             </h2>
           </div>
@@ -206,7 +211,7 @@ export function BranchManager({ branches }: { branches: Branch[] }) {
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
                 required
                 maxLength={255}
-                className="w-full px-4 py-3 bg-[#f8f8f8] rounded-xl text-base text-[#222222] focus:outline-none focus:ring-2 focus:ring-[#3b82f6]/20"
+                className={INPUT_CLASS}
                 placeholder="Nombre de la sucursal"
               />
             </div>
@@ -222,7 +227,7 @@ export function BranchManager({ branches }: { branches: Branch[] }) {
                   onChange={(e) => setForm({ ...form, code: e.target.value })}
                   required
                   maxLength={10}
-                  className="w-full px-4 py-3 bg-[#f8f8f8] rounded-xl text-base text-[#222222] focus:outline-none focus:ring-2 focus:ring-[#3b82f6]/20"
+                  className={INPUT_CLASS}
                   placeholder="Ej. CEN"
                 />
                 <p className="mt-1 text-xs text-[#6a6a6a]">
@@ -240,7 +245,7 @@ export function BranchManager({ branches }: { branches: Branch[] }) {
                 value={form.address ?? ""}
                 onChange={(e) => setForm({ ...form, address: e.target.value })}
                 maxLength={500}
-                className="w-full px-4 py-3 bg-[#f8f8f8] rounded-xl text-base text-[#222222] focus:outline-none focus:ring-2 focus:ring-[#3b82f6]/20"
+                className={INPUT_CLASS}
                 placeholder="Dirección (opcional)"
               />
             </div>
@@ -254,7 +259,7 @@ export function BranchManager({ branches }: { branches: Branch[] }) {
                 value={form.phone ?? ""}
                 onChange={(e) => setForm({ ...form, phone: e.target.value })}
                 maxLength={50}
-                className="w-full px-4 py-3 bg-[#f8f8f8] rounded-xl text-base text-[#222222] focus:outline-none focus:ring-2 focus:ring-[#3b82f6]/20"
+                className={INPUT_CLASS}
                 placeholder="Teléfono (opcional)"
               />
             </div>
@@ -268,7 +273,7 @@ export function BranchManager({ branches }: { branches: Branch[] }) {
                 value={form.email ?? ""}
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
                 maxLength={255}
-                className="w-full px-4 py-3 bg-[#f8f8f8] rounded-xl text-base text-[#222222] focus:outline-none focus:ring-2 focus:ring-[#3b82f6]/20"
+                className={INPUT_CLASS}
                 placeholder="email@ejemplo.com (opcional)"
               />
             </div>
@@ -293,11 +298,12 @@ export function BranchManager({ branches }: { branches: Branch[] }) {
               <span className="text-sm text-[#222222]">Sucursal pública</span>
             </label>
 
-            <div className="flex gap-3 pt-2">
+            {/* En celular los botones van apilados: uno al lado del otro no entran. */}
+            <div className="flex flex-col gap-3 pt-2 sm:flex-row">
               <button
                 type="submit"
                 disabled={submitting}
-                className="flex-1 px-4 py-3 bg-[#3b82f6] text-white rounded-xl font-medium hover:bg-[#3b82f6]/90 disabled:opacity-50 transition-colors touch-manipulation"
+                className="btn btn-primary flex-1"
               >
                 {submitting ? "Guardando..." : "Guardar"}
               </button>
@@ -305,7 +311,7 @@ export function BranchManager({ branches }: { branches: Branch[] }) {
                 type="button"
                 onClick={() => setMode("list")}
                 disabled={submitting}
-                className="px-4 py-3 bg-[#f2f2f2] text-[#222222] rounded-xl font-medium hover:bg-[#ebebeb] disabled:opacity-50 transition-colors touch-manipulation"
+                className="btn btn-secondary"
               >
                 Cancelar
               </button>
@@ -318,12 +324,13 @@ export function BranchManager({ branches }: { branches: Branch[] }) {
 
   // ---- List View ----
   return (
-    <div className="px-6 pb-8">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-[#222222]">Sucursales</h1>
+    <div>
+      {/* El título de la página lo pone `PageHeader`: acá va solo la acción.
+          En celular ocupa todo el ancho; desde desktop va a la derecha. */}
+      <div className="mb-4 flex sm:justify-end">
         <button
           onClick={openCreate}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-[#3b82f6] text-white rounded-xl font-medium hover:bg-[#3b82f6]/90 transition-colors touch-manipulation"
+          className="btn btn-primary w-full sm:w-auto"
         >
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -344,48 +351,68 @@ export function BranchManager({ branches }: { branches: Branch[] }) {
           <p className="mt-2 text-sm">Crea tu primera sucursal para empezar</p>
         </div>
       ) : (
-        <div className="space-y-3">
+        <ul className="space-y-4">
           {list.map((branch) => (
-            <div
+            <li
               key={branch.id}
-              className="bg-white border border-gray-100 rounded-xl p-4 hover:bg-[#f8f8f8] transition-colors"
+              className="glass rounded-2xl border border-black/5 p-4"
             >
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex-1 min-w-0">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="text-base font-semibold text-[#222222]">
+                    <h3 className="text-base font-semibold text-[#222222] break-words">
                       {branch.name}
                     </h3>
                     {branch.id === 1 && (
-                      <span className="px-2 py-0.5 bg-[#3b82f6]/10 text-[#3b82f6] rounded text-xs font-medium">
-                        Principal
+                      <span
+                        className="px-2 py-0.5 rounded text-xs font-medium"
+                        style={{
+                          backgroundColor: BRANCH_STATUS_TONES.principal.background,
+                          color: BRANCH_STATUS_TONES.principal.color,
+                        }}
+                      >
+                        {BRANCH_STATUS_TONES.principal.label}
                       </span>
                     )}
                     {!branch.isActive && (
-                      <span className="px-2 py-0.5 bg-gray-100 text-[#6a6a6a] rounded text-xs">
-                        Inactiva
+                      <span
+                        className="px-2 py-0.5 rounded text-xs"
+                        style={{
+                          backgroundColor: BRANCH_STATUS_TONES.inactive.background,
+                          color: BRANCH_STATUS_TONES.inactive.color,
+                        }}
+                      >
+                        {BRANCH_STATUS_TONES.inactive.label}
                       </span>
                     )}
                     {branch.isPublic === true && (
-                      <span className="px-2 py-0.5 bg-[#ff385c]/10 text-[#ff385c] rounded-full text-[11px] font-semibold">
-                        Pública
+                      <span
+                        className="px-2 py-0.5 rounded-full text-[11px] font-semibold"
+                        style={{
+                          backgroundColor: BRANCH_STATUS_TONES.public.background,
+                          color: BRANCH_STATUS_TONES.public.color,
+                        }}
+                      >
+                        {BRANCH_STATUS_TONES.public.label}
                       </span>
                     )}
                   </div>
                   {branch.address && (
-                    <p className="text-sm text-[#6a6a6a] mt-1">{branch.address}</p>
+                    <p className="text-sm text-[#6a6a6a] mt-1 break-words">{branch.address}</p>
                   )}
-                  <div className="flex gap-3 mt-1 text-xs text-[#6a6a6a]">
-                    {branch.phone && <span>{branch.phone}</span>}
-                    {branch.email && <span>{branch.email}</span>}
+                  <div className="flex gap-x-3 gap-y-1 mt-1 text-xs text-[#6a6a6a] flex-wrap">
+                    {branch.phone && <span className="break-words">{branch.phone}</span>}
+                    {branch.email && <span className="break-words">{branch.email}</span>}
                   </div>
                 </div>
 
-                <div className="flex items-center gap-1">
+                {/* Estado y acciones: envuelven en celular chico, sin scroll horizontal.
+                    Desde desktop van alineadas al centro de la tarjeta y a la derecha. */}
+                <div className="flex flex-wrap items-center justify-start gap-2 md:shrink-0 md:justify-end">
                   <Link
                     href={`/sucursal/${branch.id}/inventory`}
                     aria-label={`Ver portal de ${branch.name}`}
-                    className="inline-flex items-center gap-1.5 px-3 min-h-[44px] rounded-xl bg-[#f2f2f2] text-[#222222] text-sm font-medium hover:bg-[#ebebeb] transition-colors touch-manipulation"
+                    className="btn btn-secondary flex-1 md:flex-none"
                   >
                     Portal
                   </Link>
@@ -393,9 +420,9 @@ export function BranchManager({ branches }: { branches: Branch[] }) {
                   <button
                     onClick={() => openEdit(branch)}
                     aria-label={`Editar ${branch.name}`}
-                    className="w-10 h-10 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full hover:bg-[#f2f2f2] transition-colors touch-manipulation"
+                    className="btn btn-secondary btn-icon"
                   >
-                    <svg className="w-5 h-5 text-[#6a6a6a]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                     </svg>
                   </button>
@@ -408,7 +435,7 @@ export function BranchManager({ branches }: { branches: Branch[] }) {
                           text: "¿Estás seguro de que deseas eliminar esta sucursal? Esta acción no se puede deshacer.",
                           icon: "warning",
                           showCancelButton: true,
-                          confirmButtonColor: "#ff385c",
+                          confirmButtonColor: "#6d28d9",
                           cancelButtonColor: "#6a6a6a",
                           confirmButtonText: "Sí, eliminar",
                           cancelButtonText: "Cancelar",
@@ -419,18 +446,18 @@ export function BranchManager({ branches }: { branches: Branch[] }) {
                         });
                       }}
                       aria-label={`Eliminar ${branch.name}`}
-                      className="w-10 h-10 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full hover-bg-red-50 transition-colors touch-manipulation"
+                      className="btn btn-danger btn-icon"
                     >
-                      <svg className="w-5 h-5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                       </svg>
                     </button>
                   )}
                 </div>
               </div>
-            </div>
+            </li>
           ))}
-        </div>
+        </ul>
       )}
     </div>
   );

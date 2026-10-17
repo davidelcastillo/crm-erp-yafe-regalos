@@ -8,6 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "test": "jest",
+    "test:local-db": "node scripts/local-db.mjs test",
+    "db:local:push": "node scripts/local-db.mjs push",
     "postinstall": "prisma generate"
   },
   "dependencies": {

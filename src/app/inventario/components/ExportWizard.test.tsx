@@ -1,7 +1,7 @@
 /**
  * @jest-environment jsdom
  */
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { ExportWizard } from "./ExportWizard";
 
 jest.mock("@/app/actions/inventory", () => ({
@@ -57,9 +57,7 @@ function renderWizard() {
 
 async function goToStep2() {
   renderWizard();
-  fireEvent.change(screen.getByLabelText(/sucursal/i), {
-    target: { value: "1" },
-  });
+  fireEvent.click(screen.getByRole("button", { name: "Principal" }));
   fireEvent.click(screen.getByRole("button", { name: /continuar/i }));
   await waitFor(() => {
     expect(screen.getByText(/seleccionar productos/i)).toBeInTheDocument();
@@ -69,6 +67,12 @@ async function goToStep2() {
     expect(screen.queryByText(/cargando productos/i)).not.toBeInTheDocument();
   });
 }
+
+/** Checkboxes de la lista de productos (sin contar el selector Todos). */
+const checkboxesDeProductos = () =>
+  within(screen.getByRole("group", { name: /productos con stock/i })).getAllByRole(
+    "checkbox"
+  );
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -90,24 +94,22 @@ beforeEach(() => {
 });
 
 describe("ExportWizard", () => {
-  it("renders step 1 and disables Continuar until a branch is selected", () => {
+  it("muestra el paso 1 y deja Continuar deshabilitado hasta elegir sucursal", () => {
     renderWizard();
 
     expect(screen.getByText(/paso 1 de 3/i)).toBeInTheDocument();
     const continuar = screen.getByRole("button", { name: /continuar/i });
     expect(continuar).toBeDisabled();
 
-    fireEvent.change(screen.getByLabelText(/sucursal/i), {
-      target: { value: "2" },
-    });
+    fireEvent.click(screen.getByRole("button", { name: "Centro" }));
     expect(continuar).toBeEnabled();
   });
 
-  it("shows checkboxes only for products with stock > 0 and updates the counter", async () => {
+  it("muestra checkboxes solo para productos con stock > 0 y actualiza el contador", async () => {
     await goToStep2();
 
     // 3 productos en el mock, uno con stock 0 → sólo 2 checkboxes.
-    const checkboxes = screen.getAllByRole("checkbox");
+    const checkboxes = checkboxesDeProductos();
     expect(checkboxes).toHaveLength(2);
     expect(mockGetBranchProductsForExport).toHaveBeenCalledWith({
       branchId: 1,
@@ -121,7 +123,33 @@ describe("ExportWizard", () => {
     expect(screen.getByText(/2 seleccionados/i)).toBeInTheDocument();
   });
 
-  it("disables Generar PDF on step 3 when nothing is selected and enables it after selection", async () => {
+  it("el selector Todos marca todos los productos con stock", async () => {
+    await goToStep2();
+
+    const todos = screen.getByRole("checkbox", { name: /todos/i });
+    expect(todos).not.toBeChecked();
+
+    fireEvent.click(todos);
+
+    // Los 2 productos con stock, y ninguno de los que tienen stock 0.
+    expect(screen.getByText(/2 seleccionados/i)).toBeInTheDocument();
+    checkboxesDeProductos().forEach((checkbox) => expect(checkbox).toBeChecked());
+
+    fireEvent.click(todos);
+
+    expect(screen.getByText(/0 seleccionados/i)).toBeInTheDocument();
+    checkboxesDeProductos().forEach((checkbox) => expect(checkbox).not.toBeChecked());
+  });
+
+  it("marca el selector Todos cuando se eligen todos a mano", async () => {
+    await goToStep2();
+
+    checkboxesDeProductos().forEach((checkbox) => fireEvent.click(checkbox));
+
+    expect(screen.getByRole("checkbox", { name: /todos/i })).toBeChecked();
+  });
+
+  it("deshabilita Generar PDF en el paso 3 sin selección y lo habilita después de elegir", async () => {
     await goToStep2();
 
     fireEvent.click(screen.getByRole("button", { name: /siguiente/i }));
@@ -135,21 +163,21 @@ describe("ExportWizard", () => {
     await waitFor(() => {
       expect(screen.queryByText(/cargando productos/i)).not.toBeInTheDocument();
     });
-    const checkboxes = screen.getAllByRole("checkbox");
+    const checkboxes = checkboxesDeProductos();
     fireEvent.click(checkboxes[0]);
     fireEvent.click(screen.getByRole("button", { name: /siguiente/i }));
 
     expect(screen.getByRole("button", { name: /generar pdf/i })).toBeEnabled();
   });
 
-  it("stays on step 3 and preserves selection when PDF generation fails", async () => {
+  it("se queda en el paso 3 y conserva la selección si falla la generación del PDF", async () => {
     mockExportBranchProductsPdf.mockResolvedValue({
       success: false,
       error: "Error al exportar el inventario",
     });
 
     await goToStep2();
-    fireEvent.click(screen.getAllByRole("checkbox")[0]);
+    fireEvent.click(checkboxesDeProductos()[0]);
     fireEvent.click(screen.getByRole("button", { name: /siguiente/i }));
 
     fireEvent.click(screen.getByRole("button", { name: /generar pdf/i }));
@@ -170,7 +198,7 @@ describe("ExportWizard", () => {
     expect(screen.getByText(/1 seleccionados/i)).toBeInTheDocument();
   });
 
-  it("downloads the PDF on success", async () => {
+  it("descarga el PDF cuando la generación sale bien", async () => {
     URL.createObjectURL = jest.fn(() => "blob:test");
     URL.revokeObjectURL = jest.fn();
     // jsdom no implementa navegación para anchors; stubeamos el click.
@@ -179,7 +207,7 @@ describe("ExportWizard", () => {
 
     try {
       await goToStep2();
-      fireEvent.click(screen.getAllByRole("checkbox")[0]);
+      fireEvent.click(checkboxesDeProductos()[0]);
       fireEvent.click(screen.getByRole("button", { name: /siguiente/i }));
       fireEvent.click(screen.getByRole("button", { name: /generar pdf/i }));
 
@@ -201,5 +229,58 @@ describe("ExportWizard", () => {
     } finally {
       HTMLAnchorElement.prototype.click = originalClick;
     }
+  });
+});
+
+// Layout: en celular el wizard queda apilado en una columna; recién desde `md`
+// el panel crece, la sucursal y los productos usan el ancho en dos columnas y el
+// resumen toma la tarjeta del sistema. Es el patrón de CashCloseModal aplicado
+// al inventario.
+describe("ExportWizard — layout de escritorio", () => {
+  it("deja el panel a una columna en celular y lo agranda desde `md`", () => {
+    const { container } = renderWizard();
+
+    const panel = container.querySelector('[class*="md:max-w-4xl"]');
+    expect(panel).not.toBeNull();
+    expect(panel).toHaveClass("max-w-xl", "max-h-[90vh]", "md:max-h-[85vh]");
+  });
+
+  it("abre el paso de productos en dos columnas desde `md` y lo apila en celular", async () => {
+    await goToStep2();
+
+    const lista = screen.getByRole("group", { name: /productos con stock/i });
+    const columnas = lista.closest('[class*="md:grid-cols-2"]') as HTMLElement | null;
+    expect(columnas).not.toBeNull();
+    // Celular: sin grid; el `md:grid` recién aplica desde `md`.
+    expect(columnas?.className).not.toMatch(/(^|\s)grid(\s|$)/);
+    expect(columnas?.className).toContain("md:grid");
+    // La lista queda a la izquierda y el resumen de lo seleccionado a la derecha.
+    expect(columnas?.firstElementChild as HTMLElement).toContainElement(lista);
+    expect(columnas?.lastElementChild as HTMLElement).toHaveTextContent(/seleccionados/i);
+  });
+
+  it("el resumen del paso 3 usa la tarjeta del sistema", async () => {
+    await goToStep2();
+    fireEvent.click(screen.getByRole("button", { name: /siguiente/i }));
+
+    const resumen = screen
+      .getByText("Sucursal")
+      .closest("[class*='rounded-2xl']") as HTMLElement | null;
+    expect(resumen).not.toBeNull();
+    expect(resumen).toHaveClass("rounded-2xl", "border-black/10", "bg-[#f7f7f7]", "p-4");
+  });
+
+  it("no estira la acción principal a lo ancho del panel desde `md`", async () => {
+    await goToStep2();
+
+    const siguiente = screen.getByRole("button", { name: /siguiente/i });
+    expect(siguiente).toHaveClass("flex-1", "md:flex-none", "md:w-auto");
+
+    fireEvent.click(siguiente);
+    expect(screen.getByRole("button", { name: /generar pdf/i })).toHaveClass(
+      "flex-1",
+      "md:flex-none",
+      "md:w-auto"
+    );
   });
 });

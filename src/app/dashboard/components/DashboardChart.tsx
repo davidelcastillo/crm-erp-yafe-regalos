@@ -11,6 +11,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
+import { toShortLabel } from "@/lib/dates";
 
 interface DayData {
   date: string;
@@ -20,14 +21,21 @@ interface DayData {
 
 interface DashboardChartProps {
   data: DayData[] | undefined;
+  rangeLabel: string;
 }
 
-export function DashboardChart({ data }: DashboardChartProps) {
+// El eje llega como claves de día local ("YYYY-MM-DD"), así que el rótulo sale del
+// string: pasarlo por `new Date` mostraba el día anterior en UTC-3.
+export function toChartPoints(data: DayData[]) {
+  return data.map((d) => ({ ...d, date: toShortLabel(d.date) }));
+}
+
+export function DashboardChart({ data, rangeLabel }: DashboardChartProps) {
   if (!data || data.length === 0) {
     return (
-      <div className="bg-white rounded-2xl p-4 shadow-sm">
-        <h2 className="text-lg font-semibold text-[#222222] mb-4">
-          Ingresos vs Egresos (Últimos 7 días)
+      <div className="glass rounded-2xl border border-black/5 p-4">
+        <h2 className="text-lg font-semibold text-[#222222] mb-4 break-words">
+          Ingresos vs Egresos ({rangeLabel})
         </h2>
         <div className="h-64 flex items-center justify-center text-[#6a6a6a]">
           No hay datos disponibles
@@ -36,18 +44,14 @@ export function DashboardChart({ data }: DashboardChartProps) {
     );
   }
 
-  // Take last 7 days for mobile
-  const chartData = data.slice(-7).map((d) => ({
-    ...d,
-    date: new Date(d.date).toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit" }),
-  }));
+  const chartData = toChartPoints(data);
 
   return (
-    <div className="bg-white rounded-2xl p-4 shadow-sm">
-      <h2 className="text-lg font-semibold text-[#222222] mb-4">
-        Ingresos vs Egresos (Últimos 7 días)
+    <div className="glass min-w-0 rounded-2xl border border-black/5 p-4">
+      <h2 className="text-lg font-semibold text-[#222222] mb-4 break-words">
+        Ingresos vs Egresos ({rangeLabel})
       </h2>
-      <div className="h-64">
+      <div className="h-64 w-full min-w-0">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={chartData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -61,9 +65,11 @@ export function DashboardChart({ data }: DashboardChartProps) {
               tickFormatter={(value) => `$${value}`} />
             <Tooltip
               contentStyle={{
-                backgroundColor: "#fff",
-                border: "1px solid #e5e5e5",
-                borderRadius: "8px",
+                backgroundColor: "#ffffff",
+                border: "1px solid rgba(0,0,0,0.08)",
+                borderRadius: "12px",
+                fontSize: 12,
+                color: "#222222",
               }}
               formatter={(value) => [`$${Number(value).toFixed(2)}`, ""]} />
             <Legend />

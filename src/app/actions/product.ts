@@ -217,6 +217,9 @@ export async function searchProducts(data: unknown) {
 
     const products = await prisma.product.findMany({
       where: {
+        // Con sucursal (ventas) solo se ofrece lo que hay en esa sucursal; sin
+        // sucursal (etiquetas) no se puede filtrar por stock.
+        ...(branchId ? { inventory: { some: { branchId, stock: { gt: 0 } } } } : {}),
         OR: [
           { code: { contains: query, mode: "insensitive" } },
           { name: { contains: query, mode: "insensitive" } },
@@ -272,6 +275,7 @@ export async function getProductMovements(productId: number) {
           select: {
             id: true,
             date: true,
+            branch: { select: { name: true } },
           },
         },
       },
@@ -290,6 +294,7 @@ export async function getProductMovements(productId: number) {
           select: {
             id: true,
             date: true,
+            branch: { select: { name: true } },
           },
         },
       },
@@ -300,26 +305,55 @@ export async function getProductMovements(productId: number) {
       },
     });
 
+    // Libro de la sucursal: transferencias entre sucursales y ajustes de stock.
+    // Las ENTRY de una compra se descartan porque esa compra ya es una fila del
+    // historial (si no, la misma operación aparecería dos veces).
+    const branchMovements = await prisma.branchMovement.findMany({
+      where: {
+        productId,
+        NOT: [
+          { movementType: 'ENTRY', reference: { startsWith: 'PURCHASE-' } },
+          { movementType: 'EXIT', reference: { startsWith: 'SALE-' } },
+        ],
+      },
+      include: { branch: { select: { name: true } } },
+      orderBy: { createdAt: 'desc' },
+    });
+
     // Map purchases to movement objects
-    const purchases: Movement[] = purchaseItems.map(item => ({
+    const purchases: ProductMovement[] = purchaseItems.map(item => ({
       id: `purchase-${item.id}`,
       type: 'PURCHASE' as const,
       date: item.purchase.date.toISOString(),
       quantity: item.quantity,
       referenceId: item.purchase.id,
+      reference: null,
+      branchName: item.purchase.branch?.name ?? null,
     }));
 
     // Map sales to movement objects
-    const sales: Movement[] = saleItems.map(item => ({
+    const sales: ProductMovement[] = saleItems.map(item => ({
       id: `sale-${item.id}`,
       type: 'SALE' as const,
       date: item.sale.date.toISOString(),
       quantity: item.quantity,
       referenceId: item.sale.id,
+      reference: null,
+      branchName: item.sale.branch?.name ?? null,
+    }));
+
+    const deSucursal: ProductMovement[] = branchMovements.map(movement => ({
+      id: `movement-${movement.id}`,
+      type: movement.movementType,
+      date: movement.createdAt.toISOString(),
+      quantity: movement.quantity,
+      referenceId: null,
+      reference: movement.reference,
+      branchName: movement.branch?.name ?? null,
     }));
 
     // Combine and sort by date descending
-    const allMovements = [...purchases, ...sales].sort((a, b) =>
+    const allMovements = [...purchases, ...sales, ...deSucursal].sort((a, b) =>
       new Date(b.date).getTime() - new Date(a.date).getTime()
     );
 
@@ -330,13 +364,19 @@ export async function getProductMovements(productId: number) {
   }
 }
 
-// Define the movement type for the response
-type Movement = {
+// Movimiento del historial de un producto: documentos (compra/venta) y
+// movimientos del libro de sucursal (transferencias y ajustes).
+export type ProductMovement = {
   id: string;
-  type: 'PURCHASE' | 'SALE';
+  type: 'PURCHASE' | 'SALE' | 'ENTRY' | 'EXIT' | 'TRANSFER_IN' | 'TRANSFER_OUT' | 'ADJUSTMENT';
   date: string; // ISO string
   quantity: number;
-  referenceId: number;
+  /** Id del documento cuando el movimiento viene de una compra o una venta. */
+  referenceId: number | null;
+  /** Referencia del libro de sucursal (ej. "MOVE-1699999999999", "ADJUSTMENT"). */
+  reference: string | null;
+  /** Sucursal donde se registró el movimiento. */
+  branchName: string | null;
 };
 
 // ===========================================================================

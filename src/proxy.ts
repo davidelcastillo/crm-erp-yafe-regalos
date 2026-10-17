@@ -39,13 +39,15 @@ export async function proxy(request: NextRequest) {
   const isExcluded =
     pathname === '/login' ||
     pathname === '/unauthorized' ||
-    pathname === '/forgot-password' ||
-    pathname === '/reset-password' ||
-    pathname === '/auth/callback' ||
     pathname.startsWith('/_next/') ||
     pathname === '/favicon.ico' ||
     pathname.startsWith('/images/') ||
-    pathname.startsWith('/public/');
+    pathname.startsWith('/public/') ||
+    // Assets estáticos de /public servidos desde la raíz (logo, íconos de la
+    // plantilla): se sirven sin sesión. Las rutas de la app no llevan extensión
+    // y, además, cada acción valida el rol por su cuenta (p. ej. `getBranches`
+    // responde «No autorizado» sin admin), así que esto no abre ningún dato.
+    /\.[a-z0-9]+$/i.test(pathname);
 
   // If no user and path is not excluded, redirect to login
   if (!user && !isExcluded) {

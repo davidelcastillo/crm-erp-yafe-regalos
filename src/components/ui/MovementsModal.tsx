@@ -1,7 +1,28 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getProductMovements } from '@/app/actions/product';
+import { getProductMovements, type ProductMovement } from '@/app/actions/product';
+
+const TYPE_LABELS: Record<ProductMovement['type'], string> = {
+  PURCHASE: 'Compra',
+  SALE: 'Venta',
+  ENTRY: 'Entrada',
+  EXIT: 'Salida',
+  TRANSFER_IN: 'Transferencia entrada',
+  TRANSFER_OUT: 'Transferencia salida',
+  ADJUSTMENT: 'Ajuste',
+};
+
+// Entradas verdes, salidas rojas, pases entre sucursales azules, ajustes grises.
+const TYPE_STYLES: Record<ProductMovement['type'], string> = {
+  PURCHASE: 'bg-green-100 text-green-800',
+  ENTRY: 'bg-green-100 text-green-800',
+  SALE: 'bg-red-100 text-red-800',
+  EXIT: 'bg-red-100 text-red-800',
+  TRANSFER_IN: 'bg-blue-100 text-blue-800',
+  TRANSFER_OUT: 'bg-blue-100 text-blue-800',
+  ADJUSTMENT: 'bg-gray-100 text-gray-700',
+};
 
 interface MovementsModalProps {
   product: {
@@ -14,13 +35,7 @@ interface MovementsModalProps {
 }
 
 export function MovementsModal({ product, isOpen, onClose }: MovementsModalProps) {
-  const [movements, setMovements] = useState<Array<{
-    id: string;
-    type: 'PURCHASE' | 'SALE';
-    date: string;
-    quantity: number;
-    referenceId: number;
-  }>>([]);
+  const [movements, setMovements] = useState<ProductMovement[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -36,13 +51,7 @@ export function MovementsModal({ product, isOpen, onClose }: MovementsModalProps
     try {
       const result = await getProductMovements(product.id);
       if (result.success && result.data) {
-        setMovements(result.data as Array<{
-          id: string;
-          type: 'PURCHASE' | 'SALE';
-          date: string;
-          quantity: number;
-          referenceId: number;
-        }>);
+        setMovements(result.data as ProductMovement[]);
       } else {
         setError(result.error ?? 'Error al cargar movimientos');
       }
@@ -72,14 +81,14 @@ export function MovementsModal({ product, isOpen, onClose }: MovementsModalProps
 
   return (
     <div
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-end justify-center"
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-end md:items-center justify-center"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
       aria-labelledby="movements-modal-title"
     >
       <div
-        className="bg-white w-full max-w-xl rounded-t-3xl p-6 animate-slide-up max-h-[90vh] overflow-y-auto"
+        className="bg-white w-full max-w-xl md:max-w-2xl rounded-t-3xl md:rounded-b-3xl p-6 animate-slide-up max-h-[90vh] md:max-h-[85vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-between items-center mb-6">
@@ -89,7 +98,7 @@ export function MovementsModal({ product, isOpen, onClose }: MovementsModalProps
           <button
             type="button"
             onClick={onClose}
-            className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full hover:bg-[#f2f2f2] transition-colors"
+            className="btn btn-icon btn-round hover:bg-[#f2f2f2]"
             aria-label="Cerrar"
           >
             <svg className="w-6 h-6 text-[#6a6a6a]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -139,7 +148,7 @@ export function MovementsModal({ product, isOpen, onClose }: MovementsModalProps
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-[#6a6a6a] uppercase">
                       Tipo
                     </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-[#6a6a6a] uppercase">
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-[#6a6a6a] uppercase md:text-right">
                       Cantidad
                     </th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-[#6a6a6a] uppercase">
@@ -155,16 +164,23 @@ export function MovementsModal({ product, isOpen, onClose }: MovementsModalProps
                       </td>
                       <td className="px-6 py-4 text-sm text-[#222222] whitespace-nowrap">
                         <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                          movement.type === 'PURCHASE' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                          TYPE_STYLES[movement.type]
                         }`}>
-                          {movement.type === 'PURCHASE' ? 'Compra' : 'Venta'}
+                          {TYPE_LABELS[movement.type]}
                         </span>
+                        {movement.branchName && (
+                          <span className="block text-xs text-[#6a6a6a] mt-1">
+                            {movement.branchName}
+                          </span>
+                        )}
                       </td>
-                      <td className="px-6 py-4 text-sm text-[#222222] whitespace-nowrap">
+                      <td className="px-6 py-4 text-sm text-[#222222] whitespace-nowrap tabular-nums md:text-right">
                         {formatAmount(movement.quantity)}
                       </td>
                       <td className="px-6 py-4 text-sm text-[#222222] whitespace-nowrap">
-                        #{movement.referenceId}
+                        {movement.referenceId !== null
+                          ? `#${movement.referenceId}`
+                          : movement.reference ?? '-'}
                       </td>
                     </tr>
                   ))}
@@ -177,7 +193,7 @@ export function MovementsModal({ product, isOpen, onClose }: MovementsModalProps
         <div className="mt-6 flex justify-end">
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium"
+            className="btn btn-secondary"
           >
             Cerrar
           </button>

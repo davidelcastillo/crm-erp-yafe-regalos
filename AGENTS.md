@@ -1,144 +1,191 @@
-# AGENTS.md – Configuración del agente Gentle‑AI para el proyecto *Seguimientos‑compras*
+# AGENTS.md — Seguimientos-compras / Stark Commerce OS
 
-Este archivo contiene la configuración central que debe ser consultada por el agente antes de ejecutar cualquier tarea.  
-Incluye referencias a los *skills* disponibles, la configuración de entornos, las reglas de trabajo y los enlaces a la documentación más reciente de las tecnologías usadas.
+Instrucciones de trabajo para este repositorio. **ODD es el flujo vigente; SDD queda como historial cerrado.**
 
----
+## 0. Contexto del proyecto
 
-## 📋 1. Skills disponibles (actualizados)
+Sistema mobile-first de gestión comercial: inventario por sucursal, productos y categorías, compras, ventas y pagos, clientes/deudas, movimientos, dashboard y catálogo externo de solo lectura.
 
-| Skill | Descripción breve | Trigger / Uso recomendado |
-|-------|-------------------|---------------------------|
-| **_shared** | Referencias compartidas para todos los skills SDD. | - |
-| **branch‑pr** | Crear PRs con checks de issue‑first. | Al abrir o preparar PRs. |
-| **chained‑pr** | Dividir cambios grandes en PRs encadenados. | Cuando el forecast supere 400 líneas o se solicite explícitamente. |
-| **cognitive‑doc‑design** | Diseñar docs que reduzcan la carga cognitiva. | Al escribir guías, READMEs, RFCs, etc. |
-| **comment‑writer** | Escribir comentarios cálidos y directos. | En feedback de PR, issues, Slack, etc. |
-| **context7‑mcp** | Obtener documentación actualizada de libs/frameworks vía Context7. | Preguntas sobre Next.js, Prisma, Supabase, Tailwind, etc. |
-| **customize‑opencode** | Modificar únicamente la configuración de OpenCode. | Nunca para código de aplicación. |
-| **find‑skills** | Descubrir e instalar nuevos skills. | Cuando se busca funcionalidad extra. |
-| **go‑testing** | Patrón de testing para Go. | No aplicable al proyecto actual. |
-| **issue‑creation** | Crear issues con checks de issue‑first. | Al reportar bugs o nuevas funcionalidades. |
-| **judgment‑day** | Revisión adversarial doble (blind). | Cuando se requiere validación extrema. |
-| **mobile‑design** | Directrices mobile‑first, touch‑first y respeto de plataforma. | En cualquier trabajo de UI/UX. |
-| **next‑best‑practices** | Buenas prácticas de Next.js (App Router, RSC, etc.). | Desarrollo de páginas, layout, datos, etc. |
-| **nextjs** | Experto en Next.js App Router. | Cuando se trabaja con routing, server actions, etc. |
-| **prisma‑postgres** | Setup y operaciones de Prisma con Postgres. | Migraciones, seed, queries avanzadas. |
-| **sdd‑apply** | Implementar tareas desde specs y diseño. | Fase de aplicación SDD. |
-| **sdd‑archive** | Archivar cambios SDD completados. | Después de verify. |
-| **sdd‑design** | Crear diseño técnico desde propuesta. | Fase de diseño SDD. |
-| **sdd‑explore** | Explorar ideas antes de comprometerse. | Fase de exploración SDD. |
-| **sdd‑init** | Inicializar contexto SDD, testing capabilities, registry. | Primer paso de cualquier cambio SDD. |
-| **sdd‑onboard** | Onboarding guiado de SDD usando el código real. | Cuando se quiere aprender el flujo. |
-| **sdd‑propose** | Crear propuesta SDD (intent, scope, approach). | Fase de propuesta SDD. |
-| **sdd‑spec** | Escribir especificaciones delta desde propuesta. | Fase de spec SDD. |
-| **sdd‑tasks** | Desglosar spec y diseño en tareas implementables. | Fase de task‑planning SDD. |
-| **sdd‑verify** | Validar implementación contra spec, diseño y tareas. | Fase de verificación SDD. |
-| **skill‑creator** | Crear nuevos skills LLM‑first. | Cuando se necesita un skill a medida. |
-| **skill‑improver** | Mejorar y auditar skills existentes. | Mantenimiento de skills. |
-| **skill‑registry** | Mantener actualizado el registro de skills. | Cuando se añaden/eliminan skills. |
-| **supabase** | Cualquier tarea relacionada con Supabase (DB, Auth, Edge, Storage, etc.). | Configuración, migraciones, queries, auth, etc. |
-| **supabase‑postgres‑best‑practices** | Optimización y buenas prácticas de Postgres desde Supabase. | Tuning de índices, queries, vacuum, **vercel‑react‑best‑practices** | Guías de rendimiento de Vercel para React/Next.js. | Optimización de bundle, SSR, ISR, etc. |
-| **work‑unit‑commits** | Planificar commits como unidades de trabajo revisables. | Antes de aplicar cambios en SDD (para PRs chained o single‑PR). |
+**Stack:** Next.js 16.2.4 (App Router), React 19.2, TypeScript 5, Prisma 6.19.3, PostgreSQL/Supabase, Tailwind 4, Zod 4, Recharts, SweetAlert2, pdf-lib.
 
-> **Nota:** Los skills marcados con *mobile‑design* y *next‑best‑practices* son especialmente relevantes para las nuevas funcionalidades de la v3 (gestionar sucursales, categorías, filtrado, dashboard personalizable, portal externo de solo‑lectura, etc.).
+### 0.1 Documentación: orden de lectura
 
----
+1. Este archivo.
+2. [docs/README.md](docs/README.md).
+3. [STYLE.md](STYLE.md) si vas a tocar UI/CSS.
+4. El documento ODD de la feature en `odd/tasks/` si existe.
+5. El código y sus consumidores. `openspec/` **solo como antecedente histórico**.
 
-## 🛠️ 2. Configuración de entorno (variables requeridas)
+Si un documento y el código se contradicen, **no decidas por tu cuenta**: reportá la diferencia y preguntá.
 
-Asegúrate de que las siguientes variables estén definidas en el archivo `.env` (o en la configuración de Supabase/Vercel) antes de iniciar cualquier trabajo:
+### 0.2 Límites del dominio y seguridad
 
-| Variable | Descripción |
-|----------|-------------|
-| `DATABASE_URL` | URL de conexión a la base de datos PostgreSQL de Supabase. |
-| `DIRECT_URL` | URL directa (usada por Prisma en entornos de CI). |
-| `NEXT_PUBLIC_SUPABASE_URL` | URL pública del proyecto Supabase. |
-| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Key publishable (anon) para el cliente. |
-| `SUPABASE_SERVICE_ROLE_KEY` | Key de servicio para operaciones de admin (seed, migraciones, etc.). |
-| `NEXT_PUBLIC_APP_ENV` | `development`, `staging` o `production` (afecta comportamiento de middlewares y feature flags). |
-| `NEXT_PUBLIC_FEATURE_BRANCHES` | `true` si se quiere habilitar la gestión de sucursales (Fase 2/3). |
-| `NEXT_PUBLIC_FEATURE_CATEGORIES` | `true` si se quiere habilitar categorías de productos (Fase 2). |
-| `NEXT_PUBLIC_FEATURE_SOFT_DELETE` | `true` si se quiere habilitar el soft‑delete de productos (Fase 2). |
-| `NEXT_PUBLIC_FEATURE_EXTERNAL_BRANCH_VIEW` | `true` si se quiere habilitar la vista externa de inventario por sucursal (HU05). |
-| `BRANCH_EMAIL_DOMAIN` | Dominio usado para generar el email del usuario de sucursal (`sucursal-<code>@<domain>`). Default `feriaconexx.com`. |
+- Preservar validaciones de stock, pagos/deudas, sucursal y transacciones. Revisar el efecto en compras, ventas y movimientos antes de tocar una función compartida.
+- No ejecutar migraciones, reparaciones de datos ni operaciones Supabase/Vercel sin autorización explícita.
+- El catálogo `/sucursal/[branchId]/inventory` es **público, de solo lectura y opt-in**: la acción exige sucursal existente, activa y `isPublic=true`. No requiere el login antiguo `branch_user`, y no se reemplaza ese control ocultando un enlace en la UI.
+- **RLS y permisos de la Data API de Supabase se comprueban en el entorno real.** Hay advertencias históricas de RLS deshabilitado en producción: tratalas como pendiente, nunca como resuelto ni como bug confirmado por sí solas.
+- Rutas internas: sesión + rol `admin`. Una redirección del proxy **no** autoriza una mutación.
 
----
+### 0.3 Idioma
 
-## 📐 3. Reglas de trabajo (actualizadas)
+Conversación y documentación en español. Conventional Commits (sin atribuciones a IA). No traducir identificadores existentes como efecto lateral.
 
-1. **Siempre usar SDD** para cualquier cambio que implique más de un archivo o que afecte la lógica de negocio.  
-   - Flujo: `explore → propose → spec → design → tasks → apply → verify → archive`.  
-   - En modo **interactivo** (predeterminado) revisa el resumen de cada fase antes de continuar; en modo **automático** el orchestrator actúa como gatekeeper entre fases.
+### 0.4 Criterio de riesgo (cuándo parar y avisar)
 
-2. **Delegar todo el trabajo pesado** a los sub‑agentes `sdd‑*`.  
-   - Nunca edites archivos directamente salvo para lecturas de 1‑3 archivos o comandos de estado (git, npm, etc.).  
-   - Usa la herramienta `task` con `subagent_type` adecuado (ver tabla de skills) para cada fase.
+Requiere aviso explícito y espera de respuesta: tocar dinero o deudas, stock real, permisos/auth, borrar o migrar datos, o producir pérdida irreversible de información.
 
-3. **Respetar el presupuesto de líneas de cambio** (review burden).  
-   - Después de `sdd‑tasks`, el orchestrator consulta el *Review Workload Forecast*.  
-   - Si el forecast indica > 400 líneas cambiadas o se necesita decisión, aplicar la **delivery strategy** configurada en la pre‑flight (ask‑on‑risk, auto‑chain, single‑pr, exception‑ok).  
-   - En caso de `ask‑on‑risk`, el orchestrator preguntará al usuario si quiere dividir en PRs encadenados o aceptar un `size:exception`.
+### 0.5 Protocolo ODD
 
-4. **Mantener actualizado el registro de skills** antes de cada delegación.  
-   - Al inicio de la sesión (o antes de la primera delegación) ejecuta:  
-     ```bash
-     opencode skill run skill-registry
-     ```  
-   - Luego, cada sub‑agente recibirá la lista de skills a cargar mediante el campo `skill_resolution` del prompt.
+1. **Recibir el pedido.**
+2. **Clasificar:** inline, si es chico y está entendido; ODD con documento, si necesita continuidad.
+3. **Si falta un dato de producto:** preguntar (bloquea la implementación de ese bug, no del resto del plan).
+4. **Reproducir** el caso antes de concluir que ya funciona.
+5. **Implementar**, con RED → GREEN cuando el comportamiento es verificable.
+6. **Verificar** y **cerrar** con evidencia observada, no supuesta.
 
-5. **Usar Context7 para documentación de libs**.  
-   - Antes de escribir código que implique Next.js, Prisma, Supabase, Tailwind, Recharts, Zod, SweetAlert2, etc., llama a `context7_resolve-library-id` + `context7_query-docs` para obtener la versión más reciente y ejemplos de uso.
+Cada bug nuevo entra como unidad propia: reproducir → preguntar → implementar → verificar → siguiente. Detalle en [docs/flujo-odd.md](docs/flujo-odd.md).
 
-6. **Aplicar las buenas prácticas de Vercel y Next.js** (skill `vercel-react-best-practices` y `next-best-practices`).  
-   - Prioriza **Server Actions** para mutaciones, **React Server Components** para UI estática, y **Edge Functions** solo cuando sea estrictamente necesario.
+## 1. Skills disponibles y carga selectiva
 
-7. **Seguridad y autenticación** (Fase 1 ya implementada).  
-   - Todas las rutas internas (excepto `/login` y las rutas externas de sucursal) deben estar protegidas por el middleware que verifica la sesión de Supabase y el rol `admin`.  
-   - Las rutas externas `/sucursal/[branchId]/inventory` usan un middleware separado que solo permite rol `branch_user` y verbos `GET`.  
+Índice local: `.atl/skill-registry.md` (generado por la herramienta; no se versiona). Cargar solo lo relevante, no todo el registro.
 
-8. **Testing**  
-   - **Unit tests**: Jest + React Testing Library para componentes y lógica pura.  
-   - **Integration tests**: Prisma + Supabase (usar entorno de test de Supabase o Docker) para flujos completos (crear sucursal → asignar stock → compra → venta → movimiento).  
-   - **E2E**: Playwright con configuración móvil (emular Android) para validar flujos de usuario críticos (login, compra con distribución, venta por sucursal, movimiento de stock, acceso al portal externo).  
-   - El agente debe ejecutar `npm test` antes de cada `sdd‑apply` y `npm run test:e2e` antes de `sdd‑verify` si existen tests E2E.
+| Skill | Cuándo usarlo | Ruta |
+|---|---|---|
+| `next-best-practices` | App Router, RSC, Server Actions, caché | `skills/next-best-practices/SKILL.md` |
+| `vercel-react-best-practices` | React/Next y rendimiento | `skills/vercel-react-best-practices/SKILL.md` |
+| `supabase` | Auth, clientes, RLS, operaciones Supabase | `.agents/skills/supabase/SKILL.md` |
+| `supabase-postgres-best-practices` | SQL y rendimiento en PostgreSQL | `.agents/skills/supabase-postgres-best-practices/SKILL.md` |
+| `prisma-postgres` | Aprovisionamiento/operaciones Prisma Postgres | `.agents/skills/prisma-postgres/SKILL.md` |
+| `mobile-design` | UI móvil, navegación, formularios, targets táctiles | `.agents/skills/mobile-design/SKILL.md` |
+| `frontend-design` | Diseño de vistas y componentes | `skills/frontend-design/SKILL.md` |
+| `ui-ux-pro-max` | Criterio de UI/UX y sistemas de diseño | `skills/ui-ux-pro-max/SKILL.md` |
+| `cognitive-doc-design` | Guías, README, instrucciones | resolver en el registro |
+| `context7-mcp` | Documentación actual de librerías | resolver en el registro |
+| `work-unit-commits`, `chained-pr`, `branch-pr` | Unidades de revisión y entrega | resolver en el registro |
 
-9. **Documentación**  
-   - Cada nuevo feature debe contar con su propio archivo markdown en `docs/` siguiendo la plantilla de `cognitive-doc-design`.  
-   - Actualizar `README.md` con un resumen de las funcionalidades de la v3 y enlaces a los documentos detallados.
+Antes de delegar, pasá las rutas exactas de los skills necesarios. Si falta una capacidad, decilo; no simules su ejecución ni impongas comandos de otro runtime.
 
-10. **Versionado y releases**  
-    - Usa **Conventional Commits** (`feat`, `fix`, `docs`, `refactor`, `perf`, `test`, `chore`).  
-    - Para releases en `main`, valida que el *receipt* de revisión exista y que no haya cambios pendientes (ver sección *Trigger Rules* del documento de SDD).  
-    - Si el release es *major* o sigue a un incidente de seguridad, requiere una revisión extraordinaria (Judgment Day o revisión de 4R) antes de publicar.
+## 2. Entorno y memoria
 
-11. **Estilo visual - CSS / Tailwind**
-   - Leer el archivo STYLE.MD en la raíz del proyecto.
----
+`.env` no se versiona ni se imprime. Plantilla: `.env.example`. Node **>=20.9.0** (requisito del Next instalado).
 
-## 📚 4. Enlaces a documentación crítica (actualizados vía Context7)
+| Variable | Uso |
+|---|---|
+| `DATABASE_URL`, `DIRECT_URL` | Conexión Prisma; confirmar el destino antes de cualquier operación de datos |
+| `NEXT_PUBLIC_SUPABASE_URL` | Proyecto Supabase del cliente |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Clave pública del cliente |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Compatibilidad con consumidores existentes |
+| `SUPABASE_SERVICE_ROLE_KEY` | Solo servidor; nunca al cliente |
+| `NEXT_PUBLIC_APP_ENV` | Entorno declarado; no prueba por sí solo que la base sea de desarrollo |
+| `NEXT_PUBLIC_FEATURE_*` | Flags de la plantilla; verificar consumidores antes de asumir que controlan algo |
+| `BRANCH_EMAIL_DOMAIN`, `ADMIN_EMAIL` | Aprovisionamiento heredado y destino de scripts administrativos |
 
-- **Next.js 16 (App Router)** – <https://nextjs.org/docs/app>  
-- **Prisma ORM** – <https://pris.ly/d/prisma-doc>  
-- **Supabase (DB, Auth, Edge, Storage)** – <https://supabase.com/docs>  
-- **Tailwind CSS v4** – <https://tailwindcss.com/docs>  
-- **Recharts** – <https://recharts.org/en-US>  
-- **Zod v4** – <https://zod.dev/>  
-- **SweetAlert2** – <https://sweetalert2.github.io/>  
-- **Playwright** – <https://playwright.dev/docs/intro>  
+**Base aislada:** los tests que escriben datos corren contra el stack local de Supabase en Docker (`supabase/config.toml`), nunca contra un proyecto remoto.
 
-*(El agente debe usar la herramienta `context7` para obtener la versión exacta y ejemplos de uso antes de escribir código.)*
+1. `supabase db start` — levanta la base local desechable (solo Postgres).
+2. `npm run db:local:push` — aplica el esquema de Prisma a esa base; hace falta en cada arranque en frío (`supabase stop --no-backup` descarta el contenido).
+3. `npm run test:local-db` — corre la suite contra ella; acepta argumentos de Jest (`npm run test:local-db -- ruta/al.test.ts`).
 
----
+`scripts/local-db.mjs` resuelve la URL del stack, rechaza cualquier host que no sea local y avisa si la base no está levantada. La variable opcional `DATABASE_URL_TEST` permite fijar otra base local; un destino remoto se rechaza.
 
-## ✅ 5. Checklist rápido antes de iniciar una nueva tarea SDD
+**Engram:** usar `project: "seguimientos-compras"`. Hay memorias históricas bajo `crm-erp-yafe-regalos` y variantes del nombre: consultarlas si hace falta, sin duplicar ni fusionar automáticamente. Para retomar: contexto → búsqueda del topic → observación completa → archivo local → reconciliar.
 
-- [ ] Verificar que `.env` tenga todas las variables requeridas.  
-- [ ] Ejecutar `opencode skill run skill-registry` para tener el registro actualizado.  
-- [ ] Confirmar la **pre‑flight de SDD** (modo, artifact store, delivery strategy, review budget).  
-- [ ] Si la tarea implica cambios de esquema, asegurarse de que Prisma esté instalado y que el comando `prisma migrate dev` pueda ejecutarse.  
-- [ ] Si la tarea incluye nuevas rutas o componentes, revisar que los archivos de `src/app/` sigan la convención de **route groups** (`(routes)`, `(auth)`, etc.) según el proyecto actual.  
-- [ ] Antes de escribir cualquier línea de código, consultar Context7 para la documentación más reciente de la librería involucrada.  
-- [ ] Después de escribir código, ejecutar los tests unitarios y de integración correspondientes.  
-- [ ] Antes de hacer commit, asegurarse de que el *receipt* de revisión esté disponible (o crear uno mediante `review/start` si no existe).  
-- [ ] Al finalizar, archivar el cambio con `sdd‑archive` y actualizar el changelog/READEME si corresponde.   
+## 3. Metodología de desarrollo: ODD
+
+### 3.1 Entrada de un bug: preguntas antes de implementar
+
+1. Un bug por vez: pasar la lista, elegir ítem, no implementar todo junto.
+2. Leer el recorrido afectado y preguntar **solo lo que falta**: pasos de reproducción, resultado actual, esperado, entorno/rol/sucursal, límites del cambio.
+3. Confirmar alcance y criterios observables. No repetir preguntas ya respondidas ni armar un cuestionario fijo.
+4. **Reproducir el fallo antes de concluir que ya funciona.**
+5. Con el alcance aclarado, aplicar ODD.
+
+Ficha breve, si hace falta: [docs/flujo-odd.md](docs/flujo-odd.md).
+
+### 3.2 Clasificación
+
+- **Chico y entendido:** inline; sin documento, con requisitos, diff y checks que permitan retomarlo.
+- **Con continuidad:** antes de escribir código, crear `odd/tasks/<feature>.md` + espejo completo en Engram (`topic: odd/<feature>/tasks`). Orden: encabezado → `## Specs` (S# citando textual al usuario) → `## Tasks` (T#, S#, ruta, estado, commit) → `## Log` (pedido original y evidencia). Mantener archivo, memoria y todo visibles sincronizados. Nunca marcar hecho sin evidencia observada.
+
+### 3.3 Implementación y delegación
+
+- Explorar antes de escribir.
+- Delegar exploración cuando el contexto se infla; delegar escritores solo por paralelismo real o necesidad de contexto, no por contar archivos.
+- Los subagentes reciben el documento/T#/S#, límites de edición y comandos de verificación autorizados. No amplían alcance ni deciden por el usuario.
+- Mantener validación Zod, autorización en fronteras de confianza y manejo de errores que evita pérdida de datos.
+- Para APIs de librerías, consultar Context7; para Next, también sus guías instaladas.
+
+### 3.4 Verificación
+
+- Comportamiento determinista: test primero, observar RED, implementar GREEN, refactorizar. Agregar regresión del comportamiento previo que comparte el código modificado.
+- Documentación/movimientos sin comportamiento nuevo: explicar por qué no hay RED significativo y comprobar estructura, referencias e integridad.
+- Registrar comandos, salida relevante y fallos/saltos reales.
+- UI: verificar el flujo; no sustituir pruebas de navegador por leer JSX.
+- **Comandos que existen hoy** (no ejecutar lo que no existe): `npm test`, `npm run test:local-db` (§2, el que corresponde cuando algo toca base), `npm run lint`, `npx tsc --noEmit`, `npm run build`.
+- **No hay E2E en CI** ni migraciones Prisma reproducibles: no afirmes cobertura E2E ni instalaciones implícitas.
+
+### 3.5 Definition of Done
+
+- [ ] Criterios de aceptación observados (o limitación explícita que requiere decisión).
+- [ ] RED/GREEN o justificación N/A escrita.
+- [ ] Checks aplicables ejecutados contra el entorno permitido.
+- [ ] Documentación afectada actualizada.
+- [ ] Evidencia y estado del documento ODD/espejo actualizados.
+- [ ] Sin borrados, migraciones ni publicación no autorizados.
+
+### 3.6 Reporte al usuario
+
+1. Qué corregí.
+2. Dónde (`archivo:línea`).
+3. Cómo lo verifiqué (comando + resultado).
+4. Qué queda pendiente o como deuda.
+5. Qué necesito del usuario (si algo).
+
+## 4. Reglas de trabajo
+
+- **No reescribir archivos enteros.** Editá solo lo necesario salvo que el archivo sea nuevo o esté mal por completo; si no, preguntá.
+- **Lazy loading de skills** por subagente; no saturar su contexto.
+- **Respuestas breves** en el chat: resultado final, sin cuadros de resumen innecesarios.
+- ODD es el proceso actual; `openspec/` no es un backlog activo.
+- Cambios mínimos y completos: reutilizar patrones, sin dependencias ni abstracciones para un futuro no pedido.
+- No borrar código, SQL, prompts ni trazabilidad por estar aparentemente sin uso: inventariar, buscar consumidores y pedir autorización con la lista concreta.
+- Respetar cambios locales ajenos; no usar `git add .`, `git clean`, resets ni force push para despejar el árbol.
+- `STYLE.md` rige UI/CSS; preservar accesibilidad, targets táctiles y estados de error.
+
+## 5. Documentación técnica
+
+| Recurso | Referencia |
+|---|---|
+| Stack y comandos reales | `package.json`, `package-lock.json` |
+| Next.js | https://nextjs.org/docs/app |
+| Prisma 6 | https://www.prisma.io/docs |
+| Supabase | https://supabase.com/docs |
+| Tailwind 4 | https://tailwindcss.com/docs |
+| Zod | https://zod.dev/ |
+| Testing Library | https://testing-library.com/docs/react-testing-library/intro/ |
+
+## 6. Checklist rápido por tarea
+
+- [ ] Pedido autorizado y alcance aclarado.
+- [ ] Rama, diff y consumidores identificados.
+- [ ] Documento ODD/espejo si requiere continuidad; skills pertinentes.
+- [ ] Base aislada antes de ejecutar tests que escriben datos.
+- [ ] RED/GREEN o justificación N/A.
+- [ ] `npm run lint` y `npx tsc --noEmit` cuando corresponda; `npm run test:local-db` (§2) y `npm run build` para cerrar.
+- [ ] Documentación, evidencia y memoria actualizadas.
+- [ ] Riesgos y limitaciones informados; nada publicado sin autorización.
+
+## 7. Estructura y Git
+
+- `src/app/`: páginas y Server Actions de negocio (`src/app/actions/`).
+- `src/actions/`: acciones de autenticación existentes; no unificar árboles sin tarea específica.
+- `src/components/`, `src/lib/`: UI compartida, validaciones, contexto, clientes y utilidades.
+- `src/proxy.ts`, `src/middleware/`: redirecciones y acceso a rutas externas.
+- `prisma/`, `supabase/`, `scripts/`: esquema y mantenimiento; `scripts/legacy/` es historial de reparación.
+- `docs/`: guías actuales; `docs/history/`: prompts preservados.
+- `odd/tasks/`: trabajo con continuidad; `openspec/`: historial SDD cerrado.
+
+- Trabajo sustancial en rama de feature, con commits por unidad. El presupuesto de ~400 líneas es guía de entrega, no un tope: no recortar pruebas ni artefactos para ajustarse.
+- Para cambios grandes, acordar cadena de ramas/PRs o entrega única antes de publicar.
+- No crear `develop`, publicar, abrir PRs ni fusionar por arrastre de una plantilla ajena.
+- RDD depende del switch del usuario: consultar su estado y seguir las continuaciones nativas. Un receipt no autoriza commit, push, PR ni merge.

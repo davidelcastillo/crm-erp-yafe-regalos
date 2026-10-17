@@ -34,8 +34,8 @@ const branches = [
 ];
 
 const productOptions = [
-  { id: 1, name: "Producto A", stock: 10 },
-  { id: 2, name: "Producto B", stock: 15 },
+  { id: 1, name: "Producto A", code: "PR-A", stock: 10 },
+  { id: 2, name: "Producto B", code: "PR-B", stock: 15 },
 ];
 
 function renderModal(overrides?: Partial<MoveStockModalProps>) {
@@ -51,17 +51,30 @@ function renderModal(overrides?: Partial<MoveStockModalProps>) {
   return { ...view, props };
 }
 
-/** Navega al paso 2: elige sucursal origen y espera a que cargue la tabla. */
+/**
+ * Navega al paso 2: elige la sucursal origen tocando su card (carga la tabla) y
+ * confirma con «Siguiente».
+ */
 async function goToStep2() {
-  fireEvent.change(screen.getByLabelText(/sucursal origen/i), {
-    target: { value: "1" },
+  await waitFor(() => {
+    fireEvent.click(screen.getByRole("button", { name: "Principal" }));
+    expect(screen.getByRole("button", { name: "Principal" })).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
   });
   await waitFor(() => {
     expect(mockGetBranchInventory).toHaveBeenCalledWith({ branchId: 1 });
   });
   await waitFor(() => {
-    expect(screen.getByLabelText(/sucursal destino/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Siguiente" }));
+    expect(screen.getByRole("group", { name: /sucursal destino/i })).toBeInTheDocument();
   });
+}
+
+/** Elige la sucursal destino tocando su card. */
+function elegirDestino(nombre = "Centro") {
+  fireEvent.click(screen.getByRole("button", { name: nombre }));
 }
 
 async function selectProduct(name: string) {
@@ -76,7 +89,7 @@ async function setQuantity(name: string, value: string) {
 
 beforeEach(() => {
   jest.clearAllMocks();
-  mockGetBranchInventory.mockResolvedValue({ success: true, data: productOptions });
+  mockGetBranchInventory.mockResolvedValue({ success: true, data: productOptions } as never);
   mockMoveBatch.mockResolvedValue({
     success: true,
     data: {
@@ -147,9 +160,7 @@ describe("MoveStockModal", () => {
     const { props } = renderModal();
     await goToStep2();
 
-    fireEvent.change(screen.getByLabelText(/sucursal destino/i), {
-      target: { value: "2" },
-    });
+    elegirDestino();
     await selectProduct("Producto A");
     await selectProduct("Producto B");
     await setQuantity("Producto A", "3");
@@ -172,13 +183,30 @@ describe("MoveStockModal", () => {
     expect(props.onConfirm).toHaveBeenCalled();
   });
 
+  it("el buscador filtra por nombre y por código, y avisa cuando no hay coincidencias", async () => {
+    renderModal();
+    await goToStep2();
+
+    const buscador = screen.getByLabelText(/buscar producto/i);
+
+    fireEvent.change(buscador, { target: { value: "Producto B" } });
+    expect(screen.getByLabelText(/seleccionar Producto B/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/seleccionar Producto A/i)).not.toBeInTheDocument();
+
+    fireEvent.change(buscador, { target: { value: "pr-a" } });
+    expect(screen.getByLabelText(/seleccionar Producto A/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/seleccionar Producto B/i)).not.toBeInTheDocument();
+
+    fireEvent.change(buscador, { target: { value: "zzz" } });
+    expect(screen.queryByLabelText(/seleccionar Producto A/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/no encontramos productos/i)).toBeInTheDocument();
+  });
+
   it("desmarcar el checkbox deshabilita el input y excluye la fila del sumario y del array", async () => {
     renderModal();
     await goToStep2();
 
-    fireEvent.change(screen.getByLabelText(/sucursal destino/i), {
-      target: { value: "2" },
-    });
+    elegirDestino();
     await selectProduct("Producto A");
     await selectProduct("Producto B");
     await setQuantity("Producto A", "3");
@@ -204,9 +232,7 @@ describe("MoveStockModal", () => {
     const { props } = renderModal();
     await goToStep2();
 
-    fireEvent.change(screen.getByLabelText(/sucursal destino/i), {
-      target: { value: "2" },
-    });
+    elegirDestino();
     await selectProduct("Producto A");
     await setQuantity("Producto A", "3");
 
@@ -227,7 +253,7 @@ describe("MoveStockModal", () => {
     });
 
     // El modal permanece abierto (sigue en el paso 2) y no se llama onClose.
-    expect(screen.getByLabelText(/sucursal destino/i)).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: /sucursal destino/i })).toBeInTheDocument();
     expect(props.onClose).not.toHaveBeenCalled();
   });
 
@@ -235,9 +261,7 @@ describe("MoveStockModal", () => {
     const { props } = renderModal();
     await goToStep2();
 
-    fireEvent.change(screen.getByLabelText(/sucursal destino/i), {
-      target: { value: "2" },
-    });
+    elegirDestino();
     await selectProduct("Producto A");
     await setQuantity("Producto A", "3");
 
@@ -252,5 +276,44 @@ describe("MoveStockModal", () => {
     });
     expect(mockMoveBatch).not.toHaveBeenCalled();
     expect(props.onClose).not.toHaveBeenCalled();
+  });
+
+  it("si falla la carga de productos no deja avanzar al paso 2 y muestra el error", async () => {
+    mockGetBranchInventory.mockResolvedValue({
+      success: false,
+      error: "Error al cargar productos",
+    } as never);
+    renderModal();
+
+    // El clic va fuera del waitFor: reintentarlo reiniciaría la carga y borraría el error.
+    fireEvent.click(screen.getByRole("button", { name: "Principal" }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/error al cargar productos/i)).toBeInTheDocument();
+    });
+
+    expect(screen.getByRole("button", { name: "Siguiente" })).toBeDisabled();
+    expect(screen.queryByRole("group", { name: /sucursal destino/i })).not.toBeInTheDocument();
+  });
+
+  it("«Siguiente» está deshabilitado sin origen y el origen queda deshabilitado como destino", async () => {
+    renderModal();
+
+    // Sin origen elegido no se puede avanzar. Las cards listan las sucursales activas.
+    const siguiente = screen.getByRole("button", { name: "Siguiente" });
+    expect(siguiente).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Principal" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Centro" })).toBeEnabled();
+
+    await goToStep2();
+
+    // El origen ya no es elegible como destino y no queda seleccionado destino alguno.
+    const origen = screen.getByRole("button", { name: "Principal" });
+    expect(origen).toBeDisabled();
+    fireEvent.click(origen);
+    expect(screen.getByRole("button", { name: "Centro" })).toHaveAttribute(
+      "aria-pressed",
+      "false"
+    );
   });
 });

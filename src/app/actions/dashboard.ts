@@ -1,48 +1,125 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
+import { pisoDeCaja, rangoDelUltimoCierre } from "@/lib/cash-close";
+import { finDelDia, inicioDelDia, toLocalDateKey } from "@/lib/dates";
 import { z } from "zod";
+
+// Días calendario locales: `new Date("YYYY-MM-DD")` da medianoche UTC, así que el
+// día final quedaba afuera y, en hora local (UTC-3), un rango de un solo día
+// quedaba vacío (bug 4 del usuario).
+
+// Días del rango, en orden, como claves de día local.
+const diasDelRango = (desde: Date, hasta: Date) => {
+  const dias: string[] = [];
+  const cursor = new Date(desde);
+  cursor.setHours(0, 0, 0, 0);
+  while (cursor <= hasta && dias.length < 3660) {
+    dias.push(toLocalDateKey(cursor));
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return dias;
+};
+
+// Un solo rango para todo el tablero. «cierre» es el período por defecto: va
+// desde el último cierre de caja (ver `rangoDelUltimoCierre`). «7» | «30» | «90»
+// son los últimos N días calendario locales contando hoy; un rango de fechas
+// manda sobre `days`.
+async function rangoDelPeriodo(periodo: {
+  type?: string;
+  days?: number;
+  startDate?: string;
+  endDate?: string;
+  branchId?: number;
+}): Promise<{ success: true; desde: Date; hasta: Date } | { success: false; error: string }> {
+  if (periodo.type === "cierre") {
+    const rango = await rangoDelUltimoCierre(periodo.branchId);
+    return { success: true, ...rango };
+  }
+
+  const conFechas = !!periodo.startDate || !!periodo.endDate;
+
+  if (periodo.type === "custom" || conFechas) {
+    if (!periodo.startDate || !periodo.endDate) {
+      return {
+        success: false,
+        error: "Seleccioná un rango de fechas para el periodo personalizado",
+      };
+    }
+
+    const desde = inicioDelDia(periodo.startDate);
+    const hasta = finDelDia(periodo.endDate);
+    if (isNaN(desde.getTime()) || isNaN(hasta.getTime()) || desde > hasta) {
+      return { success: false, error: "Rango de fechas inválido" };
+    }
+    return { success: true, desde, hasta };
+  }
+
+  const dias = Math.max(1, periodo.days ?? Number(periodo.type ?? 30));
+  const primerDia = new Date();
+  primerDia.setDate(primerDia.getDate() - (dias - 1));
+  return {
+    success: true,
+    desde: inicioDelDia(toLocalDateKey(primerDia)),
+    hasta: finDelDia(toLocalDateKey(new Date())),
+  };
+}
 
 const globalStatsSchema = z.object({
   branchId: z.coerce.number().int().positive().optional(),
 });
 
 const statsSchema = z.object({
-  type: z.enum(["7", "30", "90", "custom"]).optional(),
+  type: z.enum(["cierre", "7", "30", "90", "custom"]).optional(),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
   branchId: z.coerce.number().int().positive().optional(),
 });
 
-async function fetchStats(where: Record<string, unknown> = {}) {
+async function fetchStats(
+  where: Record<string, unknown> = {},
+  cajaWhere: Record<string, unknown> = {}
+) {
+  // Ventas, plata y compras se miden desde el último cierre (S21): las tarjetas
+  // por defecto comparan el mismo tramo, así el neto no enfrenta el ingreso de
+  // la caja nueva con todos los egresos del período. El `AND` solo aparece
+  // cuando hay un cierre; sin cierres la consulta queda como estaba.
+  const hayPiso = Object.keys(cajaWhere).length > 0;
+  const deCaja = hayPiso ? { AND: [where, cajaWhere] } : where;
+
   // Get all sales
   const sales = await prisma.sale.aggregate({
     _sum: { totalAmount: true },
-    where,
+    where: deCaja,
   });
 
   // Get all purchases
   const purchases = await prisma.purchase.aggregate({
     _sum: { totalAmount: true },
-    where,
+    where: deCaja,
   });
 
-  // Get all customer debt (global - not branch-scoped, customer debt is per customer not per branch)
-  const customers = await prisma.customer.aggregate({
-    _sum: { totalBalance: true },
-  });
-
-  // Or get pending balance from sales (branch-scoped)
+  // Cuentas por cobrar: pendiente generado en el período y la sucursal filtrados.
+  // Antes sumaba la deuda global de clientes, que no sigue el filtro (bug 4).
   const pendingSales = await prisma.sale.aggregate({
     _sum: { pendingBalance: true },
-    where,
+    where: deCaja,
   });
 
+  // Plata de caja (correcciones): también es balance del tablero (S18).
+  const cashMovements = await prisma.cashMovement.groupBy({
+    by: ["type"],
+    where: deCaja,
+    _sum: { amount: true },
+  });
+  const caja = (tipo: "INGRESO" | "EGRESO") =>
+    Number(cashMovements.find((c) => c.type === tipo)?._sum.amount ?? 0);
+
   // Parse Decimal to number
-  const totalIncome = Number(sales._sum.totalAmount || 0);
-  const totalExpense = Number(purchases._sum.totalAmount || 0);
+  const totalIncome = Number(sales._sum.totalAmount || 0) + caja("INGRESO");
+  const totalExpense = Number(purchases._sum.totalAmount || 0) + caja("EGRESO");
   const netProfit = totalIncome - totalExpense;
-  const accountsReceivable = Number(customers._sum.totalBalance || 0) + Number(pendingSales._sum.pendingBalance || 0);
+  const accountsReceivable = Number(pendingSales._sum.pendingBalance || 0);
 
   return {
     totalIncome,
@@ -59,6 +136,7 @@ export async function getGlobalStats(data?: unknown) {
       ? { branchId: validated.branchId }
       : {};
 
+    // Sin período no hay piso de cierre: es la vista de todo el histórico.
     const stats = await fetchStats({ ...branchWhere });
 
     return {
@@ -78,33 +156,24 @@ export async function getStats(data?: unknown) {
   try {
     const validated = statsSchema.parse(data ?? {});
     const { branchId } = validated;
-    const type = validated.type ?? "30";
     const branchWhere = branchId ? { branchId } : {};
 
-    let dateFilter: { gte: Date; lte: Date };
-    if (type === "custom") {
-      if (!validated.startDate || !validated.endDate) {
-        return {
-          success: false,
-          error: "Seleccioná un rango de fechas para el periodo personalizado",
-        };
-      }
-
-      const start = new Date(validated.startDate);
-      const end = new Date(validated.endDate);
-      if (isNaN(start.getTime()) || isNaN(end.getTime()) || start > end) {
-        return { success: false, error: "Rango de fechas inválido" };
-      }
-      dateFilter = { gte: start, lte: end };
-    } else {
-      const days = Number(type);
-      const end = new Date();
-      const start = new Date();
-      start.setDate(start.getDate() - days);
-      dateFilter = { gte: start, lte: end };
+    const rango = await rangoDelPeriodo(validated);
+    if (!rango.success) {
+      return { success: false, error: rango.error };
     }
 
-    const stats = await fetchStats({ date: dateFilter, ...branchWhere });
+    // El piso del cierre se aplica **solo** en el período «desde el último
+    // cierre»: 7/30/90/personalizado muestran todo lo que cae en el rango.
+    const caja = validated.type === "cierre" ? await pisoDeCaja(branchId) : {};
+
+    const stats = await fetchStats(
+      {
+        date: { gte: rango.desde, lte: rango.hasta },
+        ...branchWhere,
+      },
+      caja
+    );
 
     return {
       success: true,
@@ -117,27 +186,34 @@ export async function getStats(data?: unknown) {
 }
 
 const performanceDataSchema = z.object({
+  type: z.enum(["cierre", "7", "30", "90", "custom"]).optional(),
   days: z.coerce.number().int().positive().default(30),
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
   branchId: z.coerce.number().int().positive().optional(),
 });
 
 // Get last N days of sales and purchases for chart
 export async function getPerformanceData(data?: unknown) {
   try {
-    const { days, branchId } = performanceDataSchema.parse(
-      data ?? { days: 30 }
-    );
+    const validated = performanceDataSchema.parse(data ?? { days: 30 });
+    const { branchId } = validated;
     const branchWhere = branchId ? { branchId } : {};
 
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - days);
+    const rango = await rangoDelPeriodo(validated);
+    if (!rango.success) {
+      return { success: false, error: rango.error };
+    }
+    const dateFilter = { gte: rango.desde, lte: rango.hasta };
+    // Mismo piso de caja que las tarjetas, y solo en el período del cierre: si no,
+    // los dos indicadores del tablero contarían cosas distintas.
+    const caja = validated.type === "cierre" ? await pisoDeCaja(branchId) : {};
 
     // Get daily sales
     const sales = await prisma.sale.groupBy({
       by: ["date"],
       where: {
-        date: { gte: startDate },
-        ...branchWhere,
+        AND: [{ date: dateFilter }, branchWhere, caja],
       },
       _sum: {
         totalAmount: true,
@@ -151,8 +227,7 @@ export async function getPerformanceData(data?: unknown) {
     const purchases = await prisma.purchase.groupBy({
       by: ["date"],
       where: {
-        date: { gte: startDate },
-        ...branchWhere,
+        AND: [{ date: dateFilter }, branchWhere, caja],
       },
       _sum: {
         totalAmount: true,
@@ -162,40 +237,41 @@ export async function getPerformanceData(data?: unknown) {
       },
     });
 
-    // Normalize dates and combine data
+    // Cada fila es un timestamp distinto, así que se acumula por día local: antes
+    // se asignaba y el gráfico mostraba solo la última venta de cada día.
     const dailyData: Record<string, { income: number; expense: number }> = {};
+    const bucket = (fecha: string) =>
+      (dailyData[fecha] ??= { income: 0, expense: 0 });
 
-    // Initialize all days
-    for (let i = 0; i < days; i++) {
-      const date = new Date();
-      date.setDate(date.getDate() - i);
-      const dateStr = date.toISOString().split("T")[0];
-      dailyData[dateStr] = { income: 0, expense: 0 };
-    }
-
-    // Fill in sales
     sales.forEach((s) => {
-      const dateStr = new Date(s.date).toISOString().split("T")[0];
-      if (dailyData[dateStr]) {
-        dailyData[dateStr].income = Number(s._sum.totalAmount || 0);
-      }
+      bucket(toLocalDateKey(new Date(s.date))).income += Number(s._sum.totalAmount || 0);
     });
 
-    // Fill in purchases
     purchases.forEach((p) => {
-      const dateStr = new Date(p.date).toISOString().split("T")[0];
-      if (dailyData[dateStr]) {
-        dailyData[dateStr].expense = Number(p._sum.totalAmount || 0);
-      }
+      bucket(toLocalDateKey(new Date(p.date))).expense += Number(p._sum.totalAmount || 0);
     });
 
-    // Convert to array for chart
-    const chartData = Object.entries(dailyData)
-      .map(([date, values]) => ({
-        date,
-        ...values,
-      }))
-      .reverse();
+    // La plata de caja entra en el mismo gráfico que las tarjetas (S18): si no,
+    // los dos indicadores del tablero contarían cosas distintas.
+    const cashMovements = await prisma.cashMovement.groupBy({
+      by: ["date", "type"],
+      where: { AND: [{ date: dateFilter }, branchWhere, caja] },
+      _sum: { amount: true },
+    });
+
+    cashMovements.forEach((c) => {
+      const dia = bucket(toLocalDateKey(new Date(c.date)));
+      const monto = Number(c._sum.amount || 0);
+      if (c.type === "INGRESO") dia.income += monto;
+      else dia.expense += monto;
+    });
+
+    // Un punto por día del rango, en orden, incluso los días sin movimientos.
+    const chartData = diasDelRango(rango.desde, rango.hasta).map((date) => ({
+      date,
+      income: dailyData[date]?.income ?? 0,
+      expense: dailyData[date]?.expense ?? 0,
+    }));
 
     return {
       success: true,

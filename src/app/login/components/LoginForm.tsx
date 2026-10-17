@@ -4,8 +4,7 @@ import { useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { z } from 'zod';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { login } from '@/actions/auth';
+import { login } from '@/actions/auth'; 
 import { loginSchema } from '@/lib/validations/auth';
 
 export default function LoginForm() {
@@ -14,6 +13,7 @@ export default function LoginForm() {
     password: '',
   });
   const [error, setError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
   const { pending } = useFormStatus();
   const router = useRouter();
@@ -53,85 +53,153 @@ export default function LoginForm() {
   };
 
   return (
-    <div className="w-full max-w-md">
-      <form className="space-y-6" onSubmit={handleSubmit}>
-        <div>
-          <label htmlFor="email" className="block mb-2 text-sm font-medium text-[#6a6a6a]">
-            Correo electrónico
-          </label>
-          <input
-            id="email"
-            name="email"
-            type="email"
-            autoComplete="email"
-            required
-            className="block w-full h-14 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-[#222222] placeholder:text-[#6a6a6a] focus:border-[#ff385c] focus:ring-2 focus:ring-[#ff385c]/20 focus:outline-none transition-all sm:text-sm sm:leading-6"
-            value={formState.email}
-            onChange={handleChange}
-          />
-        </div>
-
-        <div>
-          <label htmlFor="password" className="block mb-2 text-sm font-medium text-[#6a6a6a]">
-            Contraseña
-          </label>
-          <input
-            id="password"
-            name="password"
-            type="password"
-            autoComplete="current-password"
-            required
-            className="block w-full h-14 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-[#222222] placeholder:text-[#6a6a6a] focus:border-[#ff385c] focus:ring-2 focus:ring-[#ff385c]/20 focus:outline-none transition-all sm:text-sm sm:leading-6"
-            value={formState.password}
-            onChange={handleChange}
-          />
-        </div>
-
-        {error && (
-          <p role="alert" className="mt-2 text-sm text-[#c13515]">{error}</p>
-        )}
-
-        {success && (
-          <p role="status" className="mt-2 text-sm text-green-600">{success}</p>
-        )}
-
-        <div className="flex items-center justify-between">
-          <div className="flex items-start">
-            <div className="flex items-center h-5">
+    <div className="flex-1 w-full max-w-md mx-auto px-6 pt-8 pb-6 flex flex-col z-10 relative">
+        <h2 className="text-3xl font-bold text-[#222222] text-center mb-8">Bienvenida Estefi!</h2>
+        <form className="space-y-6" onSubmit={handleSubmit}>
+          <div className="flex flex-col gap-4 mb-6">
+            {/* Input Username (Translúcido) */}
+            <div className="bg-white/60 backdrop-blur-md border border-white/80 rounded-full px-5 py-4 shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex items-center transition-all focus-within:bg-white/80 focus-within:border-pink-300">
               <input
-                id="remember-me"
-                name="remember-me"
-                type="checkbox"
-                className="h-5 w-5 text-[#ff385c] focus:ring-[#ff385c] border-gray-300 rounded"
+                id="email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                required
+                placeholder="Correo electrónico"
+                aria-label="Correo electrónico"
+                className="w-full bg-transparent outline-none text-gray-700 placeholder-[#6a6a6a] font-medium"
+                value={formState.email}
+                onChange={handleChange}
               />
             </div>
-            <div className="ml-3 text-sm">
-              <label htmlFor="remember-me" className="font-medium text-[#222222]">
-                Recordarme
-              </label>
+
+            {/* Input Password (Translúcido) */}
+            <div className="bg-white/60 backdrop-blur-md border border-white/80 rounded-full px-5 py-4 shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex items-center justify-between transition-all focus-within:bg-white/80 focus-within:border-pink-300">
+              <input
+                id="password"
+                name="password"
+                type={showPassword ? 'text' : 'password'}
+                autoComplete="current-password"
+                placeholder="Contraseña"
+                aria-label="Contraseña"
+                className="w-full bg-transparent outline-none text-gray-700 placeholder-[#6a6a6a] font-medium"
+                value={formState.password}
+                onChange={handleChange}
+              />
+              {/* Ojo para ver contraseña: sin `type="button"` el navegador lo toma
+                  como submit y enviaba el formulario al tocarlo. */}
+              <button
+                type="button"
+                onClick={() => setShowPassword((prev) => !prev)}
+                aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                aria-pressed={showPassword}
+                className="text-gray-400 hover:text-pink-500 transition-colors touch-manipulation"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+              </button>
             </div>
           </div>
 
-          <div className="text-sm">
-            <Link
-              href="/forgot-password"
-              className="font-medium text-[#ff385c] hover:text-[#e00b41]"
-            >
-              Olvidé mi contraseña
-            </Link>
+          {/* Recordarme y Olvidé contraseña */}
+          <div className="flex justify-between items-center mb-10 px-2 text-sm">
+            <label className="flex items-center gap-2 text-gray-600 cursor-pointer font-medium">
+              {/* Un pequeño toque: acento rosa en el checkbox */}
+              <input
+                type="checkbox"
+                name="remember-me"
+                className="accent-pink-500 w-4 h-4 cursor-pointer"
+              />
+              Recordarme
+            </label>
           </div>
-        </div>
 
-        <div>
-          <button
-            type="submit"
-            disabled={pending}
-            className="w-full h-12 flex justify-center items-center border border-transparent text-sm font-medium rounded-xl shadow-sm text-white bg-[#ff385c] hover:bg-[#e00b41] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#ff385c]/50 disabled:bg-[#ffd1da] disabled:cursor-not-allowed disabled:opacity-100 transition-colors"
-          >
+          {error && (
+            <p role="alert" className="mt-2 text-sm text-[#c13515]">{error}</p>
+          )}
+
+          {success && (
+            <p role="status" className="mt-2 text-sm text-[#15803d]">{success}</p>
+          )}
+          {/* Botón de Login: en celular se hunde un poco al tocarlo (feedback táctil). */}
+          <button 
+          type="submit"
+          disabled={pending}
+          className="w-full py-4 rounded-full border-2 border-pink-400 text-pink-500 font-bold text-lg hover:bg-pink-400 hover:text-white active:scale-[0.98] active:bg-pink-400 active:text-white transition-all mb-6 shadow-sm touch-manipulation">
             {pending ? 'Iniciando sesión...' : 'Iniciar sesión'}
           </button>
-        </div>
-      </form>
-    </div>
+          
+        </form>
+      </div>
+    // <div className="w-full max-w-md">
+    //   <form className="space-y-6" onSubmit={handleSubmit}>
+    //     <div>
+    //       <label htmlFor="email" className="block mb-2 text-sm font-medium text-[#6a6a6a]">
+    //         Correo electrónico
+    //       </label>
+    //       <input
+    //         id="email"
+    //         name="email"
+    //         type="email"
+    //         autoComplete="email"
+    //         required
+    //         className="block w-full h-14 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-[#222222] placeholder:text-[#6a6a6a] focus:border-[#ec4899] focus:ring-2 focus:ring-[#ec4899]/30 focus:outline-none transition-all sm:text-sm sm:leading-6"
+    //         value={formState.email}
+    //         onChange={handleChange}
+    //       />
+    //     </div>
+
+    //     <div>
+    //       <label htmlFor="password" className="block mb-2 text-sm font-medium text-[#6a6a6a]">
+    //         Contraseña
+    //       </label>
+    //       <input
+    //         id="password"
+    //         name="password"
+    //         type="password"
+    //         autoComplete="current-password"
+    //         required
+    //         className="block w-full h-14 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-[#222222] placeholder:text-[#6a6a6a] focus:border-[#ec4899] focus:ring-2 focus:ring-[#ec4899]/30 focus:outline-none transition-all sm:text-sm sm:leading-6"
+    //         value={formState.password}
+    //         onChange={handleChange}
+    //       />
+    //     </div>
+
+    //     {error && (
+    //       <p role="alert" className="mt-2 text-sm text-[#c13515]">{error}</p>
+    //     )}
+
+    //     {success && (
+    //       <p role="status" className="mt-2 text-sm text-green-600">{success}</p>
+    //     )}
+
+    //     <div className="flex items-center">
+    //       <div className="flex items-start">
+    //         <div className="flex items-center h-5">
+    //           <input
+    //             id="remember-me"
+    //             name="remember-me"
+    //             type="checkbox"
+    //             className="h-5 w-5 text-[#ec4899] focus:ring-[#ec4899] border-gray-300 rounded"
+    //           />
+    //         </div>
+    //         <div className="ml-3 text-sm">
+    //           <label htmlFor="remember-me" className="font-medium text-[#222222]">
+    //             Recordarme
+    //           </label>
+    //         </div>
+    //       </div>
+    //     </div>
+
+    //     <div>
+    //       <button
+    //         type="submit"
+    //         disabled={pending}
+    //         className="w-full h-12 flex justify-center items-center border border-transparent text-sm font-medium rounded-xl shadow-sm brand-gradient brand-gradient-hover text-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#ec4899]/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+    //       >
+    //         {pending ? 'Iniciando sesión...' : 'Iniciar sesión'}
+    //       </button>
+    //     </div>
+    //   </form>
+    // </div>
   );
 }

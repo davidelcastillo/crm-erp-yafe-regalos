@@ -15,6 +15,8 @@ type BranchSelectorProps = {
   label?: string;
   /** Controlled value (branchId). If provided, the component does not write to BranchContext. */
   value?: number | null;
+  /** Ocupa todo el ancho en mobile (su propia línea); en desktop se ajusta al contenido. */
+  block?: boolean;
 };
 
 /**
@@ -28,6 +30,7 @@ export function BranchSelector({
   disabled = false,
   label,
   value,
+  block = false,
 }: BranchSelectorProps) {
   const { branchId: contextBranchId, branches, ready, setBranchId } = useBranch();
   const [open, setOpen] = useState(false);
@@ -71,15 +74,30 @@ export function BranchSelector({
   }
 
   return (
-    <div className="inline-flex flex-col gap-1" ref={ref}>
+    <div
+      className={`relative inline-flex min-w-0 flex-col gap-1 ${
+        block ? "w-full md:w-auto" : "max-w-full"
+      }`}
+      ref={ref}
+    >
       {label && (
-        <span className="text-xs text-[#6a6a6a] font-medium">{label}</span>
+        <span
+          className={`text-xs text-[#6a6a6a] font-medium ${
+            block ? "block md:hidden" : "hidden sm:block"
+          }`}
+        >
+          {label}
+        </span>
       )}
       <button
         type="button"
         disabled={disabled}
         onClick={() => setOpen(!open)}
-        className="inline-flex items-center justify-between gap-2 px-4 py-2 bg-[#f8f8f8] rounded-xl text-sm text-[#222222] hover:bg-[#f2f2f2] transition-colors min-w-[180px] disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
+        className={
+          block
+            ? "inline-flex min-h-[44px] w-full items-center justify-between gap-2 rounded-xl bg-[#f8f8f8] px-4 py-2 text-sm text-[#222222] transition-colors hover:bg-[#f2f2f2] disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
+            : "inline-flex min-h-[44px] max-w-[9.5rem] items-center justify-between gap-2 rounded-xl bg-[#f8f8f8] px-3 py-2 text-sm text-[#222222] transition-colors hover:bg-[#f2f2f2] disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation sm:max-w-none sm:px-4"
+        }
         aria-haspopup="listbox"
         aria-expanded={open}
       >
@@ -96,7 +114,9 @@ export function BranchSelector({
 
       {open && (
         <div
-          className="absolute z-50 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-60 overflow-y-auto min-w-[180px]"
+          className={`absolute z-50 mt-1 max-h-60 overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-lg ${
+            block ? "w-full" : "min-w-[9.5rem]"
+          }`}
           role="listbox"
         >
           {!hideAllOption && (

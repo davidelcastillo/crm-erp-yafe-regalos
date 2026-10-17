@@ -9,6 +9,8 @@ import { getStats } from "./dashboard";
 const mockSaleAggregate = jest.fn();
 const mockPurchaseAggregate = jest.fn();
 const mockCustomerAggregate = jest.fn();
+const mockCashGroupBy = jest.fn();
+const mockCashCloseFindMany = jest.fn();
 
 jest.mock("@/lib/prisma", () => ({
   prisma: {
@@ -21,6 +23,14 @@ jest.mock("@/lib/prisma", () => ({
     customer: {
       aggregate: (...args: unknown[]) => mockCustomerAggregate(...args),
     },
+    // Plata de caja: entra en el balance (S18).
+    cashMovement: {
+      groupBy: (...args: unknown[]) => mockCashGroupBy(...args),
+    },
+    // Piso del cierre de caja para los indicadores (S17).
+    cashClose: {
+      findMany: (...args: unknown[]) => mockCashCloseFindMany(...args),
+    },
   },
 }));
 
@@ -30,6 +40,8 @@ function mockEmptyAggregates() {
   });
   mockPurchaseAggregate.mockResolvedValue({ _sum: { totalAmount: 0 } });
   mockCustomerAggregate.mockResolvedValue({ _sum: { totalBalance: 0 } });
+  mockCashGroupBy.mockResolvedValue([]);
+  mockCashCloseFindMany.mockResolvedValue([]);
 }
 
 describe("getStats (dashboard period + range + branch)", () => {
@@ -78,15 +90,18 @@ describe("getStats (dashboard period + range + branch)", () => {
     }
 
     const where = mockSaleAggregate.mock.calls[0][0].where;
-    const now = new Date();
+    // Días calendario locales: 7 días contando hoy (del inicio de hoy-6 al final de
+    // hoy), que es el mismo rango que usa el gráfico. Antes era `now - 7 días`.
     const expectedStart = new Date();
-    expectedStart.setDate(now.getDate() - 7);
+    expectedStart.setDate(expectedStart.getDate() - 6);
+    expectedStart.setHours(0, 0, 0, 0);
+    const expectedEnd = new Date();
+    expectedEnd.setHours(23, 59, 59, 999);
 
     expect(where.date.gte).toBeInstanceOf(Date);
     expect(where.date.lte).toBeInstanceOf(Date);
-    expect(
-      Math.abs(where.date.gte.getTime() - expectedStart.getTime())
-    ).toBeLessThan(5000);
+    expect(where.date.gte.getTime()).toBe(expectedStart.getTime());
+    expect(where.date.lte.getTime()).toBe(expectedEnd.getTime());
   });
 
   it("omits branchId from the query when no branch is provided (global)", async () => {

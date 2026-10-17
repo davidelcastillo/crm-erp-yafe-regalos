@@ -31,15 +31,26 @@ export default async function BranchInventoryPage({
   }
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">
-          Inventario de la Sucursal #{branchId}
-        </h1>
+    <div className="min-h-screen bg-white">
+      {/* Catalogo publico: sin acciones de cuenta (no hay sesion en esta vista). */}
+      <div className="pb-16 brand-gradient">
+        <header className="px-3 pt-6">
+          <div className="rounded-2xl glass-strong px-4 py-3">
+            <p className="text-xs font-medium uppercase tracking-wide text-[#6a6a6a]">
+              Catálogo
+            </p>
+            <h1 className="text-2xl font-bold text-[#222222]">
+              Inventario de la sucursal
+            </h1>
+            <p className="text-sm text-[#6a6a6a]">
+              {inventoryResult.branchName ?? `Sucursal #${branchId}`}
+            </p>
+          </div>
+        </header>
       </div>
-      
-      <div className="space-y-4">
-        <ExternalInventoryTable 
+
+      <div className="glass rounded-t-[2.5rem] border-t border-white/80 -mt-12 px-5 pt-6 pb-8 shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
+        <ExternalInventoryTable
           inventoryData={(inventoryResult.data || []) as unknown as InventoryItem[]}
         />
       </div>

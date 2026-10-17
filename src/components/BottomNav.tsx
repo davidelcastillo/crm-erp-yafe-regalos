@@ -19,7 +19,7 @@ const PurchaseIcon = ({ active }: { active: boolean }) => (
 
 const SaleIcon = ({ active }: { active: boolean }) => (
   <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
   </svg>
 );
 
@@ -57,26 +57,35 @@ export default function BottomNav() {
   if (
     pathname.startsWith("/sucursal/") ||
     pathname === "/login" ||
-    pathname === "/unauthorized" ||
-    pathname === "/forgot-password" ||
-    pathname === "/reset-password" ||
-    pathname === "/auth/callback"
+    pathname === "/unauthorized"
   ) {
     return null;
   }
 
   return (
     <>
-      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-[0_-2px_10px_rgba(0,0,0,0.05)] z-50">
+      <nav className="fixed bottom-0 left-0 right-0 bg-white/70 backdrop-blur-2xl border-t border-white/80 shadow-[0_-2px_10px_rgba(0,0,0,0.05)] z-50">
         <div className="flex justify-around items-center h-16 max-w-lg mx-auto">
            {navItems.map((item) => {
              const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
              const Icon = item.icon;
-             const linkClassName = `flex flex-col items-center justify-center flex-1 h-full transition-all duration-200 ease-in-out ${isActive ? "text-[#ff385c]" : "text-[#6a6a6a] hover:text-[#3f3f3f]"}`;
-             const spanClassName = `text-xs mt-1 font-medium ${isActive ? "text-[#ff385c]" : "text-[#6a6a6a]"}`;
+             // El activo se marca con el circulo de marca detras del icono (texto oscuro sobre el degradé claro).
+             const linkClassName = `flex flex-col items-center justify-center flex-1 h-full transition-all duration-200 ease-in-out ${isActive ? "text-[#222222]" : "text-[#6a6a6a] hover:text-[#3f3f3f]"}`;
+             const spanClassName = `text-xs mt-1 font-medium ${isActive ? "text-[#222222]" : "text-[#6a6a6a]"}`;
              return (
-               <Link key={item.href} href={item.href} className={linkClassName}>
-                 <Icon active={isActive} />
+               <Link
+                 key={item.href}
+                 href={item.href}
+                 className={linkClassName}
+                 aria-current={isActive ? "page" : undefined}
+               >
+                 <span
+                   className={`flex h-8 w-8 items-center justify-center rounded-full ${
+                     isActive ? "brand-gradient" : ""
+                   }`}
+                 >
+                   <Icon active={isActive} />
+                 </span>
                  <span className={spanClassName}>
                    {item.label}
                  </span>

@@ -87,6 +87,9 @@ describe("generateBranchEmail", () => {
 // createBranchUser
 // ---------------------------------------------------------------------------
 describe("createBranchUser", () => {
+  /** Usuario de Auth que ya existía: el caso del alta que quedó huérfana. */
+  const UUID_EXISTENTE = "550e8400-e29b-41d4-a716-446655440001";
+
   const input = {
     email: "sucursal-cen@feriaconexx.com",
     password: "TemporaryPass1!",
@@ -130,8 +133,35 @@ describe("createBranchUser", () => {
     );
   });
 
-  it("propagates the auth error as a normalized string", async () => {
-    const { client, createUser } = buildClient();
+  it("reusa el usuario de Auth que ya existía para ese email", async () => {
+    // Caso real: el alta anterior creó el usuario pero la transacción se revirtió,
+    // así que el reintento recibe «already registered» y hay que reusarlo.
+    const listUsers = jest.fn().mockResolvedValue({
+      data: { users: [{ id: UUID_EXISTENTE, email: input.email }] },
+      error: null,
+    });
+    const updateUserById = jest.fn().mockResolvedValue({
+      data: { user: { id: UUID_EXISTENTE } },
+      error: null,
+    });
+    const { client, createUser } = buildClient({ listUsers, updateUserById });
+    createUser.mockResolvedValue({
+      data: { user: null },
+      error: { message: "A user with this email address has already been registered" },
+    });
+
+    const result = await createBranchUser(client, input);
+
+    expect(result).toEqual({ id: UUID_EXISTENTE, error: null });
+    expect(updateUserById).toHaveBeenCalledWith(
+      UUID_EXISTENTE,
+      expect.objectContaining({ password: input.password })
+    );
+  });
+
+  it("propaga el auth error cuando el email no existe en Auth", async () => {
+    const listUsers = jest.fn().mockResolvedValue({ data: { users: [] }, error: null });
+    const { client, createUser } = buildClient({ listUsers });
     createUser.mockResolvedValue({
       data: { user: null },
       error: { message: "User already registered" },
@@ -143,7 +173,8 @@ describe("createBranchUser", () => {
   });
 
   it("returns an error when the response has no user id", async () => {
-    const { client, createUser } = buildClient();
+    const listUsers = jest.fn().mockResolvedValue({ data: { users: [] }, error: null });
+    const { client, createUser } = buildClient({ listUsers });
     createUser.mockResolvedValue({ data: null, error: null });
 
     const result = await createBranchUser(client, input);

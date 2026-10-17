@@ -37,6 +37,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# estado local de herramientas (se regenera; no se versiona)
+supabase/.temp/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

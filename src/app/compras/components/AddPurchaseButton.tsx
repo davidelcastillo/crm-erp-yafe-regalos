@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { registerPurchase, createPurchaseWithBranchSplit } from "../../actions/purchase";
+import { createPurchaseWithBranchSplit } from "../../actions/purchase";
 import { getProducts } from "../../actions/product";
 import { getUser } from "@/actions/auth";
 import { useRouter } from "next/navigation";
@@ -27,7 +27,7 @@ interface PurchaseItem {
 
 export function AddPurchaseButton({ products: initialProducts, onSuccess }: AddPurchaseButtonProps) {
   const router = useRouter();
-  const { branchId, branch, branches, ready } = useBranch();
+  const { branches } = useBranch();
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<PurchaseItem[]>([
@@ -87,7 +87,7 @@ export function AddPurchaseButton({ products: initialProducts, onSuccess }: AddP
         title: "Error",
         text: "Por favor agregá al menos un producto",
         icon: "error",
-        confirmButtonColor: "#ff385c",
+        confirmButtonColor: "#dc2626",
       });
       return;
     }
@@ -113,7 +113,7 @@ export function AddPurchaseButton({ products: initialProducts, onSuccess }: AddP
         title: "Compra registrada",
         text: `${totalItems} unidades agregadas al inventario`,
         icon: "success",
-        confirmButtonColor: "#ff385c",
+        confirmButtonColor: "#6d28d9",
         confirmButtonText: "Aceptar",
         background: "#ffffff",
         color: "#222222",
@@ -127,7 +127,7 @@ export function AddPurchaseButton({ products: initialProducts, onSuccess }: AddP
         title: "Error",
         text: result.error || "Error al registrar la compra",
         icon: "error",
-        confirmButtonColor: "#ff385c",
+        confirmButtonColor: "#dc2626",
         background: "#ffffff",
         color: "#222222",
       });
@@ -156,7 +156,7 @@ export function AddPurchaseButton({ products: initialProducts, onSuccess }: AddP
     <>
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-24 right-6 w-14 h-14 bg-[#ff385c] text-white rounded-full shadow-lg hover:bg-[#e00b41] transition-colors flex items-center justify-center z-40"
+        className="btn-fab fixed bottom-24 right-6 z-40"
         aria-label="Registrar compra"
       >
         <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -166,11 +166,11 @@ export function AddPurchaseButton({ products: initialProducts, onSuccess }: AddP
 
 {isOpen && (
           <div 
-            className={`fixed inset-0 ${showProductModal ? 'bg-black/20 backdrop-blur-md' : 'bg-black/30 backdrop-blur-md'} z-[60] flex items-end justify-center`}
+            className={`fixed inset-0 ${showProductModal ? 'bg-black/20 backdrop-blur-md' : 'bg-black/30 backdrop-blur-md'} z-[60] flex items-end justify-center md:items-center`}
             onClick={() => setIsOpen(false)}
           >
           <div 
-            className="bg-white w-full max-w-lg rounded-t-3xl p-6 animate-slide-up max-h-[90vh] overflow-y-auto"
+            className="bg-white w-full max-w-lg md:max-w-4xl rounded-t-3xl md:rounded-2xl p-6 animate-slide-up md:animate-scale-in max-h-[90vh] md:max-h-[85vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex justify-between items-center mb-6">
@@ -178,7 +178,7 @@ export function AddPurchaseButton({ products: initialProducts, onSuccess }: AddP
               <button
                 type="button"
                 onClick={() => setIsOpen(false)}
-                className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full hover:bg-[#f2f2f2] transition-colors touch-manipulation"
+                className="btn btn-icon btn-round hover:bg-[#f2f2f2]"
                 aria-label="Cerrar"
               >
                 <svg className="w-6 h-6 text-[#6a6a6a]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -193,147 +193,166 @@ export function AddPurchaseButton({ products: initialProducts, onSuccess }: AddP
                 <p className="text-sm text-[#6a6a6a]">Primero creá un producto en la sección Inventario</p>
               </div>
             ) : (
-              <form onSubmit={handleSubmit} className="space-y-4">
-                {/* Items */}
-                {items.map((item, index) => (
-                  <div key={item.id} className="p-4 bg-[#f9f9f9] rounded-xl space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium text-[#222222]">Producto {index + 1}</span>
-                      {items.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            Swal.fire({
-                              title: '¿Eliminar item?',
-                              text: 'Esta acción no se puede deshacer',
-                              icon: 'warning',
-                              showCancelButton: true,
-                              confirmButtonColor: '#ff385c',
-                              cancelButtonColor: '#6a6a6a',
-                              confirmButtonText: 'Sí, eliminar',
-                              cancelButtonText: 'Cancelar',
-                              background: '#ffffff',
-                              color: '#222222',
-                            }).then((result) => {
-                              if (result.isConfirmed) {
-                                removeItem(item.id);
-                              }
-                            });
-                          }}
-                          className="min-w-[44px] min-h-[44px] px-4 py-2 text-red-500 text-sm font-medium rounded-lg hover:bg-red-50 active:bg-red-100 transition-colors touch-manipulation"
-                          aria-label={`Eliminar producto ${index + 1}`}
-                        >
-                          Eliminar
-                        </button>
-                      )}
-                    </div>
+              <form
+                onSubmit={handleSubmit}
+                className="space-y-4 md:grid md:grid-cols-2 md:gap-5 md:items-start"
+              >
+                {/* Desde `md` el cuerpo va en dos columnas: a la izquierda lo que se
+                    compra, a la derecha el total con la acción. En celular se apila
+                    en el mismo orden de siempre. */}
+                {/* Columna izquierda: buscador de productos y lista de ítems. */}
+                <div className="space-y-4">
+                  {/* Items */}
+                  {items.map((item, index) => (
+                    <div
+                      key={item.id}
+                      className="rounded-2xl border border-black/10 bg-[#f7f7f7] p-4 space-y-3"
+                    >
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs font-medium uppercase tracking-wide text-[#6a6a6a]">
+                          Producto {index + 1}
+                        </span>
+                        {items.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              Swal.fire({
+                                title: '¿Eliminar item?',
+                                text: 'Esta acción no se puede deshacer',
+                                icon: 'warning',
+                                showCancelButton: true,
+                                confirmButtonColor: "#6d28d9",
+                                cancelButtonColor: '#6a6a6a',
+                                confirmButtonText: 'Sí, eliminar',
+                                cancelButtonText: 'Cancelar',
+                                background: '#ffffff',
+                                color: '#222222',
+                              }).then((result) => {
+                                if (result.isConfirmed) {
+                                  removeItem(item.id);
+                                }
+                              });
+                            }}
+                            className="btn btn-danger"
+                            aria-label={`Eliminar producto ${index + 1}`}
+                          >
+                            Eliminar
+                          </button>
+                        )}
+                      </div>
                     
-                    <ProductAutocomplete
-                      products={products}
-                      value={item.productId}
-                      onChange={(productId) => updateItem(item.id, "productId", productId)}
-                      renderCreateButton={true}
-                      onCreateClick={() => {
-                        setEditingItemId(item.id);
-                        setShowProductModal(true);
-                      }}
-                    />
+                      <ProductAutocomplete
+                        products={products}
+                        value={item.productId}
+                        onChange={(productId) => updateItem(item.id, "productId", productId)}
+                        renderCreateButton={true}
+                        onCreateClick={() => {
+                          setEditingItemId(item.id);
+                          setShowProductModal(true);
+                        }}
+                      />
 
-                    <div>
-                      <label htmlFor={`branch-${item.id}`} className="block text-xs text-[#6a6a6a] mb-2">
-                        Sucursal
-                      </label>
-                      <select
-                        id={`branch-${item.id}`}
-                        value={item.branchId}
-                        onChange={(e) => updateItem(item.id, "branchId", e.target.value)}
-                        className="w-full px-3 py-3 min-h-[48px] rounded-lg border border-gray-200 focus:border-[#ff385c] outline-none transition-all text-sm touch-manipulation"
-                        required
-                      >
-                        <option value="">Seleccionar sucursal</option>
-                        {branches.map((b) => (
-                          <option key={b.id} value={b.id}>
-                            {b.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label htmlFor={`price-${item.id}`} className="block text-xs text-[#6a6a6a] mb-2">
-                          Precio
+                        <label htmlFor={`branch-${item.id}`} className="block text-xs text-[#6a6a6a] mb-2">
+                          Sucursal
                         </label>
-                        <div className="relative">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6a6a6a] text-sm">$</span>
+                        <select
+                          id={`branch-${item.id}`}
+                          value={item.branchId}
+                          onChange={(e) => updateItem(item.id, "branchId", e.target.value)}
+                          className="w-full px-3 py-3 min-h-[48px] rounded-lg border border-gray-200 focus:border-[#ec4899] outline-none transition-all text-sm touch-manipulation"
+                          required
+                        >
+                          <option value="">Seleccionar sucursal</option>
+                          {branches.map((b) => (
+                            <option key={b.id} value={b.id}>
+                              {b.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label htmlFor={`price-${item.id}`} className="block text-xs text-[#6a6a6a] mb-2">
+                            Precio
+                          </label>
+                          <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6a6a6a] text-sm">$</span>
+                            <input
+                              id={`price-${item.id}`}
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={item.price}
+                              onChange={(e) => updateItem(item.id, "price", e.target.value)}
+                              className="w-full pl-7 pr-3 py-3 min-h-[48px] rounded-lg border border-gray-200 focus:border-[#ec4899] outline-none transition-all text-sm touch-manipulation tabular-nums text-right"
+                              placeholder="0.00"
+                              required
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label htmlFor={`quantity-${item.id}`} className="block text-xs text-[#6a6a6a] mb-2">
+                            Cantidad
+                          </label>
                           <input
-                            id={`price-${item.id}`}
+                            id={`quantity-${item.id}`}
                             type="number"
-                            step="0.01"
-                            min="0"
-                            value={item.price}
-                            onChange={(e) => updateItem(item.id, "price", e.target.value)}
-                            className="w-full pl-7 pr-3 py-3 min-h-[48px] rounded-lg border border-gray-200 focus:border-[#ff385c] outline-none transition-all text-sm touch-manipulation"
-                            placeholder="0.00"
+                            min="1"
+                            value={item.quantity}
+                            onChange={(e) => updateItem(item.id, "quantity", e.target.value)}
+                            className="w-full px-3 py-3 min-h-[48px] rounded-lg border border-gray-200 focus:border-[#ec4899] outline-none transition-all text-sm touch-manipulation tabular-nums text-right"
+                            placeholder="0"
                             required
                           />
                         </div>
                       </div>
-                      <div>
-                        <label htmlFor={`quantity-${item.id}`} className="block text-xs text-[#6a6a6a] mb-2">
-                          Cantidad
-                        </label>
-                        <input
-                          id={`quantity-${item.id}`}
-                          type="number"
-                          min="1"
-                          value={item.quantity}
-                          onChange={(e) => updateItem(item.id, "quantity", e.target.value)}
-                          className="w-full px-3 py-3 min-h-[48px] rounded-lg border border-gray-200 focus:border-[#ff385c] outline-none transition-all text-sm touch-manipulation"
-                          placeholder="0"
-                          required
-                        />
+
+                      <div className="flex justify-between items-center pt-2 border-t border-gray-200">
+                        <span className="text-sm text-[#6a6a6a]">Subtotal</span>
+                        <span className="font-medium text-[#222222] tabular-nums">
+                          ${calculateSubtotal(item.price, item.quantity).toFixed(2)}
+                        </span>
                       </div>
                     </div>
+                  ))}
 
-                    <div className="flex justify-between items-center pt-2 border-t border-gray-200">
-                      <span className="text-sm text-[#6a6a6a]">Subtotal</span>
-                      <span className="font-medium text-[#222222]">
-                        ${calculateSubtotal(item.price, item.quantity).toFixed(2)}
+                  {/* Add Another Product Button */}
+                  <button
+                    type="button"
+                    onClick={addItem}
+                    className="btn btn-secondary w-full md:w-auto"
+                  >
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    Agregar otro producto
+                  </button>
+                </div>
+
+                {/* Columna derecha: el total y la acción. En celular queda debajo de los
+                    ítems, en el orden de siempre. El total conserva su fondo oscuro:
+                    el gris de las tarjetas no se leería con texto blanco. */}
+                <div className="mt-4 space-y-4 md:mt-0 md:sticky md:top-4">
+                  {/* Total */}
+                  <div className="p-4 bg-[#222222] rounded-xl">
+                    <div className="flex justify-between items-center">
+                      <span className="text-white font-medium">Total</span>
+                      <span className="text-white text-xl font-bold tabular-nums">
+                        ${calculateTotal().toFixed(2)}
                       </span>
                     </div>
                   </div>
-                ))}
 
-                {/* Add Another Product Button */}
-                <button
-                  type="button"
-                  onClick={addItem}
-                  className="w-full py-3 border-2 border-dashed border-gray-300 text-[#6a6a6a] rounded-xl hover:border-[#ff385c] hover:text-[#ff385c] transition-colors flex items-center justify-center gap-2"
-                >
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                  </svg>
-                  Agregar otro producto
-                </button>
-
-                {/* Total */}
-                <div className="p-4 bg-[#222222] rounded-xl">
-                  <div className="flex justify-between items-center">
-                    <span className="text-white font-medium">Total</span>
-                    <span className="text-white text-xl font-bold">
-                      ${calculateTotal().toFixed(2)}
-                    </span>
-                  </div>
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="btn btn-primary w-full"
+                  >
+                    {loading ? "Registrando..." : "Registrar Compra"}
+                  </button>
                 </div>
-
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full py-4 bg-[#ff385c] text-white font-medium rounded-xl hover:bg-[#e00b41] transition-colors disabled:opacity-50"
-                >
-                  {loading ? "Registrando..." : "Registrar Compra"}
-                </button>
               </form>
             )}
           </div>
@@ -343,14 +362,14 @@ export function AddPurchaseButton({ products: initialProducts, onSuccess }: AddP
       {/* Product Creation Modal */}
       {showProductModal && (
         <div 
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70] flex items-end justify-center"
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70] flex items-end justify-center md:items-center"
           onClick={() => {
             setShowProductModal(false);
             setEditingItemId(null);
           }}
         >
           <div 
-            className="bg-white w-full max-w-lg rounded-t-3xl p-6 animate-slide-up max-h-[90vh] overflow-y-auto"
+            className="bg-white w-full max-w-lg rounded-t-3xl md:rounded-2xl p-6 animate-slide-up md:animate-scale-in max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex justify-between items-center mb-6">
@@ -363,7 +382,7 @@ export function AddPurchaseButton({ products: initialProducts, onSuccess }: AddP
                   setShowProductModal(false);
                   setEditingItemId(null);
                 }}
-                className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full hover:bg-[#f2f2f2] transition-colors touch-manipulation"
+                className="btn btn-icon btn-round hover:bg-[#f2f2f2]"
                 aria-label="Cerrar"
               >
                 <svg className="w-6 h-6 text-[#6a6a6a]" fill="none" viewBox="0 0 24 24" stroke="currentColor">

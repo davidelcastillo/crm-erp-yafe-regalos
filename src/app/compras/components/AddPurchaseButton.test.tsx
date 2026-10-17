@@ -50,7 +50,6 @@ import { registerPurchase, createPurchaseWithBranchSplit } from "../../actions/p
 import { getProducts, createProduct, updateProduct } from "../../actions/product";
 import { getUser } from "@/actions/auth";
 import { useRouter } from "next/navigation";
-import { ProductForm } from "@/app/productos/components/ProductForm";
 import Swal from "sweetalert2";
 
 const mockRegisterPurchase = registerPurchase as jest.MockedFunction<typeof registerPurchase>;
@@ -201,7 +200,7 @@ it("closes purchase modal when clicking outside", async () => {
         title: '¿Eliminar item?',
         icon: 'warning',
         showCancelButton: true,
-        confirmButtonColor: '#ff385c',
+        confirmButtonColor: "#6d28d9",
         cancelButtonColor: '#6a6a6a',
         confirmButtonText: 'Sí, eliminar',
         cancelButtonText: 'Cancelar',
@@ -248,7 +247,7 @@ it("closes purchase modal when clicking outside", async () => {
         title: '¿Eliminar item?',
         icon: 'warning',
         showCancelButton: true,
-        confirmButtonColor: '#ff385c',
+        confirmButtonColor: "#6d28d9",
         cancelButtonColor: '#6a6a6a',
         confirmButtonText: 'Sí, eliminar',
         cancelButtonText: 'Cancelar',
@@ -333,7 +332,7 @@ it("closes purchase modal when clicking outside", async () => {
           title: 'Error',
           text: 'Por favor agregá al menos un producto',
           icon: 'error',
-          confirmButtonColor: '#ff385c',
+          confirmButtonColor: '#dc2626',
         })
       );
     });
@@ -386,7 +385,7 @@ it("closes purchase modal when clicking outside", async () => {
           title: 'Compra registrada',
           text: expect.stringMatching(/2 unidades agregadas al inventario/),
           icon: 'success',
-          confirmButtonColor: '#ff385c',
+          confirmButtonColor: "#6d28d9",
           confirmButtonText: 'Aceptar',
           background: '#ffffff',
           color: '#222222',
@@ -564,13 +563,13 @@ it("closes product creation modal when clicking outside", () => {
     // Wait for option and click it - FIXED: look for the button with product info using a function matcher
     await waitFor(() => {
       expect(
-        screen.getByRole("button", { name: (content, element) => 
+        screen.getByRole("button", { name: (content) => 
           /producto 1/i.test(content)
         })
       ).toBeInTheDocument();
     });
     const producto1Option = screen.getByRole("button", { 
-      name: (content, element) => 
+      name: (content) => 
         /producto 1/i.test(content)
     });
     fireEvent.click(producto1Option);
@@ -674,37 +673,67 @@ it("closes product creation modal when clicking outside", () => {
     });
   });
 
-  it("has adequate touch targets for mobile", () => {
+  it("mantiene objetivos táctiles adecuados en celular", () => {
     render(<AddPurchaseButton products={mockProducts} />);
     
     // Open purchase modal
     const openButton = screen.getByLabelText(/registrar compra/i);
     fireEvent.click(openButton);
     
-    // Check FAB (Floating Action Button) - should be at least 44x48
+    // El FAB mide 56px por `.btn-fab`, que es el que define su tamaño: el
+    // componente ya no repite `w-14 h-14`.
     const fab = screen.getByLabelText(/registrar compra/i);
-    expect(fab).toHaveClass("w-14"); // 56px width
-    expect(fab).toHaveClass("h-14"); // 56px height
+    expect(fab).toHaveClass("btn-fab");
     
     // Open product modal to check its controls
     const createButton = screen.getByRole("button", { name: /crear nuevo producto/i });
     fireEvent.click(createButton);
     
-    // Check product modal close button - should be at least 44x48
+    // El ✕ del modal de producto es el ícono redondo del sistema: los 44 px de
+    // alto y de ancho los pone el base, no el componente.
     const closeButtons = screen.getAllByRole("button", { name: /cerrar/i });
     if (closeButtons.length >= 2) {
-      const productCloseButton = closeButtons[1]; // Second close button
-      expect(productCloseButton).toHaveClass("w-11"); // 44px width (11 * 4 = 44)
-      expect(productCloseButton).toHaveClass("h-11"); // 44px height (11 * 4 = 44)
-      // Also has min-w-[44px] and min-h-[44px] from our implementation
+      const productCloseButton = closeButtons[1]; // Segundo ✕ (el del modal de producto)
+      expect(productCloseButton).toHaveClass("btn", "btn-icon", "btn-round");
+      expect(productCloseButton).not.toHaveClass("min-h-[44px]");
+      expect(productCloseButton).not.toHaveClass("min-w-[44px]");
     }
-    
+
     // Check input fields have adequate touch targets
     const priceInput = screen.getAllByLabelText(/precio/i)[0];
     expect(priceInput).toHaveClass("min-h-[48px]");
     
     const qtyInput = screen.getAllByLabelText(/cantidad/i)[0];
     expect(qtyInput).toHaveClass("min-h-[48px]");
+  });
+
+  // Sistema de botones (`globals.css`): el modal de compra tiene una sola acción
+  // principal, el ✕ es el ícono cuadrado, la fila elimina con la destructiva y
+  // «Agregar otro producto» es la alternativa neutra.
+  it("usa las variantes del sistema en el modal de compra", () => {
+    render(<AddPurchaseButton products={mockProducts} />);
+    fireEvent.click(screen.getByLabelText(/registrar compra/i));
+
+    const registrar = screen.getByText("Registrar Compra").closest("button");
+    expect(registrar).toHaveClass("btn", "btn-primary");
+
+    expect(screen.getByRole("button", { name: "Cerrar" })).toHaveClass(
+      "btn",
+      "btn-icon",
+      "btn-round"
+    );
+
+    expect(screen.getByRole("button", { name: /agregar otro producto/i })).toHaveClass(
+      "btn",
+      "btn-secondary"
+    );
+
+    // «Eliminar» aparece en la fila recién cuando hay más de una.
+    fireEvent.click(screen.getByRole("button", { name: /agregar otro producto/i }));
+    expect(screen.getAllByRole("button", { name: /eliminar/i })[0]).toHaveClass(
+      "btn",
+      "btn-danger"
+    );
   });
 });
 

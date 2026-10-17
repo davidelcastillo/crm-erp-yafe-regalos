@@ -261,7 +261,9 @@ describe("InventarioPage — FAB crear producto (spec inventory-ui)", () => {
       ],
     } as never);
 
-    fireEvent.click(screen.getByLabelText("Nueva categoría"));
+    // «Nueva categoría» vive en el menú ☰ del encabezado (L27).
+    fireEvent.click(screen.getByLabelText("Abrir menú"));
+    fireEvent.click(screen.getByRole("button", { name: "Nueva categoría" }));
 
     await waitFor(() => {
       expect(mockCreateCategory).toHaveBeenCalledWith({ name: "Alimentos" });
@@ -277,7 +279,7 @@ describe("InventarioPage — FAB crear producto (spec inventory-ui)", () => {
           title: "Categoría creada",
           text: 'Se creó "Alimentos"',
           icon: "success",
-          confirmButtonColor: "#ff385c",
+          confirmButtonColor: "#6d28d9",
         })
       );
     });
@@ -292,7 +294,9 @@ describe("InventarioPage — FAB crear producto (spec inventory-ui)", () => {
       error: "Ya existe una categoría con ese nombre",
     } as never);
 
-    fireEvent.click(screen.getByLabelText("Nueva categoría"));
+    // «Nueva categoría» vive en el menú ☰ del encabezado (L27).
+    fireEvent.click(screen.getByLabelText("Abrir menú"));
+    fireEvent.click(screen.getByRole("button", { name: "Nueva categoría" }));
 
     await waitFor(() => {
       expect(mockSwalFire).toHaveBeenCalledWith(

@@ -66,7 +66,7 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
           "El producto dejará de aparecer en los selectores de compras, ventas y movimientos, pero conservará su stock e historial.",
         icon: "warning",
         showCancelButton: true,
-        confirmButtonColor: "#ff385c",
+        confirmButtonColor: "#6d28d9",
         cancelButtonColor: "#6a6a6a",
         confirmButtonText: "Sí, desactivar",
         cancelButtonText: "Cancelar",
@@ -113,7 +113,7 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
           ? "El producto se ha actualizado correctamente"
           : "El producto se ha creado correctamente",
         icon: "success",
-        confirmButtonColor: "#ff385c",
+        confirmButtonColor: "#6d28d9",
         confirmButtonText: "Aceptar",
         background: "#ffffff",
         color: "#222222",
@@ -134,7 +134,7 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
         title: "Error",
         text: result.error || "Error al guardar el producto",
         icon: "error",
-        confirmButtonColor: "#ff385c",
+        confirmButtonColor: "#dc2626",
         confirmButtonText: "Aceptar",
         background: "#ffffff",
         color: "#222222",
@@ -144,7 +144,7 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
   };
 
   const inputClass =
-    "w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-[#ff385c] focus:ring-2 focus:ring-[#ff385c]/20 outline-none transition-all";
+    "w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-[#ec4899] focus:ring-2 focus:ring-[#ec4899]/30 outline-none transition-all";
   const labelClass = "block text-sm font-medium text-[#222222] mb-2";
 
   return (
@@ -302,7 +302,7 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
                 aria-label="Activo"
                 onClick={() => handleActiveToggle(!isActive)}
                 className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors touch-manipulation min-w-[44px] min-h-[44px] ${
-                  isActive ? "bg-[#ff385c]" : "bg-[#dddddd]"
+                  isActive ? "bg-[#ec4899]" : "bg-[#dddddd]"
                 }`}
               >
                 <span

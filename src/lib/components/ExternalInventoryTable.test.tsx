@@ -16,46 +16,75 @@ const items: InventoryItem[] = [
 ];
 
 describe("ExternalInventoryTable", () => {
-  it("renders the empty state when there are no products", () => {
+  it("muestra el estado vacío cuando no hay productos", () => {
     render(<ExternalInventoryTable inventoryData={[]} />);
     expect(screen.getByText(/no hay productos/i)).toBeInTheDocument();
   });
 
-  it("uses a mobile 2-column card layout and mirrors the 4-column grid on sm+", () => {
+  it("muestra el nombre, el stock y el precio del item", () => {
     const { container } = render(
       <ExternalInventoryTable inventoryData={items} />
     );
-    const gridCells =
-      'grid-cols-2 sm:grid-cols-[60px_1fr_80px_100px]';
-    expect(container.innerHTML).toContain(gridCells);
+    // El mismo dato sale dos veces: en la card de mobile y en la tabla de escritorio.
+    expect(
+      screen.getAllByText("Producto Largo Que No Debe Truncarse")
+    ).toHaveLength(2);
+    expect(screen.getAllByText("PR001")).toHaveLength(2);
+    expect(screen.getAllByText("$1234.50")).toHaveLength(2);
+    // El stock se lee en la card con su unidad y en la celda de la tabla.
+    expect(screen.getByText("3 uds")).toBeInTheDocument();
+    expect(container.querySelector("tbody td:nth-child(3)")?.textContent).toBe(
+      "3"
+    );
   });
 
-  it("stacks code + name on mobile and shows them in the sm+ grid", () => {
+  it("renderiza la tabla de escritorio y las cards de mobile", () => {
     const { container } = render(
       <ExternalInventoryTable inventoryData={items} />
     );
-    // The product name renders twice: once in the mobile stack, once in the
-    // sm+ grid column.
-    expect(screen.getAllByText(/Producto Largo/)).toHaveLength(2);
-    expect(screen.getAllByText("PR001").length).toBeGreaterThanOrEqual(2);
-    expect(container.innerHTML).toContain(
-      'class="sm:hidden flex flex-col min-w-0"'
-    );
+
+    // La tabla existe y su contenedor solo se ve desde md (con scroll propio).
+    const tabla = container.querySelector("table");
+    expect(tabla).toBeInTheDocument();
+    expect(tabla?.parentElement?.className).toContain("hidden md:block");
+    expect(tabla?.parentElement?.className).toContain("overflow-x-auto");
+
+    // Hay una card de vidrio por item, oculta desde md.
+    const cards = container.querySelectorAll("div.md\\:hidden > div.rounded-2xl");
+    expect(cards).toHaveLength(items.length);
+    expect(cards[0].className).toContain("glass");
   });
 
-  it("does not truncate the product name (break-words instead of truncate)", () => {
+  it("muestra todos los items y ninguna acción de cuenta (vista pública de solo lectura)", () => {
     const { container } = render(
-      <ExternalInventoryTable inventoryData={items} />
+      <ExternalInventoryTable
+        inventoryData={[
+          ...items,
+          { code: "PR002", name: "Otro producto", stock: 0, price: 10 },
+        ]}
+      />
     );
-    expect(container.innerHTML).not.toContain("max-w-[200px]");
-    expect(container.innerHTML).not.toContain('class="truncate ');
-    expect(container.innerHTML).toContain("break-words");
+    expect(container.querySelectorAll("tbody tr")).toHaveLength(2);
+    expect(
+      container.querySelectorAll("div.md\\:hidden > div.rounded-2xl")
+    ).toHaveLength(2);
+    // Sin botones ni enlaces: el catálogo no tiene acciones de cuenta.
+    expect(container.querySelectorAll("button")).toHaveLength(0);
+    expect(container.querySelectorAll("a")).toHaveLength(0);
   });
 
-  it("shows the mobile header with Producto and Stock / Precio cells", () => {
-    render(<ExternalInventoryTable inventoryData={items} />);
-    expect(screen.getByText("Stock / Precio")).toBeInTheDocument();
+  it("muestra los encabezados de la tabla y los oculta con showHeaders en false", () => {
+    const { unmount } = render(<ExternalInventoryTable inventoryData={items} />);
     expect(screen.getByText("Código")).toBeInTheDocument();
-    expect(screen.getAllByText("Producto").length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText("Producto")).toBeInTheDocument();
+    expect(screen.getByText("Stock")).toBeInTheDocument();
+    expect(screen.getByText("Precio")).toBeInTheDocument();
+    unmount();
+
+    render(
+      <ExternalInventoryTable inventoryData={items} showHeaders={false} />
+    );
+    expect(screen.queryByText("Código")).not.toBeInTheDocument();
+    expect(screen.queryByText("Stock")).not.toBeInTheDocument();
   });
 });

@@ -1,6 +1,6 @@
 # Gestión de sucursales
 
-Guía de las funcionalidades de sucursales de la v3: creación con usuario automático, edición, eliminación con guards, portal externo, dashboard por periodo/sucursal y búsquedas en ventas e inventario.
+Guía de sucursales: creación, edición, eliminación con guards, catálogo público opt-in, dashboard por periodo/sucursal y búsquedas en ventas e inventario. El aprovisionamiento heredado de usuarios de Auth no es un requisito para consultar el catálogo.
 
 ## Crear una sucursal
 
@@ -33,7 +33,7 @@ Si pasa los guards, se elimina primero el usuario de Auth asociado (vía `delete
 
 ## Portal externo de sucursal
 
-Cada usuario de sucursal puede consultar el inventario de su propia sucursal en `/sucursal/[branchId]/inventory` (solo lectura, solo `GET`). Detalles y troubleshooting en [portal-externo-sucursal.md](./portal-externo-sucursal.md).
+Cualquier visitante puede consultar `/sucursal/[branchId]/inventory` sin login si la sucursal existe, está activa y tiene `isPublic=true` (solo lectura, solo `GET`). La publicación se administra desde Sucursales; los usuarios `branch_user` heredados no controlan el acceso al catálogo. Detalles y troubleshooting en [portal-externo-sucursal.md](./portal-externo-sucursal.md).
 
 ## Dashboard por periodo y sucursal
 
@@ -45,8 +45,40 @@ El dashboard ahora es configurable:
 | Sucursal | **Todas** (agrega todas las sucursales) o una sucursal activa específica |
 
 - Al cambiar cualquiera de los dos, las métricas se recalculan.
+- **Un solo período para todo el tablero**: las tarjetas (`getStats`) y el gráfico de ingresos vs egresos (`getPerformanceData`) usan el mismo rango. El gráfico dibuja un punto por cada día calendario local del rango, incluidos los días sin movimientos, y acumula todas las ventas y compras de un mismo día.
 - Las tarjetas muestran una etiqueta de contexto: **"(Sucursal X)"** cuando se filtra por sucursal o **"(Todas)"** cuando se agregan todas.
-- La Server Action `getStats(type, startDate, endDate, branchId?)` rechaza rangos inválidos (fecha de inicio después de la de fin).
+- El título del gráfico nombra el rango elegido: **"Últimos N días"** o **"Del DD/MM/AAAA al DD/MM/AAAA"**.
+- Los rangos se arman con **días calendario locales** (00:00:00 del día inicial a 23:59:59.999 del final). `new Date("YYYY-MM-DD")` es medianoche UTC y dejaba el día elegido afuera en UTC-3; el mismo criterio se usa para rotular el eje del gráfico (helper `src/lib/dates.ts`).
+- La Server Action `getStats(type, startDate, endDate, branchId?)` rechaza rangos inválidos (fecha de inicio después de la de fin); `getPerformanceData({ days | startDate+endDate, branchId })` usa el mismo criterio: un rango de fechas manda sobre `days` y un rango incompleto o inválido devuelve error.
+
+## Historial de movimientos de un producto
+
+En `/inventario`, **Ver Movimientos** abre el historial del producto. La lista combina tres orígenes:
+
+| Origen | Filas | Referencia que muestra |
+|--------|-------|------------------------|
+| Compra | `PurchaseItem`, una por línea | `#<id>` de la compra |
+| Venta | `SaleItem`, una por línea | `#<id>` de la venta |
+| Libro de sucursal | `BranchMovement`: entradas, salidas, transferencias entre sucursales (`TRANSFER_IN` / `TRANSFER_OUT`) y ajustes de stock | `MOVE-<ms>`, `ADJUSTMENT`, … |
+
+- Cada fila muestra la **sucursal** donde se registró el movimiento.
+- Las entradas `ENTRY` que escribe la compra (`reference` `PURCHASE-<id>`) **no** se listan aparte: la compra ya es una fila, así que la misma operación no se duplica.
+- Las ventas todavía **no** escriben `BranchMovement`: su efecto en el stock queda en `BranchInventory` (`src/app/actions/sale.ts`), y el historial las muestra desde el `SaleItem`.
+
+### Entrada / salida de stock por lote
+
+En `/inventario`, **Entrada / Salida** abre el wizard hermano de **Mover Stock**. Las dos operaciones escriben en el mismo libro, con alcances distintos:
+
+| Operación | Alcance | Movimientos que escribe |
+|-----------|---------|-------------------------|
+| Mover Stock | entre **dos** sucursales (origen → destino) | `TRANSFER_OUT` en origen + `TRANSFER_IN` en destino |
+| Entrada / Salida | **una** sucursal | `ENTRY` o `EXIT`, uno por producto |
+
+- Tres pasos: sucursal y sentido → productos con su cantidad → motivo (opcional) y confirmación.
+- **Entrada** lista todos los productos activos, incluso los que no tienen fila de inventario en esa sucursal (el ajuste la crea). **Salida** lista solo los que tienen stock y no deja restar más que el disponible.
+- El motivo se guarda en `reference` del movimiento (si no se escribe, queda `ENTRADA` o `SALIDA`) y el actor es el email del usuario.
+- Todo el lote va en una transacción: si una línea falla, no se aplica ninguna.
+- Server Action: `adjustBranchStockBatch({ branchId, movementType, items, reference?, performedBy })` (`src/app/actions/inventory.ts`).
 
 ## Búsquedas
 
@@ -58,5 +90,8 @@ El dashboard ahora es configurable:
 - [ ] Crear sucursal muestra código normalizado en mayúsculas y credenciales de una sola vez.
 - [ ] Duplicar un código de sucursal se rechaza.
 - [ ] Eliminar la sucursal por defecto, con compras/ventas o con stock se bloquea con su guard correspondiente.
-- [ ] Un usuario de sucursal solo ve su propio inventario y no puede modificarlo.
+- [ ] El catálogo de una sucursal activa y publicada es accesible sin login; una no publicada, inactiva o inexistente no devuelve inventario.
 - [ ] El dashboard reacciona a cambios de periodo y sucursal y muestra la etiqueta correcta.
+- [ ] El historial de un producto muestra las transferencias y los ajustes con su sucursal, y no repite la compra como entrada.
+- [ ] El gráfico de ingresos vs egresos muestra el período elegido (7 / 30 / 90 días o el rango personalizado) y cada día con el total de sus movimientos.
+- [ ] Entrada / Salida ajusta el stock de la sucursal elegida (y de ninguna otra) y deja un movimiento por producto con su motivo y su actor.
