@@ -1,5 +1,12 @@
 // src/lib/utils/pdf.ts
-import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
+import {
+  PDFDocument,
+  rgb,
+  StandardFonts,
+  type PDFFont,
+  type PDFPage,
+} from 'pdf-lib';
+import { LOGO_PNG_BASE64 } from './pdf-logo';
 
 export interface ProductRow {
   code: string;
@@ -8,20 +15,55 @@ export interface ProductRow {
   price: number;
 }
 
+/** Presentation data the exported table does not carry. */
+export interface PdfMeta {
+  branchName: string;
+  branchCode: string;
+  date: Date;
+}
+
 // A4 page in points (210mm x 297mm)
 const PAGE_WIDTH = 595.28;
 const PAGE_HEIGHT = 841.89;
 const MARGIN = 36;
-const HEADER_ROW_HEIGHT = 24;
+const HEADER_BAND_HEIGHT = 56;
+const HEADER_GAP = 14;
+const TITLES_HEIGHT = 20;
+const TOTALS_HEIGHT = 22;
 const ROW_HEIGHT = 20;
+const LOGO_SIZE = 40;
 const COL_CODE = 84;
 const COL_STOCK = 56;
 const COL_PRICE = 84;
 const COL_NAME = PAGE_WIDTH - 2 * MARGIN - COL_CODE - COL_STOCK - COL_PRICE;
 
+// Rows that fit under the header band, the titles row and the reserved totals line.
 export const ROWS_PER_PAGE = Math.floor(
-  (PAGE_HEIGHT - 2 * MARGIN - HEADER_ROW_HEIGHT) / ROW_HEIGHT
+  (PAGE_HEIGHT -
+    2 * MARGIN -
+    HEADER_BAND_HEIGHT -
+    HEADER_GAP -
+    TITLES_HEIGHT -
+    TOTALS_HEIGHT) /
+    ROW_HEIGHT
 );
+
+// STYLE.md palette: ink on white, brand pink for the header accent and the totals.
+const INK = '#222222';
+const MUTED = '#6b7280';
+const FAINT = '#9ca3af';
+const HAIRLINE = '#d1d5db';
+const SURFACE_SOFT = '#f7f7f7';
+const ROW_ALTERNATE = '#fafafa';
+const BRAND = '#f472b6';
+const BRAND_TEXT = '#be185d';
+
+const color = (hex: string) =>
+  rgb(
+    parseInt(hex.slice(1, 3), 16) / 255,
+    parseInt(hex.slice(3, 5), 16) / 255,
+    parseInt(hex.slice(5, 7), 16) / 255
+  );
 
 /**
  * Builds the export file name following `inventario-<branchCode>-<YYYYMMDD>.pdf`.
@@ -43,63 +85,196 @@ export function formatPrice(price: number): string {
 }
 
 /**
- * Generates a multi-page PDF table (Código | Nombre | Stock | Precio) and
- * returns it base64-encoded, following the label-print convention.
+ * Formats the export date as DD/MM/YYYY.
  */
-export async function generateProductsPdf(rows: ProductRow[]): Promise<string> {
+export function formatDate(date: Date): string {
+  const dd = String(date.getDate()).padStart(2, '0');
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  return `${dd}/${mm}/${date.getFullYear()}`;
+}
+
+/** Cuts a text with a trailing ellipsis so it never overflows its column. */
+const clip = (text: string, font: PDFFont, size: number, maxWidth: number): string => {
+  if (font.widthOfTextAtSize(text, size) <= maxWidth) return text;
+  let visible = text;
+  while (visible.length > 0 && font.widthOfTextAtSize(`${visible}...`, size) > maxWidth) {
+    visible = visible.slice(0, -1);
+  }
+  return `${visible}...`;
+};
+
+/**
+ * Generates the branch inventory PDF (branded header with the store logo and the
+ * branch name, table with alternating rows and a totals line) and returns it
+ * base64-encoded, following the label-print convention.
+ */
+export async function generateProductsPdf(
+  rows: ProductRow[],
+  meta: PdfMeta
+): Promise<string> {
   const pdfDoc = await PDFDocument.create();
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-  const black = rgb(0, 0, 0);
-  const headerBackground = rgb(0.9, 0.9, 0.9);
+  const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  const logo = await pdfDoc.embedPng(LOGO_PNG_BASE64);
 
-  const drawHeaderRow = (page: {
-    drawRectangle: (opts: Record<string, unknown>) => void;
-    drawText: (text: string, opts: Record<string, unknown>) => void;
-  }) => {
-    const yTop = PAGE_HEIGHT - MARGIN;
-    const tableWidth = PAGE_WIDTH - 2 * MARGIN;
+  const tableWidth = PAGE_WIDTH - 2 * MARGIN;
+  const bandTop = PAGE_HEIGHT - MARGIN;
+  const rowsTop = bandTop - HEADER_BAND_HEIGHT - HEADER_GAP;
+  const totalPages = Math.max(1, Math.ceil(rows.length / ROWS_PER_PAGE));
+  const units = rows.reduce((sum, row) => sum + row.stock, 0);
+
+  const drawRight = (
+    page: PDFPage,
+    text: string,
+    xRight: number,
+    y: number,
+    size: number,
+    face: PDFFont,
+    fill: string
+  ) => {
+    page.drawText(text, {
+      x: xRight - face.widthOfTextAtSize(text, size),
+      y,
+      size,
+      font: face,
+      color: color(fill),
+    });
+  };
+
+  const drawHeaderBand = (page: PDFPage) => {
     page.drawRectangle({
       x: MARGIN,
-      y: yTop - HEADER_ROW_HEIGHT,
+      y: bandTop - HEADER_BAND_HEIGHT,
       width: tableWidth,
-      height: HEADER_ROW_HEIGHT,
-      color: headerBackground,
+      height: HEADER_BAND_HEIGHT,
+      color: color(SURFACE_SOFT),
     });
-    const headerY = yTop - HEADER_ROW_HEIGHT + 7;
-    const headerSize = 10;
-    page.drawText('Código', { x: MARGIN, y: headerY, size: headerSize, font, color: black });
-    page.drawText('Nombre', { x: MARGIN + COL_CODE, y: headerY, size: headerSize, font, color: black });
-    page.drawText('Stock', { x: MARGIN + COL_CODE + COL_NAME, y: headerY, size: headerSize, font, color: black });
-    page.drawText('Precio', { x: MARGIN + COL_CODE + COL_NAME + COL_STOCK, y: headerY, size: headerSize, font, color: black });
+    page.drawRectangle({
+      x: MARGIN,
+      y: bandTop - 4,
+      width: tableWidth,
+      height: 4,
+      color: color(BRAND),
+    });
+    page.drawImage(logo, {
+      x: MARGIN + 10,
+      y: bandTop - HEADER_BAND_HEIGHT + 8,
+      width: LOGO_SIZE,
+      height: LOGO_SIZE,
+    });
+    const textX = MARGIN + 10 + LOGO_SIZE + 12;
+    page.drawText(
+      clip(`${meta.branchName} (${meta.branchCode})`, bold, 14, PAGE_WIDTH - MARGIN - textX),
+      { x: textX, y: bandTop - 28, size: 14, font: bold, color: color(INK) }
+    );
+    page.drawText(`Inventario al ${formatDate(meta.date)}`, {
+      x: textX,
+      y: bandTop - 43,
+      size: 9,
+      font,
+      color: color(MUTED),
+    });
   };
 
-  const drawRow = (
-    page: { drawText: (text: string, opts: Record<string, unknown>) => void },
-    row: ProductRow,
-    rowIndexOnPage: number
-  ) => {
-    const y = PAGE_HEIGHT - MARGIN - HEADER_ROW_HEIGHT - (rowIndexOnPage + 1) * ROW_HEIGHT;
-    const cellSize = 9;
-    page.drawText(row.code, { x: MARGIN, y, size: cellSize, font, color: black });
-    page.drawText(row.name, { x: MARGIN + COL_CODE, y, size: cellSize, font, color: black });
-    page.drawText(String(row.stock), { x: MARGIN + COL_CODE + COL_NAME, y, size: cellSize, font, color: black });
-    page.drawText(formatPrice(row.price), { x: MARGIN + COL_CODE + COL_NAME + COL_STOCK, y, size: cellSize, font, color: black });
+  const drawTitles = (page: PDFPage) => {
+    page.drawRectangle({
+      x: MARGIN,
+      y: rowsTop - TITLES_HEIGHT,
+      width: tableWidth,
+      height: TITLES_HEIGHT,
+      color: color(SURFACE_SOFT),
+    });
+    page.drawRectangle({
+      x: MARGIN,
+      y: rowsTop - TITLES_HEIGHT,
+      width: tableWidth,
+      height: 0.8,
+      color: color(HAIRLINE),
+    });
+    const y = rowsTop - 14;
+    page.drawText('Código', { x: MARGIN + 4, y, size: 9, font: bold, color: color(INK) });
+    page.drawText('Nombre', {
+      x: MARGIN + COL_CODE + 4,
+      y,
+      size: 9,
+      font: bold,
+      color: color(INK),
+    });
+    drawRight(page, 'Stock', MARGIN + COL_CODE + COL_NAME + COL_STOCK - 4, y, 9, bold, INK);
+    drawRight(page, 'Precio', PAGE_WIDTH - MARGIN - 4, y, 9, bold, INK);
   };
 
-  let index = 0;
-  while (index < rows.length) {
-    const page = pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
-    drawHeaderRow(page);
-    let rowIndexOnPage = 0;
-    while (index < rows.length && rowIndexOnPage < ROWS_PER_PAGE) {
-      drawRow(page, rows[index], rowIndexOnPage);
-      index += 1;
-      rowIndexOnPage += 1;
+  const drawRow = (page: PDFPage, row: ProductRow, indexOnPage: number) => {
+    const top = rowsTop - TITLES_HEIGHT - (indexOnPage + 1) * ROW_HEIGHT;
+    if (indexOnPage % 2 === 1) {
+      page.drawRectangle({
+        x: MARGIN,
+        y: top,
+        width: tableWidth,
+        height: ROW_HEIGHT,
+        color: color(ROW_ALTERNATE),
+      });
     }
-  }
+    const y = top + 6;
+    page.drawText(row.code, { x: MARGIN + 4, y, size: 9, font, color: color(INK) });
+    page.drawText(clip(row.name, font, 9, COL_NAME - 8), {
+      x: MARGIN + COL_CODE + 4,
+      y,
+      size: 9,
+      font,
+      color: color(INK),
+    });
+    drawRight(
+      page,
+      String(row.stock),
+      MARGIN + COL_CODE + COL_NAME + COL_STOCK - 4,
+      y,
+      9,
+      font,
+      INK
+    );
+    drawRight(page, formatPrice(row.price), PAGE_WIDTH - MARGIN - 4, y, 9, font, INK);
+  };
 
-  if (rows.length === 0) {
-    drawHeaderRow(pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]));
+  const drawTotals = (page: PDFPage) => {
+    page.drawRectangle({
+      x: MARGIN,
+      y: MARGIN + 24,
+      width: tableWidth,
+      height: 0.8,
+      color: color(HAIRLINE),
+    });
+    drawRight(
+      page,
+      `${rows.length} productos · ${units} unidades`,
+      PAGE_WIDTH - MARGIN,
+      MARGIN + 10,
+      10,
+      bold,
+      BRAND_TEXT
+    );
+  };
+
+  const drawFooter = (page: PDFPage, pageNumber: number) => {
+    const label = `Página ${pageNumber} de ${totalPages}`;
+    page.drawText(label, {
+      x: (PAGE_WIDTH - font.widthOfTextAtSize(label, 8)) / 2,
+      y: 20,
+      size: 8,
+      font,
+      color: color(FAINT),
+    });
+  };
+
+  for (let pageNumber = 1; pageNumber <= totalPages; pageNumber += 1) {
+    const page = pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
+    drawHeaderBand(page);
+    drawTitles(page);
+    rows
+      .slice((pageNumber - 1) * ROWS_PER_PAGE, pageNumber * ROWS_PER_PAGE)
+      .forEach((row, index) => drawRow(page, row, index));
+    if (pageNumber === totalPages) drawTotals(page);
+    drawFooter(page, pageNumber);
   }
 
   const pdfBytes = await pdfDoc.save();
