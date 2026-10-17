@@ -54,7 +54,7 @@ export default function LoginForm() {
 
   return (
     <div className="flex-1 w-full max-w-md mx-auto px-6 pt-8 pb-6 flex flex-col z-10 relative">
-        <h2 className="text-3xl font-bold text-[#222222] text-center mb-8">Bienvenida!</h2>
+        <h2 className="text-3xl font-bold text-[#222222] text-center mb-8">Bienvenida Estefi!</h2>
         <form className="space-y-6" onSubmit={handleSubmit}>
           <div className="flex flex-col gap-4 mb-6">
             {/* Input Username (Translúcido) */}
