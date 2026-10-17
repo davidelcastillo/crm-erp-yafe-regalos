@@ -2,6 +2,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
+import type { StockMovementReceipt } from "@/lib/stock-movement-receipt";
 import { parseArray, parseObject } from "@/lib/parse-prisma";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -499,11 +500,11 @@ export async function moveStockBatchBetweenBranches(data: unknown) {
       const [sourceBranch, destBranch] = await Promise.all([
         tx.branch.findFirst({
           where: { id: sourceBranchId, isActive: true },
-          select: { id: true },
+          select: { id: true, name: true, code: true },
         }),
         tx.branch.findFirst({
           where: { id: destBranchId, isActive: true },
-          select: { id: true },
+          select: { id: true, name: true, code: true },
         }),
       ]);
       if (!sourceBranch) {
@@ -517,7 +518,7 @@ export async function moveStockBatchBetweenBranches(data: unknown) {
       const productIds = items.map((i) => i.productId);
       const products = await tx.product.findMany({
         where: { id: { in: productIds }, active: true },
-        select: { id: true, name: true },
+        select: { id: true, name: true, code: true, price: true },
       });
       if (products.length !== items.length) {
         const found = new Set(products.map((p) => p.id));
@@ -619,6 +620,22 @@ export async function moveStockBatchBetweenBranches(data: unknown) {
         sourceBranchId,
         destBranchId,
         items: itemResults,
+        receipt: {
+          movementType: "TRANSFER",
+          date: new Date().toISOString(),
+          branchName: destBranch.name,
+          branchCode: destBranch.code,
+          sourceBranchName: sourceBranch.name,
+          sourceBranchCode: sourceBranch.code,
+          reference,
+          rows: itemResults.map((item) => {
+            const product = products.find((p) => p.id === item.productId)!;
+            return {
+              code: product.code, name: product.name, price: Number(product.price),
+              quantity: item.quantity, stock: item.newDestStock,
+            };
+          }),
+        } satisfies StockMovementReceipt,
       };
     });
 
@@ -663,7 +680,7 @@ export async function adjustBranchStockBatch(data: unknown) {
     const result = await prisma.$transaction(async (tx) => {
       const branch = await tx.branch.findFirst({
         where: { id: branchId, isActive: true },
-        select: { id: true },
+        select: { id: true, name: true, code: true },
       });
       if (!branch) {
         throw new Error("Sucursal inválida o inactiva");
@@ -722,7 +739,7 @@ export async function adjustBranchStockBatch(data: unknown) {
       // Stock resultante de todo el lote en una sola lectura (sin N+1).
       const stockFinal = await tx.branchInventory.findMany({
         where: { branchId, productId: { in: items.map((i) => i.productId) } },
-        select: { productId: true, stock: true },
+        select: { productId: true, stock: true, product: { select: { code: true, name: true, price: true } } },
       });
       const stockPorProducto = new Map(stockFinal.map((f) => [f.productId, f.stock]));
 
@@ -730,6 +747,20 @@ export async function adjustBranchStockBatch(data: unknown) {
         branchId,
         movementType,
         reference: motivo,
+        receipt: {
+          movementType,
+          date: new Date().toISOString(),
+          branchName: branch.name,
+          branchCode: branch.code,
+          reference: motivo,
+          rows: items.map((item) => {
+            const row = stockFinal.find((f) => f.productId === item.productId)!;
+            return {
+              code: row.product.code, name: row.product.name, price: Number(row.product.price),
+              quantity: item.quantity, stock: row.stock,
+            };
+          }),
+        } satisfies StockMovementReceipt,
         items: items.map((item) => ({
           productId: item.productId,
           quantity: item.quantity,

@@ -324,12 +324,12 @@ describe("moveStockBatchBetweenBranches (Fase 3) — atomic batch", () => {
 
   it("moves a valid batch with distinct quantities in a single transaction", async () => {
     // active branches (origen 1, destino 2)
-    mockBranchFindFirst.mockResolvedValueOnce({ id: 1 });
-    mockBranchFindFirst.mockResolvedValueOnce({ id: 2 });
+    mockBranchFindFirst.mockResolvedValueOnce({ id: 1, name: "Origen", code: "ORI" });
+    mockBranchFindFirst.mockResolvedValueOnce({ id: 2, name: "Destino", code: "DES" });
     // both products active
     mockProductFindMany.mockResolvedValue([
-      { id: 1, name: "Jabón" },
-      { id: 2, name: "Shampoo" },
+      { id: 1, name: "Jabón", code: "JAB", price: 150 },
+      { id: 2, name: "Shampoo", code: "SHA", price: 300 },
     ]);
     // origin stocks: A=10, B=15 ; dest stocks: A=0 (missing), B=3
     mockBranchInventoryFindUnique
@@ -350,6 +350,18 @@ describe("moveStockBatchBetweenBranches (Fase 3) — atomic batch", () => {
     });
 
     expect(result.success).toBe(true);
+    expect(result.data).toMatchObject({
+      receipt: {
+        movementType: "TRANSFER",
+        branchName: "Destino", branchCode: "DES",
+        sourceBranchName: "Origen", sourceBranchCode: "ORI",
+        date: expect.any(String), reference: expect.stringMatching(/^MOVE-/),
+        rows: [
+          { code: "JAB", name: "Jabón", quantity: 3, stock: 3, price: 150 },
+          { code: "SHA", name: "Shampoo", quantity: 7, stock: 10, price: 300 },
+        ],
+      },
+    });
     // 4 upserts (2 per item: origin + dest) and 4 branchMovement.create
     expect(mockBranchInventoryUpsert).toHaveBeenCalledTimes(4);
     expect(mockBranchMovementCreate).toHaveBeenCalledTimes(4);

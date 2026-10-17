@@ -110,6 +110,19 @@ describe('adjustBranchStockBatch (integración, base local)', () => {
     })
 
     expect(resultado.success).toBe(true)
+    expect(resultado.data).toMatchObject({
+      receipt: {
+        movementType: 'ENTRY',
+        branchName: `QA ajuste ${sufijo}`,
+        branchCode: `QA${sufijo}`,
+        reference,
+        date: expect.any(String),
+        rows: [
+          { code: `QD${sufijo}`, name: `QA ajuste ${sufijo}`, quantity: 4, stock: 9, price: 10 },
+          { code: `QE${sufijo}`, name: `QA ajuste nuevo ${sufijo}`, quantity: 7, stock: 7, price: 10 },
+        ],
+      },
+    })
     expect(await stock(branchId, productId)).toBe(9)
     expect(await stock(branchId, productoSinFilaId)).toBe(7)
     // La otra sucursal no se toca.
@@ -135,6 +148,12 @@ describe('adjustBranchStockBatch (integración, base local)', () => {
 
     expect(resultado.success).toBe(true)
     expect(await stock(branchId, productId)).toBe(6)
+    expect(resultado.data).toMatchObject({
+      receipt: {
+        movementType: 'EXIT', reference,
+        rows: [{ code: `QD${sufijo}`, quantity: 3, stock: 6, price: 10 }],
+      },
+    })
 
     const filas = await movimientos(reference)
     movementsIds.push(...filas.map((m) => m.id))
