@@ -1,5 +1,5 @@
 /** @jest-environment node */
-import { PDFDocument, PDFDict, PDFName, PDFRawStream } from 'pdf-lib';
+import { PDFDocument, PDFDict, PDFName, PDFRawStream, PDFArray } from 'pdf-lib';
 import { inflateSync } from 'node:zlib';
 import type { StockMovementReceipt } from '@/lib/stock-movement-receipt';
 import { generateStockMovementPdf } from './stock-movement-pdf';
@@ -15,7 +15,7 @@ async function readPdf(bytes: Uint8Array) {
   const text: string[] = [];
   for (const page of doc.getPages()) {
     const contents = page.node.Contents();
-    const streams = contents?.asArray() ?? [];
+    const streams = contents instanceof PDFArray ? contents.asArray() : contents ? [contents] : [];
     for (const ref of streams) {
       const stream = doc.context.lookup(ref) as PDFRawStream;
       const raw = inflateSync(stream.getContents()).toString('latin1');

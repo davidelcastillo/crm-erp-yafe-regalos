@@ -93,7 +93,7 @@ beforeEach(() => {
   mockMoveBatch.mockResolvedValue({
     success: true,
     data: {
-      receipt: { movementType: "TRANSFER", date: "2026-08-06T18:30:00.000Z", branchName: "Centro", branchCode: "CEN", reference: "MOVE-1", rows: [] },
+      receipt: { movementType: "TRANSFER", date: "2026-08-06T18:30:00.000Z", branchName: "Centro", branchCode: "CEN", sourceBranchName: "Principal", sourceBranchCode: "PRI", reference: "MOVE-1", rows: [] },
       reference: "MOVE-1",
       sourceBranchId: 1,
       destBranchId: 2,
