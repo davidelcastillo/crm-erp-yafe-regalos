@@ -10,7 +10,7 @@ interface ClientesListProps {
 
 export function ClientesList({ initialCustomers }: ClientesListProps) {
   const [searchTerm, setSearchTerm] = useState("");
-  const [customers, setCustomers] = useState<Customer[]>(initialCustomers);
+  const [customers] = useState<Customer[]>(initialCustomers);
 
   const filteredCustomers = useMemo(() => {
     if (!searchTerm.trim()) return customers;
