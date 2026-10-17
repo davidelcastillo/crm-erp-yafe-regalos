@@ -313,8 +313,8 @@ describe("exportBranchProductsPdf (Fase 4 branch PDF export)", () => {
     expect(generateProductsPdf).not.toHaveBeenCalled();
   });
 
-  it("returns base64 + filename and calls generateProductsPdf with the rows on a valid selection", async () => {
-    mockBranchFindUnique.mockResolvedValue({ code: "DEP" });
+  it("returns base64 + filename and calls generateProductsPdf with the rows and the branch meta on a valid selection", async () => {
+    mockBranchFindUnique.mockResolvedValue({ code: "DEP", name: "Depósito" });
     mockBranchInventoryFindMany.mockResolvedValue([
       {
         productId: 2,
@@ -341,7 +341,8 @@ describe("exportBranchProductsPdf (Fase 4 branch PDF export)", () => {
       expect.arrayContaining([
         expect.objectContaining({ code: "P1", name: "Producto A", stock: 5, price: 100 }),
         expect.objectContaining({ code: "P2", name: "Producto B", stock: 8, price: 250 }),
-      ])
+      ]),
+      expect.objectContaining({ branchName: "Depósito", branchCode: "DEP" })
     );
     expect(buildExportFileName).toHaveBeenCalledWith("DEP", expect.any(Date));
   });

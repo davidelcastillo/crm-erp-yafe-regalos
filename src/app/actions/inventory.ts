@@ -869,7 +869,7 @@ export async function exportBranchProductsPdf(data: unknown) {
 
     const branch = await prisma.branch.findUnique({
       where: { id: branchId },
-      select: { code: true },
+      select: { code: true, name: true },
     });
     if (!branch) {
       return { success: false, error: "Sucursal no encontrada" };
@@ -908,8 +908,13 @@ export async function exportBranchProductsPdf(data: unknown) {
         price: Number(inv.product.price),
       }));
 
-    const pdfBase64 = await generateProductsPdf(rows);
-    const filename = buildExportFileName(branch.code, new Date());
+    const exportedAt = new Date();
+    const pdfBase64 = await generateProductsPdf(rows, {
+      branchName: branch.name,
+      branchCode: branch.code,
+      date: exportedAt,
+    });
+    const filename = buildExportFileName(branch.code, exportedAt);
 
     return { success: true, data: { pdfBase64, filename } };
   } catch (error) {
