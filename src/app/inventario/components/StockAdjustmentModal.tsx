@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Swal from "sweetalert2";
+import type { StockMovementReceipt } from "@/lib/stock-movement-receipt";
+import { StockMovementReceiptPanel } from "./StockMovementReceiptPanel";
 import {
   adjustBranchStockBatch,
   getProductsWithBranchStock,
@@ -42,6 +43,7 @@ export const StockAdjustmentModal = ({
   onConfirm,
 }: StockAdjustmentModalProps) => {
   const [step, setStep] = useState<Step>(1);
+  const [receipt, setReceipt] = useState<StockMovementReceipt | null>(null);
   const [branchId, setBranchId] = useState<number | null>(null);
   const [tipo, setTipo] = useState<Tipo>("ENTRY");
   const [filas, setFilas] = useState<Fila[]>([]);
@@ -191,16 +193,8 @@ export const StockAdjustmentModal = ({
     });
     setPending(false);
 
-    if (result.success) {
-      await Swal.fire({
-        title: tipo === "ENTRY" ? "Entrada registrada" : "Salida registrada",
-        text: `${totalUnidades} unidades en ${selectedBranchName}`,
-        icon: "success",
-        confirmButtonColor: "#6d28d9",
-        background: "#ffffff",
-        color: "#222222",
-      });
-      reset();
+    if (result.success && result.data) {
+      setReceipt(result.data.receipt);
       onConfirm();
       return;
     }
@@ -209,6 +203,9 @@ export const StockAdjustmentModal = ({
   };
 
   if (!open) return null;
+  if (receipt) {
+    return <StockMovementReceiptPanel receipt={receipt} onClose={() => { setReceipt(null); handleClose(); }} />;
+  }
 
   return (
     <div

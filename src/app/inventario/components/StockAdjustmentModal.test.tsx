@@ -74,7 +74,7 @@ const seleccionar = (nombre: string, cantidad: number) => {
 beforeEach(() => {
   jest.clearAllMocks();
   mockProductos.mockResolvedValue({ success: true, data: productos } as never);
-  mockAjustar.mockResolvedValue({ success: true } as never);
+  mockAjustar.mockResolvedValue({ success: true, data: { receipt: { movementType: "ENTRY", date: "2026-08-06T18:30:00.000Z", branchName: "Principal", branchCode: "PRI", reference: "Conteo físico", rows: [] } } } as never);
   mockGetUser.mockResolvedValue({ email: "admin@feriaconexx.com" });
 });
 
@@ -159,5 +159,8 @@ describe("StockAdjustmentModal", () => {
         performedBy: "admin@feriaconexx.com",
       });
     });
+    expect(await screen.findByRole("button", { name: "Descargar comprobante" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Registrar entrada" })).not.toBeInTheDocument();
+    expect(mockAjustar).toHaveBeenCalledTimes(1);
   });
 });

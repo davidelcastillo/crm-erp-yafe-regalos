@@ -7,6 +7,8 @@ import {
 } from "@/app/actions/inventory";
 import Swal from "sweetalert2";
 import { BranchPicker } from "@/components/ui/BranchPicker";
+import type { StockMovementReceipt } from "@/lib/stock-movement-receipt";
+import { StockMovementReceiptPanel } from "./StockMovementReceiptPanel";
 
 export interface MoveStockModalProps {
   open: boolean;
@@ -27,6 +29,7 @@ export const MoveStockModal = ({
   onConfirm,
 }: MoveStockModalProps) => {
   const [step, setStep] = useState<Step>(1);
+  const [receipt, setReceipt] = useState<StockMovementReceipt | null>(null);
   const [sourceBranchId, setSourceBranchId] = useState<number | null>(null);
   const [destBranchId, setDestBranchId] = useState<number | null>(null);
   const [productOptions, setProductOptions] = useState<MovableProduct[]>([]);
@@ -168,8 +171,8 @@ export const MoveStockModal = ({
         })),
       };
       const res = await moveStockBatchBetweenBranches(payload);
-      if (res.success) {
-        onClose();
+      if (res.success && res.data) {
+        setReceipt(res.data.receipt);
         onConfirm();
       } else {
         await Swal.fire({
@@ -190,6 +193,10 @@ export const MoveStockModal = ({
 
   if (!open) {
     return null;
+  }
+
+  if (receipt) {
+    return <StockMovementReceiptPanel receipt={receipt} onClose={() => { setReceipt(null); onClose(); }} />;
   }
 
   return (
