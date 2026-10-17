@@ -89,4 +89,41 @@ describe("resolveSessionMaxAge", () => {
     ).toBe(REMEMBER_ME_MAX_AGE);
     expect(REMEMBER_ME_MAX_AGE).toBe(604800);
   });
+
+  // El «recordarme» se perdía en el primer refresh: el proxy llama
+  // createServerClient() sin override, así que la cookie se reescribía con el
+  // default de 1 hora. La marca (cookie propia) mantiene la elección.
+  it("keeps the 7-day max age when the remember-me mark is present (no override)", () => {
+    expect(
+      resolveSessionMaxAge({
+        name: STORAGE_KEY,
+        value: "token-value",
+        storageKey: STORAGE_KEY,
+        remembered: true,
+      })
+    ).toBe(REMEMBER_ME_MAX_AGE);
+  });
+
+  it("keeps the 1-hour default only when there is no remember-me mark", () => {
+    expect(
+      resolveSessionMaxAge({
+        name: STORAGE_KEY,
+        value: "token-value",
+        storageKey: STORAGE_KEY,
+        remembered: false,
+      })
+    ).toBe(DEFAULT_SESSION_MAX_AGE);
+  });
+
+  it("an explicit override still wins over the remember-me mark", () => {
+    expect(
+      resolveSessionMaxAge({
+        name: STORAGE_KEY,
+        value: "token-value",
+        sessionMaxAge: DEFAULT_SESSION_MAX_AGE,
+        storageKey: STORAGE_KEY,
+        remembered: true,
+      })
+    ).toBe(DEFAULT_SESSION_MAX_AGE);
+  });
 });

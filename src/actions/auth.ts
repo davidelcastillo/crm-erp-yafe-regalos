@@ -4,7 +4,12 @@ import { createServerClient } from '@/lib/supabase/server';
 import { cookies } from 'next/headers';
 import { NextResponse, type NextRequest } from 'next/server';
 import { loginSchema } from '@/lib/validations/auth';
-import { REMEMBER_ME_MAX_AGE } from '@/lib/supabase/session';
+import {
+  DEFAULT_SESSION_MAX_AGE,
+  REMEMBER_ME_COOKIE,
+  REMEMBER_ME_COOKIE_VALUE,
+  REMEMBER_ME_MAX_AGE,
+} from '@/lib/supabase/session';
 
 export type ActionResult = {
   success: boolean;
@@ -31,8 +36,11 @@ export async function login(formData: FormData): Promise<ActionResult> {
   // Recordarme: 'on' → 7-day session cookie; otherwise default 1 hour.
   const remember = formData.get('remember-me') === 'on';
 
-  // Create Supabase server client
-  const supabase = await createServerClient(remember ? REMEMBER_ME_MAX_AGE : undefined);
+  // Create Supabase server client. El default va explícito para que una marca
+  // vieja de «recordarme» no alargue una sesión que el usuario pidió corta.
+  const supabase = await createServerClient(
+    remember ? REMEMBER_ME_MAX_AGE : DEFAULT_SESSION_MAX_AGE
+  );
 
   try {
     const { data, error } = await supabase.auth.signInWithPassword({
@@ -53,6 +61,17 @@ export async function login(formData: FormData): Promise<ActionResult> {
     // Determine redirect by role: branch users go straight to their portal
     // inventory; admins use the redirect-to cookie or default to /dashboard.
     const cookieStore = await cookies();
+
+    // La elección se guarda en su propia cookie (ver REMEMBER_ME_COOKIE): el
+    // refresh del token reescribe la cookie de sesión y sin la marca volvería a
+    // 1 hora. Al no marcarlo se borra, para no alargar una sesión corta.
+    cookieStore.set(REMEMBER_ME_COOKIE, remember ? REMEMBER_ME_COOKIE_VALUE : '', {
+      path: '/',
+      httpOnly: true,
+      sameSite: 'lax',
+      maxAge: remember ? REMEMBER_ME_MAX_AGE : 0,
+    });
+
     const redirectToCookie = cookieStore.get('redirect-to');
 
     const role = data.user?.app_metadata?.role;
@@ -88,6 +107,13 @@ export async function logout(): Promise<ActionResult> {
     await supabase.auth.signOut();
     // signOut() clears the real session cookies (sb-<ref>-auth-token + chunks)
     // via the store's setAll with value '' / maxAge 0. No dead cookie here.
+    const cookieStore = await cookies();
+    cookieStore.set(REMEMBER_ME_COOKIE, '', {
+      path: '/',
+      httpOnly: true,
+      sameSite: 'lax',
+      maxAge: 0,
+    });
 
     return {
       success: true,
