@@ -297,6 +297,28 @@
   backdrop-filter: blur(16px);
 }
 
+/* Barra inferior. El vidrio solo se lee si detrás hay algo con color, y las
+   páginas tienen fondo blanco (`bg-white` en el wrapper de cada una): sin un
+   tinte propio la barra se ve como un blanco sólido en todas las páginas menos
+   donde justo pasa contenido por debajo. Los alfa están en el techo que deja el
+   piso AA: con las etiquetas en #6a6a6a el borde celeste queda en 4,64:1
+   (0,45/0,15) y uno más fuerte lo baja a 4,47:1.
+   Los alfa van en rgb() a mano y no con color-mix(): Tailwind/Lightning CSS
+   reescribe el color-mix como un fallback a color pleno + @supports, y ese
+   fallback se comería el contraste. Los tonos son los de la paleta
+   (--palette-brand-celeste #bfdbfe y --palette-brand-rosa #f472b6): si cambia
+   la paleta, cambian acá. */
+.glass-nav {
+  background-color: rgb(255 255 255 / 0.72);
+  background-image: linear-gradient(
+    to right,
+    rgb(191 219 254 / 0.45),
+    rgb(244 114 182 / 0.15)
+  );
+  -webkit-backdrop-filter: blur(24px);
+  backdrop-filter: blur(24px);
+}
+
 } /* fin de @layer components */
 
 /* Native <select> <option> best-effort styling (browser rendering varies). */

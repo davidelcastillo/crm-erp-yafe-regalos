@@ -552,6 +552,7 @@ El rebranding reemplaza el rojo `#ff385c` (que sigue existiendo como legado, pen
 - **Sobre el degradé claro el texto va oscuro.** `text-gray-800` da **10,2:1** en el extremo celeste y **5,5:1** en el rosa: AA cumplido con margen. **Blanco sobre el mismo degradé da ~1,9:1 en el celeste: falla.** Es el error más fácil de cometer al copiar un botón viejo (los del rojo usaban texto blanco).
 - Sobre el degradé fuerte, blanco da **3,5–3,9:1**: alcanza para texto grande en negrita o para íconos (piso 3:1), **no** para una etiqueta de 14 px.
 - Superficies de vidrio: `.glass` (blanco 70 % + blur 24 px) para el cuerpo de las páginas y las tarjetas; `.glass-strong` (blanco 80 % + blur 16 px) para barras y píldoras del encabezado. Van **sobre el degradé**, nunca sobre blanco puro: ahí no se distinguen del fondo.
+- La **barra inferior** (`BottomNav`) es el caso aparte, porque abajo de todo el fondo de la página es blanco: lleva su propio tinte de marca con `.glass-nav` (celeste 45 % → rosa 15 % sobre blanco 72 % + blur 24 px). Sin ese tinte se leía como un **blanco sólido** en todas las páginas menos donde justo pasaba contenido por debajo (en `/inventario`, con la lista larga, siempre pasa algo). Los alfa están en el techo que deja el piso AA: con las etiquetas en `#6a6a6a` el extremo celeste queda en **4,64:1**, y un tinte más fuerte (0,55/0,20) lo baja a **4,47:1**, que falla.
 
 ### Tonos con contraste verificado
 
