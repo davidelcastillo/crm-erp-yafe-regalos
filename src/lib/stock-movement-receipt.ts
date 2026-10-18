@@ -12,6 +12,11 @@ export interface StockMovementReceipt {
     name: string;
     quantity: number;
     stock: number;
+    /** Saldo que le queda a la sucursal de origen tras el traslado; solo en traslados. */
+    sourceStock?: number;
     price: number;
   }>;
 }
+
+/** Lado del movimiento que documenta el comprobante: la sucursal que recibe o la que envía. */
+export type StockMovementSide = "SOURCE" | "DESTINATION";

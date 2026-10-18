@@ -180,7 +180,9 @@ describe("MoveStockModal", () => {
         ],
       });
     });
-    expect(await screen.findByRole("button", { name: "Descargar comprobante" })).toBeInTheDocument();
+    // S7: el traslado ofrece dos comprobantes, uno por sucursal; el botón genérico anterior pasó a nombrar su lado.
+    expect(await screen.findByRole("button", { name: "Comprobante de la sucursal que recibe" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Comprobante de la sucursal que envía" })).toBeInTheDocument();
     expect(props.onClose).not.toHaveBeenCalled();
     expect(props.onConfirm).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole("button", { name: /mover stock/i })).not.toBeInTheDocument();

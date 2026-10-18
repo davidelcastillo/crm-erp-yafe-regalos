@@ -632,7 +632,7 @@ export async function moveStockBatchBetweenBranches(data: unknown) {
             const product = products.find((p) => p.id === item.productId)!;
             return {
               code: product.code, name: product.name, price: Number(product.price),
-              quantity: item.quantity, stock: item.newDestStock,
+              quantity: item.quantity, stock: item.newDestStock, sourceStock: item.newSourceStock,
             };
           }),
         } satisfies StockMovementReceipt,

@@ -1,10 +1,13 @@
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
-import type { StockMovementReceipt } from '@/lib/stock-movement-receipt';
+import type { StockMovementReceipt, StockMovementSide } from '@/lib/stock-movement-receipt';
 import { LOGO_PNG_BASE64 } from './pdf-logo';
 import { formatPrice } from './pdf';
 
 /** Mismo estilo del inventario, con cantidades y saldos de la operación confirmada. */
-export async function generateStockMovementPdf(receipt: StockMovementReceipt): Promise<Uint8Array> {
+export async function generateStockMovementPdf(
+  receipt: StockMovementReceipt,
+  side: StockMovementSide = 'DESTINATION',
+): Promise<Uint8Array> {
   const pdf = await PDFDocument.create();
   const font = await pdf.embedFont(StandardFonts.Helvetica);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
@@ -24,14 +27,29 @@ export async function generateStockMovementPdf(receipt: StockMovementReceipt): P
     timeZone: 'America/Argentina/Buenos_Aires', day: '2-digit', month: '2-digit', year: 'numeric',
     hour: '2-digit', minute: '2-digit', hour12: false,
   }).format(new Date(receipt.date));
-  const branch = `${receipt.branchName} (${receipt.branchCode})`;
+  const sourceBranch = `${receipt.sourceBranchName} (${receipt.sourceBranchCode})`;
+  const destinationBranch = `${receipt.branchName} (${receipt.branchCode})`;
+  const branch = side === 'SOURCE' && receipt.movementType === 'TRANSFER' ? sourceBranch : destinationBranch;
   const details = [
     `Fecha: ${date}`,
     ...(receipt.movementType === 'TRANSFER'
-      ? [`Origen: ${receipt.sourceBranchName} (${receipt.sourceBranchCode})`, `Destino: ${branch}`]
+      ? [
+        `Origen: ${sourceBranch}`,
+        `Destino: ${destinationBranch}`,
+        side === 'SOURCE'
+          ? `Comprobante de la sucursal que envía: ${sourceBranch}`
+          : `Comprobante de la sucursal que recibe: ${destinationBranch}`,
+      ]
       : [`Sucursal: ${branch}`]),
     `Motivo: ${receipt.reference}`,
   ];
+  // S7: el comprobante de la sucursal que envía muestra el saldo que le queda al origen, nunca el del destino.
+  const rows = side === 'SOURCE'
+    ? receipt.rows.map((row) => {
+      if (row.sourceStock === undefined) throw new Error('El comprobante de la sucursal que envía requiere el saldo de origen');
+      return { ...row, stock: row.sourceStock };
+    })
+    : receipt.rows;
   const lines: string[] = [];
   for (const detail of details) {
     let line = '';
@@ -47,13 +65,15 @@ export async function generateStockMovementPdf(receipt: StockMovementReceipt): P
   const bandHeight = 60 + lines.length * 13;
   const tableTop = 841.89 - 36 - bandHeight - 14;
   const capacity = Math.max(1, Math.floor((tableTop - 20 - 80) / 20));
-  const pages = Math.max(1, Math.ceil(receipt.rows.length / capacity));
-  const units = receipt.rows.reduce((sum, row) => sum + row.quantity, 0);
+  const pages = Math.max(1, Math.ceil(rows.length / capacity));
+  const units = rows.reduce((sum, row) => sum + row.quantity, 0);
   const x = [40, 114, 290, 354, 458];
   const right = [106, 282, 346, 450, 555];
   const widths = right.map((end, i) => end - x[i]);
-  const quantitySign = { ENTRY: '+', EXIT: '-', TRANSFER: '' }[receipt.movementType];
-  const quantityColor = { ENTRY: gain, EXIT: loss, TRANSFER: ink }[receipt.movementType];
+  // S7: el signo y el color dependen del lado; la sucursal que recibe suma en verde y la que envía resta en rojo.
+  const gainSide = receipt.movementType === 'ENTRY' || (receipt.movementType === 'TRANSFER' && side === 'DESTINATION');
+  const quantitySign = gainSide ? '+' : '-';
+  const quantityColor = gainSide ? gain : loss;
 
   for (let number = 1; number <= pages; number++) {
     const page = pdf.addPage([595.28, 841.89]);
@@ -69,7 +89,7 @@ export async function generateStockMovementPdf(receipt: StockMovementReceipt): P
     ['Código', 'Nombre', 'Cantidad', 'Stock final', 'Precio unit.'].forEach((label, i) => {
       text(label, i < 2 ? x[i] : right[i] - bold.widthOfTextAtSize(label, 9), tableTop - 14, 9, true);
     });
-    receipt.rows.slice((number - 1) * capacity, number * capacity).forEach((row, index) => {
+    rows.slice((number - 1) * capacity, number * capacity).forEach((row, index) => {
       const y = tableTop - 20 - (index + 1) * 20;
       if (index % 2 === 1) page.drawRectangle({ x: 36, y, width: 523.28, height: 20, color: rgb(250 / 255, 250 / 255, 250 / 255) });
       [row.code, row.name, `${quantitySign}${row.quantity}`, String(row.stock), formatPrice(row.price)].forEach((value, i) => {
@@ -82,7 +102,7 @@ export async function generateStockMovementPdf(receipt: StockMovementReceipt): P
       });
     });
     if (number === pages) {
-      const total = `${receipt.rows.length} productos · ${units} unidades`;
+      const total = `${rows.length} productos · ${units} unidades`;
       page.drawLine({ start: { x: 36, y: 60 }, end: { x: 559.28, y: 60 }, color: muted, thickness: 0.8 });
       page.drawText(total, { x: 559.28 - bold.widthOfTextAtSize(total, 10), y: 46, size: 10, font: bold, color: rgb(190 / 255, 24 / 255, 93 / 255) });
     }

@@ -10,6 +10,11 @@ const receipt: StockMovementReceipt = {
   movementType: 'EXIT', date: '2026-08-06T18:30:00.000Z', branchName: 'Centro', branchCode: 'CEN',
   reference: 'Rotura', rows: [{ code: 'PR001', name: 'Producto', quantity: 3, stock: 0, price: 25 }],
 };
+const transfer: StockMovementReceipt = {
+  ...receipt, movementType: 'TRANSFER', reference: 'MOVE-1',
+  sourceBranchName: 'Depósito', sourceBranchCode: 'DEP',
+  rows: [{ code: 'PR001', name: 'Producto', quantity: 3, stock: 12, price: 25, sourceStock: 5 }],
+};
 let click: jest.SpyInstance;
 beforeEach(() => {
   jest.clearAllMocks();
@@ -26,7 +31,7 @@ it('descarga solo al pedirlo y permite cerrar sin acciones de stock', async () =
   expect(generate).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole('button', { name: 'Descargar comprobante' }));
   await waitFor(() => expect(click).toHaveBeenCalledTimes(1));
-  expect(generate).toHaveBeenCalledWith(receipt);
+  expect(generate).toHaveBeenCalledWith(receipt, 'DESTINATION');
   expect(URL.createObjectURL).toHaveBeenCalledWith(expect.any(Blob));
   expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:receipt');
   const link = click.mock.instances[0] as HTMLAnchorElement;
@@ -34,6 +39,18 @@ it('descarga solo al pedirlo y permite cerrar sin acciones de stock', async () =
   expect(document.querySelector('a')).toBeNull();
   fireEvent.click(screen.getByRole('button', { name: 'Cerrar comprobante' }));
   expect(onClose).toHaveBeenCalledTimes(1);
+});
+
+it('un traslado descarga el comprobante de la sucursal que recibe y el de la que envía', async () => {
+  render(<StockMovementReceiptPanel receipt={transfer} onClose={jest.fn()} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Comprobante de la sucursal que envía' }));
+  await waitFor(() => expect(click).toHaveBeenCalledTimes(1));
+  expect(generate).toHaveBeenCalledWith(transfer, 'SOURCE');
+  expect((click.mock.instances[0] as HTMLAnchorElement).download).toMatch(/^comprobante-traslado-origen-DEP-.*\.pdf$/);
+  fireEvent.click(screen.getByRole('button', { name: 'Comprobante de la sucursal que recibe' }));
+  await waitFor(() => expect(click).toHaveBeenCalledTimes(2));
+  expect(generate).toHaveBeenNthCalledWith(2, transfer, 'DESTINATION');
+  expect((click.mock.instances[1] as HTMLAnchorElement).download).toMatch(/^comprobante-traslado-destino-CEN-.*\.pdf$/);
 });
 
 it('distingue un fallo del PDF de la operación exitosa y reintenta el mismo snapshot', async () => {
@@ -45,6 +62,6 @@ it('distingue un fallo del PDF de la operación exitosa y reintenta el mismo sna
   expect(click).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole('button', { name: 'Descargar comprobante' }));
   await waitFor(() => expect(click).toHaveBeenCalledTimes(1));
-  expect(generate).toHaveBeenNthCalledWith(2, receipt);
+  expect(generate).toHaveBeenNthCalledWith(2, receipt, 'DESTINATION');
   expect(screen.queryByRole('alert')).not.toBeInTheDocument();
 });

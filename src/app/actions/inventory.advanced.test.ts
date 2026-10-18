@@ -357,8 +357,8 @@ describe("moveStockBatchBetweenBranches (Fase 3) — atomic batch", () => {
         sourceBranchName: "Origen", sourceBranchCode: "ORI",
         date: expect.any(String), reference: expect.stringMatching(/^MOVE-/),
         rows: [
-          { code: "JAB", name: "Jabón", quantity: 3, stock: 3, price: 150 },
-          { code: "SHA", name: "Shampoo", quantity: 7, stock: 10, price: 300 },
+          { code: "JAB", name: "Jabón", quantity: 3, stock: 3, sourceStock: 7, price: 150 },
+          { code: "SHA", name: "Shampoo", quantity: 7, stock: 10, sourceStock: 8, price: 300 },
         ],
       },
     });
