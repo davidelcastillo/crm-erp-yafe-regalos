@@ -26,6 +26,10 @@ Desde **Inventario** → botón **"Exportar productos"** el admin genera un PDF 
 | Nombre de archivo | `inventario-<branchCode>-<YYYYMMDD>.pdf` (ej. `inventario-DEP-20260806.pdf`) |
 | Sin cambios con el rediseño | Nombre de archivo, contrato de la Server Action `{ pdfBase64, filename }`, autorización solo `admin`, re-validación server-side de sucursal/stock, los 3 pasos del asistente y los datos exportados (ni columnas ni consultas nuevas) |
 
+## Comprobantes de movimientos
+
+El resultado de **Mover Stock** y **Entrada / Salida** también ofrece **Descargar comprobante**, con el mismo estilo visual. Es un documento de la operación confirmada, no otra exportación del inventario ni una nueva modificación de stock. Ver [contenido, descarga y manejo de errores](comprobantes-stock.md).
+
 ## Regenerar el logo
 
 El logo va embebido como PNG en base64 dentro de `src/lib/utils/pdf-logo.ts` porque `pdf-lib` no embebe webp. Cuando cambie `public/logo.webp`, se rehace así:

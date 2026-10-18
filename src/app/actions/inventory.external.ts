@@ -2,7 +2,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { parseArray, parseObject } from "@/lib/parse-prisma";
+import { parseArray } from "@/lib/parse-prisma";
 import { z } from "zod";
 
 /**
@@ -37,6 +37,7 @@ export async function getExternalBranchInventory(data: unknown) {
         inventory: {
           some: {
             branchId: branchId,
+            stock: { gt: 0 },
           },
         },
       },
@@ -47,6 +48,7 @@ export async function getExternalBranchInventory(data: unknown) {
         inventory: {
           where: {
             branchId: branchId,
+            stock: { gt: 0 },
           },
           select: {
             stock: true,

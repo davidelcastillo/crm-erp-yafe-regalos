@@ -93,6 +93,7 @@ beforeEach(() => {
   mockMoveBatch.mockResolvedValue({
     success: true,
     data: {
+      receipt: { movementType: "TRANSFER", date: "2026-08-06T18:30:00.000Z", branchName: "Centro", branchCode: "CEN", sourceBranchName: "Principal", sourceBranchCode: "PRI", reference: "MOVE-1", rows: [] },
       reference: "MOVE-1",
       sourceBranchId: 1,
       destBranchId: 2,
@@ -156,7 +157,7 @@ describe("MoveStockModal", () => {
     expect(screen.getByText(/2 productos · 10 unidades/i)).toBeInTheDocument();
   });
 
-  it("envía el array de items a moveStockBatchBetweenBranches y cierra el modal", async () => {
+  it("envía el lote una sola vez y ofrece el comprobante antes de cerrar", async () => {
     const { props } = renderModal();
     await goToStep2();
 
@@ -179,8 +180,15 @@ describe("MoveStockModal", () => {
         ],
       });
     });
-    expect(props.onClose).toHaveBeenCalled();
-    expect(props.onConfirm).toHaveBeenCalled();
+    // S7: el traslado ofrece dos comprobantes, uno por sucursal; el botón genérico anterior pasó a nombrar su lado.
+    expect(await screen.findByRole("button", { name: "Comprobante de la sucursal que recibe" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Comprobante de la sucursal que envía" })).toBeInTheDocument();
+    expect(props.onClose).not.toHaveBeenCalled();
+    expect(props.onConfirm).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("button", { name: /mover stock/i })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Cerrar comprobante" }));
+    expect(props.onClose).toHaveBeenCalledTimes(1);
+    expect(mockMoveBatch).toHaveBeenCalledTimes(1);
   });
 
   it("el buscador filtra por nombre y por código, y avisa cuando no hay coincidencias", async () => {
