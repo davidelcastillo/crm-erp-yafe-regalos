@@ -16,7 +16,7 @@ El diseño sigue el PDF de inventario: logo, banda con acento rosa, filas altern
 - Encabezado: **Ingreso**, **Egreso** o **Movimiento de sucursal**; fecha y hora de Argentina; sucursal con su código. En traslados, origen y destino.
 - Motivo: texto registrado por el usuario en entrada/salida; si no escribió uno, el rótulo existente `ENTRADA`/`SALIDA`. En traslados, referencia `MOVE-…` de la operación.
 - Tabla: **Código | Nombre | Cantidad | Stock final | Precio unit.**
-- **Cantidad**: unidades ingresadas, retiradas o trasladadas, no el stock total.
+- **Cantidad**: unidades ingresadas, retiradas o trasladadas, no el stock total. En **Ingreso** el número lleva signo `+` en verde y en **Egreso** signo `-` en rojo; en **Movimiento de sucursal** va sin signo, porque la misma cantidad sale de una sucursal y entra en la otra. Las demás columnas usan el color de texto habitual.
 - **Stock final**: saldo confirmado de esa sucursal; en traslados, **solo el destino**. Es el saldo de esa operación, no una consulta al stock que haya después de otros movimientos.
 - **Precio unit.**: precio de venta del producto al registrar la operación, en ARS; no costo ni importe total del movimiento.
 - Totales: cantidad de productos y suma de unidades movidas. Paginación automática; un nombre demasiado largo se abrevia con puntos suspensivos. El motivo se distribuye en líneas sin recortarlo. Helvetica no incluye emojis: los caracteres no representables se muestran como `?`.

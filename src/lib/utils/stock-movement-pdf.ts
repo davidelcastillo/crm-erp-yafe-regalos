@@ -16,6 +16,9 @@ export async function generateStockMovementPdf(receipt: StockMovementReceipt): P
   const ink = rgb(34 / 255, 34 / 255, 34 / 255);
   const muted = rgb(107 / 255, 114 / 255, 128 / 255);
   const soft = rgb(247 / 255, 247 / 255, 247 / 255);
+  // S6: mismos tonos semánticos que las tarjetas de la app.
+  const gain = rgb(21 / 255, 128 / 255, 61 / 255);
+  const loss = rgb(220 / 255, 38 / 255, 38 / 255);
   const title = { ENTRY: 'Ingreso', EXIT: 'Egreso', TRANSFER: 'Movimiento de sucursal' }[receipt.movementType];
   const date = new Intl.DateTimeFormat('es-AR', {
     timeZone: 'America/Argentina/Buenos_Aires', day: '2-digit', month: '2-digit', year: 'numeric',
@@ -49,11 +52,13 @@ export async function generateStockMovementPdf(receipt: StockMovementReceipt): P
   const x = [40, 114, 290, 354, 458];
   const right = [106, 282, 346, 450, 555];
   const widths = right.map((end, i) => end - x[i]);
+  const quantitySign = { ENTRY: '+', EXIT: '-', TRANSFER: '' }[receipt.movementType];
+  const quantityColor = { ENTRY: gain, EXIT: loss, TRANSFER: ink }[receipt.movementType];
 
   for (let number = 1; number <= pages; number++) {
     const page = pdf.addPage([595.28, 841.89]);
-    const text = (value: string, left: number, y: number, size = 9, strong = false) => {
-      page.drawText(safe(value), { x: left, y, size, font: strong ? bold : font, color: ink });
+    const text = (value: string, left: number, y: number, size = 9, strong = false, color = ink) => {
+      page.drawText(safe(value), { x: left, y, size, font: strong ? bold : font, color });
     };
     page.drawRectangle({ x: 36, y: 805.89 - bandHeight, width: 523.28, height: bandHeight, color: soft });
     page.drawRectangle({ x: 36, y: 801.89, width: 523.28, height: 4, color: rgb(244 / 255, 114 / 255, 182 / 255) });
@@ -67,13 +72,13 @@ export async function generateStockMovementPdf(receipt: StockMovementReceipt): P
     receipt.rows.slice((number - 1) * capacity, number * capacity).forEach((row, index) => {
       const y = tableTop - 20 - (index + 1) * 20;
       if (index % 2 === 1) page.drawRectangle({ x: 36, y, width: 523.28, height: 20, color: rgb(250 / 255, 250 / 255, 250 / 255) });
-      [row.code, row.name, String(row.quantity), String(row.stock), formatPrice(row.price)].forEach((value, i) => {
+      [row.code, row.name, `${quantitySign}${row.quantity}`, String(row.stock), formatPrice(row.price)].forEach((value, i) => {
         let display = safe(value);
         if (font.widthOfTextAtSize(display, 9) > widths[i]) {
           while (display.length && font.widthOfTextAtSize(display + '...', 9) > widths[i]) display = display.slice(0, -1);
           display += '...';
         }
-        text(display, i < 2 ? x[i] : right[i] - font.widthOfTextAtSize(display, 9), y + 6);
+        text(display, i < 2 ? x[i] : right[i] - font.widthOfTextAtSize(display, 9), y + 6, 9, false, i === 2 ? quantityColor : ink);
       });
     });
     if (number === pages) {
