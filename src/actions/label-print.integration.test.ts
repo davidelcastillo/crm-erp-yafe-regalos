@@ -1,108 +1,112 @@
-// src/actions/label-print.integration.test.ts
+/**
+ * @jest-environment node
+ *
+ * Integración de la acción de etiquetas con los datos que el wizard ya filtró:
+ * productos activos con stock en la sucursal, cantidades y orden de la selección.
+ * El pdf-lib es real (ver `label-print.test.ts` sobre el entorno node).
+ */
+import { PDFDocument } from 'pdf-lib';
+import zlib from 'zlib';
 import { generateProductLabels } from './label-print';
-import { searchProducts } from '@/app/actions/product';
 import { prisma } from '@/lib/prisma';
 
 jest.mock('@/lib/prisma', () => ({
   prisma: {
-    product: {
-      findMany: jest.fn(),
-    },
+    branch: { findUnique: jest.fn() },
+    product: { findMany: jest.fn() },
   },
 }));
 
-jest.mock('pdf-lib', () => ({
-  PDFDocument: {
-    create: jest.fn().mockReturnValue({
-      addPage: jest.fn().mockReturnValue({
-        drawRectangle: jest.fn(),
-        drawText: jest.fn(),
-      }),
-      embedFont: jest.fn().mockResolvedValue({
-        widthOfTextAtSize: jest.fn().mockResolvedValue(10),
-      }),
-      save: jest.fn().mockResolvedValue(
-        new Uint8Array([37, 80, 68, 70, 45, 49, 46, 48]).buffer // "%PDF-1.0"
-      ),
-    }),
-  },
-  rgb: jest.fn(),
-  StandardFonts: {
-    Helvetica: 'Helvetica',
-  },
-}));
+const mockBranchFindUnique = prisma.branch.findUnique as jest.Mock;
+const mockProductFindMany = prisma.product.findMany as jest.Mock;
 
-jest.mock('fs/promises', () => ({
-  readFile: jest.fn().mockResolvedValue(new ArrayBuffer(0)),
-}));
+const loadPdf = (base64: string) => PDFDocument.load(Buffer.from(base64, 'base64'));
 
-jest.mock('path', () => ({
-  join: (...args: string[]) => args.join('/'),
-}));
+const pdfText = (base64: string): string => {
+  const buf = Buffer.from(base64, 'base64');
+  const raw = buf.toString('latin1');
+  const inflated: string[] = [];
+  const streamStart = /stream\r?\n/g;
+  let match: RegExpExecArray | null;
 
-describe('generateProductLabels integration', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
+  while ((match = streamStart.exec(raw)) !== null) {
+    const start = match.index + match[0].length;
+    const end = raw.indexOf('endstream', start);
+    if (end < 0) continue;
+    try {
+      const stream = zlib.inflateSync(buf.subarray(start, end)).toString('latin1');
+      if (stream.includes('BT')) inflated.push(stream);
+    } catch {
+      // Streams sin compresión: no son contenido de dibujo.
+    }
+  }
+
+  return inflated
+    .join('\n')
+    .replace(/<([0-9A-Fa-f]+)>/g, (_all, hex: string) =>
+      Buffer.from(hex, 'hex').toString('latin1')
+    );
+};
+
+beforeEach(() => {
+  jest.clearAllMocks();
+  mockBranchFindUnique.mockResolvedValue({ code: 'CEN' });
+  mockProductFindMany.mockResolvedValue([
+    { id: 1, code: 'AAA001', price: 100 },
+    { id: 2, code: 'BBB888', price: 200 },
+  ]);
+});
+
+describe('generateProductLabels — flujo con las selecciones del wizard', () => {
+  test('genera el PDF de una sucursal con dos productos y sus cantidades', async () => {
+    const result = await generateProductLabels({
+      branchId: 2,
+      selections: [
+        { productId: 1, quantity: 2 },
+        { productId: 2, quantity: 1 },
+      ],
+    });
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+
+    expect(result.data.filename).toMatch(/^etiquetas-CEN-\d{8}\.pdf$/);
+
+    const pdfDoc = await loadPdf(result.data.pdfBase64);
+    expect(pdfDoc.getPageCount()).toBe(1);
+
+    const { width, height } = pdfDoc.getPage(0).getSize();
+    expect(width).toBeCloseTo(841.89, 1);
+    expect(height).toBeCloseTo(595.28, 1);
   });
 
-  test('generates PDF after searching for products', async () => {
-    // Mock product data for search
-    (prisma.product.findMany as jest.Mock).mockResolvedValue([
-      {
-        id: 1,
-        code: 'AAA000',
-        name: 'Product A',
-        price: 100.0,
-        inventory: [{ stock: 5, branchId: 1 }],
-      },
-    ]);
+  test('repite cada etiqueta y respeta el orden de la selección', async () => {
+    const result = await generateProductLabels({
+      branchId: 2,
+      selections: [
+        { productId: 2, quantity: 2 }, // BBB888 primero
+        { productId: 1, quantity: 1 }, // AAA001 después
+      ],
+    });
+    if (!result.success) throw new Error(result.error);
 
-     // Simulate searching for a product
-     const searchResults = await searchProducts({ query: 'AAA' });
-     expect(searchResults.success).toBe(true);
-     const searchData = searchResults.data!;
-     expect(searchData).toHaveLength(1);
-     expect(searchData[0].code).toBe('AAA000');
-
-    // Now generate labels for the found product
-    const selection = [{ productId: searchData[0].id, quantity: 3 }];
-    const pdfBase64 = await generateProductLabels(selection);
-
-    // Action returns a base64-encoded PDF string
-    expect(typeof pdfBase64).toBe('string');
-    expect(pdfBase64.length).toBeGreaterThan(0);
+    const text = pdfText(result.data.pdfBase64);
+    expect(text.match(/BBB888/g)).toHaveLength(2);
+    expect(text.match(/AAA001/g)).toHaveLength(1);
+    expect(text.indexOf('BBB888')).toBeLessThan(text.indexOf('AAA001'));
   });
 
-  test('handles multiple products from search', async () => {
-    (prisma.product.findMany as jest.Mock).mockResolvedValue([
-      {
-        id: 1,
-        code: 'AAA000',
-        name: 'Product A',
-        price: 100.0,
-        inventory: [{ stock: 3, branchId: 1 }],
-      },
-      {
-        id: 2,
-        code: 'BBB000',
-        name: 'Product B',
-        price: 200.0,
-        inventory: [{ stock: 7, branchId: 1 }],
-      },
-    ]);
+  test('una sucursal sin los productos pedidos no genera PDF', async () => {
+    mockProductFindMany.mockResolvedValue([]);
 
-     const searchResults = await searchProducts({ query: 'A' });
-     expect(searchResults.success).toBe(true);
-     const searchData = searchResults.data!;
-     expect(searchData).toHaveLength(2);
+    const result = await generateProductLabels({
+      branchId: 2,
+      selections: [{ productId: 1, quantity: 1 }],
+    });
 
-     const selections = searchData.map(p => ({
-       productId: p.id,
-       quantity: 2,
-     }));
-
-    const pdfBase64 = await generateProductLabels(selections);
-    expect(typeof pdfBase64).toBe('string');
-    expect(pdfBase64.length).toBeGreaterThan(0);
+    expect(result).toEqual({
+      success: false,
+      error: 'Hay productos inactivos o sin stock en la sucursal seleccionada',
+    });
   });
 });

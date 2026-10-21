@@ -3,6 +3,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { parseArray } from "@/lib/parse-prisma";
+import { sortProducts } from "@/lib/product-order";
 import { z } from "zod";
 
 /**
@@ -45,6 +46,7 @@ export async function getExternalBranchInventory(data: unknown) {
         code: true,
         name: true,
         price: true,
+        updatedAt: true,
         inventory: {
           where: {
             branchId: branchId,
@@ -69,13 +71,22 @@ export async function getExternalBranchInventory(data: unknown) {
           name: product.name,
           stock: inventoryEntry.stock,
           price: product.price,
+          // Opcional: el catálogo ordena por esta fecha cuando la consulta la
+          // trae; si falta, queda el orden por código.
+          ...(product.updatedAt
+            ? { updatedAt: product.updatedAt.toISOString() }
+            : {}),
         };
       })
       .filter((item): item is NonNullable<typeof item> => item !== null);
 
+    // Orden por código como en el resto de las listas (S4). El cliente puede
+    // cambiarlo a última modificación.
+    const rows = sortProducts(inventoryData);
+
     // El nombre va al lado de los datos: la página lo usa en el título (el id no
     // le dice nada a quien mira el catálogo).
-    return { success: true, data: parseArray(inventoryData), branchName: branch.name };
+    return { success: true, data: parseArray(rows), branchName: branch.name };
   } catch (error) {
     if (error instanceof z.ZodError) {
       return {

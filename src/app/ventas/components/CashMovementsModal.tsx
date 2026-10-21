@@ -149,7 +149,6 @@ export const CashMovementsModal = ({
   return (
     <div
       className="fixed inset-0 bg-black/30 backdrop-blur-md z-[60] flex items-center justify-center"
-      onClick={handleClose}
       role="dialog"
       aria-modal="true"
       aria-labelledby="cash-movements-title"

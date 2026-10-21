@@ -3,6 +3,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { parseArray, parseObject } from "@/lib/parse-prisma";
+import { sortProducts } from "@/lib/product-order";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getNextCode } from "@/lib/utils/product-code";
@@ -445,6 +446,8 @@ export async function getActiveProducts(branchId?: number) {
 
 /**
  * Productos inactivos (`active=false`) — para la página de inactivos.
+ * El orden por defecto es por código (S4); la página ofrece el cambio a última
+ * modificación sobre la lista ya cargada.
  */
 export async function getInactiveProducts() {
   try {
@@ -453,7 +456,7 @@ export async function getInactiveProducts() {
       orderBy: { updatedAt: "desc" },
       include: { category: { select: { id: true, name: true } } },
     });
-    return { success: true, data: parseArray(products) };
+    return { success: true, data: parseArray(sortProducts(products)) };
   } catch (error) {
     console.error("Error fetching inactive products:", error);
     return { success: false, error: "Error al obtener los productos inactivos" };

@@ -163,4 +163,16 @@ describe("StockAdjustmentModal", () => {
     expect(screen.queryByRole("button", { name: "Registrar entrada" })).not.toBeInTheDocument();
     expect(mockAjustar).toHaveBeenCalledTimes(1);
   });
+
+  it("no cierra al tocar el fondo del modal", () => {
+    // S2: el click afuera no cierra los modales con datos, para no perder lo cargado.
+    const onClose = jest.fn();
+    render(
+      <StockAdjustmentModal open branches={branches} onClose={onClose} onConfirm={jest.fn()} />
+    );
+
+    fireEvent.click(screen.getByRole("dialog"));
+
+    expect(onClose).not.toHaveBeenCalled();
+  });
 });

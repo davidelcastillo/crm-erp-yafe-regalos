@@ -82,7 +82,6 @@ export function MovementsModal({ product, isOpen, onClose }: MovementsModalProps
   return (
     <div
       className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-end md:items-center justify-center"
-      onClick={onClose}
       role="dialog"
       aria-modal="true"
       aria-labelledby="movements-modal-title"

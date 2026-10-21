@@ -6,6 +6,8 @@ import { getInactiveProducts, reactivateProduct } from '@/app/actions/product';
 import type { Product } from '@prisma/client';
 import Swal from 'sweetalert2';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { ProductSortToggle } from '@/components/ui/ProductSortToggle';
+import { sortProducts, type ProductSortMode } from '@/lib/product-order';
 import { Spinner } from '@/components/ui/Spinner';
 import { CardSkeleton } from '@/components/ui/Skeleton';
 
@@ -23,6 +25,8 @@ export default function InactivosPage() {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  // S4: el default de todas las listas es por código.
+  const [sortMode, setSortMode] = useState<ProductSortMode>('code');
 
   const loadProducts = async () => {
     setLoading(true);
@@ -83,13 +87,17 @@ export default function InactivosPage() {
     return () => clearTimeout(timer);
   }, [search]);
 
-  const visibleProducts = debouncedSearch
-    ? products.filter(
-        (p) =>
-          p.name.toLowerCase().includes(debouncedSearch) ||
-          (p.code && p.code.toLowerCase().includes(debouncedSearch))
-      )
-    : products;
+  // El orden se aplica sobre la lista ya cargada, con el helper compartido (S4).
+  const visibleProducts = sortProducts(
+    debouncedSearch
+      ? products.filter(
+          (p) =>
+            p.name.toLowerCase().includes(debouncedSearch) ||
+            (p.code && p.code.toLowerCase().includes(debouncedSearch))
+        )
+      : products,
+    sortMode
+  );
 
   return (
     <div className="min-h-screen bg-white pb-20">
@@ -143,6 +151,9 @@ export default function InactivosPage() {
                 placeholder="Buscar por nombre o código..."
                 autoComplete="off"
               />
+            </div>
+            <div className="mt-3 flex justify-end">
+              <ProductSortToggle value={sortMode} onChange={setSortMode} />
             </div>
           </div>
 

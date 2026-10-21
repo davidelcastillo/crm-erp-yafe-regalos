@@ -108,6 +108,23 @@ describe("CashCloseModal", () => {
     expect(onConfirm).toHaveBeenCalled();
     expect(onClose).toHaveBeenCalled();
   });
+
+  it("no cierra al tocar el fondo del modal", () => {
+    // S2: el click afuera no cierra los modales con datos, para no perder lo cargado.
+    const onClosePropio = jest.fn();
+    render(
+      <CashCloseModal
+        open
+        branches={branches}
+        onClose={onClosePropio}
+        onConfirm={jest.fn()}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("dialog"));
+
+    expect(onClosePropio).not.toHaveBeenCalled();
+  });
 });
 
 // Sistema de botones (`globals.css`): cada paso del modal tiene una sola acción

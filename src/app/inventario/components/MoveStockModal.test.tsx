@@ -324,4 +324,22 @@ describe("MoveStockModal", () => {
       "false"
     );
   });
+
+  it("no cierra al tocar el fondo del modal", () => {
+    // S2: el click afuera no cierra los modales con datos, para no perder lo cargado.
+    const onClose = jest.fn();
+    render(
+      <MoveStockModal
+        open
+        onClose={onClose}
+        productId={1}
+        branches={branches}
+        onConfirm={jest.fn()}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("dialog"));
+
+    expect(onClose).not.toHaveBeenCalled();
+  });
 });

@@ -57,6 +57,11 @@ jest.mock("sweetalert2", () => ({
   fire: jest.fn().mockResolvedValue({ isConfirmed: true }),
 }));
 
+// El wizard de etiquetas llama a la Server Action del PDF (que importa prisma).
+jest.mock("@/actions/label-print", () => ({
+  generateProductLabels: jest.fn(),
+}));
+
 jest.mock("next/navigation", () => ({
   useRouter: jest.fn(() => ({
     push: jest.fn(),
@@ -336,5 +341,47 @@ describe("AddProductButton parametrizado (tarea 1.1)", () => {
     // el ProductForm interno (D4 — la página renderiza el suyo propio).
     rerender(<AddProductButton open={true} onOpenChange={onOpenChange} />);
     expect(screen.queryByText("Nuevo Producto")).not.toBeInTheDocument();
+  });
+});
+describe("InventarioPage — acceso a inactivos desde PC (S1)", () => {
+  it("la barra de acciones del encabezado lleva a /inventario/inactivos", async () => {
+    await renderPage();
+
+    // La tarjeta de celular ya existía; lo pedido es el acceso desde la barra
+    // de PC, que es el contenedor `hidden md:flex` del encabezado.
+    const enlaces = screen.getAllByRole("link", { name: /^Inactivos/ });
+    const barraDePc = enlaces.filter((enlace) =>
+      enlace.parentElement?.className.includes("md:flex")
+    );
+
+    expect(barraDePc).toHaveLength(1);
+    expect(barraDePc[0]).toHaveAttribute("href", "/inventario/inactivos");
+  });
+});
+
+describe("InventarioPage — acceso a etiquetas de precio (S3)", () => {
+  it("la barra de PC tiene «Etiquetas» al lado de Exportar y abre el wizard", async () => {
+    await renderPage();
+
+    const botones = screen.getAllByRole("button", { name: "Etiquetas" });
+    const barraDePc = botones.filter((boton) =>
+      boton.parentElement?.className.includes("md:flex")
+    );
+    expect(barraDePc).toHaveLength(1);
+
+    fireEvent.click(barraDePc[0]);
+
+    expect(await screen.findByText("Etiquetas de precio")).toBeInTheDocument();
+    expect(screen.getByText(/paso 1 de 2/i)).toBeInTheDocument();
+  });
+
+  it("la grilla de celular tiene su tarjeta de acción", async () => {
+    await renderPage();
+
+    const tarjetas = screen
+      .getAllByRole("button", { name: /Precios para imprimir/ })
+      .filter((boton) => boton.className.includes("text-left"));
+
+    expect(tarjetas).toHaveLength(1);
   });
 });

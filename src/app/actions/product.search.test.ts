@@ -9,7 +9,7 @@
  * Los tests que escriben datos corren con `npm run test:local-db`.
  */
 import { prisma } from '@/lib/prisma'
-import { searchProducts } from './product'
+import { getInactiveProducts, searchProducts } from './product'
 
 jest.setTimeout(30000)
 
@@ -107,5 +107,50 @@ describe('searchProducts (integración, base local)', () => {
     const encontrados = await idsDe(`QA producto ${sufijo}`)
     expect(encontrados).toContain(ids[0])
     expect(encontrados).toContain(ids[1])
+  })
+})
+
+// S4: la lista de inactivos sale por código (prefijo alfabético + número), que es
+// el orden por defecto de todas las listas de productos.
+describe('getInactiveProducts — orden por código (integración, base local)', () => {
+  const sufijoOrden = Math.floor(1000 + Math.random() * 9000)
+  const creados: number[] = []
+
+  beforeAll(async () => {
+    // El nombre va al revés del código y la fecha de creación también: si la
+    // action ordenara por nombre (o por fecha de modificación) el resultado
+    // sería distinto del esperado. Los dos primeros códigos solo se diferencian
+    // en los ceros/sufijo numérico (9 antes que 10).
+    const filas = [
+      { code: `AAA${sufijoOrden}9`, name: `QA orden ${sufijoOrden} zzz`, updatedAt: new Date('2020-01-01T00:00:00.000Z') },
+      { code: `AAA${sufijoOrden}10`, name: `QA orden ${sufijoOrden} mmm`, updatedAt: new Date('2020-01-02T00:00:00.000Z') },
+      { code: `BBB${sufijoOrden}`, name: `QA orden ${sufijoOrden} aaa`, updatedAt: new Date('2020-01-03T00:00:00.000Z') },
+    ]
+
+    for (const fila of filas) {
+      const producto = await prisma.product.create({
+        data: { ...fila, price: 10, active: false },
+      })
+      creados.push(producto.id)
+    }
+  })
+
+  afterAll(async () => {
+    await prisma.product.deleteMany({ where: { id: { in: creados } } })
+  })
+
+  it('devuelve los productos por prefijo y número, no por nombre ni por fecha', async () => {
+    const resultado = await getInactiveProducts()
+    expect(resultado.success).toBe(true)
+
+    const codigos = (resultado.data ?? [])
+      .filter((producto) => creados.includes(producto.id))
+      .map((producto) => producto.code)
+
+    expect(codigos).toEqual([
+      `AAA${sufijoOrden}9`,
+      `AAA${sufijoOrden}10`,
+      `BBB${sufijoOrden}`,
+    ])
   })
 })
