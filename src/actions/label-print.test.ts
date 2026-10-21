@@ -56,6 +56,10 @@ const pdfText = (base64: string): string =>
       Buffer.from(hex, 'hex').toString('latin1')
     );
 
+/** Operadores de trazo (`S`): cada marca de corte es un segmento trazado. */
+const strokeOps = (base64: string): number =>
+  pageStreams(base64).join(' ').match(/(?:^|\s)S(?=\s|$)/g)?.length ?? 0;
+
 /** Cantidad total de operadores de texto (`Tj`) en las páginas. */
 const textOperators = (base64: string): number =>
   pageStreams(base64).join('\n').match(/Tj/g)?.length ?? 0;
@@ -202,6 +206,20 @@ describe('generateProductLabels — PDF según la plantilla (§S3)', () => {
     expect(
       content.match(/0\.4196078431372549 0\.16862745098039217 0\.2627450980392157 rg/g)
     ).toHaveLength(2);
+  });
+
+  test('dibuja las marcas de corte: 8 ticks por etiqueta, en negro', async () => {
+    const result = await generateProductLabels({
+      branchId: 1,
+      selections: [{ productId: 1, quantity: 5 }],
+    });
+    if (!result.success) throw new Error(result.error);
+
+    const content = pageStreams(result.data.pdfBase64).join(' ');
+    // Negro como color de TRAZO (RG), no de relleno (rg).
+    expect(content).toContain('0 0 0 RG');
+    // Dos ticks por esquina: 8 por etiqueta, 40 para 5 etiquetas.
+    expect(strokeOps(result.data.pdfBase64)).toBe(5 * 8);
   });
 
   test('repite la etiqueta tantas veces como la cantidad pedida', async () => {

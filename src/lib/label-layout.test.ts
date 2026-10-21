@@ -10,8 +10,12 @@ import {
   CODE_BOX_TOP_MM,
   CODE_MAX_WIDTH_RATIO,
   COLS_PER_SHEET,
-  CUT_LINE_COLOR,
-  CUT_LINE_WIDTH_MM,
+  CUT_MARK_COLOR,
+  CELL_HEIGHT_MM,
+  CELL_WIDTH_MM,
+  CUT_MARK_LENGTH_MM,
+  CUT_MARK_OFFSET_MM,
+  CUT_MARK_WIDTH_MM,
   DOLLAR_INSET_MM,
   HANDLE_MAX_WIDTH_RATIO,
   HANDLE_TEXT,
@@ -19,7 +23,11 @@ import {
   LABELS_PER_SHEET,
   LABEL_BACKGROUND_COLOR,
   LABEL_HEIGHT_MM,
+  LABEL_INSET_X_MM,
+  LABEL_INSET_Y_MM,
   LABEL_WIDTH_MM,
+  GUTTER_X_MM,
+  GUTTER_Y_MM,
   PRICE_BOX_HEIGHT_MM,
   PRICE_BOX_RADIUS_MM,
   PRICE_BOX_TOP_MM,
@@ -29,6 +37,7 @@ import {
   TEXT_COLOR,
   calculateLabelSlots,
   calculateSheetCount,
+  cutMarksForSlot,
   formatPrice,
 } from './label-layout';
 
@@ -39,11 +48,18 @@ describe('label-layout.ts — hoja A4 horizontal 9 × 8 (S6)', () => {
     expect(COLS_PER_SHEET).toBe(9);
     expect(ROWS_PER_SHEET).toBe(8);
     expect(LABELS_PER_SHEET).toBe(72);
-    expect(LABEL_WIDTH_MM).toBe(33);
-    expect(LABEL_HEIGHT_MM).toBe(26.25);
-    // Sin márgenes: 9 × 33 = 297 y 8 × 26,25 = 210.
-    expect(COLS_PER_SHEET * LABEL_WIDTH_MM).toBe(SHEET_WIDTH_MM);
-    expect(ROWS_PER_SHEET * LABEL_HEIGHT_MM).toBe(SHEET_HEIGHT_MM);
+    // La celda es el paso de la grilla y entra exacta: 9 × 33 = 297 y 8 × 26,25 = 210.
+    expect(CELL_WIDTH_MM).toBe(33);
+    expect(CELL_HEIGHT_MM).toBe(26.25);
+    expect(COLS_PER_SHEET * CELL_WIDTH_MM).toBe(SHEET_WIDTH_MM);
+    expect(ROWS_PER_SHEET * CELL_HEIGHT_MM).toBe(SHEET_HEIGHT_MM);
+    // La etiqueta dibujada es más chica que su celda: ese resto es el canal (S2).
+    expect(LABEL_WIDTH_MM).toBe(30);
+    expect(LABEL_HEIGHT_MM).toBe(23.5);
+    expect(GUTTER_X_MM).toBeCloseTo(3, 6);
+    expect(GUTTER_Y_MM).toBeCloseTo(2.75, 6);
+    expect(LABEL_INSET_X_MM).toBeCloseTo(1.5, 6);
+    expect(LABEL_INSET_Y_MM).toBeCloseTo(1.375, 6);
   });
 
   test('calculateSheetCount cuenta hojas de 72 etiquetas', () => {
@@ -64,7 +80,13 @@ describe('label-layout.ts — posiciones', () => {
     const conSobrante = calculateLabelSlots(73);
     expect(conSobrante).toHaveLength(73);
     expect(conSobrante[71].page).toBe(0);
-    expect(conSobrante[72]).toMatchObject({ page: 1, column: 0, row: 0, x: 0, y: 0 });
+    expect(conSobrante[72]).toMatchObject({
+      page: 1,
+      column: 0,
+      row: 0,
+      x: LABEL_INSET_X_MM,
+      y: LABEL_INSET_Y_MM,
+    });
   });
 
   test('llena columna por columna: de arriba abajo y después la columna siguiente', () => {
@@ -72,10 +94,20 @@ describe('label-layout.ts — posiciones', () => {
 
     // Los primeros 8 van en la columna 0, filas 0-7.
     for (let row = 0; row < ROWS_PER_SHEET; row++) {
-      expect(slots[row]).toMatchObject({ column: 0, row, x: 0, y: row * LABEL_HEIGHT_MM });
+      expect(slots[row]).toMatchObject({
+        column: 0,
+        row,
+        x: LABEL_INSET_X_MM,
+        y: row * CELL_HEIGHT_MM + LABEL_INSET_Y_MM,
+      });
     }
     // La novena etiqueta abre la columna 1.
-    expect(slots[8]).toMatchObject({ column: 1, row: 0, x: LABEL_WIDTH_MM, y: 0 });
+    expect(slots[8]).toMatchObject({
+      column: 1,
+      row: 0,
+      x: CELL_WIDTH_MM + LABEL_INSET_X_MM,
+      y: LABEL_INSET_Y_MM,
+    });
     // La 17ª abre la columna 2 y la hoja 2 arranca de nuevo en (0, 0).
     expect(slots[16]).toMatchObject({ column: 2, row: 0 });
     expect(slots[72]).toMatchObject({ page: 1, column: 0, row: 0 });
@@ -89,6 +121,28 @@ describe('label-layout.ts — posiciones', () => {
       expect(slot.y + LABEL_HEIGHT_MM).toBeLessThanOrEqual(SHEET_HEIGHT_MM + 1e-9);
     }
   });
+
+  test('las marcas de corte caen dentro de la hoja y fuera de la etiqueta', () => {
+    for (const slot of calculateLabelSlots(72)) {
+      const marcas = cutMarksForSlot(slot);
+      // Dos ticks por esquina: uno horizontal y uno vertical.
+      expect(marcas).toHaveLength(8);
+
+      const derecha = slot.x + LABEL_WIDTH_MM;
+      const abajo = slot.y + LABEL_HEIGHT_MM;
+
+      for (const { x1, y1, x2, y2 } of marcas) {
+        expect(Math.min(x1, x2)).toBeGreaterThanOrEqual(0);
+        expect(Math.min(y1, y2)).toBeGreaterThanOrEqual(0);
+        expect(Math.max(x1, x2)).toBeLessThanOrEqual(SHEET_WIDTH_MM + 1e-9);
+        expect(Math.max(y1, y2)).toBeLessThanOrEqual(SHEET_HEIGHT_MM + 1e-9);
+        // Ningún tick pisa la etiqueta.
+        const fueraEnX = Math.max(x1, x2) <= slot.x + 1e-9 || Math.min(x1, x2) >= derecha - 1e-9;
+        const fueraEnY = Math.max(y1, y2) <= slot.y + 1e-9 || Math.min(y1, y2) >= abajo - 1e-9;
+        expect(fueraEnX || fueraEnY).toBe(true);
+      }
+    }
+  });
 });
 
 describe('label-layout.ts — medidas y colores de la plantilla (§S3)', () => {
@@ -96,12 +150,16 @@ describe('label-layout.ts — medidas y colores de la plantilla (§S3)', () => {
     expect(LABEL_BACKGROUND_COLOR).toBe('#fcd2d3');
     expect(BOX_COLOR).toBe('#ffeff3');
     expect(TEXT_COLOR).toBe('#6b2b43');
-    expect(CUT_LINE_COLOR).toBe('#000000');
+    expect(CUT_MARK_COLOR).toBe('#000000');
   });
 
-  test('respeta la geometría de cajas y líneas de corte', () => {
-    expect(CUT_LINE_WIDTH_MM).toBe(0.6);
-    // Caja del código: 81 % del ancho de la celda, centrada.
+  test('respeta la geometría de cajas y las marcas de corte', () => {
+    // Ticks: cortos, finos y separados del borde de la etiqueta.
+    expect(CUT_MARK_WIDTH_MM).toBe(0.2);
+    expect(CUT_MARK_LENGTH_MM).toBe(1.1);
+    expect(CUT_MARK_OFFSET_MM).toBe(0.15);
+    expect(CUT_MARK_LENGTH_MM + CUT_MARK_OFFSET_MM).toBeLessThanOrEqual(GUTTER_Y_MM / 2);
+    // Caja del código: 89 % del ancho de la etiqueta, centrada.
     expect(BOX_WIDTH_MM).toBe(26.7);
     expect(BOX_LEFT_MM).toBeCloseTo((LABEL_WIDTH_MM - BOX_WIDTH_MM) / 2, 6);
     expect(CODE_BOX_TOP_MM).toBe(1);
@@ -122,6 +180,9 @@ describe('label-layout.ts — medidas y colores de la plantilla (§S3)', () => {
     // El precio no debe invadir la caja del código ni el pie de la etiqueta.
     expect(CODE_BOX_TOP_MM + CODE_BOX_HEIGHT_MM).toBeLessThanOrEqual(PRICE_BOX_TOP_MM);
     expect(PRICE_BOX_TOP_MM + PRICE_BOX_HEIGHT_MM).toBeLessThanOrEqual(LABEL_HEIGHT_MM);
+    // El contenido completo (hasta el pie del handle) entra en la etiqueta achicada.
+    expect(HANDLE_TOP_MM).toBeLessThanOrEqual(LABEL_HEIGHT_MM);
+    expect(HANDLE_TOP_MM).toBeCloseTo(20.7, 6);
   });
 
   test('deja el $, el handle y su lugar en la etiqueta', () => {
