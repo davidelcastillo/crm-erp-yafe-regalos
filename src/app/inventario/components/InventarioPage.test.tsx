@@ -338,3 +338,18 @@ describe("AddProductButton parametrizado (tarea 1.1)", () => {
     expect(screen.queryByText("Nuevo Producto")).not.toBeInTheDocument();
   });
 });
+describe("InventarioPage — acceso a inactivos desde PC (S1)", () => {
+  it("la barra de acciones del encabezado lleva a /inventario/inactivos", async () => {
+    await renderPage();
+
+    // La tarjeta de celular ya existía; lo pedido es el acceso desde la barra
+    // de PC, que es el contenedor `hidden md:flex` del encabezado.
+    const enlaces = screen.getAllByRole("link", { name: /^Inactivos/ });
+    const barraDePc = enlaces.filter((enlace) =>
+      enlace.parentElement?.className.includes("md:flex")
+    );
+
+    expect(barraDePc).toHaveLength(1);
+    expect(barraDePc[0]).toHaveAttribute("href", "/inventario/inactivos");
+  });
+});

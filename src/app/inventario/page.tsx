@@ -18,6 +18,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import { CardSkeleton } from "@/components/ui/Skeleton";
 import { AddProductButton } from "../productos/components/AddProductButton";
 import { ProductForm } from "../productos/components/ProductForm";
+import Link from 'next/link';
 import { useEffect, useState, useCallback } from 'react';
 import { Product } from "@prisma/client";
 import Swal from "sweetalert2";
@@ -249,6 +250,10 @@ export default function InventarioPage() {
                 >
                   Exportar
                 </button>
+                {/* Acceso de PC a inactivos: en celular es la cuarta tarjeta. */}
+                <Link href="/inventario/inactivos" className="btn btn-primary">
+                  Inactivos
+                </Link>
               </>
             }
             menuItems={[
