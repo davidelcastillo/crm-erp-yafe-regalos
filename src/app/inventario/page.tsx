@@ -250,6 +250,13 @@ export default function InventarioPage() {
                 >
                   Exportar
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setLabelSelectorOpen(true)}
+                  className="btn btn-primary"
+                >
+                  Etiquetas
+                </button>
                 {/* Acceso de PC a inactivos: en celular es la cuarta tarjeta. */}
                 <Link href="/inventario/inactivos" className="btn btn-primary">
                   Inactivos
@@ -299,6 +306,16 @@ export default function InventarioPage() {
                 }
               />
               <ActionCard
+                label="Etiquetas"
+                hint="Precios para imprimir"
+                onClick={() => setLabelSelectorOpen(true)}
+                icon={
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M3 5.5A2.5 2.5 0 015.5 3h4.379a2 2 0 011.414.586l8.621 8.621a2 2 0 010 2.828l-4.879 4.879a2 2 0 01-2.828 0L3.586 11.293A2 2 0 013 9.879V5.5z" />
+                  </svg>
+                }
+              />
+              <ActionCard
                 label="Inactivos"
                 hint="Productos dados de baja"
                 href="/inventario/inactivos"
@@ -341,10 +358,11 @@ export default function InventarioPage() {
 
         </div>
 
-        {/* Label Selector Modal */}
+        {/* Wizard de etiquetas de precio (S3/S6) */}
         <LabelSelector
           isOpen={labelSelectorOpen}
           onClose={() => setLabelSelectorOpen(false)}
+          branches={branches}
         />
         
         {/* Movements Modal */}

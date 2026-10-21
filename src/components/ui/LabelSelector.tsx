@@ -1,145 +1,179 @@
-// src/components/ui/LabelSelector.tsx
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { ProductSearch } from '@/components/ProductSearch';
-import { generateProductLabels } from '@/actions/label-print';
-import { calculateSheetCount } from '@/lib/label-layout';
-import { searchProducts, getProducts } from '@/app/actions/product';
+import { useMemo, useState } from "react";
+import { getBranchProductsForExport, type ExportProductRow } from "@/app/actions/inventory";
+import { generateProductLabels } from "@/actions/label-print";
+import { calculateSheetCount } from "@/lib/label-layout";
+import { BranchPicker } from "@/components/ui/BranchPicker";
+import { Spinner } from "@/components/ui/Spinner";
 
-interface LabelSelectorProps {
+type BranchOption = { id: number; name: string };
+type Step = 1 | 2;
+
+export interface LabelSelectorProps {
   isOpen: boolean;
   onClose: () => void;
+  branches: BranchOption[];
 }
 
-export function LabelSelector({ isOpen, onClose }: LabelSelectorProps) {
-  const [query, setQuery] = useState('');
-  const [results, setResults] = useState<Array<{ id: number; code: string; name: string; price: number; stock: number }>>([]);
+/**
+ * Wizard de etiquetas de precio (S3/S6):
+ *   1. Elegir la sucursal (botón deshabilitado hasta elegir).
+ *   2. Elegir los productos **activos con stock > 0** de esa sucursal, con
+ *      cantidad por producto y «Todos» (una etiqueta por producto), y descargar
+ *      el PDF. El resumen muestra en vivo cuántas etiquetas y hojas A4 salen.
+ */
+export function LabelSelector({ isOpen, onClose, branches }: LabelSelectorProps) {
+  const [step, setStep] = useState<Step>(1);
+  const [branchId, setBranchId] = useState<number | null>(null);
+  const [rows, setRows] = useState<ExportProductRow[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [selections, setSelections] = useState<Map<string, number>>(new Map());
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [quantities, setQuantities] = useState<Record<number, string>>({});
   const [generating, setGenerating] = useState(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
 
-  const handleSearch = async (q: string) => {
-    if (!q.trim()) {
-      setResults([]);
-      setError(null);
+  const cargarProductos = async (branch: number) => {
+    setLoading(true);
+    setLoadError(null);
+    setRows([]);
+
+    const result = await getBranchProductsForExport({ branchId: branch });
+    setLoading(false);
+
+    if (!result?.success || !Array.isArray(result.data)) {
+      setLoadError(result?.error ?? "Error al obtener los productos");
       return;
     }
 
-    setLoading(true);
-    setError(null);
-    try {
-      const result = await searchProducts({ query: q });
-      if (result.success) {
-        // Convert Decimal price to number
-        const converted = result.data?.map(p => ({
-          ...p,
-          price: Number(p.price),
-        })) ?? [];
-        setResults(converted);
-      } else {
-        setError(result.error ?? 'Error al buscar productos');
-        setResults([]);
-      }
-    } catch (err) {
-      setError('Error de conexión');
-      setResults([]);
-    } finally {
-      setLoading(false);
-    }
+    setRows(result.data as ExportProductRow[]);
   };
 
-  const handleSelect = (product: { id: number; code: string; name: string; price: number; stock: number }) => {
-    const productId = product.id.toString();
-    const currentQty = selections.get(productId) ?? 0;
-    setSelections(new Map(selections).set(productId, currentQty + 1));
+  const handleContinue = () => {
+    if (branchId === null) return;
+    setSelectedIds([]);
+    setQuantities({});
+    setSearch("");
+    setGenerateError(null);
+    setStep(2);
+    void cargarProductos(branchId);
   };
 
-  const handleRemove = (productId: string) => {
-    const currentQty = selections.get(productId);
-    if (currentQty === 1) {
-      selections.delete(productId);
-    } else if (currentQty && currentQty > 1) {
-      selections.set(productId, currentQty - 1);
+  const handleClose = () => {
+    setStep(1);
+    setBranchId(null);
+    setRows([]);
+    setLoadError(null);
+    setSearch("");
+    setSelectedIds([]);
+    setQuantities({});
+    setGenerateError(null);
+    onClose();
+  };
+
+  const visibles = useMemo(() => {
+    const texto = search.trim().toLowerCase();
+    if (!texto) return rows;
+    return rows.filter(
+      (row) =>
+        row.name.toLowerCase().includes(texto) ||
+        row.code.toLowerCase().includes(texto)
+    );
+  }, [rows, search]);
+
+  const allSelected = rows.length > 0 && selectedIds.length === rows.length;
+
+  const cantidadDe = (id: number) => {
+    const cantidad = parseInt(quantities[id] ?? "1", 10);
+    return Number.isInteger(cantidad) && cantidad > 0 ? cantidad : 0;
+  };
+
+  // Cantidad de etiquetas: solo cuentan las filas tildadas con cantidad válida.
+  const totalLabels = selectedIds.reduce((total, id) => total + cantidadDe(id), 0);
+  const totalSheets = calculateSheetCount(totalLabels);
+
+  const toggleSelection = (id: number) => {
+    const yaElegido = selectedIds.includes(id);
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((selected) => selected !== id) : [...prev, id]
+    );
+    if (!yaElegido) setQuantities((actual) => ({ ...actual, [id]: actual[id] ?? "1" }));
+  };
+
+  const toggleAll = () => {
+    if (allSelected) {
+      setSelectedIds([]);
+      return;
     }
-    setSelections(new Map(selections));
+    setSelectedIds(rows.map((row) => row.id));
+    setQuantities(
+      rows.reduce<Record<number, string>>(
+        (actual, row) => ({ ...actual, [row.id]: actual[row.id] ?? "1" }),
+        {}
+      )
+    );
+  };
+
+  const downloadPdf = (pdfBase64: string, filename: string) => {
+    const byteCharacters = atob(pdfBase64);
+    const byteNumbers = new Array(byteCharacters.length);
+    for (let i = 0; i < byteCharacters.length; i++) {
+      byteNumbers[i] = byteCharacters.charCodeAt(i);
+    }
+    const blob = new Blob([new Uint8Array(byteNumbers)], { type: "application/pdf" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   const handleGenerate = async () => {
-    if (selections.size === 0) {
-      setGenerateError('Seleccione al menos un producto');
-      return;
-    }
-
+    if (branchId === null || totalLabels === 0) return;
     setGenerating(true);
     setGenerateError(null);
-    setSuccess(false);
 
-    try {
-      // Convert Map to array of { productId: string, quantity: number }
-      const selectionArray: { productId: string; quantity: number }[] = Array.from(selections.entries()).map(
-        ([productId, quantity]) => ({ productId, quantity })
-      );
+    // Las selecciones van en el orden de la lista, con su cantidad.
+    const result = await generateProductLabels({
+      branchId,
+      selections: rows
+        .filter((row) => selectedIds.includes(row.id))
+        .map((row) => ({ productId: row.id, quantity: cantidadDe(row.id) })),
+    });
 
-// Call the server action to generate the PDF
-       const result = await generateProductLabels(
-         selectionArray.map(s => ({ productId: Number(s.productId), quantity: s.quantity }))
-       );
-
-       // The action returns a base64 encoded PDF string
-       // Convert it to a Blob for download
-       const byteCharacters = atob(result);
-       const byteNumbers = new Array(byteCharacters.length);
-       for (let i = 0; i < byteCharacters.length; i++) {
-         byteNumbers[i] = byteCharacters.charCodeAt(i);
-       }
-       const byteArray = new Uint8Array(byteNumbers);
-       const blob = new Blob([byteArray], { type: 'application/pdf' });
-       
-       // Create a download link
-       const url = window.URL.createObjectURL(blob);
-       const a = document.createElement('a');
-       a.href = url;
-       a.download = `etiquetas_${Date.now()}.pdf`;
-       document.body.appendChild(a);
-       a.click();
-       window.URL.revokeObjectURL(url);
-       a.remove();
-       setSuccess(true);
-    } catch (err) {
-      setGenerateError(err instanceof Error ? err.message : 'Error al generar el PDF');
-    } finally {
-      setGenerating(false);
+    if (result.success) {
+      downloadPdf(result.data.pdfBase64, result.data.filename);
+    } else {
+      setGenerateError(result.error);
     }
+    setGenerating(false);
   };
-
-  const totalLabels = Array.from(selections.values()).reduce((sum, qty) => sum + qty, 0);
-  const totalSheets = calculateSheetCount(totalLabels);
 
   if (!isOpen) return null;
 
   return (
     <div
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-end justify-center"
-      onClick={onClose}
+      className="fixed inset-0 bg-black/30 backdrop-blur-md z-[60] flex items-center justify-center"
       role="dialog"
       aria-modal="true"
       aria-labelledby="label-selector-title"
     >
       <div
-        className="bg-white w-full max-w-lg rounded-t-3xl p-6 animate-slide-up max-h-[90vh] overflow-y-auto"
+        className="bg-white w-full max-w-xl md:max-w-4xl rounded-2xl p-6 animate-scale-in max-h-[90vh] md:max-h-[85vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-between items-center mb-4">
           <h2 id="label-selector-title" className="text-xl font-semibold text-[#222222]">
-            Generar Etiquetas
+            Etiquetas de precio
           </h2>
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleClose}
             className="btn btn-icon btn-round hover:bg-[#f2f2f2]"
             aria-label="Cerrar"
           >
@@ -149,169 +183,161 @@ export function LabelSelector({ isOpen, onClose }: LabelSelectorProps) {
           </button>
         </div>
 
-        <div className="mb-4">
-          <label htmlFor="label-search" className="block text-sm font-medium text-[#222222] mb-1">
-            Buscar producto
-          </label>
-          <div className="relative">
-            <input
-              id="label-search"
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  handleSearch((e.target as HTMLInputElement).value);
-                }
-              }}
-              className="w-full px-4 py-3 bg-[#f8f8f8] rounded-xl text-base text-[#222222] placeholder-[#999] focus:outline-none focus:ring-2 focus:ring-[#3b82f6]/20"
-              placeholder="Buscar producto por código o nombre..."
-              autoComplete="off"
+        <p className="text-xs font-medium uppercase tracking-wide text-[#6a6a6a] mb-4">
+          Paso {step} de 2
+        </p>
+
+        {step === 1 && (
+          <div>
+            <h3 className="text-base font-semibold text-[#222222] mb-3">Elegí la sucursal</h3>
+            <BranchPicker
+              branches={branches}
+              value={branchId}
+              onChange={(id) => setBranchId(id)}
+              columns={2}
+              label="Sucursal"
             />
-            {loading && (
-              <div className="absolute inset-y-0 right-0 flex items-center px-3 text-[#6a6a6a]">
-                <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
-              </div>
-            )}
+            <div className="md:flex md:justify-end">
+              <button
+                type="button"
+                onClick={handleContinue}
+                disabled={branchId === null}
+                className="btn btn-primary w-full mt-6 md:w-auto"
+              >
+                Siguiente
+              </button>
+            </div>
           </div>
-          {error && (
-            <p className="mt-2 text-sm text-red-500" role="alert">
-              {error}
-            </p>
-          )}
-          {!loading && results.length > 0 && (
-            <ul className="mt-2 space-y-1 max-h-40 overflow-y-auto" role="listbox">
-              {results.map((product) => (
-                <li
-                  key={product.id}
-                  onClick={() => handleSelect(product)}
-                  className="px-3 py-2 bg-white rounded-lg border border-gray-100 hover:bg-[#f8f8f8] transition-colors cursor-pointer flex items-center justify-between"
-                  role="option"
-                  tabIndex={0}
-                  onKeyDown={(e) => e.key === "Enter" && handleSelect(product)}
+        )}
+
+        {step === 2 && (
+          <div className="md:grid md:grid-cols-2 md:gap-5 md:items-start">
+            <section className="min-w-0">
+              <h3 className="text-base font-semibold text-[#222222] mb-3">
+                Elegí los productos
+              </h3>
+
+              <input
+                type="search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Buscar por nombre o código"
+                aria-label="Buscar producto"
+                className="w-full px-3 py-3 mb-3 min-h-[48px] rounded-xl border border-gray-200 focus:border-[#ec4899] focus:ring-2 focus:ring-[#ec4899]/30 outline-none transition-all text-sm touch-manipulation"
+              />
+
+              {loading && <Spinner label="Cargando productos..." />}
+
+              {!loading && loadError && (
+                <p className="py-8 text-center text-sm text-[#c13515]">{loadError}</p>
+              )}
+
+              {!loading && !loadError && rows.length === 0 && (
+                <p className="py-8 text-center text-sm text-[#6a6a6a]">
+                  No hay productos con stock en esta sucursal
+                </p>
+              )}
+
+              {!loading && !loadError && rows.length > 0 && (
+                <label className="flex items-center gap-3 p-3 mb-2 min-h-[44px] rounded-xl bg-[#f8f8f8] cursor-pointer touch-manipulation">
+                  <input
+                    type="checkbox"
+                    checked={allSelected}
+                    onChange={toggleAll}
+                    className="w-5 h-5 accent-[#ec4899]"
+                  />
+                  <span className="text-sm font-medium text-[#222222]">Todos</span>
+                </label>
+              )}
+
+              {!loading && !loadError && visibles.length > 0 && (
+                <div
+                  role="group"
+                  aria-label="Productos con stock"
+                  className="space-y-2 max-h-60 overflow-y-auto"
                 >
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-[#222222] truncate">{product.name}</p>
-                    <div className="flex items-center gap-2 text-xs text-[#6a6a6a] mt-0.5">
-                      <span className="px-2 py-0.5 bg-[#f2f2f2] rounded">{product.code}</span>
-                      <span>${product.price.toFixed(2)}</span>
-                      <span className={product.stock <= 5 ? "text-red-500" : ""}>
-                        Stock: {product.stock}
-                      </span>
+                  {visibles.map((row) => (
+                    <div
+                      key={row.id}
+                      className="flex items-center gap-3 p-3 min-h-[44px] rounded-xl hover:bg-[#f8f8f8] transition-colors"
+                    >
+                      <input
+                        type="checkbox"
+                        id={`label-check-${row.id}`}
+                        checked={selectedIds.includes(row.id)}
+                        onChange={() => toggleSelection(row.id)}
+                        aria-label={`Seleccionar ${row.name}`}
+                        className="w-5 h-5 accent-[#ec4899]"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <label
+                          htmlFor={`label-check-${row.id}`}
+                          className="block text-sm font-medium text-[#222222] truncate cursor-pointer"
+                        >
+                          {row.name}
+                        </label>
+                        <span className="block text-xs text-[#6a6a6a]">
+                          {row.code} · Stock: {row.stock}
+                        </span>
+                      </div>
+                      <input
+                        type="number"
+                        min={1}
+                        max={999}
+                        value={quantities[row.id] ?? "1"}
+                        onChange={(e) =>
+                          setQuantities((prev) => ({ ...prev, [row.id]: e.target.value }))
+                        }
+                        disabled={!selectedIds.includes(row.id) || generating}
+                        aria-label={`Cantidad ${row.name}`}
+                        className="w-20 px-3 py-3 rounded-xl border border-gray-200 focus:border-[#ec4899] focus:ring-2 focus:ring-[#ec4899]/30 outline-none transition-all text-sm disabled:opacity-40 disabled:cursor-not-allowed tabular-nums text-right"
+                      />
                     </div>
-                  </div>
-                  <svg className="w-4 h-4 text-[#6a6a6a] flex-shrink-0 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </li>
-              ))}
-            </ul>
-          )}
-          {!loading && results.length === 0 && query.trim() && (
-            <p className="mt-2 text-sm text-[#222222]">No se encontraron productos</p>
-          )}
-        </div>
+                  ))}
+                </div>
+              )}
 
-        <div className="mt-4">
-          <label className="block text-sm font-medium text-[#222222] mb-1">
-            Productos seleccionados
-          </label>
-          {selections.size === 0 ? (
-            <p className="text-sm text-[#6a6a6a]">Ningún producto seleccionado</p>
-          ) : (
-            <ul className="space-y-1">
-              {Array.from(selections.entries()).map(([productId, qty]) => {
-                const product = results.find(p => p.id.toString() === productId);
-                return (
-                  <li
-                    key={productId}
-                    className="flex items-center justify-between px-3 py-2 bg-white rounded-lg border border-gray-100"
-                  >
-                    <div className="flex-1 min-w-0">
-                      {product ? (
-                        <>
-                          <p className="text-sm font-medium text-[#222222] truncate">{product.name}</p>
-                          <p className="text-xs text-[#6a6a6a]">Código: {product.code}</p>
-                        </>
-                      ) : (
-                        <p className="text-sm text-[#6a6a6a]">Producto ID: {productId}</p>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => handleRemove(productId)}
-                        disabled={qty === 1}
-                        className="p-1 rounded hover:bg-[#f2f2f2] transition-colors"
-                        aria-label="Disminuir cantidad"
-                      >
-                        <svg className="w-4 h-4 text-[#6a6a6a]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12H9m0 0 0 0m0 0h6m-6 0l-3 3m3-3l3-3" />
-                        </svg>
-                      </button>
-                      <span className="mx-2 font-medium">{qty}</span>
-                      <button
-                        onClick={() => handleSelect(results.find(p => p.id.toString() === productId)!)}
-                        className="p-1 rounded hover:bg-[#f2f2f2] transition-colors"
-                        aria-label="Aumentar cantidad"
-                      >
-                        <svg className="w-4 h-4 text-[#6a6a6a]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v12m0 0l-3-3m3 3l3-3" />
-                        </svg>
-                      </button>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </div>
+              {!loading && !loadError && rows.length > 0 && visibles.length === 0 && (
+                <p className="py-6 text-center text-sm text-[#6a6a6a]">
+                  No hay productos que coincidan con la búsqueda
+                </p>
+              )}
+            </section>
 
-        <div className="mt-4">
-          <p className="text-sm font-medium text-[#222222]">
-            {totalLabels} etiqueta{totalLabels !== 1 ? 's' : ''} en {totalSheets} hoja{totalSheets !== 1 ? 's' : ''} A4
-          </p>
-        </div>
+            {/* Resumen en vivo: en celular cae debajo de la lista; desde `md`
+                va a la derecha y queda pegado. */}
+            <aside className="mt-4 rounded-2xl border border-black/10 bg-[#f7f7f7] p-4 md:mt-0 md:sticky md:top-4">
+              <h3 className="text-xs font-medium uppercase tracking-wide text-[#6a6a6a]">
+                Resumen
+              </h3>
 
-        {generating && (
-          <div className="mt-4 flex items-center justify-center py-4 text-[#6a6a6a]">
-            <svg className="animate-spin w-5 h-5 mr-2" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-            </svg>
-            Generando PDF...
+              <p className="mt-2 text-sm font-semibold text-brand-rosa-texto tabular-nums">
+                {totalLabels} {totalLabels === 1 ? "etiqueta" : "etiquetas"} en {totalSheets}{" "}
+                {totalSheets === 1 ? "hoja" : "hojas"} A4
+              </p>
+
+              {generateError && (
+                <p className="mt-3 text-sm text-[#c13515]" role="alert">
+                  {generateError}
+                </p>
+              )}
+
+              <div className="mt-4 flex items-center justify-between gap-3">
+                <button type="button" onClick={() => setStep(1)} className="btn btn-secondary">
+                  Volver
+                </button>
+                <button
+                  type="button"
+                  onClick={handleGenerate}
+                  disabled={totalLabels === 0 || generating}
+                  className="btn btn-primary flex-1 md:flex-none"
+                >
+                  {generating ? "Generando..." : "Descargar PDF"}
+                </button>
+              </div>
+            </aside>
           </div>
         )}
-
-        {generateError && (
-          <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm" role="alert">
-            {generateError}
-          </div>
-        )}
-
-        {success && (
-          <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
-            PDF generado con éxito. La descarga debería haber comenzado.
-          </div>
-        )}
-
-        <div className="mt-6 flex justify-end space-x-3">
-          <button
-            onClick={onClose}
-            className="btn btn-secondary"
-          >
-            Cancelar
-          </button>
-          <button
-            onClick={handleGenerate}
-            disabled={generating || selections.size === 0}
-            className="btn btn-primary"
-          >
-            {generating ? 'Generando...' : 'Descargar Etiquetas PDF'}
-          </button>
-        </div>
       </div>
     </div>
   );
