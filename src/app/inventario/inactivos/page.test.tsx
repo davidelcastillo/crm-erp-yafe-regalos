@@ -70,6 +70,30 @@ describe('InactivosPage', () => {
     );
   });
 
+  // S4: por defecto se ordena por código y se puede pasar a última modificación.
+  it('ordena por código por defecto y permite cambiar a última modificación', async () => {
+    mockGetInactiveProducts.mockResolvedValue({
+      success: true,
+      data: [
+        { id: 3, name: 'Producto Alfa', code: 'BBB888', price: 10, category: null, updatedAt: '2026-01-03T00:00:00.000Z' },
+        { id: 2, name: 'Producto Zeta', code: 'AAA099', price: 20, category: null, updatedAt: '2026-01-02T00:00:00.000Z' },
+        { id: 1, name: 'Producto Mmm', code: 'AAA001', price: 30, category: null, updatedAt: '2026-01-01T00:00:00.000Z' },
+      ],
+    });
+
+    render(<InactivosPage />);
+    await screen.findByText('Producto Alfa');
+
+    const nombres = () =>
+      screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent);
+
+    expect(nombres()).toEqual(['Producto Mmm', 'Producto Zeta', 'Producto Alfa']);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Última modificación' }));
+
+    expect(nombres()).toEqual(['Producto Alfa', 'Producto Zeta', 'Producto Mmm']);
+  });
+
   it('filtra también por código', async () => {
     render(<InactivosPage />);
     await screen.findByText('Producto Alfa');

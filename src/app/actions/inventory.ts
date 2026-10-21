@@ -14,6 +14,7 @@ import {
   getMovementsFiltersSchema,
 } from "@/lib/validations/branchMovement";
 import { exportInventorySchema } from "@/lib/validations/export";
+import { sortProducts } from "@/lib/product-order";
 import {
   buildExportFileName,
   generateProductsPdf,
@@ -23,8 +24,16 @@ import {
 /**
  * Fila de exportación con el id numérico del producto, requerido por
  * exportBranchProductsPdf para re-validar la membresía de la sucursal.
+ * `updatedAt` viaja serializado para que el wizard pueda ordenar por última
+ * modificación (S4).
  */
-export type ExportProductRow = ProductRow & { id: number };
+export type ExportProductRow = ProductRow & { id: number; updatedAt?: string | null };
+
+/** `sortBy` es opcional para no romper a los callers existentes: el default es
+ * el orden por código (S4). */
+const exportBranchPdfSchema = exportInventorySchema.extend({
+  sortBy: z.enum(["code", "updated"]).default("code"),
+});
 
 const getProductStockSchema = z.object({
   productId: z.number().int().positive("Producto inválido"),
@@ -70,14 +79,17 @@ export async function getBranchInventory(data: unknown) {
       },
       orderBy: { name: 'asc' },
     });
-    // Map to simplify
-    const result = productsWithInventory.map(p => ({
-      id: p.id,
-      name: p.name,
-      code: p.code,
-      stock: p.inventory[0]?.stock ?? 0,
-      active: p.active,
-    }));
+    // Map to simplify. El orden por código es el default de todas las listas
+    // (S4); la consulta queda ordenada por nombre para no cambiar el SQL.
+    const result = sortProducts(
+      productsWithInventory.map(p => ({
+        id: p.id,
+        name: p.name,
+        code: p.code,
+        stock: p.inventory[0]?.stock ?? 0,
+        active: p.active,
+      }))
+    );
     return { success: true, data: parseArray(result) };
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -255,7 +267,7 @@ export async function getProductsWithBranchStock(filters?: unknown) {
       },
     });
 
-    return { success: true, data: parseArray(products) };
+    return { success: true, data: parseArray(sortProducts(products)) };
   } catch (error) {
     if (error instanceof z.ZodError) {
       return {
@@ -843,7 +855,7 @@ const getBranchProductsForExportSchema = z.object({
 
 /**
  * Obtiene los productos con stock (>0) en una sucursal, proyectados como
- * ProductRow[] (code, name, stock, price) ordenados por nombre asc.
+ * ProductRow[] (code, name, stock, price) ordenados por código (S4).
  * Útil para el paso 2 del wizard de exportación.
  */
 export async function getBranchProductsForExport(data: unknown) {
@@ -860,19 +872,23 @@ export async function getBranchProductsForExport(data: unknown) {
       select: {
         stock: true,
         product: {
-          select: { id: true, code: true, name: true, price: true },
+          select: { id: true, code: true, name: true, price: true, updatedAt: true },
         },
       },
       orderBy: { product: { name: "asc" } },
     });
 
-    const rows: ExportProductRow[] = inventory.map((inv) => ({
-      id: inv.product.id,
-      code: inv.product.code,
-      name: inv.product.name,
-      stock: inv.stock,
-      price: Number(inv.product.price),
-    }));
+    // Prisma no ordena natural por el sufijo numérico: se ordena en memoria.
+    const rows: ExportProductRow[] = sortProducts(
+      inventory.map((inv) => ({
+        id: inv.product.id,
+        code: inv.product.code,
+        name: inv.product.name,
+        stock: inv.stock,
+        price: Number(inv.product.price),
+        updatedAt: inv.product.updatedAt?.toISOString() ?? null,
+      }))
+    );
 
     return { success: true, data: rows };
   } catch (error) {
@@ -898,7 +914,7 @@ export async function getBranchProductsForExport(data: unknown) {
  */
 export async function exportBranchProductsPdf(data: unknown) {
   try {
-    const { branchId, selectedProductIds } = exportInventorySchema.parse(data);
+    const { branchId, selectedProductIds, sortBy } = exportBranchPdfSchema.parse(data);
 
     const branch = await prisma.branch.findUnique({
       where: { id: branchId },
@@ -921,7 +937,7 @@ export async function exportBranchProductsPdf(data: unknown) {
         productId: true,
         stock: true,
         product: {
-          select: { code: true, name: true, price: true },
+          select: { code: true, name: true, price: true, updatedAt: true },
         },
       },
     });
@@ -935,14 +951,17 @@ export async function exportBranchProductsPdf(data: unknown) {
       };
     }
 
-    const rows: ProductRow[] = inventory
-      .sort((a, b) => a.product.name.localeCompare(b.product.name))
-      .map((inv) => ({
+    // El orden del PDF es el que eligió el usuario en el wizard (S4).
+    const rows: Array<ProductRow & { updatedAt?: Date }> = sortProducts(
+      inventory.map((inv) => ({
         code: inv.product.code,
         name: inv.product.name,
         stock: inv.stock,
         price: Number(inv.product.price),
-      }));
+        updatedAt: inv.product.updatedAt,
+      })),
+      sortBy
+    );
 
     const exportedAt = new Date();
     const pdfBase64 = await generateProductsPdf(rows, {

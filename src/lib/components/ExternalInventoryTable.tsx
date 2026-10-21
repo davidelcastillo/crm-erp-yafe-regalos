@@ -1,12 +1,16 @@
 "use client";
 
 import { useState } from "react";
+import { ProductSortToggle } from "@/components/ui/ProductSortToggle";
+import { sortProducts, type ProductSortMode } from "@/lib/product-order";
 
 export interface InventoryItem {
   code: string;
   name: string;
   stock: number;
   price: number;
+  /** Opcional: el catálogo ordena por esta fecha cuando el payload la trae. */
+  updatedAt?: string | null;
 }
 
 interface ExternalInventoryTableProps {
@@ -19,9 +23,15 @@ export default function ExternalInventoryTable({
   showHeaders = true,
 }: ExternalInventoryTableProps) {
   const [search, setSearch] = useState("");
+  // S4: por código por defecto, con cambio a última modificación.
+  const [sortMode, setSortMode] = useState<ProductSortMode>("code");
   const query = search.trim().toLowerCase();
-  const visible = inventoryData.filter((item) =>
-    item.name.toLowerCase().includes(query) || item.code.toLowerCase().includes(query)
+  const visible = sortProducts(
+    inventoryData.filter(
+      (item) =>
+        item.name.toLowerCase().includes(query) || item.code.toLowerCase().includes(query)
+    ),
+    sortMode
   );
 
   if (inventoryData.length === 0) {
@@ -45,6 +55,9 @@ export default function ExternalInventoryTable({
           className="mt-2 w-full min-h-12 rounded-xl border border-black/10 bg-white px-4 text-base focus-visible:outline-2 focus-visible:outline-pink-500"
         />
       </label>
+      <div className="flex justify-end">
+        <ProductSortToggle value={sortMode} onChange={setSortMode} />
+      </div>
       {visible.length === 0 && (
         <p role="status" className="py-6 text-center text-[#6a6a6a]">
           No se encontraron productos para esta búsqueda

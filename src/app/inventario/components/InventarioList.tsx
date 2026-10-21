@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { Product } from "@prisma/client";
 import { InventarioCard } from "./InventarioCard";
 import { sumStock, type StockSource } from "@/lib/inventory-stock";
+import { sortProducts } from "@/lib/product-order";
 
 interface InventarioListProps {
   products: Product[];
@@ -14,7 +15,7 @@ interface InventarioListProps {
   categories?: Array<{ id: number; name: string }>;
 }
 
-type SortOption = "name" | "stock-asc" | "stock-desc" | "recent";
+type SortOption = "code" | "updated" | "name" | "stock-asc" | "stock-desc";
 
 /** Sum stock across every branch row (inventory[0] alone is wrong for "Todas"). */
 function readStock(p: Product): number {
@@ -22,7 +23,7 @@ function readStock(p: Product): number {
 }
 
 export function InventarioList({ products, onViewMovements, searchActive = false, categories = [] }: InventarioListProps) {
-  const [sortBy, setSortBy] = useState<SortOption>("recent");
+  const [sortBy, setSortBy] = useState<SortOption>("code");
   const [showOnlyLowStock, setShowOnlyLowStock] = useState(false);
 
   // Filter (low stock only) and sort products. Search is handled server-side.
@@ -34,7 +35,7 @@ export function InventarioList({ products, onViewMovements, searchActive = false
       result = result.filter((p) => readStock(p) <= 5);
     }
 
-    // Sort
+    // Sort. Por código es el default de todas las listas de productos (S4).
     switch (sortBy) {
       case "name":
         result.sort((a, b) => a.name.localeCompare(b.name));
@@ -45,13 +46,11 @@ export function InventarioList({ products, onViewMovements, searchActive = false
       case "stock-desc":
         result.sort((a, b) => readStock(b) - readStock(a));
         break;
-      case "recent":
+      case "updated":
+        return sortProducts(result, "updated");
+      case "code":
       default:
-        result.sort(
-          (a, b) =>
-            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        );
-        break;
+        return sortProducts(result, "code");
     }
 
     return result;
@@ -78,7 +77,8 @@ export function InventarioList({ products, onViewMovements, searchActive = false
             aria-label="Ordenar por"
             className="min-h-[44px] w-full rounded-xl bg-[#f8f8f8] px-3 py-2.5 text-base text-[#222222] focus:outline-none focus:ring-2 focus:ring-[#ec4899]/30 sm:w-auto sm:text-sm"
           >
-            <option value="recent">Más recientes</option>
+            <option value="code">Código</option>
+            <option value="updated">Última modificación</option>
             <option value="name">Por nombre</option>
             <option value="stock-asc">Stock: menor a mayor</option>
             <option value="stock-desc">Stock: mayor a menor</option>

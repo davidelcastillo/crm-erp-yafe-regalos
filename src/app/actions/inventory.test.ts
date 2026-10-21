@@ -395,6 +395,72 @@ describe("exportBranchProductsPdf (Fase 4 branch PDF export)", () => {
     expect(result.error).toContain("Sucursal no encontrada");
     expect(generateProductsPdf).not.toHaveBeenCalled();
   });
+
+  // S4: el PDF respeta el orden elegido; sin `sortBy` el default es por código.
+  const filasDesordenadas = [
+    {
+      productId: 3,
+      stock: 1,
+      product: {
+        code: "BBB888",
+        name: "Aaa producto",
+        price: 10,
+        updatedAt: new Date("2026-01-03T00:00:00.000Z"),
+      },
+    },
+    {
+      productId: 2,
+      stock: 1,
+      product: {
+        code: "AAA099",
+        name: "Zzz producto",
+        price: 10,
+        updatedAt: new Date("2026-01-02T00:00:00.000Z"),
+      },
+    },
+    {
+      productId: 1,
+      stock: 1,
+      product: {
+        code: "AAA001",
+        name: "Mmm producto",
+        price: 10,
+        updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+      },
+    },
+  ];
+
+  const codigosDelPdf = () =>
+    ((generateProductsPdf as jest.Mock).mock.calls[0][0] as Array<{ code: string }>).map(
+      (row) => row.code
+    );
+
+  it("ordena las filas por código cuando no se pide otro orden (S4)", async () => {
+    mockBranchFindUnique.mockResolvedValue({ code: "DEP", name: "Depósito" });
+    mockBranchInventoryFindMany.mockResolvedValue(filasDesordenadas);
+
+    const result = await exportBranchProductsPdf({
+      branchId: 1,
+      selectedProductIds: [1, 2, 3],
+    });
+
+    expect(result.success).toBe(true);
+    expect(codigosDelPdf()).toEqual(["AAA001", "AAA099", "BBB888"]);
+  });
+
+  it("respeta sortBy «updated»: la última modificación va primero (S4)", async () => {
+    mockBranchFindUnique.mockResolvedValue({ code: "DEP", name: "Depósito" });
+    mockBranchInventoryFindMany.mockResolvedValue(filasDesordenadas);
+
+    const result = await exportBranchProductsPdf({
+      branchId: 1,
+      selectedProductIds: [1, 2, 3],
+      sortBy: "updated",
+    });
+
+    expect(result.success).toBe(true);
+    expect(codigosDelPdf()).toEqual(["BBB888", "AAA099", "AAA001"]);
+  });
 });
 
 // ===========================================================================
@@ -424,6 +490,56 @@ describe("getBranchProductsForExport", () => {
           branchId: 1,
           stock: { gt: 0 },
           product: { active: true },
+        }),
+      })
+    );
+  });
+
+  it("devuelve las filas en orden por código y con su updatedAt (S4)", async () => {
+    mockBranchInventoryFindMany.mockResolvedValue([
+      {
+        stock: 1,
+        product: {
+          id: 3,
+          code: "BBB888",
+          name: "Aaa producto",
+          price: 10,
+          updatedAt: new Date("2026-01-03T00:00:00.000Z"),
+        },
+      },
+      {
+        stock: 1,
+        product: {
+          id: 2,
+          code: "AAA099",
+          name: "Zzz producto",
+          price: 10,
+          updatedAt: new Date("2026-01-02T00:00:00.000Z"),
+        },
+      },
+      {
+        stock: 1,
+        product: {
+          id: 1,
+          code: "AAA001",
+          name: "Mmm producto",
+          price: 10,
+          updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+        },
+      },
+    ]);
+
+    const result = await getBranchProductsForExport({ branchId: 1 });
+
+    expect(result.data?.map((row) => row.code)).toEqual(["AAA001", "AAA099", "BBB888"]);
+    // El wizard necesita la fecha para ofrecer «Última modificación».
+    expect(result.data?.[0]?.updatedAt).toBe("2026-01-01T00:00:00.000Z");
+    expect(mockBranchInventoryFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        select: expect.objectContaining({
+          product: expect.objectContaining({
+            select: expect.objectContaining({ updatedAt: true }),
+          }),
         }),
       })
     );

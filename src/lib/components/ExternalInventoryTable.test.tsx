@@ -101,23 +101,30 @@ describe("ExternalInventoryTable", () => {
     expect(
       container.querySelectorAll("div.md\\:hidden > div.rounded-2xl")
     ).toHaveLength(2);
-    // Sin botones ni enlaces: el catálogo no tiene acciones de cuenta.
-    expect(container.querySelectorAll("button")).toHaveLength(0);
+    // Sin acciones de cuenta: el único control es el de orden (S4), que no
+    // inicia sesión ni navega a ninguna cuenta.
+    const grupoDeOrden = container.querySelector(
+      '[role="group"][aria-label="Ordenar por"]'
+    );
+    expect(grupoDeOrden).not.toBeNull();
+    const botones = Array.from(container.querySelectorAll("button"));
+    expect(botones.length).toBeGreaterThan(0);
+    expect(botones.every((b) => grupoDeOrden?.contains(b))).toBe(true);
     expect(container.querySelectorAll("a")).toHaveLength(0);
   });
 
   it("muestra los encabezados de la tabla y los oculta con showHeaders en false", () => {
     const { unmount } = render(<ExternalInventoryTable inventoryData={items} />);
-    expect(screen.getByText("Código")).toBeInTheDocument();
-    expect(screen.getByText("Producto")).toBeInTheDocument();
-    expect(screen.getByText("Stock")).toBeInTheDocument();
-    expect(screen.getByText("Precio")).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Código" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Producto" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Stock" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Precio" })).toBeInTheDocument();
     unmount();
 
     render(
       <ExternalInventoryTable inventoryData={items} showHeaders={false} />
     );
-    expect(screen.queryByText("Código")).not.toBeInTheDocument();
-    expect(screen.queryByText("Stock")).not.toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: "Código" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: "Stock" })).not.toBeInTheDocument();
   });
 });

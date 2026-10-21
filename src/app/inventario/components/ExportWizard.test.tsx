@@ -198,6 +198,72 @@ describe("ExportWizard", () => {
     expect(screen.getByText(/1 seleccionados/i)).toBeInTheDocument();
   });
 
+  it("ordena la lista por código y pasa el orden elegido al PDF (S4)", async () => {
+    URL.createObjectURL = jest.fn(() => "blob:test");
+    URL.revokeObjectURL = jest.fn();
+    const originalClick = HTMLAnchorElement.prototype.click;
+    HTMLAnchorElement.prototype.click = jest.fn();
+
+    mockGetBranchProductsForExport.mockResolvedValue({
+      success: true,
+      data: [
+        {
+          id: 3,
+          code: "BBB888",
+          name: "Alfa",
+          stock: 3,
+          price: 10,
+          updatedAt: "2026-01-03T00:00:00.000Z",
+        },
+        {
+          id: 2,
+          code: "AAA099",
+          name: "Zeta",
+          stock: 2,
+          price: 10,
+          updatedAt: "2026-01-02T00:00:00.000Z",
+        },
+        {
+          id: 1,
+          code: "AAA001",
+          name: "Mmm",
+          stock: 1,
+          price: 10,
+          updatedAt: "2026-01-01T00:00:00.000Z",
+        },
+      ],
+    });
+
+    try {
+      await goToStep2();
+
+      const codigos = () =>
+        checkboxesDeProductos().map(
+          (checkbox) => checkbox.closest("label")?.textContent ?? ""
+        );
+
+      // Default: por código, no en el orden en que llegaron las filas.
+      expect(codigos()[0]).toContain("AAA001");
+      expect(codigos()[1]).toContain("AAA099");
+      expect(codigos()[2]).toContain("BBB888");
+
+      fireEvent.click(screen.getByRole("button", { name: "Última modificación" }));
+      expect(codigos()[0]).toContain("BBB888");
+
+      fireEvent.click(checkboxesDeProductos()[0]);
+      fireEvent.click(screen.getByRole("button", { name: /siguiente/i }));
+      fireEvent.click(screen.getByRole("button", { name: /generar pdf/i }));
+
+      await waitFor(() => {
+        expect(mockExportBranchProductsPdf).toHaveBeenCalledWith(
+          expect.objectContaining({ branchId: 1, sortBy: "updated" })
+        );
+      });
+    } finally {
+      HTMLAnchorElement.prototype.click = originalClick;
+    }
+  });
+
   it("descarga el PDF cuando la generación sale bien", async () => {
     URL.createObjectURL = jest.fn(() => "blob:test");
     URL.revokeObjectURL = jest.fn();
@@ -215,6 +281,7 @@ describe("ExportWizard", () => {
         expect(mockExportBranchProductsPdf).toHaveBeenCalledWith({
           branchId: 1,
           selectedProductIds: [1],
+          sortBy: "code",
         });
       });
 
@@ -282,5 +349,17 @@ describe("ExportWizard — layout de escritorio", () => {
       "md:flex-none",
       "md:w-auto"
     );
+  });
+});
+
+describe("ExportWizard — el fondo no cierra el wizard (S2)", () => {
+  it("no llama onClose al tocar el fondo del modal", () => {
+    // S2: un click al costado no debe borrar el paso 1 ya elegido.
+    const onClose = jest.fn();
+    render(<ExportWizard open branches={branches} onClose={onClose} />);
+
+    fireEvent.click(screen.getByRole("dialog"));
+
+    expect(onClose).not.toHaveBeenCalled();
   });
 });
