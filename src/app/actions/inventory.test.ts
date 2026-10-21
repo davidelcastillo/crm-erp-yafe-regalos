@@ -347,6 +347,31 @@ describe("exportBranchProductsPdf (Fase 4 branch PDF export)", () => {
     expect(buildExportFileName).toHaveBeenCalledWith("DEP", expect.any(Date));
   });
 
+  it("rejects an inactive product: el PDF de la sucursal es solo de activos (S5)", async () => {
+    mockBranchFindUnique.mockResolvedValue({ code: "DEP", name: "Depósito" });
+    // El producto desactivado ya no vuelve de la consulta (filtro `active`).
+    mockBranchInventoryFindMany.mockResolvedValue([
+      {
+        productId: 1,
+        stock: 5,
+        product: { code: "P1", name: "Producto A", price: 100 },
+      },
+    ]);
+
+    const result = await exportBranchProductsPdf({
+      branchId: 1,
+      selectedProductIds: [1, 2],
+    });
+
+    expect(mockBranchInventoryFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ product: { active: true } }),
+      })
+    );
+    expect(result.success).toBe(false);
+    expect(generateProductsPdf).not.toHaveBeenCalled();
+  });
+
   it("rejects with a Zod error when selectedProductIds is empty", async () => {
     const result = await exportBranchProductsPdf({
       branchId: 1,
@@ -386,6 +411,22 @@ describe("getBranchProductsForExport", () => {
     expect(result.success).toBe(false);
     expect(result.error).toContain("expected object");
     expect(mockBranchInventoryFindMany).not.toHaveBeenCalled();
+  });
+
+  it("solo ofrece productos activos con stock en la sucursal (S5)", async () => {
+    mockBranchInventoryFindMany.mockResolvedValue([]);
+
+    await getBranchProductsForExport({ branchId: 1 });
+
+    expect(mockBranchInventoryFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          branchId: 1,
+          stock: { gt: 0 },
+          product: { active: true },
+        }),
+      })
+    );
   });
 
   it("filters stock > 0 and returns rows ordered by name", async () => {

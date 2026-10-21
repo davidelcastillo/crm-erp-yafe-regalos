@@ -854,6 +854,8 @@ export async function getBranchProductsForExport(data: unknown) {
       where: {
         branchId,
         stock: { gt: 0 },
+        // Solo activos: el catálogo que se imprime no muestra dados de baja (S5).
+        product: { active: true },
       },
       select: {
         stock: true,
@@ -911,6 +913,9 @@ export async function exportBranchProductsPdf(data: unknown) {
         branchId,
         productId: { in: selectedProductIds },
         stock: { gt: 0 },
+        // Re-validación: un producto desactivado no se imprime aunque venga en
+        // la selección (S5).
+        product: { active: true },
       },
       select: {
         productId: true,
