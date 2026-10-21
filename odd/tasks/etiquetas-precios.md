@@ -28,7 +28,7 @@ Colores: fondo de etiqueta `#fcd2d3`; cajas `#ffeff3`; `$`, `@feria_conexx` y el
 | Caja del código: alto | 26,4 % | 6,9 |
 | Caja del código: desde el borde superior | 3,8 % | 1,0 |
 | Caja del código: radio de esquina | 18 px | 2,7 |
-| Separación entre cajas | 1,3 mm | 1,3 |
+| Separación entre cajas | derivada de los tops medidos | 1,1 (9,0 − 7,9) |
 | Caja del precio: alto | 44,5 % | 11,7 |
 | Caja del precio: desde el borde superior | 34,5 % | 9,0 |
 | Caja del precio: radio de esquina | 23 px | 3,4 |
@@ -37,7 +37,7 @@ Colores: fondo de etiqueta `#fcd2d3`; cajas `#ffeff3`; `$`, `@feria_conexx` y el
 | `@feria_conexx`: alto visible | 16 px | 2,5–3,2 |
 | `@feria_conexx`: desde el borde superior | justo debajo de la caja del precio | 20,7 |
 | `@feria_conexx`: ancho | 154 px (88 % de la caja) | 23,4 |
-| Margen inferior libre | 8 px | 1,3 |
+| Margen inferior libre (bajo la tinta del handle) | ~12 px | ~1,9 |
 
 Contenido por etiqueta, en este orden: **código** centrado en la caja superior (Helvetica-Bold, ajustado para no pasar el 90 % del ancho de la caja); **`$`** a la izquierda de la caja del precio en Shrikhand; **precio** a la derecha del `$`, alineado a la misma base (Helvetica-Bold); **`@feria_conexx`** centrado debajo de la caja del precio en Shrikhand. Sin nombre de producto, sin stock y sin otros datos.
 Distribución de la hoja: 72 etiquetas, **llenando columna por columna** (de arriba abajo, después la columna siguiente); las etiquetas de la última hoja quedan en las primeras posiciones.
@@ -69,3 +69,12 @@ Distribución de la hoja: 72 etiquetas, **llenando columna por columna** (de arr
   - **Verificado sobre el PDF de muestra** (no a ojo): una sola página A4 horizontal, dos fuentes embebidas (`Shrikhand-Regular` y `Helvetica-Bold`) y **un solo** `FontFile` (la tipografía se embebe una vez, no por etiqueta), 137 KB para 72 etiquetas.
   - **RDD**: `assess` sobre el candidato → `rddLine: on`, `risk: medium`, `nativeRisk: unassessable` (el propio assess falla porque hay archivos sin trackear en el árbol — la carpeta `docs/PDF Precios/`, `docs/base-reutilizable.md` y `odd/tasks/base-reutilizable.md`, que son del usuario y no se tocan). Plan devuelto: sin verificador independiente (ningún ítem de riesgo alto escalado), con la autoverificación del escritor. La revisión nativa del rango queda **ofrecida**, no iniciada: el usuario no la pidió y el switch es suyo.
   - **Riesgos declarados al usuario**: (1) dependencia nueva `fontkit` (la exige pdf-lib para embeber un TTF) — `Risk: item 5 (delivery/dependencias)`; (2) el catálogo público ahora devuelve `updatedAt` (dato nuevo en un payload sin login, de datos que ya son públicos y que no se dibujan); (3) el **aspecto** de las etiquetas no está verificado automáticamente — solo la geometría — y necesita la mirada del usuario sobre `docs/PDF Precios/etiquetas-muestra.pdf`; (4) el TTF del repo no era el que decía ser y se reemplazó por el Shrikhand real (OFL); si su plantilla usa otra tipografía, cambiar el archivo y regenerar el módulo es el único paso.
+
+- **L11 — Verificación independiente y pulido (2026-10-21)**. Un verificador independiente (solo lectura) revisó los seis puntos del riesgo declarado. **Veredicto: sin bloqueantes.** Lo relevante que confirmó o midió:
+  - **`fontkit` es necesario, no un capricho**: con pdf-lib 1.17.1, `embedFont` de un TTF lanza «no fontkit instance was found»; el paquete es ESM puro (`exports.node.import`) y **solo publica exports con nombre**, que es la razón exacta de la falla de Turbopack y del arreglo `import * as fontkit`. `@ts-expect-error` está justificado (fontkit no trae tipos) y `tsc` pasa.
+  - **La fuente**: el TTF ahora declara familia `Shrikhand` (antes `Geist`, confirmado con el blob del commit anterior) y el base64 de `src/lib/fonts/shrikhand.ts` decodifica **byte a byte** el mismo archivo (sha256 idéntico).
+  - **Geometría sobre el PDF real**: celdas 93,543 × 74,409 pt = 33 × 26,25 mm, corte 1,7 pt = 0,6 mm, colores exactos, caja del código a 3,15 mm de x con 26,7 mm de ancho, llenado columna por columna (la etiqueta 8 arranca en x = 41,38 = 8,38 + 33).
+  - **Dos observaciones, medidas por mí antes de tocar nada**: (a) el documento declaraba «separación 1,3 mm» mientras el código usa los tops medidos (1,0 / 9,0), lo que da 1,1 mm — el documento era el que estaba mal, y `BOX_GAP_MM` era un export sin uso: se corrigió la tabla, se corrigió el comentario del test y se eliminó la constante; (b) el `$` y el `@feria_conexx` quedan a **0,33 mm** y **0,2 mm** del centro/medida de la plantilla (medido sobre el PDF con las métricas de la fuente), muy por debajo de lo que se ve a ojo; no se tocó el dibujo.
+  - **Deuda preexistente que reportó, no corregida**: `generateProductLabels` y `getBranchProductsForExport` no verifican sesión/rol **dentro** de la acción (igual que el resto de `src/app/actions/`; solo `branch.ts` lo hace): la protección es proxy + UI. Es lectura de precios y stock, no mutación; arreglarlo es una unidad transversal de auth, no de esta ronda.
+  - **`updatedAt` en el catálogo público**: el verificador lo consideró aceptable (no hay PII, ni costo, ni margen; el elemento ya es público y el campo no se dibuja). Queda como decisión del usuario si prefiere que el orden se resuelva en el servidor y el campo no viaje.
+  - **Aspecto visual**: sigue sin verificador automático (no hay rasterizador de PDF en el entorno). La muestra `docs/PDF Precios/etiquetas-muestra.pdf` es el artefacto para la revisión del usuario.

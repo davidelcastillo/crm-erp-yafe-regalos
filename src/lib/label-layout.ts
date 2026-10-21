@@ -51,8 +51,6 @@ export const CODE_MAX_WIDTH_RATIO = 0.9;
 export const PRICE_BOX_TOP_MM = 9;
 export const PRICE_BOX_HEIGHT_MM = 11.7;
 export const PRICE_BOX_RADIUS_MM = 3.4;
-/** Separación entre las dos cajas: 9,0 − (1,0 + 6,9). */
-export const BOX_GAP_MM = PRICE_BOX_TOP_MM - (CODE_BOX_TOP_MM + CODE_BOX_HEIGHT_MM);
 
 // --- Contenido de la caja del precio --------------------------------------
 /** Sangría del `$` desde el borde izquierdo de la caja. */

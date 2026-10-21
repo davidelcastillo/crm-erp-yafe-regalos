@@ -106,7 +106,8 @@ describe('label-layout.ts — medidas y colores de la plantilla (§S3)', () => {
     expect(CODE_BOX_HEIGHT_MM).toBe(6.9);
     expect(CODE_BOX_RADIUS_MM).toBe(2.7);
     expect(CODE_MAX_WIDTH_RATIO).toBe(0.9);
-    // Caja del precio: alto 44,5 % y arranca donde termina el hueco de 1,3 mm.
+    // Caja del precio: alto 44,5 % y arranca a 9 mm del borde superior, o sea
+    // 1,1 mm después del pie de la caja del código (top medido en la plantilla).
     expect(PRICE_BOX_TOP_MM).toBe(9);
     expect(PRICE_BOX_HEIGHT_MM).toBe(11.7);
     expect(PRICE_BOX_RADIUS_MM).toBe(3.4);
