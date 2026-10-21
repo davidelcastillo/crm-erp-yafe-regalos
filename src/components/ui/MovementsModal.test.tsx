@@ -6,7 +6,7 @@
  * El historial del producto tiene que mostrar los movimientos de sucursal
  * (transferencias y ajustes), no solo compras y ventas (bug 10.1 del usuario).
  */
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MovementsModal } from './MovementsModal';
 
 jest.mock('@/app/actions/product', () => ({
@@ -96,6 +96,18 @@ describe('MovementsModal con movimientos de sucursal', () => {
     expect(screen.getByText('#12')).toBeInTheDocument();
     expect(screen.getByText('Venta')).toBeInTheDocument();
     expect(screen.getByText('#4')).toBeInTheDocument();
+  });
+
+  it('no cierra al tocar el fondo del modal', async () => {
+    // S2: el click afuera no cierra los modales con datos, para no perder lo cargado.
+    responder([]);
+    const onClose = jest.fn();
+    render(<MovementsModal product={producto} isOpen onClose={onClose} />);
+    await waitFor(() => expect(mockGetProductMovements).toHaveBeenCalled());
+
+    fireEvent.click(screen.getByRole('dialog'));
+
+    expect(onClose).not.toHaveBeenCalled();
   });
 });
 
