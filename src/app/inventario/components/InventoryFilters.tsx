@@ -6,9 +6,34 @@ export interface InventoryFiltersProps {
   onFilterChange: (categoryId: number | null) => void;
   search: string;
   onSearchChange: (search: string) => void;
+  sortBy: InventorySortOption;
+  onSortChange: (sortBy: InventorySortOption) => void;
 }
 
-export const InventoryFilters = ({ categories, selectedCategoryId, onFilterChange, search, onSearchChange }: InventoryFiltersProps) => {
+/**
+ * Opciones de orden de las listas de inventario. Nombres y valores en un solo
+ * lugar: el `<select>` de la página y el ordenamiento de `InventarioList` no
+ * pueden desincronizarse.
+ */
+export const INVENTORY_SORT_OPTIONS = [
+  { value: 'code', label: 'Código' },
+  { value: 'updated', label: 'Última modificación' },
+  { value: 'name', label: 'Por nombre' },
+  { value: 'stock-asc', label: 'Stock: menor a mayor' },
+  { value: 'stock-desc', label: 'Stock: mayor a menor' },
+] as const;
+
+export type InventorySortOption = (typeof INVENTORY_SORT_OPTIONS)[number]['value'];
+
+export const InventoryFilters = ({
+  categories,
+  selectedCategoryId,
+  onFilterChange,
+  search,
+  onSearchChange,
+  sortBy,
+  onSortChange,
+}: InventoryFiltersProps) => {
   const handleCategoryChange = (e: ChangeEvent<HTMLSelectElement>) => {
     const val = e.target.value;
     onFilterChange(val === '' ? null : Number(val));
@@ -31,25 +56,44 @@ export const InventoryFilters = ({ categories, selectedCategoryId, onFilterChang
           autoComplete="off"
         />
       </div>
-      <div>
-        {/* En celular la etiqueta no aporta y suma altura; el select se nombra por aria-label. */}
-        <label htmlFor="inventario-categoria" className="hidden text-sm font-medium text-gray-700 mb-1 sm:block">
-          Categoría
-        </label>
-        <select
-          id="inventario-categoria"
-          value={selectedCategoryId ?? ''}
-          onChange={handleCategoryChange}
-          aria-label="Categoría"
-          className="block w-full min-h-[44px] rounded-xl border-0 bg-[#f8f8f8] py-2.5 pl-3 pr-10 text-base text-[#222222] focus:outline-none focus:ring-2 focus:ring-[#ec4899]/30 sm:text-sm"
-        >
-          <option value="">Todas las categorías</option>
-          {categories.map(c => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </select>
+      {/* Categoría y orden comparten contenedor y control (`.field-select`): en
+          celular van apilados a lo ancho y desde `sm` en dos columnas iguales. */}
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div>
+          <label htmlFor="inventario-categoria" className="field-label">
+            Categoría
+          </label>
+          <select
+            id="inventario-categoria"
+            value={selectedCategoryId ?? ''}
+            onChange={handleCategoryChange}
+            className="field-select"
+          >
+            <option value="">Todas las categorías</option>
+            {categories.map(c => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="inventario-orden" className="field-label">
+            Ordenar por
+          </label>
+          <select
+            id="inventario-orden"
+            value={sortBy}
+            onChange={(e) => onSortChange(e.target.value as InventorySortOption)}
+            className="field-select"
+          >
+            {INVENTORY_SORT_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
     </div>
   );

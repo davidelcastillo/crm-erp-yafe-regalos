@@ -18,7 +18,7 @@
  *  - Modo controlado (open/onOpenChange): delega la apertura y NUNCA renderiza
  *    el ProductForm interno (D4 del design).
  */
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import type { Product } from "@prisma/client";
 import InventarioPage from "../page";
 import { AddProductButton } from "@/app/productos/components/AddProductButton";
@@ -383,5 +383,32 @@ describe("InventarioPage — acceso a etiquetas de precio (S3)", () => {
       .filter((boton) => boton.className.includes("text-left"));
 
     expect(tarjetas).toHaveLength(1);
+  });
+});
+
+describe("InventarioPage — banda de acciones en celular (S3)", () => {
+  it("cierra 2x2: cuatro controles y ningún «Inactivos» suelto al final", async () => {
+    await renderPage();
+
+    const banda = screen.getByRole("group", { name: "Acciones de la página" });
+
+    // Cuatro tarjetas: Mover Stock, Entrada/Salida, Exportar y Etiquetas.
+    const controles = within(banda).getAllByRole("button");
+    expect(controles).toHaveLength(4);
+    // «Inactivos» ya no es la quinta tarjeta (quedaba sola en 2+1).
+    expect(within(banda).queryAllByRole("link")).toHaveLength(0);
+    expect(banda.textContent).not.toMatch(/inactivos/i);
+  });
+
+  it("«Inactivos» se alcanza desde el menú ☰", async () => {
+    await renderPage();
+
+    fireEvent.click(screen.getByLabelText("Abrir menú"));
+    const menu = screen.getByLabelText("Menú de Inventario");
+
+    expect(within(menu).getByRole("link", { name: "Inactivos" })).toHaveAttribute(
+      "href",
+      "/inventario/inactivos"
+    );
   });
 });

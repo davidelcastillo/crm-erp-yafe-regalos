@@ -19,9 +19,10 @@ describe("BottomNav", () => {
     (usePathname as jest.Mock).mockReturnValue("/dashboard");
     render(React.createElement(BottomNav));
 
-    // Should have 6 nav links (Productos was removed — /productos now redirects to /inventario)
+    // 5 destinos: el máximo de STYLE.md. «Clientes» salió de la barra (S6):
+    // ahora se entra solo por el botón de /sucursales.
     const navLinks = screen.getAllByRole("link");
-    expect(navLinks).toHaveLength(6);
+    expect(navLinks).toHaveLength(5);
     expect(navLinks.map((l) => l.textContent)).toEqual(
       expect.arrayContaining([
         "Dashboard",
@@ -29,9 +30,9 @@ describe("BottomNav", () => {
         "Ventas",
         "Inventario",
         "Sucursales",
-        "Clientes",
       ])
     );
+    expect(screen.queryByRole("link", { name: /clientes/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /productos/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /inactivos/i })).not.toBeInTheDocument();
   });

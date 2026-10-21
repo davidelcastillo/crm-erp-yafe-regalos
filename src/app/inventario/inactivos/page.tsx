@@ -152,7 +152,7 @@ export default function InactivosPage() {
                 autoComplete="off"
               />
             </div>
-            <div className="mt-3 flex justify-end">
+            <div className="mt-3 flex justify-center">
               <ProductSortToggle value={sortMode} onChange={setSortMode} />
             </div>
           </div>

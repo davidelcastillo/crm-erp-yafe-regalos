@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { Customer } from "@prisma/client";
-import { registerPayment, getCustomerHistory } from "@/app/actions/customer";
-import Swal from "sweetalert2";
+import { getCustomerHistory } from "@/app/actions/customer";
+import { RegistrarPagoModal } from "./RegistrarPagoModal";
 
 interface Sale {
   id: number;
@@ -33,6 +33,7 @@ export function ClienteCard({ customer }: ClienteCardProps) {
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [historyData, setHistoryData] = useState<CustomerHistory | null>(null);
   const [activeTab, setActiveTab] = useState<"sales" | "payments">("sales");
+  const [pagoOpen, setPagoOpen] = useState(false);
 
   const balance = Number(customer.totalBalance);
   const hasDebt = balance > 0;
@@ -50,91 +51,10 @@ export function ClienteCard({ customer }: ClienteCardProps) {
     setShowHistory(!showHistory);
   };
 
-  const handlePayment = async () => {
-    const result = await Swal.fire({
-      title: "Registrar Pago",
-      html: `
-        <p class="text-sm text-[#6a6a6a] mb-2">Cliente: <strong>${customer.name} ${customer.surname}</strong></p>
-        <p class="text-lg font-bold text-[#b91c1c] mb-4">Deuda actual: $${balance.toFixed(2)}</p>
-        <input type="number" id="paymentAmount" name="amount" class="swal2-input" placeholder="Monto a pagar" min="0" step="0.01">
-      `,
-      preConfirm: () => {
-        const inputValue = (document.getElementById("paymentAmount") as HTMLInputElement)?.value;
-        
-        // Debug log
-        console.log("Input value (raw):", inputValue);
-        
-        const amount = Number(inputValue);
-        console.log("Amount converted:", amount, "Type:", typeof amount);
-        
-        if (!inputValue || inputValue.trim() === "") {
-          Swal.showValidationMessage("Ingrese un monto");
-          return false;
-        }
-        
-        if (!amount || amount <= 0) {
-          Swal.showValidationMessage("El monto debe ser mayor a 0");
-          return false;
-        }
-        
-        if (amount > balance) {
-          Swal.showValidationMessage("El monto no puede exceder la deuda");
-          return false;
-        }
-        
-        console.log("Returning amount:", amount);
-        return amount;
-      },
-      confirmButtonText: "Registrar Pago",
-      confirmButtonColor: "#15803d",
-      showCancelButton: true,
-      cancelButtonText: "Cancelar",
-      cancelButtonColor: "#6b7280",
-    });
-
-    if (result.isConfirmed && result.value) {
-      try {
-        const amount = Number(result.value);
-        
-        console.log("Sending to server:", {
-          customerId: customer.id,
-          amount: amount,
-          amountType: typeof amount
-        });
-        
-        const res = await registerPayment({
-          customerId: customer.id,
-          amount: amount,
-        });
-
-        if (res.success) {
-          await Swal.fire({
-            title: "¡Pago registrado!",
-            text: `Se registraron $${amount.toFixed(2)} de deuda`,
-            icon: "success",
-            confirmButtonColor: "#15803d",
-            timer: 1500,
-            showConfirmButton: false,
-          });
-          window.location.reload();
-        } else {
-          await Swal.fire({
-            title: "Error",
-            text: res.error || "No se pudo registrar el pago",
-            icon: "error",
-            confirmButtonColor: "#dc2626",
-          });
-        }
-      } catch (error) {
-        console.error("Error registering payment:", error);
-        await Swal.fire({
-          title: "Error",
-          text: "Error al registrar el pago",
-          icon: "error",
-          confirmButtonColor: "#dc2626",
-        });
-      }
-    }
+  // El pago lo registra `RegistrarPagoModal`; acá solo se refresca la lista,
+  // que es un Server Component con la deuda ya recalculada.
+  const handlePaid = () => {
+    window.location.reload();
   };
 
   const formatDate = (dateStr: string) => {
@@ -179,7 +99,7 @@ export function ClienteCard({ customer }: ClienteCardProps) {
         </button>
         {hasDebt && (
           <button
-            onClick={handlePayment}
+            onClick={() => setPagoOpen(true)}
             className="btn btn-primary flex-1 whitespace-nowrap"
           >
             Registrar Pago
@@ -264,6 +184,13 @@ export function ClienteCard({ customer }: ClienteCardProps) {
           )}
         </div>
       )}
+
+      <RegistrarPagoModal
+        open={pagoOpen}
+        customer={customer}
+        onClose={() => setPagoOpen(false)}
+        onPaid={handlePaid}
+      />
     </div>
   );
 }
