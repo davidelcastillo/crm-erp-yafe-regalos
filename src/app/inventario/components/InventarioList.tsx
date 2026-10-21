@@ -5,6 +5,7 @@ import { Product } from "@prisma/client";
 import { InventarioCard } from "./InventarioCard";
 import { sumStock, type StockSource } from "@/lib/inventory-stock";
 import { sortProducts } from "@/lib/product-order";
+import type { InventorySortOption } from "./InventoryFilters";
 
 interface InventarioListProps {
   products: Product[];
@@ -13,17 +14,16 @@ interface InventarioListProps {
   searchActive?: boolean;
   /** Category options hoisted from the page (shared by all cards, avoids N+1). */
   categories?: Array<{ id: number; name: string }>;
+  /** El orden vive en la página, junto al filtro de categoría (mismo control). */
+  sortBy: InventorySortOption;
 }
-
-type SortOption = "code" | "updated" | "name" | "stock-asc" | "stock-desc";
 
 /** Sum stock across every branch row (inventory[0] alone is wrong for "Todas"). */
 function readStock(p: Product): number {
   return sumStock(p as unknown as StockSource);
 }
 
-export function InventarioList({ products, onViewMovements, searchActive = false, categories = [] }: InventarioListProps) {
-  const [sortBy, setSortBy] = useState<SortOption>("code");
+export function InventarioList({ products, onViewMovements, searchActive = false, categories = [], sortBy }: InventarioListProps) {
   const [showOnlyLowStock, setShowOnlyLowStock] = useState(false);
 
   // Filter (low stock only) and sort products. Search is handled server-side.
@@ -67,32 +67,18 @@ export function InventarioList({ products, onViewMovements, searchActive = false
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Sort and low-stock filters */}
+      {/* Filtro de stock bajo. El select de orden vive en `InventoryFilters`,
+          junto al de categoría: así los dos selectores comparten contenedor
+          y tamaño (S2). */}
       <div className="glass rounded-2xl border border-black/5 p-4">
-        {/* En celular se apilan: los dos controles no entran en una fila. */}
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as SortOption)}
-            aria-label="Ordenar por"
-            className="min-h-[44px] w-full rounded-xl bg-[#f8f8f8] px-3 py-2.5 text-base text-[#222222] focus:outline-none focus:ring-2 focus:ring-[#ec4899]/30 sm:w-auto sm:text-sm"
-          >
-            <option value="code">Código</option>
-            <option value="updated">Última modificación</option>
-            <option value="name">Por nombre</option>
-            <option value="stock-asc">Stock: menor a mayor</option>
-            <option value="stock-desc">Stock: mayor a menor</option>
-          </select>
-
-          {/* Control segmentado: la opción elegida va `btn-active`, la otra `btn-secondary`. */}
-          <button
-            onClick={() => setShowOnlyLowStock(!showOnlyLowStock)}
-            aria-pressed={showOnlyLowStock}
-            className={`btn ${showOnlyLowStock ? "btn-active" : "btn-secondary"} w-full whitespace-nowrap sm:w-auto`}
-          >
-            Stock bajo ({stats.lowStock})
-          </button>
-        </div>
+        {/* Control segmentado: la opción elegida va `btn-active`, la otra `btn-secondary`. */}
+        <button
+          onClick={() => setShowOnlyLowStock(!showOnlyLowStock)}
+          aria-pressed={showOnlyLowStock}
+          className={`btn ${showOnlyLowStock ? "btn-active" : "btn-secondary"} w-full whitespace-nowrap sm:w-auto`}
+        >
+          Stock bajo ({stats.lowStock})
+        </button>
       </div>
 
       {/* Stats Summary */}

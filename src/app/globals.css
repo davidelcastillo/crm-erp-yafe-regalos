@@ -319,6 +319,41 @@
   backdrop-filter: blur(24px);
 }
 
+/* ============================================================================
+   CONTROL DE LISTA (SELECT DE FILTRO Y ORDEN)
+
+   Todos los selectores de una lista usan esta clase: misma altura táctil, mismo
+   radio, misma tipografía y mismo foco. Está acá y no en cada componente para
+   que dos selects de la misma pantalla no puedan quedar de distinto tamaño.
+   16 px de fuente: por debajo de eso iOS hace zoom al enfocar el control.
+   ============================================================================ */
+.field-select {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  padding: 0.5rem 0.75rem;
+  border: 0;
+  border-radius: 0.75rem;
+  background-color: #f8f8f8;
+  color: var(--palette-near-black);
+  font-size: 1rem;
+  line-height: 1.5rem;
+  touch-action: manipulation;
+}
+
+.field-select:focus-visible {
+  outline: 2px solid var(--palette-brand-rosa-fuerte);
+  outline-offset: 2px;
+}
+
+.field-label {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--palette-near-black);
+}
+
 } /* fin de @layer components */
 
 /* Native <select> <option> best-effort styling (browser rendering varies). */

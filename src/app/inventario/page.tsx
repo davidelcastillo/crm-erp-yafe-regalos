@@ -5,7 +5,7 @@ import { getProductsWithBranchStock } from "../actions/inventory";
 import { getBranchOptions } from "../actions/branch";
 import { getCategoryOptions, createCategory } from "../actions/category";
 import { InventarioList } from "./components/InventarioList";
-import { InventoryFilters } from "./components/InventoryFilters";
+import { InventoryFilters, type InventorySortOption } from "./components/InventoryFilters";
 import { MoveStockModal } from "./components/MoveStockModal";
 import { StockAdjustmentModal } from "./components/StockAdjustmentModal";
 import { ExportWizard } from "./components/ExportWizard";
@@ -52,6 +52,9 @@ export default function InventarioPage() {
   // in InventarioList was removed in favor of this server-driven search.
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  // El orden vive acá, junto a la categoría: los dos selectores de la lista
+  // comparten contenedor y control (S2).
+  const [sortBy, setSortBy] = useState<InventorySortOption>('code');
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -257,20 +260,22 @@ export default function InventarioPage() {
                 >
                   Etiquetas
                 </button>
-                {/* Acceso de PC a inactivos: en celular es la cuarta tarjeta. */}
+                {/* En celular «Inactivos» vive en el menú ☰: la banda de acciones
+                    cierra 2x2 y no entra un quinto destino (S3). */}
                 <Link href="/inventario/inactivos" className="btn btn-primary">
                   Inactivos
                 </Link>
               </>
             }
             menuItems={[
+              { label: "Inactivos", href: "/inventario/inactivos" },
               { label: "Categorías", href: "/categorias" },
               { label: "Nueva categoría", onClick: handleCreateCategory },
             ]}
           />
 
           {/* Acciones de la pagina en mobile: en su propio div, con el fondo a la vista. */}
-          <div className="mt-4 px-3 md:hidden">
+          <div className="mt-4 px-3 md:hidden" role="group" aria-label="Acciones de la página">
             <div className="grid grid-cols-2 gap-3">
               <ActionCard
                 label="Mover Stock"
@@ -315,16 +320,6 @@ export default function InventarioPage() {
                   </svg>
                 }
               />
-              <ActionCard
-                label="Inactivos"
-                hint="Productos dados de baja"
-                href="/inventario/inactivos"
-                icon={
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7h18M6 7v12a2 2 0 002 2h8a2 2 0 002-2V7M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2M10 12l4 4m0-4l-4 4" />
-                  </svg>
-                }
-              />
             </div>
           </div>
         </div>
@@ -343,6 +338,8 @@ export default function InventarioPage() {
             }}
             search={search}
             onSearchChange={setSearch}
+            sortBy={sortBy}
+            onSortChange={setSortBy}
           />
         </div>
 
@@ -350,6 +347,7 @@ export default function InventarioPage() {
           products={products} 
           searchActive={debouncedSearch !== ''}
           categories={categories}
+          sortBy={sortBy}
           onViewMovements={(product) => {
             setSelectedProductForMovements(product);
             setMovementsModalOpen(true);

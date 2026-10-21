@@ -55,7 +55,7 @@ export default function ExternalInventoryTable({
           className="mt-2 w-full min-h-12 rounded-xl border border-black/10 bg-white px-4 text-base focus-visible:outline-2 focus-visible:outline-pink-500"
         />
       </label>
-      <div className="flex justify-end">
+      <div className="flex justify-center">
         <ProductSortToggle value={sortMode} onChange={setSortMode} />
       </div>
       {visible.length === 0 && (
