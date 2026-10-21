@@ -1,4 +1,5 @@
 "use server";
+import { requireAdmin } from "@/lib/auth-guard";
 
 import { prisma } from "@/lib/prisma";
 import { pisoDeCaja, rangoDelUltimoCierre } from "@/lib/cash-close";
@@ -131,6 +132,9 @@ async function fetchStats(
 
 export async function getGlobalStats(data?: unknown) {
   try {
+    const auth = await requireAdmin();
+    if (!auth.ok) return { success: false as const, error: auth.error };
+
     const validated = data ? globalStatsSchema.parse(data) : {};
     const branchWhere = validated.branchId
       ? { branchId: validated.branchId }
@@ -154,6 +158,9 @@ export async function getGlobalStats(data?: unknown) {
 // When branchId is omitted, stats aggregate across all branches.
 export async function getStats(data?: unknown) {
   try {
+    const auth = await requireAdmin();
+    if (!auth.ok) return { success: false as const, error: auth.error };
+
     const validated = statsSchema.parse(data ?? {});
     const { branchId } = validated;
     const branchWhere = branchId ? { branchId } : {};
@@ -196,6 +203,9 @@ const performanceDataSchema = z.object({
 // Get last N days of sales and purchases for chart
 export async function getPerformanceData(data?: unknown) {
   try {
+    const auth = await requireAdmin();
+    if (!auth.ok) return { success: false as const, error: auth.error };
+
     const validated = performanceDataSchema.parse(data ?? { days: 30 });
     const { branchId } = validated;
     const branchWhere = branchId ? { branchId } : {};
@@ -286,6 +296,9 @@ export async function getPerformanceData(data?: unknown) {
 // Get analytics for a specific product
 export async function getProductAnalytics(productId: number) {
   try {
+    const auth = await requireAdmin();
+    if (!auth.ok) return { success: false as const, error: auth.error };
+
     // Get purchase data for this product
     const purchases = await prisma.purchaseItem.findMany({
       where: { productId },

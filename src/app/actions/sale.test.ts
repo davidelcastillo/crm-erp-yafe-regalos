@@ -419,3 +419,23 @@ describe("registerSale Server Action - Payment Method Logic", () => {
     );
   });
 });
+// AGENTS.md §0.2: sesión + rol admin antes de validar y antes de Prisma.
+describe("ventas: autorización admin", () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it("rechaza registerSale sin sesión admin y no toca Prisma", async () => {
+    const { requireAdmin } = jest.requireMock<{ requireAdmin: jest.Mock }>(
+      "@/lib/auth-guard"
+    );
+    requireAdmin.mockResolvedValueOnce({ ok: false, error: "No autorizado" });
+
+    // Sucursal inválida: si el guardián no fuera primero, el error sería de Zod.
+    const result = await registerSale({
+      items: [{ productId: 1, price: 500, quantity: 1 }],
+      branchId: -1,
+    });
+
+    expect(result).toEqual({ success: false, error: "No autorizado" });
+    expect(mockBranchFindFirst).not.toHaveBeenCalled();
+  });
+});

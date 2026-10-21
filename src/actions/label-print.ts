@@ -1,5 +1,6 @@
 // src/actions/label-print.ts
 'use server';
+import { requireAdmin } from "@/lib/auth-guard";
 
 // fontkit 2.0.4 no publica tipos y es ESM sin export default: se importa el
 // espacio de nombres, que es lo que `registerFontkit` espera (`create`).
@@ -288,6 +289,9 @@ const buildLabelsFileName = (branchCode: string, date: Date) => {
  */
 export async function generateProductLabels(data: unknown): Promise<GenerateLabelsResult> {
   try {
+    const auth = await requireAdmin();
+    if (!auth.ok) return { success: false as const, error: auth.error };
+
     const { branchId, selections } = generateLabelsSchema.parse(data);
 
     const branch = await prisma.branch.findUnique({

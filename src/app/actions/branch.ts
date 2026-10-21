@@ -1,12 +1,12 @@
 // src/app/actions/branch.ts
 "use server";
+import { requireAdmin } from "@/lib/auth-guard";
 
 import { prisma } from "@/lib/prisma";
 import { parseArray, parseObject } from "@/lib/parse-prisma";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { createServiceClient, createServerClient } from "@/lib/supabase/server";
-import { hasUserRole } from "@/lib/supabase/auth";
+import { createServiceClient } from "@/lib/supabase/server";
 import {
   createBranchUser,
   deleteBranchUser,
@@ -22,6 +22,9 @@ import {
 
 export async function createBranch(data: unknown) {
   try {
+    const auth = await requireAdmin();
+    if (!auth.ok) return { success: false as const, error: auth.error };
+
     const validatedData = createBranchSchema.parse(data);
 
     // Duplicate-code check
@@ -101,13 +104,9 @@ export async function createBranch(data: unknown) {
 }
 
 export async function getBranches() {
-  // Check if the current user is an admin
-  const isAdmin = await hasUserRole('admin');
-  if (!isAdmin) {
-    return { success: false, error: "No autorizado" };
-  }
-
   try {
+    const auth = await requireAdmin();
+    if (!auth.ok) return { success: false, error: auth.error };
     const branches = await prisma.branch.findMany({
       orderBy: { createdAt: "asc" },
     });
@@ -119,13 +118,9 @@ export async function getBranches() {
 }
 
 export async function getBranchById(id: number) {
-  // Check if the current user is an admin
-  const isAdmin = await hasUserRole('admin');
-  if (!isAdmin) {
-    return { success: false, error: "No autorizado" };
-  }
-
   try {
+    const auth = await requireAdmin();
+    if (!auth.ok) return { success: false, error: auth.error };
     const branch = await prisma.branch.findUnique({
       where: { id },
     });
@@ -142,13 +137,9 @@ export async function getBranchById(id: number) {
 }
 
 export async function updateBranch(data: unknown) {
-  // Check if the current user is an admin
-  const isAdmin = await hasUserRole('admin');
-  if (!isAdmin) {
-    return { success: false, error: "No autorizado" };
-  }
-
   try {
+    const auth = await requireAdmin();
+    if (!auth.ok) return { success: false, error: auth.error };
     const validatedData = updateBranchSchema.parse(data);
 
     const branch = await prisma.branch.update({
@@ -191,13 +182,9 @@ export async function updateBranch(data: unknown) {
 }
 
 export async function deleteBranch(data: unknown) {
-  // Check if the current user is an admin
-  const isAdmin = await hasUserRole('admin');
-  if (!isAdmin) {
-    return { success: false, error: "No autorizado" };
-  }
-
   try {
+    const auth = await requireAdmin();
+    if (!auth.ok) return { success: false, error: auth.error };
     const validatedData = deleteBranchSchema.parse(data);
 
     // Start a transaction to ensure consistency
@@ -301,18 +288,9 @@ export async function deleteBranch(data: unknown) {
  * Returns only id and name for active branches.
  */
 export async function getBranchOptions() {
-  // Check if the user is authenticated
-  const supabase = await createServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  // If not authenticated, return empty array (or could return error)
-  if (!user) {
-    return { success: true, data: [] };
-  }
-
   try {
+    const auth = await requireAdmin();
+    if (!auth.ok) return { success: false, error: auth.error };
     const branches = await prisma.branch.findMany({
       where: { isActive: true },
       select: { id: true, name: true },

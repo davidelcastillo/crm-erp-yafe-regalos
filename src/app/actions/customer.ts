@@ -1,4 +1,5 @@
 "use server";
+import { requireAdmin } from "@/lib/auth-guard";
 
 import { prisma } from "@/lib/prisma";
 import { parseArray, parseObject } from "@/lib/parse-prisma";
@@ -31,6 +32,9 @@ const registerPaymentSchema = z.object({
 
 export async function createCustomer(data: unknown) {
   try {
+    const auth = await requireAdmin();
+    if (!auth.ok) return { success: false as const, error: auth.error };
+
     const validatedData = createCustomerSchema.parse(data);
 
     const customer = await prisma.customer.create({
@@ -56,6 +60,9 @@ export async function createCustomer(data: unknown) {
 
 export async function getCustomers() {
   try {
+    const auth = await requireAdmin();
+    if (!auth.ok) return { success: false as const, error: auth.error };
+
     const customers = await prisma.customer.findMany({
       orderBy: [{ surname: "asc" }, { name: "asc" }],
     });
@@ -68,6 +75,9 @@ export async function getCustomers() {
 
 export async function getCustomerById(id: number) {
   try {
+    const auth = await requireAdmin();
+    if (!auth.ok) return { success: false as const, error: auth.error };
+
     const customer = await prisma.customer.findUnique({
       where: { id },
       include: {
@@ -98,6 +108,9 @@ export async function getCustomerById(id: number) {
 
 export async function updateCustomer(data: unknown) {
   try {
+    const auth = await requireAdmin();
+    if (!auth.ok) return { success: false as const, error: auth.error };
+
     const validatedData = updateCustomerSchema.parse(data);
 
     const customer = await prisma.customer.update({
@@ -123,6 +136,9 @@ export async function updateCustomer(data: unknown) {
 
 export async function deleteCustomer(data: unknown) {
   try {
+    const auth = await requireAdmin();
+    if (!auth.ok) return { success: false as const, error: auth.error };
+
     const validatedData = deleteCustomerSchema.parse(data);
 
     // Verificar que no tenga deuda antes de eliminar
@@ -156,6 +172,9 @@ export async function deleteCustomer(data: unknown) {
 
 export async function registerPayment(data: unknown) {
   try {
+    const auth = await requireAdmin();
+    if (!auth.ok) return { success: false as const, error: auth.error };
+
     // Debug: log what we receive
     console.log("Monto recibido (raw):", data);
     
@@ -228,6 +247,9 @@ export async function registerPayment(data: unknown) {
 // Obtener clientes con búsqueda
 export async function searchCustomers(query: string) {
   try {
+    const auth = await requireAdmin();
+    if (!auth.ok) return { success: false as const, error: auth.error };
+
     const customers = await prisma.customer.findMany({
       where: {
         OR: [
@@ -252,6 +274,9 @@ const getCustomerHistorySchema = z.object({
 
 export async function getCustomerHistory(data: unknown) {
   try {
+    const auth = await requireAdmin();
+    if (!auth.ok) return { success: false as const, error: auth.error };
+
     const validatedData = getCustomerHistorySchema.parse(data);
 
     const customer = await prisma.customer.findUnique({

@@ -120,3 +120,24 @@ describe("getStats (dashboard period + range + branch)", () => {
     expect(where.date).toBeDefined();
   });
 });
+
+// AGENTS.md §0.2: sesión + rol admin antes de validar y antes de Prisma.
+describe("dashboard: autorización admin", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockEmptyAggregates();
+  });
+
+  it("rechaza getStats sin sesión admin y no consulta Prisma", async () => {
+    const { requireAdmin } = jest.requireMock<{ requireAdmin: jest.Mock }>(
+      "@/lib/auth-guard"
+    );
+    requireAdmin.mockResolvedValueOnce({ ok: false, error: "No autorizado" });
+
+    // Rango inválido: si el guardián no fuera primero, el error sería de Zod.
+    const result = await getStats({ type: "custom", startDate: "2026-01-01" });
+
+    expect(result).toEqual({ success: false, error: "No autorizado" });
+    expect(mockSaleAggregate).not.toHaveBeenCalled();
+  });
+});

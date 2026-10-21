@@ -1,4 +1,5 @@
 "use server";
+import { requireAdmin } from "@/lib/auth-guard";
 
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -26,6 +27,9 @@ const registerPurchaseSchema = z.object({
 
 export async function registerPurchase(data: unknown) {
   try {
+    const auth = await requireAdmin();
+    if (!auth.ok) return { success: false as const, error: auth.error };
+
     const validatedData = registerPurchaseSchema.parse(data);
 
     // Verify the branch exists and is active before processing
@@ -121,6 +125,9 @@ const getPurchasesSchema = z.object({
 
 export async function getPurchases(filters?: unknown) {
   try {
+    const auth = await requireAdmin();
+    if (!auth.ok) return { success: false as const, error: auth.error };
+
     const validatedFilters = filters ? getPurchasesSchema.parse(filters) : {};
     
     const where: Record<string, unknown> = {};
@@ -181,6 +188,9 @@ export async function getPurchases(filters?: unknown) {
 
 export async function getPurchaseById(id: number) {
   try {
+    const auth = await requireAdmin();
+    if (!auth.ok) return { success: false as const, error: auth.error };
+
     const purchase = await prisma.purchase.findUnique({
       where: { id },
       include: {
@@ -394,6 +404,9 @@ async function executePurchaseWithRetry(
  */
 export async function createPurchaseWithBranchSplit(data: unknown) {
   try {
+    const auth = await requireAdmin();
+    if (!auth.ok) return { success: false as const, error: auth.error };
+
     const validatedData = createPurchaseWithBranchSplitSchema.parse(data);
     const { items } = validatedData;
 

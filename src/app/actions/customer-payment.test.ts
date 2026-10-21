@@ -87,3 +87,20 @@ describe("registerPayment - String Coercion", () => {
     expect(result.success).toBe(false);
   });
 });
+// AGENTS.md §0.2: sesión + rol admin antes de validar y antes de Prisma.
+describe("clientes: autorización admin", () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it("rechaza registerPayment sin sesión admin y no toca Prisma", async () => {
+    const { requireAdmin } = jest.requireMock<{ requireAdmin: jest.Mock }>(
+      "@/lib/auth-guard"
+    );
+    requireAdmin.mockResolvedValueOnce({ ok: false, error: "No autorizado" });
+
+    // Monto inválido: si el guardián no fuera primero, el error sería de Zod.
+    const result = await registerPayment({ customerId: 1, amount: "invalid" });
+
+    expect(result).toEqual({ success: false, error: "No autorizado" });
+    expect(mockCustomerFindUnique).not.toHaveBeenCalled();
+  });
+});

@@ -188,3 +188,21 @@ describe('plata de caja (integración, base local)', () => {
     expect(despues.data!.totalExpense - antes.data!.totalExpense).toBeCloseTo(50)
   })
 })
+
+// AGENTS.md §0.2: la acción exige sesión + rol admin antes de validar nada.
+describe('caja: autorización admin', () => {
+  it('rechaza registerCashMovement sin sesión admin, antes de Zod y sin escribir', async () => {
+    const { requireAdmin } = jest.requireMock<{ requireAdmin: jest.Mock }>(
+      '@/lib/auth-guard'
+    )
+    requireAdmin.mockResolvedValueOnce({ ok: false, error: 'No autorizado' })
+
+    const antes = await prisma.cashMovement.count({ where: { branchId } })
+
+    // Payload inválido: si el guardián no fuera primero, el error sería de Zod.
+    const resultado = await registerCashMovement({ branchId, type: 'INVALIDO' })
+
+    expect(resultado).toEqual({ success: false, error: 'No autorizado' })
+    expect(await prisma.cashMovement.count({ where: { branchId } })).toBe(antes)
+  })
+})
