@@ -1,5 +1,6 @@
 // src/app/actions/sale.ts
 "use server";
+import { requireAdmin } from "@/lib/auth-guard";
 
 import { prisma } from "@/lib/prisma";
 import { parseArray, parseObject } from "@/lib/parse-prisma";
@@ -39,6 +40,9 @@ const registerSaleSchema = z.object({
 
 export async function registerSale(data: unknown) {
   try {
+    const auth = await requireAdmin();
+    if (!auth.ok) return { success: false as const, error: auth.error };
+
     const validatedData = registerSaleSchema.parse(data);
 
     // Verify the branch exists and is active before processing
@@ -217,6 +221,9 @@ const getSalesSchema = z.object({
 
 export async function getSales(filters?: unknown) {
   try {
+    const auth = await requireAdmin();
+    if (!auth.ok) return { success: false as const, error: auth.error };
+
     const validatedFilters = filters ? getSalesSchema.parse(filters) : {};
     
     const where: Record<string, unknown> = {};
@@ -299,6 +306,9 @@ export async function getSales(filters?: unknown) {
 
 export async function getSaleById(id: number) {
   try {
+    const auth = await requireAdmin();
+    if (!auth.ok) return { success: false as const, error: auth.error };
+
     const sale = await prisma.sale.findUnique({
       where: { id },
       include: {

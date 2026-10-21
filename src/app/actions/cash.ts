@@ -1,5 +1,6 @@
 // src/app/actions/cash.ts
 "use server";
+import { requireAdmin } from "@/lib/auth-guard";
 
 import { prisma } from "@/lib/prisma";
 import { parseArray, parseObject } from "@/lib/parse-prisma";
@@ -24,6 +25,9 @@ import {
 
 export async function registerCashMovement(data: unknown) {
   try {
+    const auth = await requireAdmin();
+    if (!auth.ok) return { success: false as const, error: auth.error };
+
     const validado = registerCashMovementSchema.parse(data);
 
     // La sucursal tiene que existir y estar activa, como en las ventas.
@@ -65,6 +69,9 @@ export async function registerCashMovement(data: unknown) {
 
 export async function getCashMovements(filters?: unknown) {
   try {
+    const auth = await requireAdmin();
+    if (!auth.ok) return { success: false as const, error: auth.error };
+
     const validado = filters ? getCashMovementsSchema.parse(filters) : {};
 
     const where: Record<string, unknown> = {};
@@ -155,6 +162,9 @@ const totalesDeCaja = async (db: Prisma.TransactionClient, branchId: number) => 
 /** Lo que el cierre va a mostrar antes de confirmarlo (S9). */
 export async function getCashClosePreview(data: unknown) {
   try {
+    const auth = await requireAdmin();
+    if (!auth.ok) return { success: false as const, error: auth.error };
+
     const validado = cashClosePreviewSchema.parse(data);
 
     const branch = await prisma.branch.findFirst({
@@ -198,6 +208,9 @@ export async function getCashClosePreview(data: unknown) {
  */
 export async function closeCash(data: unknown) {
   try {
+    const auth = await requireAdmin();
+    if (!auth.ok) return { success: false as const, error: auth.error };
+
     const validado = closeCashSchema.parse(data);
 
     const branch = await prisma.branch.findFirst({

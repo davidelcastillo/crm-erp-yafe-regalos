@@ -216,3 +216,21 @@ describe("deleteCategory (Fase 3)", () => {
     expect(result.error).toContain("ID");
   });
 });
+
+// AGENTS.md §0.2: sesión + rol admin antes de validar y antes de Prisma.
+describe("categorías: autorización admin", () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it("rechaza createCategory sin sesión admin y no toca Prisma", async () => {
+    const { requireAdmin } = jest.requireMock<{ requireAdmin: jest.Mock }>(
+      "@/lib/auth-guard"
+    );
+    requireAdmin.mockResolvedValueOnce({ ok: false, error: "No autorizado" });
+
+    // Nombre inválido: si el guardián no fuera primero, el error sería de Zod.
+    const result = await createCategory({ name: "" });
+
+    expect(result).toEqual({ success: false, error: "No autorizado" });
+    expect(mockCategoryCreate).not.toHaveBeenCalled();
+  });
+});

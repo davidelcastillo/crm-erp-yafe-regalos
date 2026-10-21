@@ -1,5 +1,6 @@
 // src/app/actions/inventory.ts
 "use server";
+import { requireAdmin } from "@/lib/auth-guard";
 
 import { prisma } from "@/lib/prisma";
 import type { StockMovementReceipt } from "@/lib/stock-movement-receipt";
@@ -49,6 +50,9 @@ export async function getBranchInventory(data: unknown) {
     branchId: z.number().int().positive("Sucursal inválida"),
   });
   try {
+    const auth = await requireAdmin();
+    if (!auth.ok) return { success: false as const, error: auth.error };
+
     const { branchId } = branchStockSchema.parse(data);
     // First, get products that have inventory entry for this branch (including stock)
     const productsWithInventory = await prisma.product.findMany({
@@ -115,6 +119,9 @@ const adjustProductStockSchema = z.object({
  */
 export async function getProductStock(data: unknown) {
   try {
+    const auth = await requireAdmin();
+    if (!auth.ok) return { success: false as const, error: auth.error };
+
     const { productId, branchId } = getProductStockSchema.parse(data);
 
     const inventory = await prisma.branchInventory.findUnique({
@@ -146,6 +153,9 @@ export async function getProductStock(data: unknown) {
  */
 export async function adjustProductStock(data: unknown) {
   try {
+    const auth = await requireAdmin();
+    if (!auth.ok) return { success: false as const, error: auth.error };
+
     const { productId, branchId, change } = adjustProductStockSchema.parse(
       data
     );
@@ -225,6 +235,9 @@ const getProductsWithBranchStockSchema = z.object({
 
 export async function getProductsWithBranchStock(filters?: unknown) {
   try {
+    const auth = await requireAdmin();
+    if (!auth.ok) return { success: false as const, error: auth.error };
+
     const opts = getProductsWithBranchStockSchema.parse(filters ?? {});
     const where: Record<string, unknown> = {};
     if (opts.activeOnly !== false) where.active = true;
@@ -291,6 +304,9 @@ export async function getProductsWithBranchStock(filters?: unknown) {
  */
 export async function assignStockToBranch(data: unknown) {
   try {
+    const auth = await requireAdmin();
+    if (!auth.ok) return { success: false as const, error: auth.error };
+
     const { productId, branchId, quantity, performedBy } =
       assignStockSchema.parse(data);
 
@@ -363,6 +379,9 @@ export async function assignStockToBranch(data: unknown) {
  */
 export async function moveStockBetweenBranches(data: unknown) {
   try {
+    const auth = await requireAdmin();
+    if (!auth.ok) return { success: false as const, error: auth.error };
+
     const validatedData = moveStockSchema.parse(data);
     const { productId, sourceBranchId, destBranchId, quantity, performedBy } =
       validatedData;
@@ -504,6 +523,9 @@ export async function moveStockBetweenBranches(data: unknown) {
  */
 export async function moveStockBatchBetweenBranches(data: unknown) {
   try {
+    const auth = await requireAdmin();
+    if (!auth.ok) return { success: false as const, error: auth.error };
+
     const parsed = moveStockBatchSchema.parse(data);
     const { sourceBranchId, destBranchId, items, performedBy } = parsed;
 
@@ -686,6 +708,9 @@ export async function moveStockBatchBetweenBranches(data: unknown) {
  */
 export async function adjustBranchStockBatch(data: unknown) {
   try {
+    const auth = await requireAdmin();
+    if (!auth.ok) return { success: false as const, error: auth.error };
+
     const { branchId, movementType, items, reference, performedBy } =
       adjustStockBatchSchema.parse(data);
 
@@ -808,6 +833,9 @@ export async function adjustBranchStockBatch(data: unknown) {
  */
 export async function getBranchMovements(filters?: unknown) {
   try {
+    const auth = await requireAdmin();
+    if (!auth.ok) return { success: false as const, error: auth.error };
+
     const opts = getMovementsFiltersSchema.parse(filters ?? {});
     const where: Record<string, unknown> = {};
     if (opts.branchId) where.branchId = opts.branchId;
@@ -860,6 +888,9 @@ const getBranchProductsForExportSchema = z.object({
  */
 export async function getBranchProductsForExport(data: unknown) {
   try {
+    const auth = await requireAdmin();
+    if (!auth.ok) return { success: false as const, error: auth.error };
+
     const { branchId } = getBranchProductsForExportSchema.parse(data);
 
     const inventory = await prisma.branchInventory.findMany({
@@ -914,6 +945,9 @@ export async function getBranchProductsForExport(data: unknown) {
  */
 export async function exportBranchProductsPdf(data: unknown) {
   try {
+    const auth = await requireAdmin();
+    if (!auth.ok) return { success: false as const, error: auth.error };
+
     const { branchId, selectedProductIds, sortBy } = exportBranchPdfSchema.parse(data);
 
     const branch = await prisma.branch.findUnique({

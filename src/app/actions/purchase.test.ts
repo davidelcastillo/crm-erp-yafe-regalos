@@ -150,3 +150,23 @@ describe("getPurchases", () => {
     expect(result.data?.[0]?.totalAmount).toBe(150);
   });
 });
+// AGENTS.md §0.2: sesión + rol admin antes de validar y antes de Prisma.
+describe("compras: autorización admin", () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it("rechaza registerPurchase sin sesión admin y no toca Prisma", async () => {
+    const { requireAdmin } = jest.requireMock<{ requireAdmin: jest.Mock }>(
+      "@/lib/auth-guard"
+    );
+    requireAdmin.mockResolvedValueOnce({ ok: false, error: "No autorizado" });
+
+    // Sucursal inválida: si el guardián no fuera primero, el error sería de Zod.
+    const result = await registerPurchase({
+      items: [{ productId: 1, price: 10, quantity: 1 }],
+      branchId: -1,
+    });
+
+    expect(result).toEqual({ success: false, error: "No autorizado" });
+    expect(mockBranchFindFirst).not.toHaveBeenCalled();
+  });
+});

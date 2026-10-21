@@ -644,3 +644,38 @@ describe("getBranchOptions Server Action (HU2)", () => {
     expect(result.data).toEqual([]);
   });
 });
+// AGENTS.md §0.2: sesión + rol admin antes de validar y antes de Prisma.
+// Las seis acciones usan el mismo guardián (`requireAdmin`); las cuatro que
+// antes comprobaban `hasUserRole` por su cuenta ya no lo hacen.
+// `createBranch` y `getBranchOptions` fijan el rechazo acá; el resto queda
+// cubierto por el barrido estructural de `src/lib/auth-guard.coverage.test.ts`.
+describe("sucursales: autorización admin", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("rechaza createBranch sin sesión admin y no toca Prisma", async () => {
+    const { requireAdmin } = jest.requireMock<{ requireAdmin: jest.Mock }>(
+      "@/lib/auth-guard"
+    );
+    requireAdmin.mockResolvedValueOnce({ ok: false, error: "No autorizado" });
+
+    // Código inválido: si el guardián no fuera primero, el error sería de Zod.
+    const result = await createBranch({ ...baseValidInput, code: "" });
+
+    expect(result).toEqual({ success: false, error: "No autorizado" });
+    expect(mockBranchFindFirst).not.toHaveBeenCalled();
+  });
+
+  it("rechaza getBranchOptions sin sesión admin y no consulta Prisma", async () => {
+    const { requireAdmin } = jest.requireMock<{ requireAdmin: jest.Mock }>(
+      "@/lib/auth-guard"
+    );
+    requireAdmin.mockResolvedValueOnce({ ok: false, error: "No autorizado" });
+
+    const result = await getBranchOptions();
+
+    expect(result).toEqual({ success: false, error: "No autorizado" });
+    expect(mockBranchFindMany).not.toHaveBeenCalled();
+  });
+});

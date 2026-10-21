@@ -278,3 +278,20 @@ describe('generateProductLabels — PDF según la plantilla (§S3)', () => {
     expect(pdfText(segunda.data.pdfBase64).match(/AAA001/g)).toHaveLength(73);
   });
 });
+
+// AGENTS.md §0.2: sesión + rol admin antes de validar y antes de Prisma.
+describe('etiquetas: autorización admin', () => {
+  test('rechaza generateProductLabels sin sesión admin y no consulta Prisma', async () => {
+    const { requireAdmin } = jest.requireMock<{ requireAdmin: jest.Mock }>(
+      '@/lib/auth-guard'
+    );
+    requireAdmin.mockResolvedValueOnce({ ok: false, error: 'No autorizado' });
+
+    // Selección vacía: si el guardián no fuera primero, el error sería de Zod.
+    const resultado = await generateProductLabels({ branchId: 1, selections: [] });
+
+    expect(resultado).toEqual({ success: false, error: 'No autorizado' });
+    expect(mockBranchFindUnique).not.toHaveBeenCalled();
+    expect(mockProductFindMany).not.toHaveBeenCalled();
+  });
+});

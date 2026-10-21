@@ -37,3 +37,10 @@ if (typeof window !== "undefined") {
   // Mock confirm for delete confirmations
   window.confirm = jest.fn(() => true);
 }
+// Las Server Actions internas exigen sesión + rol admin (`src/lib/auth-guard.ts`).
+// Se mockea como autorizado para que las suites de negocio prueben su propio
+// comportamiento sin levantar Supabase; el archivo que necesite el rechazo lo
+// sobreescribe con `mockResolvedValueOnce({ ok: false, error: "No autorizado" })`.
+jest.mock("@/lib/auth-guard", () => ({
+  requireAdmin: jest.fn(async () => ({ ok: true, email: "test@feria.test" })),
+}));

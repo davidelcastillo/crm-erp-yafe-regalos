@@ -330,3 +330,25 @@ describe("searchProducts Server Action", () => {
     expect(result.data?.[0]).not.toHaveProperty("codePrefix");
   });
 });
+// AGENTS.md §0.2: sesión + rol admin antes de validar y antes de Prisma.
+describe("productos: autorización admin", () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it("rechaza createProduct sin sesión admin y no toca Prisma", async () => {
+    const { requireAdmin } = jest.requireMock<{ requireAdmin: jest.Mock }>(
+      "@/lib/auth-guard"
+    );
+    requireAdmin.mockResolvedValueOnce({ ok: false, error: "No autorizado" });
+
+    // Prefijo inválido: si el guardián no fuera primero, el error sería de Zod.
+    const result = await createProduct({
+      name: "Test",
+      prefix: "X",
+      price: 100,
+    });
+
+    expect(result).toEqual({ success: false, error: "No autorizado" });
+    expect(prisma.product.findMany).not.toHaveBeenCalled();
+    expect(prisma.product.create).not.toHaveBeenCalled();
+  });
+});

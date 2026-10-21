@@ -1,5 +1,6 @@
 // src/app/actions/product.ts
 "use server";
+import { requireAdmin } from "@/lib/auth-guard";
 
 import { prisma } from "@/lib/prisma";
 import { parseArray, parseObject } from "@/lib/parse-prisma";
@@ -54,6 +55,9 @@ function isUniqueConstraintError(error: unknown): boolean {
 
 export async function createProduct(data: unknown) {
   try {
+    const auth = await requireAdmin();
+    if (!auth.ok) return { success: false as const, error: auth.error };
+
     const validatedData = createProductSchema.parse(data);
 
     // Retry logic with advisory lock to handle race conditions
@@ -119,6 +123,9 @@ export async function createProduct(data: unknown) {
 
 export async function getProducts(branchId?: number) {
   try {
+    const auth = await requireAdmin();
+    if (!auth.ok) return { success: false as const, error: auth.error };
+
     const products = await prisma.product.findMany({
       where: {
         active: true,
@@ -141,6 +148,9 @@ export async function getProducts(branchId?: number) {
 
 export async function getProductById(id: number) {
   try {
+    const auth = await requireAdmin();
+    if (!auth.ok) return { success: false as const, error: auth.error };
+
     const product = await prisma.product.findUnique({
       where: { id },
     });
@@ -156,6 +166,9 @@ export async function getProductById(id: number) {
 
 export async function updateProduct(data: unknown) {
   try {
+    const auth = await requireAdmin();
+    if (!auth.ok) return { success: false as const, error: auth.error };
+
     const validatedData = updateProductSchema.parse(data);
 
     const product = await prisma.product.update({
@@ -183,6 +196,9 @@ export async function updateProduct(data: unknown) {
 
 export async function deleteProduct(data: unknown) {
   try {
+    const auth = await requireAdmin();
+    if (!auth.ok) return { success: false as const, error: auth.error };
+
     const validatedData = deleteProductSchema.parse(data);
 
     await prisma.product.delete({
@@ -209,6 +225,9 @@ export async function deleteProduct(data: unknown) {
  */
 export async function searchProducts(data: unknown) {
   try {
+    const auth = await requireAdmin();
+    if (!auth.ok) return { success: false as const, error: auth.error };
+
     const { query, branchId } = searchProductsSchema.parse(data);
 
     // Empty or whitespace-only query returns empty array (no DB call)
@@ -268,6 +287,9 @@ export async function searchProducts(data: unknown) {
  */
 export async function getProductMovements(productId: number) {
   try {
+    const auth = await requireAdmin();
+    if (!auth.ok) return { success: false as const, error: auth.error };
+
     // Fetch purchases with related purchase data
     const purchaseItems = await prisma.purchaseItem.findMany({
       where: { productId },
@@ -396,6 +418,9 @@ const toggleProductActiveSchema = z.object({
  */
 export async function toggleProductActive(data: unknown) {
   try {
+    const auth = await requireAdmin();
+    if (!auth.ok) return { success: false as const, error: auth.error };
+
     const { id, active } = toggleProductActiveSchema.parse(data);
 
     await prisma.product.update({
@@ -424,6 +449,9 @@ export async function toggleProductActive(data: unknown) {
  */
 export async function getActiveProducts(branchId?: number) {
   try {
+    const auth = await requireAdmin();
+    if (!auth.ok) return { success: false as const, error: auth.error };
+
     const products = await prisma.product.findMany({
       where: {
         active: true,
@@ -451,6 +479,9 @@ export async function getActiveProducts(branchId?: number) {
  */
 export async function getInactiveProducts() {
   try {
+    const auth = await requireAdmin();
+    if (!auth.ok) return { success: false as const, error: auth.error };
+
     const products = await prisma.product.findMany({
       where: { active: false },
       orderBy: { updatedAt: "desc" },
@@ -470,6 +501,9 @@ export async function getInactiveProducts() {
 export async function reactivateProduct(data: unknown) {
   const reactivateSchema = z.object({ id: z.number().int().positive("ID inválido") });
   try {
+    const auth = await requireAdmin();
+    if (!auth.ok) return { success: false as const, error: auth.error };
+
     const { id } = reactivateSchema.parse(data);
 
     await prisma.product.update({
@@ -501,6 +535,9 @@ export async function reactivateProduct(data: unknown) {
  */
 export async function updateProductExtended(data: unknown) {
   try {
+    const auth = await requireAdmin();
+    if (!auth.ok) return { success: false as const, error: auth.error };
+
     const validatedData = updateProductExtendedSchema.parse(data);
 
     const product = await prisma.product.update({

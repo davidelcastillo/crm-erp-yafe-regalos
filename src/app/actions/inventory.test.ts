@@ -568,3 +568,21 @@ describe("getBranchProductsForExport", () => {
     expect(result.data?.length).toBe(2);
   });
 });
+
+// AGENTS.md §0.2: sesión + rol admin antes de validar y antes de Prisma.
+describe("inventario: autorización admin", () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it("rechaza getProductStock sin sesión admin y no consulta Prisma", async () => {
+    const { requireAdmin } = jest.requireMock<{ requireAdmin: jest.Mock }>(
+      "@/lib/auth-guard"
+    );
+    requireAdmin.mockResolvedValueOnce({ ok: false, error: "No autorizado" });
+
+    // Ids inválidos: si el guardián no fuera primero, el error sería de Zod.
+    const result = await getProductStock({ productId: -1, branchId: -1 });
+
+    expect(result).toEqual({ success: false, error: "No autorizado" });
+    expect(mockBranchInventoryFindUnique).not.toHaveBeenCalled();
+  });
+});

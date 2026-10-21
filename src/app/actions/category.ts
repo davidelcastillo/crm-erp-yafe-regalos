@@ -1,5 +1,6 @@
 // src/app/actions/category.ts
 'use server';
+import { requireAdmin } from "@/lib/auth-guard";
 
 import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
@@ -28,6 +29,9 @@ function isPrismaError(err: unknown, code: string): boolean {
  */
 export async function createCategory(data: { name: string }) {
   try {
+    const auth = await requireAdmin();
+    if (!auth.ok) return { success: false as const, error: auth.error };
+
     const { name } = createCategorySchema.parse(data);
 
     const category = await prisma.category.create({
@@ -61,6 +65,9 @@ export async function createCategory(data: { name: string }) {
  */
 export async function getCategories() {
   try {
+    const auth = await requireAdmin();
+    if (!auth.ok) return { success: false as const, error: auth.error };
+
     const categories = await prisma.category.findMany({
       orderBy: { name: 'asc' },
       include: { _count: { select: { products: true } } },
@@ -77,6 +84,9 @@ export async function getCategories() {
  */
 export async function getCategoryById(id: number) {
   try {
+    const auth = await requireAdmin();
+    if (!auth.ok) return { success: false as const, error: auth.error };
+
     const category = await prisma.category.findUnique({
       where: { id },
       include: { _count: { select: { products: true } } },
@@ -98,6 +108,9 @@ export async function getCategoryById(id: number) {
  */
 export async function updateCategory(data: { id: number; name?: string }) {
   try {
+    const auth = await requireAdmin();
+    if (!auth.ok) return { success: false as const, error: auth.error };
+
     const validatedData = updateCategorySchema.parse(data);
 
     const category = await prisma.category.update({
@@ -140,6 +153,9 @@ export async function updateCategory(data: { id: number; name?: string }) {
  */
 export async function deleteCategory(data: { id: number }) {
   try {
+    const auth = await requireAdmin();
+    if (!auth.ok) return { success: false as const, error: auth.error };
+
     const { id } = deleteCategorySchema.parse(data);
 
     const productCount = await prisma.product.count({
@@ -176,6 +192,9 @@ export async function deleteCategory(data: { id: number }) {
  */
 export async function getCategoryOptions() {
   try {
+    const auth = await requireAdmin();
+    if (!auth.ok) return { success: false as const, error: auth.error };
+
     const categories = await prisma.category.findMany({
       select: { id: true, name: true },
       orderBy: { name: 'asc' },
