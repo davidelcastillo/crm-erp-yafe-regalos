@@ -33,8 +33,12 @@ export const CUT_LINE_WIDTH_MM = 0.6;
 export const LABEL_BACKGROUND_COLOR = '#fcd2d3';
 /** Cajas del código y del precio. */
 export const BOX_COLOR = '#ffeff3';
-/** Código, `$` y `@feria_conexx`. */
+/** `$` y `@feria_conexx`: el tono de marca de la plantilla. */
 export const TEXT_COLOR = '#6b2b43';
+/** Código del producto: oscuro, en negrita, para que se lea de lejos (L12). */
+export const CODE_TEXT_COLOR = '#222222';
+/** Importe: negro pleno (L12). */
+export const PRICE_TEXT_COLOR = '#000000';
 /** Líneas de corte. */
 export const CUT_LINE_COLOR = '#000000';
 

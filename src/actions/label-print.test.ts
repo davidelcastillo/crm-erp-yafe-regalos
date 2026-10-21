@@ -181,6 +181,29 @@ describe('generateProductLabels — PDF según la plantilla (§S3)', () => {
     expect(text).toContain('1.250,00');
   });
 
+  test('el codigo va oscuro y el importe en negro; el tono de marca queda para $ y handle', async () => {
+    mockProductFindMany.mockResolvedValue([{ id: 1, code: 'AAA001', price: 1500 }]);
+
+    const result = await generateProductLabels({
+      branchId: 2,
+      selections: [{ productId: 1, quantity: 1 }],
+    });
+    expect(result.success).toBe(true);
+    if (!result.success) throw new Error(result.error);
+
+    const content = pageStreams(result.data.pdfBase64).join("\n");
+    // Código: #222222, en negrita.
+    expect(content).toContain(
+      '0.13333333333333333 0.13333333333333333 0.13333333333333333 rg'
+    );
+    // Importe: negro pleno.
+    expect(content).toContain('0 0 0 rg');
+    // El tono de marca (#6b2b43) queda solo en el `$` y en @feria_conexx.
+    expect(
+      content.match(/0\.4196078431372549 0\.16862745098039217 0\.2627450980392157 rg/g)
+    ).toHaveLength(2);
+  });
+
   test('repite la etiqueta tantas veces como la cantidad pedida', async () => {
     const result = await generateProductLabels({
       branchId: 1,

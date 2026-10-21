@@ -45,7 +45,9 @@ import {
   ROWS_PER_SHEET,
   SHEET_HEIGHT_MM,
   SHEET_WIDTH_MM,
+  CODE_TEXT_COLOR,
   TEXT_COLOR,
+  PRICE_TEXT_COLOR,
   calculateLabelSlots,
   calculateSheetCount,
   formatPrice,
@@ -208,7 +210,7 @@ const drawLabel = (
     y: mm(SHEET_HEIGHT_MM - codeBoxTop) - (mm(CODE_BOX_HEIGHT_MM) + codeAscent) / 2,
     size: codeSize,
     font: bold,
-    color: inkColor,
+    color: color(CODE_TEXT_COLOR),
   });
 
   // Caja del precio.
@@ -247,7 +249,7 @@ const drawLabel = (
     y: priceBaseline,
     size: amountSize,
     font: bold,
-    color: inkColor,
+    color: color(PRICE_TEXT_COLOR),
   });
 
   // Handle debajo de la caja del precio, centrado y ajustado al 88 % del ancho.

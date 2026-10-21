@@ -1,5 +1,7 @@
 // src/lib/label-layout.test.ts
 import {
+  CODE_TEXT_COLOR,
+  PRICE_TEXT_COLOR,
   BOX_COLOR,
   BOX_LEFT_MM,
   BOX_WIDTH_MM,
@@ -106,6 +108,12 @@ describe('label-layout.ts — medidas y colores de la plantilla (§S3)', () => {
     expect(CODE_BOX_HEIGHT_MM).toBe(6.9);
     expect(CODE_BOX_RADIUS_MM).toBe(2.7);
     expect(CODE_MAX_WIDTH_RATIO).toBe(0.9);
+    // Texto: el tono de marca es de la plantilla; código e importe van aparte
+    // (L12: el usuario pidió el código más oscuro y el precio en negro).
+    expect(TEXT_COLOR).toBe('#6b2b43');
+    expect(CODE_TEXT_COLOR).toBe('#222222');
+    expect(PRICE_TEXT_COLOR).toBe('#000000');
+
     // Caja del precio: alto 44,5 % y arranca a 9 mm del borde superior, o sea
     // 1,1 mm después del pie de la caja del código (top medido en la plantilla).
     expect(PRICE_BOX_TOP_MM).toBe(9);

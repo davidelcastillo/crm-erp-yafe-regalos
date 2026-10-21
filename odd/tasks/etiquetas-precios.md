@@ -18,7 +18,7 @@ Pedido original en L1 (verbatim). Las respuestas de producto dadas por el usuari
 
 La imagen es un A4 horizontal (2000 × 1414 px @ 171 dpi). Medido píxel a píxel: grilla de 9 columnas × 8 filas, celda 217,25 × 166,4 px, líneas de corte negras de 4 px. Todo lo de abajo está expresado en mm para la celda de **33,00 × 26,25 mm** (S6) y en porcentaje de la celda para que escale.
 
-Colores: fondo de etiqueta `#fcd2d3`; cajas `#ffeff3`; `$`, `@feria_conexx` y el código `#6b2b43`; líneas de corte `#000000`.
+Colores: fondo de etiqueta `#fcd2d3`; cajas `#ffeff3`; `$` y `@feria_conexx` en el tono de marca `#6b2b43`; **código** `#222222` en negrita e **importe** `#000000` (L12: el usuario pidió el código más oscuro y el precio en negro); líneas de corte `#000000`.
 
 | Pieza | Medida en la plantilla | En mm (celda 33 × 26,25) |
 | --- | --- | --- |
@@ -78,3 +78,5 @@ Distribución de la hoja: 72 etiquetas, **llenando columna por columna** (de arr
   - **Deuda preexistente que reportó, no corregida**: `generateProductLabels` y `getBranchProductsForExport` no verifican sesión/rol **dentro** de la acción (igual que el resto de `src/app/actions/`; solo `branch.ts` lo hace): la protección es proxy + UI. Es lectura de precios y stock, no mutación; arreglarlo es una unidad transversal de auth, no de esta ronda.
   - **`updatedAt` en el catálogo público**: el verificador lo consideró aceptable (no hay PII, ni costo, ni margen; el elemento ya es público y el campo no se dibuja). Queda como decisión del usuario si prefiere que el orden se resuelva en el servidor y el campo no viaje.
   - **Aspecto visual**: sigue sin verificador automático (no hay rasterizador de PDF en el entorno). La muestra `docs/PDF Precios/etiquetas-muestra.pdf` es el artefacto para la revisión del usuario.
+
+- **L12 — Colores del texto (pedido del usuario, verbatim)**: «Bien, apruebo el PDF con una modificación, que de los numeros del precio sea color negra, asi se ve bien, y el codigo sea un poco mas oscura y con bold, asi se nota bien». Implementado: **importe en negro pleno** (`PRICE_TEXT_COLOR = #000000`) y **código en `#222222`** (`CODE_TEXT_COLOR`), que ya iba en `Helvetica-Bold` — el «con bold» ya se cumplía, lo que faltaba era el contraste. El `$` y `@feria_conexx` conservan el tono de marca `#6b2b43` (son los que dan la identidad de la etiqueta). RED→GREEN: un caso en `label-layout.test.ts` para las tres constantes y otro en `label-print.test.ts` que lee los operadores de color del PDF (código oscuro 1 por etiqueta, negro 1 por etiqueta, marca exactamente 2 por etiqueta). Verificado además sobre la muestra regenerada: **72** usos de `#222222`, **72** de negro, **144** de marca (2 × 72) y **72** fondos rosados. Suite completa: **84 suites / 650 tests**; `tsc` y `lint` limpios; build OK. La muestra `docs/PDF Precios/etiquetas-muestra.pdf` quedó regenerada con estos colores.
