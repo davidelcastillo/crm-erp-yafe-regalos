@@ -15,10 +15,6 @@ type InactiveProduct = Product & { category: { id: number; name: string } | null
 
 const DEBOUNCE_MS = 300;
 
-// Botón secundario gris del encabezado: no compite con la acción principal.
-const VOLVER_CLASS =
-  'btn btn-secondary whitespace-nowrap';
-
 export default function InactivosPage() {
   const [products, setProducts] = useState<InactiveProduct[]>([]);
   const [loading, setLoading] = useState(true);
@@ -105,13 +101,9 @@ export default function InactivosPage() {
         <div className="pb-16 brand-gradient">
           <PageHeader
             title="Productos inactivos"
-            actions={
-              <Link href="/inventario" className={VOLVER_CLASS}>
-                Volver a inventario
-              </Link>
-            }
             menuItems={[
-              // El slot `actions` solo se ve desde desktop: el volver va también acá.
+              // El volver ya no vive solo acá: también está a la vista arriba de la
+              // hoja. La fila queda para el que entra por el menú por costumbre.
               { label: 'Volver a inventario', href: '/inventario' },
             ]}
           />
@@ -151,6 +143,18 @@ export default function InactivosPage() {
         </div>
 
         <div className="glass rounded-t-[2.5rem] border-t border-white/80 -mt-12 px-5 pt-6 pb-8 shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
+          {/* El regreso estaba sólo en el menú ☰: ahora se ve, con target táctil
+              del mismo alto que el de /inventario/control. */}
+          <Link
+            href="/inventario"
+            className="mb-4 inline-flex min-h-[44px] items-center gap-2 rounded-xl px-3 text-sm font-medium text-ink-muted transition-colors hover:bg-surface-strong touch-manipulation"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            Volver a inventario
+          </Link>
+
           {/* El orden se queda en la hoja: es un filtro de la lista, no la búsqueda. */}
           <div className="flex justify-center">
             <ProductSortToggle value={sortMode} onChange={setSortMode} />

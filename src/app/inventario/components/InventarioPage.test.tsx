@@ -452,6 +452,26 @@ describe("InventarioPage — «Inactivos» sigue en el menú ☰ (S3)", () => {
       "/inventario/inactivos"
     );
   });
+
+  // Prueba visual del usuario (S18, U3): «Sacar control de stock del menu de
+  // hamburguesa, ya esta en los botones principales». Queda un solo acceso.
+  it("«Control de stock» ya no está en el menú ☰ porque vive en la banda", async () => {
+    await renderPage();
+
+    fireEvent.click(screen.getByLabelText("Abrir menú"));
+    const menu = screen.getByLabelText("Menú de Inventario");
+
+    expect(within(menu).queryByText(/control de stock/i)).toBeNull();
+
+    // No se perdió: sigue siendo el tercer paso del acceso «Stock».
+    fireEvent.click(screen.getByLabelText("Cerrar menú"));
+    fireEvent.click(screen.getAllByRole("button", { name: /^Stock/ })[0]);
+    expect(
+      within(await screen.findByRole("dialog", { name: "Stock" })).getByRole("button", {
+        name: /Control de stock/,
+      })
+    ).toBeInTheDocument();
+  });
 });
 
 describe("Inventario: buscador en su propia tarjeta (S16)", () => {

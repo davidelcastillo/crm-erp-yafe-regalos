@@ -3,7 +3,7 @@
  * tarjetas y también el gráfico. Antes el gráfico pedía siempre `days: 30` sin
  * importar lo que se eligiera (bug 5 del usuario).
  */
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import DashboardPage from './page';
 
 const mockGetStats = jest.fn();
@@ -13,6 +13,8 @@ const mockGetProducts = jest.fn();
 jest.mock('../actions/dashboard', () => ({
   getStats: (...args: unknown[]) => mockGetStats(...args),
   getPerformanceData: (...args: unknown[]) => mockGetPerformanceData(...args),
+  // El caso de `ProductAnalytics` (S18) renderiza el componente real, que lo pide al elegir.
+  getProductAnalytics: jest.fn(async () => ({ success: true, data: null })),
 }));
 
 jest.mock('../actions/product', () => ({
@@ -211,5 +213,53 @@ describe('DashboardPage — resumen', () => {
     expect(screen.getByText(/\$ 800/)).toBeInTheDocument();
     expect(screen.getByText(/\$ 700/)).toBeInTheDocument();
     expect(screen.getByText(/\$ 250/)).toBeInTheDocument();
+  });
+});
+
+// Prueba visual del usuario (S18, U1): «el selector de productos cuando le hago
+// click para seleccionar es demasiado grande y se sale de la pantalla». Era un
+// `<select>` nativo: la lista la dibuja el sistema operativo y se abría tan ancha
+// como el nombre más largo, sin poder acotarla. Se reemplaza por un desplegable
+// del sistema, con alto máximo, scroll interno y ancho de la tarjeta.
+// La página mockea el componente, así que acá se renderiza el real.
+describe('ProductAnalytics — selector de producto acotado (S18)', () => {
+  const { ProductAnalytics } = jest.requireActual('./components/ProductAnalytics') as typeof import('./components/ProductAnalytics');
+
+  const productos = [
+    { id: 1, name: 'Producto con un nombre larguísimo que antes ensanchaba la lista' },
+  ] as never[];
+
+  const abrirSelector = () => {
+    const { container } = render(<ProductAnalytics products={productos} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Elegir producto' }));
+    return container;
+  };
+
+  it('abre un desplegable del sistema, no la lista nativa del navegador', () => {
+    const container = abrirSelector();
+
+    // Son botones de verdad dentro de un panel propio: cada opción se alcanza con
+    // Tab y se activa con Enter, sin que el sistema operativo dibuje la lista.
+    const opcion = screen.getByRole('button', { name: /nombre larguísimo/ });
+    expect(opcion).toHaveClass('truncate');
+    expect(container.querySelector('select')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Elegir producto' })).toHaveAttribute(
+      'aria-expanded',
+      'true'
+    );
+
+    // Alto máximo con scroll adentro y el ancho del trigger: nada se sale de la pantalla.
+    expect(opcion.parentElement).toHaveClass('max-h-60', 'overflow-y-auto', 'w-full', 'absolute');
+  });
+
+  it('al elegir un producto cierra la lista y deja la elección a la vista', async () => {
+    abrirSelector();
+
+    fireEvent.click(screen.getByRole('button', { name: /nombre larguísimo/ }));
+
+    expect(screen.queryByRole('button', { name: /nombre larguísimo/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Elegir producto' })).toHaveTextContent(
+      /nombre larguísimo/
+    );
   });
 });

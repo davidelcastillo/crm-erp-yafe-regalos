@@ -120,10 +120,13 @@ export function MovementsModal({ product, isOpen, onClose, branchId = null }: Mo
           <h2 id="movements-modal-title" className="text-xl font-semibold text-ink">
             Historial de Movimientos: {product.name}
           </h2>
+          {/* Un solo cierre: el ✕ del encabezado, que sigue a la vista cuando la
+              tabla es larga y se scrollea. La versión anterior tenía además un
+              botón «Cerrar» al pie, así que el modal cerraba de dos maneras. */}
           <button
             type="button"
             onClick={onClose}
-            className="btn btn-icon btn-round hover:bg-surface-strong"
+            className="btn btn-icon btn-round shrink-0 text-ink-muted hover:bg-surface-strong"
             aria-label="Cerrar"
           >
             <svg className="w-6 h-6 text-ink-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -247,15 +250,6 @@ export function MovementsModal({ product, isOpen, onClose, branchId = null }: Mo
             </div>
           </div>
         )}
-
-        <div className="mt-6 flex justify-end">
-          <button
-            onClick={onClose}
-            className="btn btn-secondary"
-          >
-            Cerrar
-          </button>
-        </div>
       </div>
     </div>
   );

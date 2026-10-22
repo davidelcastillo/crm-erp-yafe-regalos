@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Product } from "@prisma/client";
 import { getProductAnalytics } from "../../actions/dashboard";
 import { Spinner } from "@/components/ui/Spinner";
@@ -24,6 +24,29 @@ export function ProductAnalytics({ products }: ProductAnalyticsProps) {
   const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [loading, setLoading] = useState(false);
+  // El `<select>` nativo lo dibuja el sistema operativo: con un nombre de
+  // producto largo la lista se abría más ancha que la pantalla y no se podía
+  // acotar. Este desplegable es del sistema, con alto máximo y scroll adentro.
+  const [open, setOpen] = useState(false);
+  const selectorRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+
+    function handleClick(e: MouseEvent) {
+      if (selectorRef.current && !selectorRef.current.contains(e.target as Node)) setOpen(false);
+    }
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+
+    document.addEventListener("mousedown", handleClick);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
 
   const handleProductChange = async (productId: number) => {
     setSelectedProductId(productId);
@@ -55,20 +78,75 @@ export function ProductAnalytics({ products }: ProductAnalyticsProps) {
         Análisis por Producto
       </h2>
 
-      {/* Product Selector */}
-      <select
-        value={selectedProductId || ""}
-        onChange={(e) => handleProductChange(Number(e.target.value))}
-        aria-label="Elegir producto"
-        className="mb-4 min-h-[44px] w-full rounded-xl bg-surface-soft px-3 py-2.5 text-base text-ink focus:outline-none focus:ring-2 focus:ring-accent/30"
-      >
-        <option value="">Seleccionar producto...</option>
-        {products.map((product) => (
-          <option key={product.id} value={product.id}>
-            {product.name}
-          </option>
-        ))}
-      </select>
+      {/* Product Selector: ancho de la tarjeta, alto máximo y scroll adentro. */}
+      <div className="relative mb-4 min-w-0" ref={selectorRef}>
+        <button
+          type="button"
+          onClick={() => setOpen(!open)}
+          aria-expanded={open}
+          aria-label="Elegir producto"
+          className="flex min-h-[44px] w-full items-center justify-between gap-2 rounded-xl bg-surface-soft px-3 py-2.5 text-base text-ink transition-colors hover:bg-surface-strong touch-manipulation"
+        >
+          <span className="truncate">
+            {selectedProductId === null
+              ? "Seleccionar producto..."
+              : products.find((p) => p.id === selectedProductId)?.name ??
+                "Seleccionar producto..."}
+          </span>
+          <svg
+            className={`h-4 w-4 shrink-0 text-ink-muted transition-transform ${open ? "rotate-180" : ""}`}
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            aria-hidden="true"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+
+        {open && (
+          <div
+            className="absolute z-30 mt-1 max-h-60 w-full overflow-y-auto rounded-xl border border-hairline bg-surface shadow-lg"
+          >
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                handleProductChange(0);
+              }}
+              aria-current={selectedProductId === null ? "true" : undefined}
+              className={`block w-full min-h-[44px] truncate px-4 py-3 text-left text-sm transition-colors hover:bg-surface-soft ${
+                selectedProductId === null
+                  ? "bg-accent/10 text-brand-rosa-texto font-medium"
+                  : "text-ink"
+              }`}
+            >
+              Seleccionar producto...
+            </button>
+            {products.map((product) => (
+              <button
+                key={product.id}
+                type="button"
+                onClick={() => {
+                  setOpen(false);
+                  handleProductChange(product.id);
+                }}
+                aria-current={selectedProductId === product.id ? "true" : undefined}
+                className={`block w-full min-h-[44px] truncate px-4 py-3 text-left text-sm transition-colors hover:bg-surface-soft ${
+                  selectedProductId === product.id
+                    ? "bg-accent/10 text-brand-rosa-texto font-medium"
+                    : "text-ink"
+                }`}
+              >
+                {product.name}
+              </button>
+            ))}
+            {products.length === 0 && (
+              <div className="px-4 py-3 text-sm text-ink-muted">No hay productos activos</div>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Analytics Display */}
       {loading ? (

@@ -242,3 +242,25 @@ describe('MovementsModal — rango del historial', () => {
     );
   })
 })
+
+// Prueba visual del usuario (S18, U3): «el modal para ver los movimientos de un
+// producto tiene 2 botones cerrar, poner 1 solo». Quedaba el ✕ del encabezado
+// —que sigue a la vista aunque la tabla scrollee— y además un «Cerrar» al pie.
+describe('MovementsModal — un solo cierre (S18, U3)', () => {
+  it('ofrece un único botón de cerrar y es el ✕ etiquetado del encabezado', async () => {
+    responder([]);
+    const onClose = jest.fn();
+    render(<MovementsModal product={producto} isOpen onClose={onClose} />);
+    await waitFor(() => expect(mockGetProductMovements).toHaveBeenCalled());
+
+    const cierres = screen.getAllByRole('button', { name: 'Cerrar' });
+    expect(cierres).toHaveLength(1);
+
+    // Etiquetado para lectores de pantalla y alcanzable con el teclado.
+    expect(cierres[0]).toHaveAttribute('aria-label', 'Cerrar');
+    expect(cierres[0].tagName).toBe('BUTTON');
+
+    fireEvent.click(cierres[0]);
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+});

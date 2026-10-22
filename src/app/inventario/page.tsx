@@ -316,7 +316,8 @@ export default function InventarioPage() {
               </>
             }
             menuItems={[
-              { label: "Control de stock", href: "/inventario/control" },
+              // «Control de stock» salió del menú ☰: ya está en el acceso «Stock»
+              // de la banda, visible en celular y en escritorio.
               { label: "Inactivos", href: "/inventario/inactivos" },
               { label: "Categorías", href: "/categorias" },
               { label: "Nueva categoría", onClick: handleCreateCategory },
