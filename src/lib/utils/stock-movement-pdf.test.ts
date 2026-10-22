@@ -76,11 +76,11 @@ describe('generateStockMovementPdf', () => {
     expect(text.join(' ')).toContain('<script>alert(1)</script> ?');
   });
 
-  test('pinta el título en violeta de marca y el encabezado de tabla en blanco', async () => {
+  test('pinta el título con el rosa de marca y el encabezado de tabla en blanco', async () => {
     const { colors } = await readPdf(await generateStockMovementPdf(receipt));
 
-    // #6d28d9 = rgb(0,43 · 0,16 · 0,85); el encabezado va en blanco sobre la banda violeta.
-    expect(colors.get('Ingreso')).toEqual([0.43, 0.16, 0.85]);
+    // #be185d = rgb(0,75 · 0,09 · 0,36): el rosa de marca del sistema; el encabezado va en blanco encima.
+    expect(colors.get('Ingreso')).toEqual([0.75, 0.09, 0.36]);
     expect(colors.get('Código')).toEqual([1, 1, 1]);
   });
 

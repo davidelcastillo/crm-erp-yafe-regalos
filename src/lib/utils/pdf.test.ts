@@ -109,13 +109,13 @@ describe('generateProductsPdf', () => {
     expect(text).toContain('Página 3 de 3');
   });
 
-  test('pinta el título en violeta de marca y el encabezado de tabla en blanco', async () => {
+  test('pinta el título con el rosa de marca y el encabezado de tabla en blanco', async () => {
     const { colors } = await readPdfContent(
       Buffer.from(await generateProductsPdf(makeRows(3), META), 'base64')
     );
 
-    // #6d28d9 = rgb(0,43 · 0,16 · 0,85); el encabezado va en blanco sobre la banda violeta.
-    expect(colors.get('Sucursal Depósito (DEP)')).toEqual([0.43, 0.16, 0.85]);
+    // #be185d = rgb(0,75 · 0,09 · 0,36): el rosa de marca del sistema; el encabezado va en blanco encima.
+    expect(colors.get('Sucursal Depósito (DEP)')).toEqual([0.75, 0.09, 0.36]);
     expect(colors.get('Código')).toEqual([1, 1, 1]);
     // El contenido sigue en tinta #222222.
     expect(colors.get('P000')).toEqual([0.13, 0.13, 0.13]);

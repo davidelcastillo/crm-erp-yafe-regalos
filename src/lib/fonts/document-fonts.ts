@@ -28,8 +28,10 @@ export const DOCUMENT_FONT_SIZE = {
  * su contraste medido, y una línea de fila que no compite con el contenido.
  */
 export const DOCUMENT_COLOR = {
-  /** Acción de marca: título, banda del encabezado de tabla y línea de resumen. */
-  brand: '#6d28d9',
+  /** Rosa de marca: título, banda del encabezado de tabla y línea de resumen.
+   *  Es el `brand-rosa-texto` del sistema (#be185d), que sobre blanco llega a
+   *  7:1, así el blanco del encabezado se lee. */
+  brand: '#be185d',
   /** Texto de contenido. */
   ink: '#222222',
   /** Metadatos y pie. */
