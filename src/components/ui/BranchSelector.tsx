@@ -67,7 +67,7 @@ export function BranchSelector({
 
   if (!ready) {
     return (
-      <div className="inline-flex items-center px-3 py-2 text-sm text-[#6a6a6a]">
+      <div className="inline-flex items-center px-3 py-2 text-sm text-ink-muted">
         Cargando sucursales...
       </div>
     );
@@ -82,7 +82,7 @@ export function BranchSelector({
     >
       {label && (
         <span
-          className={`text-xs text-[#6a6a6a] font-medium ${
+          className={`text-xs text-ink-muted font-medium ${
             block ? "block md:hidden" : "hidden sm:block"
           }`}
         >
@@ -95,15 +95,15 @@ export function BranchSelector({
         onClick={() => setOpen(!open)}
         className={
           block
-            ? "inline-flex min-h-[44px] w-full items-center justify-between gap-2 rounded-xl bg-[#f8f8f8] px-4 py-2 text-sm text-[#222222] transition-colors hover:bg-[#f2f2f2] disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
-            : "inline-flex min-h-[44px] max-w-[9.5rem] items-center justify-between gap-2 rounded-xl bg-[#f8f8f8] px-3 py-2 text-sm text-[#222222] transition-colors hover:bg-[#f2f2f2] disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation sm:max-w-none sm:px-4"
+            ? "inline-flex min-h-[44px] w-full items-center justify-between gap-2 rounded-xl bg-surface-soft px-4 py-2 text-sm text-ink transition-colors hover:bg-surface-strong disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
+            : "inline-flex min-h-[44px] max-w-[9.5rem] items-center justify-between gap-2 rounded-xl bg-surface-soft px-3 py-2 text-sm text-ink transition-colors hover:bg-surface-strong disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation sm:max-w-none sm:px-4"
         }
         aria-haspopup="listbox"
         aria-expanded={open}
       >
         <span className="truncate">{selectedName}</span>
         <svg
-          className={`w-4 h-4 text-[#6a6a6a] transition-transform ${open ? "rotate-180" : ""}`}
+          className={`w-4 h-4 text-ink-muted transition-transform ${open ? "rotate-180" : ""}`}
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -114,7 +114,7 @@ export function BranchSelector({
 
       {open && (
         <div
-          className={`absolute z-50 mt-1 max-h-60 overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-lg ${
+          className={`absolute z-50 mt-1 max-h-60 overflow-y-auto rounded-xl border border-hairline bg-surface shadow-lg ${
             block ? "w-full" : "min-w-[9.5rem]"
           }`}
           role="listbox"
@@ -123,8 +123,8 @@ export function BranchSelector({
             <button
               type="button"
               onClick={() => handleSelect(null)}
-              className={`w-full text-left px-4 py-2 text-sm hover:bg-[#f8f8f8] transition-colors ${
-                selectedBranchId === null ? "bg-[#3b82f6]/10 text-[#3b82f6] font-medium" : "text-[#222222]"
+              className={`w-full text-left px-4 py-2 text-sm hover:bg-surface-soft transition-colors ${
+                selectedBranchId === null ? "bg-[#3b82f6]/10 text-info font-medium" : "text-ink"
               }`}
               role="option"
               aria-selected={selectedBranchId === null}
@@ -137,8 +137,8 @@ export function BranchSelector({
               key={b.id}
               type="button"
               onClick={() => handleSelect(b.id)}
-              className={`w-full text-left px-4 py-2 text-sm hover:bg-[#f8f8f8] transition-colors ${
-                selectedBranchId === b.id ? "bg-[#3b82f6]/10 text-[#3b82f6] font-medium" : "text-[#222222]"
+              className={`w-full text-left px-4 py-2 text-sm hover:bg-surface-soft transition-colors ${
+                selectedBranchId === b.id ? "bg-[#3b82f6]/10 text-info font-medium" : "text-ink"
               }`}
               role="option"
               aria-selected={selectedBranchId === b.id}
@@ -147,7 +147,7 @@ export function BranchSelector({
             </button>
           ))}
           {branches.length === 0 && (
-            <div className="px-4 py-3 text-sm text-[#6a6a6a]">
+            <div className="px-4 py-3 text-sm text-ink-muted">
               No hay sucursales activas
             </div>
           )}

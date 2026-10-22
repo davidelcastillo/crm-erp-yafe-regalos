@@ -55,7 +55,7 @@ export const PageHeader = ({ title, actions, right, menuItems = [] }: PageHeader
   };
 
   const menuItemClass =
-    "flex min-h-[48px] items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium text-[#222222] hover:bg-white/60 transition-colors touch-manipulation";
+    "flex min-h-[48px] items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium text-ink hover:bg-white/60 transition-colors touch-manipulation";
 
   return (
     <>
@@ -72,14 +72,14 @@ export const PageHeader = ({ title, actions, right, menuItems = [] }: PageHeader
             aria-expanded={isOpen}
             /* `md:hidden!`: el base `btn` fija `display: inline-flex` fuera de capas,
                así que pisa a las utilidades de visibilidad de Tailwind. */
-            className="btn btn-icon md:hidden -ml-2 text-[#222222] hover:bg-white/60"
+            className="btn btn-icon md:hidden -ml-2 text-ink hover:bg-white/60"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
 
-          <h1 className="flex-1 text-2xl font-bold text-[#222222]">{title}</h1>
+          <h1 className="flex-1 text-2xl font-bold text-ink">{title}</h1>
 
           {right && <div className="w-full md:w-auto">{right}</div>}
 
@@ -121,7 +121,7 @@ export const PageHeader = ({ title, actions, right, menuItems = [] }: PageHeader
                 type="button"
                 onClick={() => setIsOpen(false)}
                 aria-label="Cerrar menú"
-                className="btn btn-icon btn-round -mr-1 text-[#6a6a6a] hover:bg-white/60"
+                className="btn btn-icon btn-round -mr-1 text-ink-muted hover:bg-white/60"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -139,7 +139,7 @@ export const PageHeader = ({ title, actions, right, menuItems = [] }: PageHeader
                     className={menuItemClass}
                   >
                     {item.icon && (
-                      <span className="text-[#6a6a6a]" aria-hidden="true">
+                      <span className="text-ink-muted" aria-hidden="true">
                         {item.icon}
                       </span>
                     )}
@@ -156,7 +156,7 @@ export const PageHeader = ({ title, actions, right, menuItems = [] }: PageHeader
                     className={menuItemClass}
                   >
                     {item.icon && (
-                      <span className="text-[#6a6a6a]" aria-hidden="true">
+                      <span className="text-ink-muted" aria-hidden="true">
                         {item.icon}
                       </span>
                     )}
@@ -168,7 +168,7 @@ export const PageHeader = ({ title, actions, right, menuItems = [] }: PageHeader
               <button
                 type="button"
                 onClick={handleLogout}
-                className="flex min-h-[48px] items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium text-[#c13515] hover:bg-white/60 transition-colors touch-manipulation"
+                className="flex min-h-[48px] items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium text-error hover:bg-white/60 transition-colors touch-manipulation"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                   <path

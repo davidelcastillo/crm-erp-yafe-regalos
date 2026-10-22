@@ -53,6 +53,29 @@
   --ink-soft: #929292;
   --hairline: rgb(0 0 0 / 0.1);
   --hairline-soft: rgb(0 0 0 / 0.05);
+  /* Cuerpo de texto: el gris de `#3f3f3f`, que es el que usa la prosa larga. */
+  --ink-body: var(--palette-focused-gray);
+
+  /* ==========================================================================
+     COLORES DE ESTADO Y DE MARCA
+
+     No son "un color lindo": cada uno está elegido por su contraste medido
+     (tabla en STYLE.md) y vive acá para que el tema oscuro pueda darle su par
+     sin tocar ni un componente. Los badges de estado por producto que se pintan
+     con `style={{}}` (no con clases) quedan como excepción declarada, porque
+     Tailwind no genera clases dinámicas.
+     ========================================================================== */
+  --accent: var(--palette-brand-rosa-fuerte);
+  --positive: #15803d;
+  --negative: #b91c1c;
+  --warning: #b45309;
+  --danger: var(--palette-rausch-red);
+  --error: #c13515;
+  --error-surface: #ffe4ea;
+  --error-ink: #8f0020;
+  --info: #3b82f6;
+  --scrim: rgb(0 0 0 / 0.3);
+  --scrim-strong: rgb(0 0 0 / 0.6);
 
   /* ==========================================================================
      MOVIMIENTO (S6)
@@ -101,6 +124,18 @@
   --color-ink-soft: var(--ink-soft);
   --color-hairline: var(--hairline);
   --color-hairline-soft: var(--hairline-soft);
+  --color-ink-body: var(--ink-body);
+  --color-accent: var(--accent);
+  --color-positive: var(--positive);
+  --color-negative: var(--negative);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-error: var(--error);
+  --color-error-surface: var(--error-surface);
+  --color-error-ink: var(--error-ink);
+  --color-info: var(--info);
+  --color-scrim: var(--scrim);
+  --color-scrim-strong: var(--scrim-strong);
 
   /* Curvas de movimiento: habilitan `ease-standard`, `ease-enter`, `ease-exit`. */
   --ease-standard: var(--motion-ease-standard);

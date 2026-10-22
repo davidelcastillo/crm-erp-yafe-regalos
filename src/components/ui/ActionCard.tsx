@@ -25,13 +25,13 @@ export const ActionCard = ({ label, hint, icon, onClick, href }: ActionCardProps
   const contenido = (
     <>
       {icon && (
-        <span className="text-[#222222]" aria-hidden="true">
+        <span className="text-ink" aria-hidden="true">
           {icon}
         </span>
       )}
       <span className="flex min-w-0 flex-col">
-        <span className="text-sm font-medium text-[#222222] break-words">{label}</span>
-        {hint && <span className="text-xs text-[#6a6a6a]">{hint}</span>}
+        <span className="text-sm font-medium text-ink break-words">{label}</span>
+        {hint && <span className="text-xs text-ink-muted">{hint}</span>}
       </span>
     </>
   );

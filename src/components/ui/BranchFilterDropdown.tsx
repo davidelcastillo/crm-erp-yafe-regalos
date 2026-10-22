@@ -92,13 +92,13 @@ export function BranchFilterDropdown({
   return (
     <div className="flex flex-col gap-1" ref={containerRef}>
       {label && (
-        <span className="text-xs text-[#6a6a6a] font-medium">{label}</span>
+        <span className="text-xs text-ink-muted font-medium">{label}</span>
       )}
       <button
         type="button"
         disabled={disabled || loading}
         onClick={() => setOpen(!open)}
-        className="inline-flex items-center justify-between gap-2 px-4 py-3 min-h-[44px] bg-[#f8f8f8] rounded-xl text-sm text-[#222222] hover:bg-[#f2f2f2] transition-colors min-w-[180px] disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
+        className="inline-flex items-center justify-between gap-2 px-4 py-3 min-h-[44px] bg-surface-soft rounded-xl text-sm text-ink hover:bg-surface-strong transition-colors min-w-[180px] disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
         aria-haspopup="listbox"
         aria-expanded={open}
       >
@@ -110,7 +110,7 @@ export function BranchFilterDropdown({
               : "Todas las sucursales"}
         </span>
         <svg
-          className={`w-4 h-4 text-[#6a6a6a] transition-transform ${open ? "rotate-180" : ""}`}
+          className={`w-4 h-4 text-ink-muted transition-transform ${open ? "rotate-180" : ""}`}
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -121,14 +121,14 @@ export function BranchFilterDropdown({
 
       {open && !loading && (
         <div
-          className="absolute z-50 mt-1 bg-white border border-[#ebebeb] rounded-xl shadow-lg max-h-60 overflow-y-auto min-w-[200px]"
+          className="absolute z-50 mt-1 bg-surface border border-[#ebebeb] rounded-xl shadow-lg max-h-60 overflow-y-auto min-w-[200px]"
           role="listbox"
         >
           <button
             type="button"
             onClick={() => handleClick(null)}
-            className={`w-full text-left px-4 py-3 min-h-[44px] text-sm hover:bg-[#f8f8f8] transition-colors ${
-              selectedId === null ? "bg-[#ec4899]/10 text-brand-rosa-texto font-medium" : "text-[#222222]"
+            className={`w-full text-left px-4 py-3 min-h-[44px] text-sm hover:bg-surface-soft transition-colors ${
+              selectedId === null ? "bg-[#ec4899]/10 text-brand-rosa-texto font-medium" : "text-ink"
             }`}
             role="option"
             aria-selected={selectedId === null}
@@ -140,8 +140,8 @@ export function BranchFilterDropdown({
               key={o.id}
               type="button"
               onClick={() => handleClick(o.id)}
-              className={`w-full text-left px-4 py-3 min-h-[44px] text-sm hover:bg-[#f8f8f8] transition-colors ${
-                o.id === selectedId ? "bg-[#ec4899]/10 text-brand-rosa-texto font-medium" : "text-[#222222]"
+              className={`w-full text-left px-4 py-3 min-h-[44px] text-sm hover:bg-surface-soft transition-colors ${
+                o.id === selectedId ? "bg-[#ec4899]/10 text-brand-rosa-texto font-medium" : "text-ink"
               }`}
               role="option"
               aria-selected={o.id === selectedId}
@@ -150,7 +150,7 @@ export function BranchFilterDropdown({
             </button>
           ))}
           {options.length === 0 && (
-            <div className="px-4 py-3 text-sm text-[#6a6a6a]">
+            <div className="px-4 py-3 text-sm text-ink-muted">
               No hay sucursales activas
             </div>
           )}

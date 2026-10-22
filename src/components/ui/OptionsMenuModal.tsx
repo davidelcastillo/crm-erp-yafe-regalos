@@ -50,7 +50,7 @@ export const OptionsMenuModal = ({
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-end justify-center bg-black/30 backdrop-blur-md md:items-center"
+      className="fixed inset-0 z-[60] flex items-end justify-center bg-scrim backdrop-blur-md md:items-center"
       role="dialog"
       aria-modal="true"
       aria-labelledby={titleId}

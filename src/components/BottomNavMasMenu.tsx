@@ -9,7 +9,7 @@ const MasMenuItem = ({ label, href, active }: { label: string; href: string; act
     className={`
       flex w-full items-center justify-start px-4 py-3 text-sm font-medium
       transition-colors duration-150
-      ${active ? "bg-gradient-to-r from-blue-200 to-pink-400 text-gray-800" : "text-[#6a6a6a] hover:bg-[#f2f2f2]"}
+      ${active ? "bg-gradient-to-r from-blue-200 to-pink-400 text-ink" : "text-ink-muted hover:bg-surface-strong"}
     `}
   >
     <span className="flex-1">{label}</span>
@@ -33,7 +33,7 @@ export default function BottomNavMasMenu({ items, onClose }: BottomNavMasMenuPro
       />
       {/* Menu */}
       <div className="fixed bottom-0 left-0 right-0 z-50">
-        <div className="bg-white border-t border-gray-200 shadow-xl max-w-lg mx-auto">
+        <div className="bg-surface border-t border-hairline shadow-xl max-w-lg mx-auto">
           <div className="space-y-1">
             {items.map((item, index) => {
               const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
@@ -51,7 +51,7 @@ export default function BottomNavMasMenu({ items, onClose }: BottomNavMasMenuPro
           <div className="flex items-center justify-center py-3">
             <button
               onClick={onClose}
-              className="text-xs text-[#6a6a6a] hover:text-[#3f3f3f]"
+              className="text-xs text-ink-muted hover:text-ink-body"
             >
               Cerrar
             </button>

@@ -51,7 +51,7 @@ const EMPTY_FORM: BranchForm = {
 
 // 16px (`text-base`) es obligatorio: por debajo, iOS hace zoom al enfocar.
 const INPUT_CLASS =
-  "w-full min-h-[44px] px-4 py-3 bg-[#f8f8f8] rounded-xl text-base text-[#222222] focus:outline-none focus:ring-2 focus:ring-[#ec4899]/30";
+  "w-full min-h-[44px] px-4 py-3 bg-surface-soft rounded-xl text-base text-ink focus:outline-none focus:ring-2 focus:ring-[#ec4899]/30";
 
 function escapeHtml(value: string) {
   return value
@@ -189,7 +189,7 @@ export function BranchManager({ branches }: { branches: Branch[] }) {
       <div className="max-w-lg">
         <div className="min-w-0">
           <div className="mb-5">
-            <h2 className="text-xl font-semibold text-[#222222]">
+            <h2 className="text-xl font-semibold text-ink">
               {mode === "create" ? "Nueva sucursal" : "Editar sucursal"}
             </h2>
           </div>
@@ -202,7 +202,7 @@ export function BranchManager({ branches }: { branches: Branch[] }) {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-[#222222] mb-1">
+              <label className="block text-sm font-medium text-ink mb-1">
                 Nombre
               </label>
               <input
@@ -218,7 +218,7 @@ export function BranchManager({ branches }: { branches: Branch[] }) {
 
             {mode === "create" && (
               <div>
-                <label className="block text-sm font-medium text-[#222222] mb-1">
+                <label className="block text-sm font-medium text-ink mb-1">
                   Código
                 </label>
                 <input
@@ -230,14 +230,14 @@ export function BranchManager({ branches }: { branches: Branch[] }) {
                   className={INPUT_CLASS}
                   placeholder="Ej. CEN"
                 />
-                <p className="mt-1 text-xs text-[#6a6a6a]">
+                <p className="mt-1 text-xs text-ink-muted">
                   2-10 letras o números. Se usa para el portal de la sucursal.
                 </p>
               </div>
             )}
 
             <div>
-              <label className="block text-sm font-medium text-[#222222] mb-1">
+              <label className="block text-sm font-medium text-ink mb-1">
                 Dirección
               </label>
               <input
@@ -251,7 +251,7 @@ export function BranchManager({ branches }: { branches: Branch[] }) {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-[#222222] mb-1">
+              <label className="block text-sm font-medium text-ink mb-1">
                 Teléfono
               </label>
               <input
@@ -265,7 +265,7 @@ export function BranchManager({ branches }: { branches: Branch[] }) {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-[#222222] mb-1">
+              <label className="block text-sm font-medium text-ink mb-1">
                 Email
               </label>
               <input
@@ -285,7 +285,7 @@ export function BranchManager({ branches }: { branches: Branch[] }) {
                 onChange={(e) => setForm({ ...form, isActive: e.target.checked })}
                 className="w-5 h-5 rounded"
               />
-              <span className="text-sm text-[#222222]">Sucursal activa</span>
+              <span className="text-sm text-ink">Sucursal activa</span>
             </label>
 
             <label className="flex items-center gap-2 cursor-pointer">
@@ -295,7 +295,7 @@ export function BranchManager({ branches }: { branches: Branch[] }) {
                 onChange={(e) => setForm({ ...form, isPublic: e.target.checked })}
                 className="w-5 h-5 rounded"
               />
-              <span className="text-sm text-[#222222]">Sucursal pública</span>
+              <span className="text-sm text-ink">Sucursal pública</span>
             </label>
 
             {/* En celular los botones van apilados: uno al lado del otro no entran. */}
@@ -346,7 +346,7 @@ export function BranchManager({ branches }: { branches: Branch[] }) {
       )}
 
       {list.length === 0 ? (
-        <div className="text-center py-12 text-[#6a6a6a]">
+        <div className="text-center py-12 text-ink-muted">
           <p>No hay sucursales registradas</p>
           <p className="mt-2 text-sm">Crea tu primera sucursal para empezar</p>
         </div>
@@ -355,12 +355,12 @@ export function BranchManager({ branches }: { branches: Branch[] }) {
           {list.map((branch) => (
             <li
               key={branch.id}
-              className="glass rounded-2xl border border-black/5 p-4"
+              className="glass rounded-2xl border border-hairline-soft p-4"
             >
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="text-base font-semibold text-[#222222] break-words">
+                    <h3 className="text-base font-semibold text-ink break-words">
                       {branch.name}
                     </h3>
                     {branch.id === 1 && (
@@ -398,9 +398,9 @@ export function BranchManager({ branches }: { branches: Branch[] }) {
                     )}
                   </div>
                   {branch.address && (
-                    <p className="text-sm text-[#6a6a6a] mt-1 break-words">{branch.address}</p>
+                    <p className="text-sm text-ink-muted mt-1 break-words">{branch.address}</p>
                   )}
-                  <div className="flex gap-x-3 gap-y-1 mt-1 text-xs text-[#6a6a6a] flex-wrap">
+                  <div className="flex gap-x-3 gap-y-1 mt-1 text-xs text-ink-muted flex-wrap">
                     {branch.phone && <span className="break-words">{branch.phone}</span>}
                     {branch.email && <span className="break-words">{branch.email}</span>}
                   </div>

@@ -12,7 +12,7 @@ export const Skeleton = ({ className = "" }: { className?: string }) => (
 
 /** Placeholder con la forma de una card de lista: título, detalle y pie. */
 export const CardSkeleton = () => (
-  <div className="rounded-2xl border border-black/5 bg-white/70 p-4" aria-hidden="true">
+  <div className="rounded-2xl border border-hairline-soft bg-white/70 p-4" aria-hidden="true">
     <Skeleton className="h-4 w-2/5" />
     <Skeleton className="mt-3 h-3 w-4/5" />
     <Skeleton className="mt-4 h-3 w-1/3" />

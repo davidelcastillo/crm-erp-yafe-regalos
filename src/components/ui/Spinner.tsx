@@ -28,6 +28,6 @@ export const Spinner = ({ label = "Cargando...", size = "md", className = "" }: 
     <span
       className={`${TAMANOS[size]} animate-spin rounded-full border-[#fbcfe8] border-t-[#ec4899]`}
     />
-    <span className="text-sm text-[#6a6a6a]">{label}</span>
+    <span className="text-sm text-ink-muted">{label}</span>
   </div>
 );
