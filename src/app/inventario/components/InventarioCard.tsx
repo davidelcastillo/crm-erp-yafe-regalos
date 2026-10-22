@@ -160,34 +160,34 @@ export function InventarioCard({ product, dataProductId, isHighlighted, onViewMo
        <div className="bg-white rounded-2xl p-4 shadow-sm border-2 border-[#3b82f6]">
          <div className="flex flex-col gap-3">
            <div>
-             <label className="block text-xs text-[#6a6a6a] mb-1">Nombre</label>
+             <label className="block text-xs text-ink-muted mb-1">Nombre</label>
              <input
                type="text"
                value={localName}
                onChange={(e) => setLocalName(e.target.value)}
-               className="w-full px-3 py-2 bg-[#f8f8f8] rounded-lg text-[#222222] focus:outline-none focus:ring-2 focus:ring-[#3b82f6]/20"
+               className="w-full px-3 py-2 bg-surface-soft rounded-lg text-ink focus:outline-none focus:ring-2 focus:ring-[#3b82f6]/20"
              />
            </div>
 
            <div>
-             <label className="block text-xs text-[#6a6a6a] mb-1">Descripción</label>
+             <label className="block text-xs text-ink-muted mb-1">Descripción</label>
              <textarea
                value={localDescription}
                onChange={(e) => setLocalDescription(e.target.value)}
                rows={2}
-               className="w-full px-3 py-2 bg-[#f8f8f8] rounded-lg text-[#222222] focus:outline-none focus:ring-2 focus:ring-[#3b82f6]/20 resize-none"
+               className="w-full px-3 py-2 bg-surface-soft rounded-lg text-ink focus:outline-none focus:ring-2 focus:ring-[#3b82f6]/20 resize-none"
              />
            </div>
 
            <div>
-             <label className="block text-xs text-[#6a6a6a] mb-1">Categoría</label>
+             <label className="block text-xs text-ink-muted mb-1">Categoría</label>
              <select
                value={localCategoryId ?? ''}
                onChange={(e) => {
                  const val = e.target.value;
                  setLocalCategoryId(val === '' ? null : Number(val));
                }}
-               className="w-full px-3 py-2 bg-[#f8f8f8] rounded-lg text-[#222222] focus:outline-none focus:ring-2 focus:ring-[#3b82f6]/20"
+               className="w-full px-3 py-2 bg-surface-soft rounded-lg text-ink focus:outline-none focus:ring-2 focus:ring-[#3b82f6]/20"
              >
                <option value="">Sin categoría</option>
                {categories.map(cat => (
@@ -199,36 +199,36 @@ export function InventarioCard({ product, dataProductId, isHighlighted, onViewMo
            </div>
 
            <div>
-             <label className="block text-xs text-[#6a6a6a] mb-1">Código</label>
+             <label className="block text-xs text-ink-muted mb-1">Código</label>
              <input
                type="text"
                value={product.code || ""}
                readOnly
-               className="w-full px-3 py-2 bg-[#f2f2f2] rounded-lg text-[#222222] font-mono text-sm"
+               className="w-full px-3 py-2 bg-surface-strong rounded-lg text-ink font-mono text-sm"
                title="El código no se puede modificar"
              />
            </div>
 
            <div>
-             <label className="block text-xs text-[#6a6a6a] mb-1">Prefijo</label>
+             <label className="block text-xs text-ink-muted mb-1">Prefijo</label>
              <input
                type="text"
                value={product.codePrefix || ""}
                readOnly
-               className="w-full px-3 py-2 bg-[#f2f2f2] rounded-lg text-[#222222] font-mono text-sm text-uppercase"
+               className="w-full px-3 py-2 bg-surface-strong rounded-lg text-ink font-mono text-sm text-uppercase"
                title="El prefijo no se puede modificar"
              />
            </div>
 
            <div>
-             <label className="block text-xs text-[#6a6a6a] mb-1">Precio de venta</label>
+             <label className="block text-xs text-ink-muted mb-1">Precio de venta</label>
              <input
                type="number"
                step="0.01"
                min="0"
                value={localPrice}
                onChange={(e) => setLocalPrice(parseFloat(e.target.value) || 0)}
-               className="w-full px-3 py-2 bg-[#f8f8f8] rounded-lg text-[#222222] focus:outline-none focus:ring-2 focus:ring-[#3b82f6]/20"
+               className="w-full px-3 py-2 bg-surface-soft rounded-lg text-ink focus:outline-none focus:ring-2 focus:ring-[#3b82f6]/20"
              />
            </div>
 
@@ -266,13 +266,13 @@ export function InventarioCard({ product, dataProductId, isHighlighted, onViewMo
        <div className="flex items-start justify-between gap-3">
          <div className="min-w-0 flex-1">
            <div className="flex items-center gap-2 mb-1">
-             <h3 className="text-base font-semibold text-[#222222] break-words">{product.name}</h3>
-             <code className="shrink-0 px-2 py-0.5 bg-[#f2f2f2] rounded text-xs font-mono text-[#6a6a6a]">
+             <h3 className="text-base font-semibold text-ink break-words">{product.name}</h3>
+             <code className="shrink-0 px-2 py-0.5 bg-surface-strong rounded text-xs font-mono text-ink-muted">
                {product.code}
              </code>
            </div>
            {product.description && product.description !== "-" && (
-             <p className="text-sm text-[#6a6a6a] mt-1 line-clamp-2">
+             <p className="text-sm text-ink-muted mt-1 line-clamp-2">
                {product.description}
              </p>
            )}
@@ -283,13 +283,13 @@ export function InventarioCard({ product, dataProductId, isHighlighted, onViewMo
             >
               {displayStock} uds
             </span>
-           <span className="text-xs text-[#6a6a6a]">{status.label}</span>
-           <span className="text-sm font-semibold text-[#222222]">{formatPrice(product.price)}</span>
+           <span className="text-xs text-ink-muted">{status.label}</span>
+           <span className="text-sm font-semibold text-ink">{formatPrice(product.price)}</span>
          </div>
        </div>
 
        {/* Los botones se envuelven: en un celular chico no entran los tres en una fila. */}
-       <div className="mt-3 flex flex-wrap gap-2 border-t border-gray-100 pt-3">
+       <div className="mt-3 flex flex-wrap gap-2 border-t border-hairline-soft pt-3">
          <button onClick={handleEdit} className="btn btn-secondary flex-1 whitespace-nowrap">
            Editar
          </button>

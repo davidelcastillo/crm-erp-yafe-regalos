@@ -12,7 +12,10 @@ import {
 import { getBranchOptions } from "@/app/actions/branch";
 import { BranchPicker } from "@/components/ui/BranchPicker";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { Spinner } from "@/components/ui/Spinner";
+import { ValueChange } from "@/components/ui/ValueChange";
+import { motion, useReducedMotion, useScroll, useTransform } from "motion/react";
 import type {
   StockControlDecision,
   StockControlReceipt,
@@ -65,6 +68,9 @@ const formatDay = (iso: string | null) =>
 export default function ControlStockPage() {
   const [branchId, setBranchId] = useState<number | null>(null);
   const [branches, setBranches] = useState<Array<{ id: number; name: string }>>([]);
+  // Arranca en `true`: sin esto la página muestra el vacío «No hay sucursales
+  // activas» mientras la lista todavía viaja (S1).
+  const [branchesLoading, setBranchesLoading] = useState(true);
   const [ultimo, setUltimo] = useState<UltimoControl | null>(null);
   const [control, setControl] = useState<Control | null>(null);
   const [reusado, setReusado] = useState(false);
@@ -76,6 +82,13 @@ export default function ControlStockPage() {
   const [error, setError] = useState<string | null>(null);
   const [cierre, setCierre] = useState<StockControlReceipt | null>(null);
 
+  // El encabezado se mueve solo y el degradé de marca se retira al hacer scroll
+  // (S10, S11). Con movimiento reducido queda quieto.
+  const { scrollY } = useScroll();
+  const headerY = useTransform(scrollY, [0, 160], [0, 16]);
+  const brandOpacity = useTransform(scrollY, [0, 140], [1, 0.45]);
+  const reduceMotion = useReducedMotion();
+
   // Las sucursales se eligen en una lista grande (paso 1), no en un desplegable
   // del encabezado: en el celular el desplegable quedaba fuera de la vista.
   useEffect(() => {
@@ -84,7 +97,10 @@ export default function ControlStockPage() {
       .then((resultado) => {
         if (vivo && resultado.success) setBranches(resultado.data ?? []);
       })
-      .catch(() => undefined);
+      .catch(() => undefined)
+      .finally(() => {
+        if (vivo) setBranchesLoading(false);
+      });
     return () => {
       vivo = false;
     };
@@ -274,11 +290,21 @@ export default function ControlStockPage() {
   return (
     <div className="min-h-screen bg-white pb-20">
       <main>
-        <div className="pb-16 brand-gradient">
-          <PageHeader
-            title="Control de stock"
-            menuItems={[{ label: "Volver al inventario", href: "/inventario" }]}
+        <div className="relative isolate pb-16">
+          {/* Superficie decorativa: se atenua al scrollear (S10). Los controles
+              de abajo no se tocan. */}
+          <motion.div
+            className="brand-gradient pointer-events-none absolute inset-0"
+            aria-hidden="true"
+            style={reduceMotion ? undefined : { opacity: brandOpacity }}
           />
+          {/* Parallax: solo el encabezado se mueve (S11). */}
+          <motion.div style={reduceMotion ? undefined : { y: headerY }}>
+            <PageHeader
+              title="Control de stock"
+              menuItems={[{ label: "Volver al inventario", href: "/inventario" }]}
+            />
+          </motion.div>
         </div>
 
         <div className="glass border-t border-white/80 rounded-t-[2.5rem] -mt-12 px-5 pt-6 pb-8 shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
@@ -288,21 +314,32 @@ export default function ControlStockPage() {
             </p>
           )}
 
-          <p className="mb-4 text-xs font-medium uppercase tracking-wide text-[#6a6a6a]">
+          <p className="mb-4 text-xs font-medium uppercase tracking-wide text-ink-muted">
             {control ? "Paso 2 de 2 · Contar y decidir" : "Paso 1 de 2 · Elegí la sucursal"}
           </p>
 
           {!control && (
             <section aria-label="Sucursal del control">
-              <BranchPicker
-                branches={branches}
-                value={branchId}
-                onChange={setBranchId}
-                columns={2}
-                label="Sucursal del control"
-              />
+              {branchesLoading ? (
+                // Las formas son decorativas (`aria-hidden`): el estado lo anuncia
+                // el `Spinner` y la sección ya tiene su rótulo, sin repetirlo.
+                <div className="grid gap-2 grid-cols-1 md:grid-cols-2" aria-hidden="true">
+                  <Skeleton className="h-[44px] rounded-2xl" />
+                  <Skeleton className="h-[44px] rounded-2xl" />
+                  <Skeleton className="h-[44px] rounded-2xl" />
+                  <Skeleton className="h-[44px] rounded-2xl" />
+                </div>
+              ) : (
+                <BranchPicker
+                  branches={branches}
+                  value={branchId}
+                  onChange={setBranchId}
+                  columns={2}
+                  label="Sucursal del control"
+                />
+              )}
               {branchId === null && (
-                <p className="mt-2 text-sm text-[#6a6a6a]">
+                <p className="mt-2 text-sm text-ink-muted">
                   Elegí una sucursal para contar su mercadería y ver las diferencias contra el stock del sistema.
                 </p>
               )}
@@ -312,14 +349,14 @@ export default function ControlStockPage() {
           {branchId !== null && loading && <Spinner label="Cargando el último control" />}
 
           {branchId !== null && !loading && !control && (
-            <section className="mt-4 rounded-2xl border border-black/10 bg-[#f7f7f7] p-4">
-              <h2 className="text-base font-semibold text-[#222222]">Contar la mercadería</h2>
-              <p className="mt-1 text-sm text-[#6a6a6a]">
+            <section className="mt-4 rounded-2xl border border-hairline bg-surface-soft p-4">
+              <h2 className="text-base font-semibold text-ink">Contar la mercadería</h2>
+              <p className="mt-1 text-sm text-ink-muted">
                 {ultimo
                   ? `Último control cerrado: ${formatDay(ultimo.closedAt)}.`
                   : "Esta sucursal todavía no tiene un control cerrado."}
               </p>
-              <p className="mt-1 text-sm text-[#6a6a6a]">
+              <p className="mt-1 text-sm text-ink-muted">
                 Se abre un borrador con el stock del sistema. Nada cambia hasta que aceptes una
                 diferencia y cierres el control.
               </p>
@@ -331,18 +368,27 @@ export default function ControlStockPage() {
 
           {control && (
             <>
-              <section className="rounded-2xl border border-black/10 bg-[#f7f7f7] p-4">
-                <h2 className="text-base font-semibold text-[#222222]">
+              <section className="rounded-2xl border border-hairline bg-surface-soft p-4">
+                <h2 className="text-base font-semibold text-ink">
                   {control.branchName} · control #{control.id}
                 </h2>
-                <p className="mt-1 text-sm text-[#6a6a6a]">
+                <p className="mt-1 text-sm text-ink-muted">
                   {control.status === "DRAFT"
                     ? `Borrador abierto el ${formatDay(control.startedAt)}${reusado ? " (retomado)" : ""}.`
                     : `Cerrado el ${formatDay(control.closedAt)}.`}
                 </p>
-                <p className="mt-1 text-sm text-[#222222]">
-                  {control.items.length} productos · {diferencias} con diferencia
-                  {diferencias > 0 ? ` · ${aceptadas} a ajustar · ${pendientes} pendientes` : ""}
+                <p className="mt-1 text-sm text-ink">
+                  {/* Un solo nodo de texto: los tests leen la línea completa. */}
+                  <ValueChange
+                    className="inline-block"
+                    key={`${control.items.length}-${diferencias}-${aceptadas}-${pendientes}`}
+                  >
+                    {`${control.items.length} productos · ${diferencias} con diferencia${
+                      diferencias > 0
+                        ? ` · ${aceptadas} a ajustar · ${pendientes} pendientes`
+                        : ""
+                    }`}
+                  </ValueChange>
                 </p>
 
                 {control.status === "DRAFT" && diferencias > 0 && (
@@ -366,12 +412,12 @@ export default function ControlStockPage() {
               </section>
 
               {cierre && (
-                <section className="mt-4 rounded-2xl border border-black/10 bg-[#f7f7f7] p-4">
+                <section className="mt-4 rounded-2xl border border-hairline bg-surface-soft p-4">
                   <p className="text-sm font-semibold text-[#15803d]">
                     Control cerrado: {cierre.adjustedCount} ajustados · {cierre.pendingCount} pendientes.
                   </p>
                   {cierre.pendingCount > 0 && (
-                    <p className="mt-1 text-sm text-[#6a6a6a]">
+                    <p className="mt-1 text-sm text-ink-muted">
                       Las pendientes no tocan el stock: si aparece la mercadería, se registra una
                       entrada desde el inventario.
                     </p>
@@ -386,13 +432,13 @@ export default function ControlStockPage() {
                 {control.items.map((item) => {
                   const diferencia = item.countedStock - item.systemStock;
                   return (
-                    <li key={item.productId} className="rounded-2xl border border-black/10 bg-white p-3">
+                    <li key={item.productId} className="rounded-2xl border border-hairline bg-white p-3">
                       <div className="flex items-start gap-3">
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-semibold text-[#222222]">
+                          <p className="truncate text-sm font-semibold text-ink">
                             {item.code} · {item.name}
                           </p>
-                          <p className="text-xs text-[#6a6a6a]">Sistema: {item.systemStock}</p>
+                          <p className="text-xs text-ink-muted">Sistema: {item.systemStock}</p>
                         </div>
                         <div className="shrink-0">
                           <label className="sr-only" htmlFor={`conteo-${item.productId}`}>
@@ -407,7 +453,7 @@ export default function ControlStockPage() {
                             disabled={control.status === "CLOSED"}
                             value={item.countedStock}
                             onChange={(event) => cambiarConteo(item.productId, Number(event.target.value))}
-                            className="h-11 w-20 rounded-xl border border-[#dddddd] bg-white px-3 text-right text-sm text-[#222222] disabled:bg-[#f2f2f2]"
+                            className="h-11 w-20 rounded-xl border border-hairline bg-white px-3 text-right text-sm text-ink disabled:bg-surface-strong"
                           />
                         </div>
                       </div>
@@ -418,7 +464,9 @@ export default function ControlStockPage() {
                             className="text-sm font-semibold"
                             style={{ color: diferencia < 0 ? "#b91c1c" : "#15803d" }}
                           >
-                            {diferencia < 0 ? `Faltan ${-diferencia}` : `Sobran ${diferencia}`}
+                            <ValueChange className="inline-block" key={diferencia}>
+                              {diferencia < 0 ? `Faltan ${-diferencia}` : `Sobran ${diferencia}`}
+                            </ValueChange>
                           </span>
                           <button
                             type="button"
@@ -446,11 +494,11 @@ export default function ControlStockPage() {
               </ul>
 
               {control.status === "DRAFT" && (
-                <section className="mt-4 rounded-2xl border border-black/10 bg-[#f7f7f7] p-4">
-                  <label htmlFor="motivo" className="block text-sm font-semibold text-[#222222]">
+                <section className="mt-4 rounded-2xl border border-hairline bg-surface-soft p-4">
+                  <label htmlFor="motivo" className="block text-sm font-semibold text-ink">
                     Motivo del ajuste{diferencias > 0 ? "" : " (opcional sin diferencias)"}
                   </label>
-                  <p className="mt-1 text-xs text-[#6a6a6a]">
+                  <p className="mt-1 text-xs text-ink-muted">
                     Obligatorio si aceptás alguna diferencia: queda en el PDF del ajuste.
                   </p>
                   <input
@@ -459,7 +507,7 @@ export default function ControlStockPage() {
                     onChange={(event) => setMotivo(event.target.value)}
                     maxLength={500}
                     placeholder="Ej.: cierre quincenal, faltante por rotura"
-                    className="mt-2 h-11 w-full rounded-xl border border-[#dddddd] bg-white px-3 text-sm text-[#222222]"
+                    className="mt-2 h-11 w-full rounded-xl border border-hairline bg-white px-3 text-sm text-ink"
                   />
 
                   <div className="mt-3 flex flex-col gap-2 md:flex-row">

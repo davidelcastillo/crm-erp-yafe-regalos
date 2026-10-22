@@ -3,6 +3,8 @@
 import { useState, useMemo } from "react";
 import { Product } from "@prisma/client";
 import { InventarioCard } from "./InventarioCard";
+import { Reveal } from "@/components/ui/Reveal";
+import { ValueChange } from "@/components/ui/ValueChange";
 import { sumStock, type StockSource } from "@/lib/inventory-stock";
 import { sortProducts } from "@/lib/product-order";
 import type { InventorySortOption } from "./InventoryFilters";
@@ -84,37 +86,45 @@ export function InventarioList({ products, onViewMovements, searchActive = false
       {/* Stats Summary */}
       <div className="grid grid-cols-3 gap-2">
         <div className="glass rounded-xl border border-black/5 p-3 text-center">
-          <div className="text-xl font-bold text-[#222222]">{stats.total}</div>
-          <div className="text-xs text-[#6a6a6a]">Productos</div>
+          {/* Un valor que cambia entra animado (S9): un solo nodo de texto. */}
+          <ValueChange key={stats.total} className="block text-xl font-bold text-ink">
+            {stats.total}
+          </ValueChange>
+          <div className="text-xs text-ink-muted">Productos</div>
         </div>
         <div className="glass rounded-xl border border-black/5 p-3 text-center">
           {/* #b45309 es el ámbar que llega a 4.5:1 sobre estas superficies. */}
-          <div className="text-xl font-bold text-[#b45309]">{stats.lowStock}</div>
-          <div className="text-xs text-[#6a6a6a]">Stock bajo</div>
+          <ValueChange key={stats.lowStock} className="block text-xl font-bold text-[#b45309]">
+            {stats.lowStock}
+          </ValueChange>
+          <div className="text-xs text-ink-muted">Stock bajo</div>
         </div>
         <div className="glass rounded-xl border border-black/5 p-3 text-center">
-          <div className="text-xl font-bold text-[#222222]">{stats.totalUnits}</div>
-          <div className="text-xs text-[#6a6a6a]">Total uds</div>
+          <ValueChange key={stats.totalUnits} className="block text-xl font-bold text-ink">
+            {stats.totalUnits}
+          </ValueChange>
+          <div className="text-xs text-ink-muted">Total uds</div>
         </div>
       </div>
 
       {/* Products List */}
       <div className="flex flex-col gap-3">
 {filteredProducts.length === 0 ? (
-         <div className="text-center py-8 text-[#6a6a6a]">
+         <div className="text-center py-8 text-ink-muted">
            {searchActive || showOnlyLowStock
              ? "No se encontraron productos"
              : "No hay productos en el inventario"}
          </div>
        ) : (
-          filteredProducts.map((product) => (
-            <InventarioCard 
-              key={product.id} 
-              product={product} 
-              data-product-id={product.id}
-              onViewMovements={onViewMovements}
-              categories={categories}
-            />
+          filteredProducts.map((product, index) => (
+            <Reveal key={product.id} index={index}>
+              <InventarioCard 
+                product={product} 
+                data-product-id={product.id}
+                onViewMovements={onViewMovements}
+                categories={categories}
+              />
+            </Reveal>
           ))
        )}
       </div>

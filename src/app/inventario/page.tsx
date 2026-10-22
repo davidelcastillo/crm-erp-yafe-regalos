@@ -15,18 +15,49 @@ import { BranchFilterDropdown } from "@/components/ui/BranchFilterDropdown";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { ActionCard } from "@/components/ui/ActionCard";
 import { Spinner } from "@/components/ui/Spinner";
-import { CardSkeleton } from "@/components/ui/Skeleton";
+import { CardSkeleton, Skeleton } from "@/components/ui/Skeleton";
 import { AddProductButton } from "../productos/components/AddProductButton";
 import { ProductForm } from "../productos/components/ProductForm";
 import Link from 'next/link';
 import { useEffect, useState, useCallback } from 'react';
 import { Product } from "@prisma/client";
 import Swal from "sweetalert2";
+import { motion, useReducedMotion, useScroll, useTransform } from 'motion/react';
 
 type BranchOption = { id: number; name: string };
 type CategoryOption = { id: number; name: string };
 
 const DEBOUNCE_MS = 300;
+
+/**
+ * Carga: la banda de marca, la forma del encabezado y la hoja con la forma de
+ * la lista que va a llegar, en el mismo orden y con las mismas medidas que la
+ * página, para que no salte al terminar (S2).
+ */
+const InventarioLoading = () => (
+  <div className="min-h-screen bg-white pb-20">
+    <div className="pb-16 brand-gradient">
+      <div className="px-3 pt-6">
+        <Skeleton className="h-[60px] rounded-2xl" />
+      </div>
+      <div className="mt-4 px-3">
+        <Skeleton className="h-[72px] rounded-2xl" />
+      </div>
+    </div>
+    <div className="glass rounded-t-[2.5rem] -mt-12 px-5 pt-6">
+      <Spinner label="Cargando inventario..." />
+      <div className="mt-4">
+        <Skeleton className="h-[44px] rounded-xl" />
+        <Skeleton className="mt-3 h-[44px] rounded-xl" />
+      </div>
+      <div className="mt-6 space-y-4">
+        <CardSkeleton />
+        <CardSkeleton />
+        <CardSkeleton />
+      </div>
+    </div>
+  </div>
+);
 
 export default function InventarioPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -55,6 +86,13 @@ export default function InventarioPage() {
   // El orden vive acá, junto a la categoría: los dos selectores de la lista
   // comparten contenedor y control (S2).
   const [sortBy, setSortBy] = useState<InventorySortOption>('code');
+
+  // Movimiento de la página: el encabezado se mueve solo y el degradé de marca
+  // se retira cuando la hoja lo tapa (S10, S11). Con movimiento reducido queda quieto.
+  const { scrollY } = useScroll();
+  const headerY = useTransform(scrollY, [0, 160], [0, 16]);
+  const brandOpacity = useTransform(scrollY, [0, 140], [1, 0.45]);
+  const reduceMotion = useReducedMotion();
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -181,19 +219,7 @@ export default function InventarioPage() {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-white pb-20">
-        <div className="h-28 brand-gradient" />
-        <div className="glass rounded-t-[2.5rem] -mt-12 px-5 pt-8">
-          <Spinner label="Cargando inventario..." />
-          <div className="mt-6 space-y-4">
-            <CardSkeleton />
-            <CardSkeleton />
-            <CardSkeleton />
-          </div>
-        </div>
-      </div>
-    );
+    return <InventarioLoading />;
   }
 
   if (error) {
@@ -217,14 +243,23 @@ export default function InventarioPage() {
   return (
     <div className="min-h-screen bg-white pb-20">
       <main>
-        <div className="pb-16 brand-gradient">
-          <PageHeader
-            title="Inventario"
-            right={
-              <BranchFilterDropdown
-                selectedId={branchId}
-                onValueChange={setBranchId}
-                label="Stock por sucursal"
+        <div className="relative isolate pb-16">
+          {/* El degradé de marca es una capa de fondo: se retira al hacer scroll
+              (S10), pero la banda de acciones y la hoja no se tocan. */}
+          <motion.div
+            className="brand-gradient pointer-events-none absolute inset-0"
+            aria-hidden="true"
+            style={reduceMotion ? undefined : { opacity: brandOpacity }}
+          />
+
+          <motion.div style={reduceMotion ? undefined : { y: headerY }}>
+            <PageHeader
+              title="Inventario"
+              right={
+                <BranchFilterDropdown
+                  selectedId={branchId}
+                  onValueChange={setBranchId}
+                  label="Stock por sucursal"
               />
             }
             actions={
@@ -276,7 +311,8 @@ export default function InventarioPage() {
               { label: "Categorías", href: "/categorias" },
               { label: "Nueva categoría", onClick: handleCreateCategory },
             ]}
-          />
+            />
+          </motion.div>
 
           {/* Acciones de la pagina en mobile: en su propio div, con el fondo a la vista. */}
           <div className="mt-4 px-3 md:hidden" role="group" aria-label="Acciones de la página">

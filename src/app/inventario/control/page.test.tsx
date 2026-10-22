@@ -91,6 +91,19 @@ beforeEach(() => {
   mockGuardar.mockResolvedValue({ success: true, data: { saved: 2 } } as never);
 });
 
+describe("Control de stock: skeleton del selector (S1)", () => {
+  it("mientras cargan las sucursales muestra la forma de la lista y la reemplaza al llegar", async () => {
+    const { container } = render(<ControlStockPage />);
+
+    // Primera pintura: la lista de sucursales todavía viaja. Antes se veía el
+    // vacío falso «No hay sucursales activas» hasta que llegaba la respuesta.
+    expect(container.querySelectorAll(".animate-pulse").length).toBeGreaterThanOrEqual(4);
+
+    expect(await screen.findByRole("button", { name: "Centro" })).toBeInTheDocument();
+    expect(container.querySelectorAll(".animate-pulse")).toHaveLength(0);
+  });
+});
+
 const abrirControl = async () => {
   render(<ControlStockPage />);
   fireEvent.click(await screen.findByRole("button", { name: "Centro" }));
