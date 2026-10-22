@@ -308,6 +308,17 @@ export default function ControlStockPage() {
         </div>
 
         <div className="glass border-t border-white/80 rounded-t-[2.5rem] -mt-12 px-5 pt-6 pb-8 shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
+          {/* El regreso estaba sólo en el menú ☰: ahora se ve, con target táctil. */}
+          <Link
+            href="/inventario"
+            className="mb-4 inline-flex min-h-[44px] items-center gap-2 rounded-xl px-3 text-sm font-medium text-ink-muted transition-colors hover:bg-surface-strong touch-manipulation"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            Volver al inventario
+          </Link>
+
           {error && (
             <p role="alert" className="mb-4 rounded-xl bg-[#ffe4ea] px-4 py-3 text-sm text-[#8f0020]">
               {error}

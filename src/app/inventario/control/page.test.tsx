@@ -273,3 +273,14 @@ describe("Control de stock por sucursal", () => {
     expect(screen.getByLabelText(/Motivo del ajuste/)).toHaveValue("cierre quincenal");
   });
 });
+
+describe("Control de stock: volver al inventario a la vista", () => {
+  it("ofrece el regreso sin tener que abrir el menú ☰", async () => {
+    render(<ControlStockPage />);
+    await screen.findByRole("button", { name: "Centro" });
+
+    // El usuario lo reportó escondido en el menú: ahora tiene que estar a la vista.
+    const volver = screen.getByRole("link", { name: /Volver al inventario/ });
+    expect(volver).toHaveAttribute("href", "/inventario");
+  });
+});

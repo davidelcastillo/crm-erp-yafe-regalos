@@ -250,7 +250,7 @@ export function ExportWizard({ open, onClose, branches }: ExportWizardProps) {
 
             <div className="md:grid md:grid-cols-2 md:gap-5 md:items-start">
               <div className="min-w-0">
-                <div className="mb-3 flex justify-end">
+                <div className="mb-3 flex justify-center">
                   <ProductSortToggle value={sortMode} onChange={setSortMode} />
                 </div>
 
