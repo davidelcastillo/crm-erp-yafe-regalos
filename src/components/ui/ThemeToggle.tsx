@@ -1,7 +1,7 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
-import { THEME_STORAGE_KEY, type Theme } from "@/lib/theme";
+import { applyTheme, withThemeTransition, type Theme } from "@/lib/theme";
 
 /**
  * Interruptor de tema (S12): un botón redondo que alterna claro y oscuro.
@@ -29,10 +29,15 @@ export const ThemeToggle = () => {
   const theme = useSyncExternalStore(subscribe, readTheme, () => "light" as Theme);
   const next: Theme = theme === "dark" ? "light" : "dark";
 
-  const toggle = () => {
-    document.documentElement.setAttribute("data-theme", next);
-    localStorage.setItem(THEME_STORAGE_KEY, next);
-    window.dispatchEvent(new Event(CHANGE_EVENT));
+  const toggle = (event: React.MouseEvent<HTMLButtonElement>) => {
+    // El círculo del cambio de tema nace en el botón que se tocó.
+    const caja = event.currentTarget.getBoundingClientRect();
+    const origin = { x: caja.left + caja.width / 2, y: caja.top + caja.height / 2 };
+
+    withThemeTransition(() => {
+      applyTheme(next);
+      window.dispatchEvent(new Event(CHANGE_EVENT));
+    }, origin);
   };
 
   return (

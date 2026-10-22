@@ -622,6 +622,46 @@
 
 } /* fin de @layer components */
 
+
+/* ============================================================================
+   CAMBIO DE TEMA EN CÍRCULO (S12)
+
+   El tema nuevo se revela encima del viejo con un `clip-path` que crece desde
+   el botón que se tocó, en 2,2 s (coincide con `THEME_TRANSITION_MS`). Si el
+   navegador no tiene View Transitions o el usuario pidió movimiento reducido,
+   `withThemeTransition` no la usa y el tema cambia de golpe: la animación es un
+   gusto, nunca un requisito.
+   ========================================================================== */
+@media (prefers-reduced-motion: no-preference) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 2200ms;
+    animation-timing-function: var(--motion-ease-enter);
+  }
+
+  /* El viejo queda quieto abajo; el nuevo se abre encima de él. */
+  ::view-transition-old(root) {
+    animation: none;
+    mix-blend-mode: normal;
+  }
+
+  ::view-transition-new(root) {
+    mix-blend-mode: normal;
+    animation-name: theme-reveal;
+  }
+
+  @keyframes theme-reveal {
+    from {
+      clip-path: circle(0 at var(--theme-origin-x, 50%) var(--theme-origin-y, 0));
+    }
+    to {
+      clip-path: circle(
+        var(--theme-reveal, 150vmax) at var(--theme-origin-x, 50%) var(--theme-origin-y, 0)
+      );
+    }
+  }
+}
+
 /* Native <select> <option> best-effort styling (browser rendering varies). */
 select option {
   background-color: var(--surface);
