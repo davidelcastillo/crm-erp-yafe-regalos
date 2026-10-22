@@ -9,42 +9,44 @@ datasource db {
 }
 
 model Product {
-  id            Int              @id @default(autoincrement())
-  name          String
-  description   String?          @default("-")
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
-  code          String           @unique
-  codePrefix    String?
-  price         Decimal          @default(0) @db.Decimal(10, 2)
-  categoryId    Int?
-  category      Category?        @relation(fields: [categoryId], references: [id])
-  active        Boolean          @default(true)
-  purchaseItems PurchaseItem[]
-  saleItems     SaleItem[]
-  inventory     BranchInventory[]
-  movements     BranchMovement[] @relation("ProductMovements")
+  id                Int                @id @default(autoincrement())
+  name              String
+  description       String?            @default("-")
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  code              String             @unique
+  codePrefix        String?
+  price             Decimal            @default(0) @db.Decimal(10, 2)
+  categoryId        Int?
+  category          Category?          @relation(fields: [categoryId], references: [id])
+  active            Boolean            @default(true)
+  purchaseItems     PurchaseItem[]
+  saleItems         SaleItem[]
+  inventory         BranchInventory[]
+  movements         BranchMovement[]   @relation("ProductMovements")
+  stockControlItems StockControlItem[] @relation("ProductStockControlItems")
 }
 
 model Branch {
-  id            Int      @id @default(autoincrement())
-  name          String
-  address       String?
-  phone         String?
-  email         String?
-   code          String   @unique
-  authUserId    String?  @unique
-  isActive      Boolean  @default(true)
-  isPublic      Boolean  @default(false)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id         Int      @id @default(autoincrement())
+  name       String
+  address    String?
+  phone      String?
+  email      String?
+  code       String   @unique
+  authUserId String?  @unique
+  isActive   Boolean  @default(true)
+  isPublic   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   inventory     BranchInventory[]
-  purchases     Purchase[]              @relation("BranchPurchases")
-  sales         Sale[]                  @relation("BranchSales")
-  movements     BranchMovement[]        @relation("BranchMovements")
-  cashMovements CashMovement[]          @relation("BranchCashMovements")
-  cashCloses    CashClose[]             @relation("BranchCashCloses")
+  purchases     Purchase[]        @relation("BranchPurchases")
+  sales         Sale[]            @relation("BranchSales")
+  movements     BranchMovement[]  @relation("BranchMovements")
+  cashMovements CashMovement[]    @relation("BranchCashMovements")
+  cashCloses    CashClose[]       @relation("BranchCashCloses")
+  stockControls StockControl[]    @relation("BranchStockControls")
 
   @@index([isActive])
   @@index([authUserId])
@@ -52,12 +54,12 @@ model Branch {
 }
 
 model BranchInventory {
-  id        Int      @id @default(autoincrement())
-  branchId  Int
-  branch    Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
-  productId Int
-  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  stock     Int      @default(0)
+  id          Int      @id @default(autoincrement())
+  branchId    Int
+  branch      Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  productId   Int
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  stock       Int      @default(0)
   lastUpdated DateTime @updatedAt
 
   @@unique([branchId, productId])
@@ -118,7 +120,7 @@ model SaleItem {
   price     Decimal @db.Decimal(10, 2)
   quantity  Int
   subtotal  Decimal @db.Decimal(10, 2)
-  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
   sale      Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
 
   @@index([saleId])
@@ -153,22 +155,22 @@ enum PaymentMethod {
 }
 
 model Category {
-  id   Int      @id @default(autoincrement())
-  name String   @unique
+  id       Int       @id @default(autoincrement())
+  name     String    @unique
   products Product[]
 }
 
 model BranchMovement {
-  id          Int      @id @default(autoincrement())
-  productId   Int
-  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade, name: "ProductMovements")
-  branchId    Int
-  branch      Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade, name: "BranchMovements")
+  id           Int          @id @default(autoincrement())
+  productId    Int
+  product      Product      @relation(fields: [productId], references: [id], onDelete: Cascade, name: "ProductMovements")
+  branchId     Int
+  branch       Branch       @relation(fields: [branchId], references: [id], onDelete: Cascade, name: "BranchMovements")
   movementType MovementType // ENUM: ENTRY, EXIT, TRANSFER_IN, TRANSFER_OUT, ADJUSTMENT
-  quantity    Int
-  reference   String?  // e.g., purchase id, sale id, etc.
-  createdAt   DateTime @default(now())
-  performedBy String   // user id or name
+  quantity     Int
+  reference    String? // e.g., purchase id, sale id, etc.
+  createdAt    DateTime     @default(now())
+  performedBy  String // user id or name
 }
 
 enum MovementType {
@@ -182,17 +184,17 @@ enum MovementType {
 // Plata que entra o sale de la caja de una sucursal fuera de una venta
 // (correcciones de dinero). Reusa PaymentMethod para el medio.
 model CashMovement {
-  id          Int           @id @default(autoincrement())
+  id          Int              @id @default(autoincrement())
   branchId    Int
-  branch      Branch        @relation("BranchCashMovements", fields: [branchId], references: [id], onDelete: Cascade)
+  branch      Branch           @relation("BranchCashMovements", fields: [branchId], references: [id], onDelete: Cascade)
   type        CashMovementType
-  method      PaymentMethod @default(EFECTIVO)
-  amount      Decimal       @db.Decimal(10, 2)
+  method      PaymentMethod    @default(EFECTIVO)
+  amount      Decimal          @db.Decimal(10, 2)
   // Fecha propia del movimiento (elegible), distinta de la de carga.
-  date        DateTime      @default(now())
+  date        DateTime         @default(now())
   description String?
   performedBy String
-  createdAt   DateTime      @default(now())
+  createdAt   DateTime         @default(now())
 
   @@index([branchId])
   @@index([date])
@@ -217,4 +219,65 @@ model CashClose {
   total         Decimal  @default(0) @db.Decimal(10, 2)
 
   @@index([branchId, closedAt])
+}
+
+// --- Control de stock -------------------------------------------------------
+// Cierre de inventario de una sucursal: se cuenta cada producto y se compara con
+// el stock del sistema. Mientras está DRAFT no toca nada (se puede guardar y
+// retomar); al cerrarse, el stock queda con lo contado y cada diferencia deja un
+// BranchMovement ADJUSTMENT con su actor (S2/S6 de odd/tasks/control-stock-sucursal.md).
+// La diferencia NO se guarda: es `countedStock - systemStock` y no se duplica
+// un dato que puede quedar desincronizado.
+model StockControl {
+  id        Int                @id @default(autoincrement())
+  branchId  Int
+  branch    Branch             @relation("BranchStockControls", fields: [branchId], references: [id], onDelete: Cascade)
+  status    StockControlStatus @default(DRAFT)
+  startedAt DateTime           @default(now())
+  closedAt  DateTime?
+  closedBy  String?
+  /**
+   * Motivo del ajuste, escrito al cerrar: va en el PDF del ajuste (S10).
+   */
+  reason    String?
+  items     StockControlItem[]
+
+  @@index([branchId, closedAt])
+  @@index([branchId, status])
+}
+
+enum StockControlStatus {
+  DRAFT
+  CLOSED
+}
+
+model StockControlItem {
+  id           Int                  @id @default(autoincrement())
+  controlId    Int
+  control      StockControl         @relation(fields: [controlId], references: [id], onDelete: Cascade)
+  productId    Int
+  product      Product              @relation("ProductStockControlItems", fields: [productId], references: [id], onDelete: Cascade)
+  /**
+   * Stock del sistema al momento de contar.
+   */
+  systemStock  Int
+  /**
+   * Lo que se contó a mano.
+   */
+  countedStock Int
+  /**
+   * Qué se hizo con la diferencia: `PENDING` la deja visible para seguir
+   * buscando la mercadería (el stock no cambia) y `ACCEPTED` ajusta el stock a
+   * lo contado y deja el movimiento ADJUSTMENT (S9). Por defecto pendiente:
+   * ajustar es siempre una decisión explícita.
+   */
+  decision     StockControlDecision @default(PENDING)
+
+  @@unique([controlId, productId])
+  @@index([controlId])
+}
+
+enum StockControlDecision {
+  PENDING
+  ACCEPTED
 }
