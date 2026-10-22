@@ -634,6 +634,15 @@ Un badge por caso, con un color propio y contraste medido:
 - Un color por caso: no se repite el fondo entre estados y el estado nunca se comunica **solo** por color — el badge siempre lleva su palabra.
 - Los valores viven en `src/lib/status-tones.ts` y se aplican con `style={{ backgroundColor, color }}`: las clases dinámicas de Tailwind (`bg-[${hex}]`) no las genera el JIT. La regla queda fijada por `src/lib/status-tones.test.ts`.
 
+## Movimiento y tokens de superficie
+
+- **Tokens semánticos:** `bg-surface`, `bg-surface-soft`, `bg-surface-strong`, `bg-surface-sunken`, `text-ink`, `text-ink-muted`, `text-ink-soft`, `border-hairline`, `border-hairline-soft`. En un componente nuevo no se escribe un hex: si falta un tono, se agrega el token en `globals.css` y su contraste acá.
+- **Curvas y duraciones:** `ease-standard` (lo funcional: un valor que cambia, un botón que se transforma), `ease-enter` (lo que aparece) y `ease-exit` (lo que se va), con 150 / 250 / 400 ms. Son las de Material Design 3 y están en `globals.css` (`--motion-*`) y en `src/lib/motion.ts`, con los mismos números, para que una transición de Tailwind y una de Motion no se sientan distintas.
+- **Transiciones con nombre por intención**, no por componente: `transitions.value`, `transitions.transform`, `transitions.surface`, `transitions.reveal`.
+- **Aparición (`Reveal`):** sube 12 px y aparece una vez, con retardo en cascada según la posición en la lista (`stagger`, tope 0,24 s). Se usa en las cards de una lista, no en cada fila de una tabla ni en elementos que ya están en pantalla al cargar.
+- **Movimiento reducido:** la preferencia apaga animaciones y transiciones de todo el sistema con una regla global en `globals.css` —no de a una clase— y `Reveal` muestra el contenido sin animar. En un entorno sin `IntersectionObserver` también se muestra el contenido: esconderlo sería peor que no animarlo.
+- **Se animan `opacity` y `transform`**, nunca `height`, `top`, `left` ni `width`: esas propiedades fuerzan layout en cada cuadro.
+
 ## Responsive Behavior
 
 | Name | Width | Key Changes |

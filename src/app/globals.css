@@ -35,6 +35,39 @@
   
   --background: var(--palette-white);
   --foreground: var(--palette-near-black);
+
+  /* ==========================================================================
+     TOKENS SEMÁNTICOS
+
+     Las pantallas usan estos nombres (`bg-surface`, `text-ink-muted`,
+     `border-hairline`) y no el hex: el día que cambie la paleta —o que entre el
+     tema oscuro— se cambia acá y no en cada componente. Los valores son los
+     tonos ya aprobados de STYLE.md; ningún token inventa un color nuevo.
+     ========================================================================== */
+  --surface: var(--palette-white);
+  --surface-soft: #f7f7f7;
+  --surface-strong: var(--palette-light-surface);
+  --surface-sunken: #f8f8f8;
+  --ink: var(--palette-near-black);
+  --ink-muted: var(--palette-secondary-gray);
+  --ink-soft: #929292;
+  --hairline: rgb(0 0 0 / 0.1);
+  --hairline-soft: rgb(0 0 0 / 0.05);
+
+  /* ==========================================================================
+     MOVIMIENTO (S6)
+
+     Curvas y duraciones de Material Design 3, con el mismo valor que
+     `src/lib/motion.ts` para que una transición de Tailwind y una de Motion no
+     se sientan distintas. `standard` es la curva funcional; `enter` desacelera
+     (lo que aparece) y `exit` acelera (lo que se va).
+     ========================================================================== */
+  --motion-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --motion-ease-enter: cubic-bezier(0.05, 0.7, 0.1, 1);
+  --motion-ease-exit: cubic-bezier(0.3, 0, 0.8, 0.15);
+  --motion-duration-fast: 150ms;
+  --motion-duration-base: 250ms;
+  --motion-duration-slow: 400ms;
 }
 
 @theme inline {
@@ -57,6 +90,22 @@
   --color-brand-violeta: var(--palette-brand-violeta);
   --color-brand-rosa-fuerte: var(--palette-brand-rosa-fuerte);
   --color-brand-rosa-texto: var(--palette-brand-rosa-texto);
+
+  /* Tokens semánticos: superficies, texto y bordes. */
+  --color-surface: var(--surface);
+  --color-surface-soft: var(--surface-soft);
+  --color-surface-strong: var(--surface-strong);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-ink-soft: var(--ink-soft);
+  --color-hairline: var(--hairline);
+  --color-hairline-soft: var(--hairline-soft);
+
+  /* Curvas de movimiento: habilitan `ease-standard`, `ease-enter`, `ease-exit`. */
+  --ease-standard: var(--motion-ease-standard);
+  --ease-enter: var(--motion-ease-enter);
+  --ease-exit: var(--motion-ease-exit);
   
   /* Shadows */
   --shadow-card: var(--shadow-card);
@@ -367,11 +416,17 @@ select option:checked {
   color: #222222;
 }
 
+/* Movimiento reducido: es una preferencia de accesibilidad, no un detalle. Se
+   apaga toda animación y transición, no solo las tres clases de entrada de
+   modales, así ningún componente nuevo puede olvidarse de respetarla. */
 @media (prefers-reduced-motion: reduce) {
-  .animate-scale-in,
-  .animate-fade-in,
-  .animate-fade-in-right {
-    animation: none;
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
 
