@@ -1,11 +1,33 @@
 import { PDFDocument, rgb } from 'pdf-lib';
 import type { StockMovementReceipt, StockMovementSide } from '@/lib/stock-movement-receipt';
-import { DOCUMENT_FONT_SIZE, embedDocumentFonts } from '@/lib/fonts/document-fonts';
+import {
+  DOCUMENT_COLOR,
+  DOCUMENT_FONT_SIZE,
+  documentColor,
+  embedDocumentFonts,
+} from '@/lib/fonts/document-fonts';
 import { LOGO_PNG_BASE64 } from './pdf-logo';
 import { formatPrice } from './pdf';
 
+const PAGE_WIDTH = 595.28;
+const PAGE_HEIGHT = 841.89;
+const MARGIN = 36;
+const TABLE_WIDTH = PAGE_WIDTH - 2 * MARGIN;
+const LOGO_SIZE = 40;
+/** Del borde inferior del logo a la línea base del título, y de ahí al primer detalle. */
+const TITLE_DROP = 26;
+const DETAIL_DROP = 18;
 /** Interlineado de las líneas de detalle, en puntos. */
 const DETAIL_LINE_HEIGHT = 15;
+const TABLE_GAP = 16;
+const TABLE_HEAD_HEIGHT = 22;
+const ROW_HEIGHT = 20;
+/** Reservado al pie para la línea de resumen, encima del pie «Página X de Y». */
+const SUMMARY_RESERVE = 70;
+
+const HEADER_TOP = PAGE_HEIGHT - MARGIN;
+const TITLE_BASELINE = HEADER_TOP - LOGO_SIZE - TITLE_DROP;
+const DETAIL_BASELINE = TITLE_BASELINE - DETAIL_DROP;
 
 /** Mismo estilo del inventario, con cantidades y saldos de la operación confirmada. */
 export async function generateStockMovementPdf(
@@ -20,9 +42,12 @@ export async function generateStockMovementPdf(
   // Poppins tampoco trae emojis: reemplazarlos evita perder el comprobante por una nota.
   const safe = (value: string) => Array.from(value.normalize('NFC'))
     .map((char) => /\s/.test(char) ? ' ' : supported.has(char.codePointAt(0)!) ? char : '?').join('');
-  const ink = rgb(34 / 255, 34 / 255, 34 / 255);
-  const muted = rgb(107 / 255, 114 / 255, 128 / 255);
-  const soft = rgb(247 / 255, 247 / 255, 247 / 255);
+  const ink = documentColor(DOCUMENT_COLOR.ink);
+  const muted = documentColor(DOCUMENT_COLOR.muted);
+  const brand = documentColor(DOCUMENT_COLOR.brand);
+  const hairline = documentColor(DOCUMENT_COLOR.hairline);
+  const zebra = documentColor(DOCUMENT_COLOR.zebra);
+  const white = rgb(1, 1, 1);
   // S6: mismos tonos semánticos que las tarjetas de la app.
   const gain = rgb(21 / 255, 128 / 255, 61 / 255);
   const loss = rgb(220 / 255, 38 / 255, 38 / 255);
@@ -58,7 +83,7 @@ export async function generateStockMovementPdf(
   for (const detail of details) {
     let line = '';
     for (const char of safe(detail)) {
-      if (font.widthOfTextAtSize(line + char, body) > 499) {
+      if (font.widthOfTextAtSize(line + char, labelSize) > TABLE_WIDTH) {
         lines.push(line);
         line = '';
       }
@@ -66,9 +91,11 @@ export async function generateStockMovementPdf(
     }
     lines.push(line);
   }
-  const bandHeight = 60 + lines.length * DETAIL_LINE_HEIGHT;
-  const tableTop = 841.89 - 36 - bandHeight - 14;
-  const capacity = Math.max(1, Math.floor((tableTop - 20 - 80) / 20));
+  const tableTop = DETAIL_BASELINE - (lines.length - 1) * DETAIL_LINE_HEIGHT - TABLE_GAP;
+  const capacity = Math.max(
+    1,
+    Math.floor((tableTop - TABLE_HEAD_HEIGHT - SUMMARY_RESERVE) / ROW_HEIGHT),
+  );
   const pages = Math.max(1, Math.ceil(rows.length / capacity));
   const units = rows.reduce((sum, row) => sum + row.quantity, 0);
   const x = [40, 114, 290, 354, 458];
@@ -80,22 +107,25 @@ export async function generateStockMovementPdf(
   const quantityColor = gainSide ? gain : loss;
 
   for (let number = 1; number <= pages; number++) {
-    const page = pdf.addPage([595.28, 841.89]);
+    const page = pdf.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
     const text = (value: string, left: number, y: number, size: number = body, strong = false, color = ink) => {
       page.drawText(safe(value), { x: left, y, size, font: strong ? bold : font, color });
     };
-    page.drawRectangle({ x: 36, y: 805.89 - bandHeight, width: 523.28, height: bandHeight, color: soft });
-    page.drawRectangle({ x: 36, y: 801.89, width: 523.28, height: 4, color: rgb(244 / 255, 114 / 255, 182 / 255) });
-    page.drawImage(logo, { x: 46, y: 754, width: 40, height: 40 });
-    text(title, 98, 774, titleSize, true);
-    lines.forEach((line, i) => text(line, 48, 740 - i * DETAIL_LINE_HEIGHT));
-    page.drawRectangle({ x: 36, y: tableTop - 20, width: 523.28, height: 20, color: soft });
+    page.drawImage(logo, { x: MARGIN, y: HEADER_TOP - LOGO_SIZE, width: LOGO_SIZE, height: LOGO_SIZE });
+    text(title, MARGIN, TITLE_BASELINE, titleSize, true, brand);
+    lines.forEach((line, i) => text(line, MARGIN, DETAIL_BASELINE - i * DETAIL_LINE_HEIGHT, labelSize, false, muted));
+    // Encabezado de tabla: banda violeta con el texto en blanco en negrita.
+    page.drawRectangle({
+      x: MARGIN, y: tableTop - TABLE_HEAD_HEIGHT, width: TABLE_WIDTH, height: TABLE_HEAD_HEIGHT, color: brand,
+    });
     ['Código', 'Nombre', 'Cantidad', 'Stock final', 'Precio unit.'].forEach((label, i) => {
-      text(label, i < 2 ? x[i] : right[i] - bold.widthOfTextAtSize(label, labelSize), tableTop - 14, labelSize, true);
+      text(label, i < 2 ? x[i] : right[i] - bold.widthOfTextAtSize(label, labelSize), tableTop - TABLE_HEAD_HEIGHT + 7, labelSize, true, white);
     });
     rows.slice((number - 1) * capacity, number * capacity).forEach((row, index) => {
-      const y = tableTop - 20 - (index + 1) * 20;
-      if (index % 2 === 1) page.drawRectangle({ x: 36, y, width: 523.28, height: 20, color: rgb(250 / 255, 250 / 255, 250 / 255) });
+      const y = tableTop - TABLE_HEAD_HEIGHT - (index + 1) * ROW_HEIGHT;
+      if (index % 2 === 1) page.drawRectangle({ x: MARGIN, y, width: TABLE_WIDTH, height: ROW_HEIGHT, color: zebra });
+      // Sin caja: sólo la línea fina que separa una fila de la siguiente.
+      page.drawLine({ start: { x: MARGIN, y }, end: { x: MARGIN + TABLE_WIDTH, y }, thickness: 0.5, color: hairline });
       [row.code, row.name, `${quantitySign}${row.quantity}`, String(row.stock), formatPrice(row.price)].forEach((value, i) => {
         let display = safe(value);
         if (font.widthOfTextAtSize(display, body) > widths[i]) {
@@ -107,11 +137,11 @@ export async function generateStockMovementPdf(
     });
     if (number === pages) {
       const total = `${rows.length} productos · ${units} unidades`;
-      page.drawLine({ start: { x: 36, y: 60 }, end: { x: 559.28, y: 60 }, color: muted, thickness: 0.8 });
-      page.drawText(total, { x: 559.28 - bold.widthOfTextAtSize(total, body), y: 46, size: body, font: bold, color: rgb(190 / 255, 24 / 255, 93 / 255) });
+      page.drawLine({ start: { x: MARGIN, y: 62 }, end: { x: MARGIN + TABLE_WIDTH, y: 62 }, color: hairline, thickness: 0.5 });
+      page.drawText(total, { x: MARGIN + TABLE_WIDTH - bold.widthOfTextAtSize(total, body), y: 46, size: body, font: bold, color: brand });
     }
     const footer = `Página ${number} de ${pages}`;
-    page.drawText(footer, { x: (595.28 - font.widthOfTextAtSize(footer, footerSize)) / 2, y: 20, size: footerSize, font, color: muted });
+    page.drawText(footer, { x: (PAGE_WIDTH - font.widthOfTextAtSize(footer, footerSize)) / 2, y: 20, size: footerSize, font, color: muted });
   }
   return pdf.save();
 }

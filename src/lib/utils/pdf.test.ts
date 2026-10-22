@@ -109,6 +109,18 @@ describe('generateProductsPdf', () => {
     expect(text).toContain('Página 3 de 3');
   });
 
+  test('pinta el título en violeta de marca y el encabezado de tabla en blanco', async () => {
+    const { colors } = await readPdfContent(
+      Buffer.from(await generateProductsPdf(makeRows(3), META), 'base64')
+    );
+
+    // #6d28d9 = rgb(0,43 · 0,16 · 0,85); el encabezado va en blanco sobre la banda violeta.
+    expect(colors.get('Sucursal Depósito (DEP)')).toEqual([0.43, 0.16, 0.85]);
+    expect(colors.get('Código')).toEqual([1, 1, 1]);
+    // El contenido sigue en tinta #222222.
+    expect(colors.get('P000')).toEqual([0.13, 0.13, 0.13]);
+  });
+
   test('embebe Poppins Regular y SemiBold en lugar de Helvetica', async () => {
     const { fonts } = await readPdfContent(
       Buffer.from(await generateProductsPdf(makeRows(3), META), 'base64')
@@ -121,10 +133,10 @@ describe('generateProductsPdf', () => {
 });
 
 describe('ROWS_PER_PAGE', () => {
-  test('accounts for the taller header band plus the reserved totals line', () => {
-    // 841.89 - 2*36 margin - 56 band - 14 gap - 20 titles - 22 totals = 657.89
-    // floor(657.89 / 20) = 32 rows per page.
-    expect(ROWS_PER_PAGE).toBe(32);
+  test('accounts for the taller title block plus the reserved summary line', () => {
+    // 841.89 - 36 - 40 logo - 26 título - 16 metadatos - 16 hueco = 707.89
+    // menos 22 de encabezado de tabla y 70 reservados al pie: floor(615.89 / 20) = 30.
+    expect(ROWS_PER_PAGE).toBe(30);
   });
 });
 

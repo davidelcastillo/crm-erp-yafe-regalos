@@ -89,6 +89,14 @@ describe('generateStockControlPdf (S10)', () => {
     expect(text).toContain(`Página ${doc.getPageCount()} de ${doc.getPageCount()}`);
   });
 
+  test('pinta el título en violeta de marca y el encabezado de tabla en blanco', async () => {
+    const { colors } = await readPdf(await generateStockControlPdf(receipt));
+
+    // #6d28d9 = rgb(0,43 · 0,16 · 0,85); el encabezado va en blanco sobre la banda violeta.
+    expect(colors.get('Ajuste de stock')).toEqual([0.43, 0.16, 0.85]);
+    expect(colors.get('Código')).toEqual([1, 1, 1]);
+  });
+
   test('embebe Poppins Regular y SemiBold en lugar de Helvetica', async () => {
     const { fonts } = await readPdf(await generateStockControlPdf(receipt));
 

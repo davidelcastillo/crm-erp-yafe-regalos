@@ -76,6 +76,14 @@ describe('generateStockMovementPdf', () => {
     expect(text.join(' ')).toContain('<script>alert(1)</script> ?');
   });
 
+  test('pinta el título en violeta de marca y el encabezado de tabla en blanco', async () => {
+    const { colors } = await readPdf(await generateStockMovementPdf(receipt));
+
+    // #6d28d9 = rgb(0,43 · 0,16 · 0,85); el encabezado va en blanco sobre la banda violeta.
+    expect(colors.get('Ingreso')).toEqual([0.43, 0.16, 0.85]);
+    expect(colors.get('Código')).toEqual([1, 1, 1]);
+  });
+
   test('embebe Poppins Regular y SemiBold en lugar de Helvetica', async () => {
     const { fonts } = await readPdf(await generateStockMovementPdf(receipt));
     expect(fonts.join(' ')).toContain('Poppins-Regular');

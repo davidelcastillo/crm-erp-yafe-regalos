@@ -1,5 +1,5 @@
 // src/lib/fonts/document-fonts.ts
-import type { PDFDocument, PDFFont } from 'pdf-lib';
+import { rgb, type PDFDocument, type PDFFont } from 'pdf-lib';
 
 /**
  * Escala tipográfica de los PDF de documento (inventario y comprobantes de
@@ -13,7 +13,7 @@ import type { PDFDocument, PDFFont } from 'pdf-lib';
  */
 export const DOCUMENT_FONT_SIZE = {
   /** Título del documento (nombre de sucursal o tipo de comprobante). */
-  title: 15,
+  title: 20,
   /** Contenido: filas de la tabla, líneas de detalle y totales. */
   body: 12,
   /** Encabezados de columna, metadatos y notas de la cabecera. */
@@ -21,6 +21,32 @@ export const DOCUMENT_FONT_SIZE = {
   /** Pie «Página X de Y». */
   footer: 9,
 } as const;
+
+/**
+ * Paleta de los PDF de documento, sacada de `STYLE.md`: violeta de marca (7,1:1
+ * con blanco) para títulos y encabezados de tabla, tinta y gris de metadatos con
+ * su contraste medido, y una línea de fila que no compite con el contenido.
+ */
+export const DOCUMENT_COLOR = {
+  /** Acción de marca: título, banda del encabezado de tabla y línea de resumen. */
+  brand: '#6d28d9',
+  /** Texto de contenido. */
+  ink: '#222222',
+  /** Metadatos y pie. */
+  muted: '#6a6a6a',
+  /** Separador de filas. */
+  hairline: '#e5e7eb',
+  /** Fila alternada. */
+  zebra: '#f7f7f7',
+} as const;
+
+/** `#rrggbb` al color de pdf-lib. */
+export const documentColor = (hex: string) =>
+  rgb(
+    parseInt(hex.slice(1, 3), 16) / 255,
+    parseInt(hex.slice(3, 5), 16) / 255,
+    parseInt(hex.slice(5, 7), 16) / 255
+  );
 
 /** Poppins embebida, lista para `drawText`. */
 export interface DocumentFonts {

@@ -19,11 +19,17 @@ Los PDF que genera el sistema (inventario exportado, comprobante de movimiento y
 
 ## Tasks
 
-- **T1** — `src/lib/utils/pdf.ts` (inventario exportado) con su test.
-- **T2** — `src/lib/utils/stock-movement-pdf.ts` (comprobante de movimiento) con su test.
-- **T3** — `src/lib/utils/stock-control-pdf.ts` (comprobante de ajuste de stock) con su test.
-- **T4** — Documentación afectada (`docs/exportar-inventario-pdf.md`, `docs/comprobantes-stock.md`) y evidencia en este documento.
+- **T1** — `src/lib/utils/pdf.ts` (inventario exportado) con su test. **Hecho.**
+- **T2** — `src/lib/utils/stock-movement-pdf.ts` (comprobante de movimiento) con su test. **Hecho.**
+- **T3** — `src/lib/utils/stock-control-pdf.ts` (comprobante de ajuste de stock) con su test. **Hecho.**
+- **T4** — Documentación afectada (`docs/exportar-inventario-pdf.md`, `docs/comprobantes-stock.md`) y evidencia en este documento. **Hecho.**
 
 ## Log
 
 - **L1 — Pedido**, verbatim en S1–S3. La imagen del modelo se pudo leer: el archivo es `docs/PDF/ModeloPDF.webp`.
+- **L2 — Implementación (T1–T3).** Paleta y escala compartidas en `DOCUMENT_COLOR` / `DOCUMENT_FONT_SIZE` (`src/lib/fonts/document-fonts.ts`); los tres generadores dejaron de usar la banda gris con acento rosa y el encabezado de tabla gris. Ahora: logo arriba, título 20 pt SemiBold `#6d28d9`, metadatos 9–10 pt `#6a6a6a`, encabezado de tabla 10 pt SemiBold blanco sobre rectángulo `#6d28d9`, filas sin caja con línea fina `#e5e7eb` y alternancia `#f7f7f7`/blanco, contenido `#222222`, y un solo resumen por documento en `#6d28d9`. No cambió ningún dato, campo, rótulo, orden ni cálculo.
+- **L3 — Tests.** Se agregó un caso por generador («pinta el título en violeta de marca y el encabezado de tabla en blanco»), que lee los colores por el CMap: RED observado antes del cambio (título en `[0.13,0.13,0.13]`, encabezado sin blanco) y GREEN después. `ROWS_PER_PAGE` pasó de 32 a 30 por el bloque de título más alto: el caso que lo fija se ajustó con la cuenta nueva (707,89 − 22 encabezado − 70 reservado = 615,89 → 30), sin tocar los casos de paginación (80 filas → 3 páginas, 33 → 2).
+- **L4 — Evidencia observada.** `npx jest src/lib/utils --runInBand`: 6 suites, 76 tests en verde. `npx tsc --noEmit`: sin salida. `npx eslint src/lib/utils src/lib/fonts`: sin salida. `src/lib/color-tokens.test.ts`, `control/page.test.tsx` y `StockMovementReceiptPanel.test.tsx`: 15 tests en verde. Muestra generada fuera del repo en `%TEMP%\pdf-sample\out` (inventario 1 pág., movimiento 1 pág., ajuste 1 pág.; los tres con `Poppins-Regular` y `Poppins-SemiBold` embebidas).
+- **L5 — Fuera de alcance respetado.** Etiquetas de precio sin tocar (S4). No se agregaron encabezados de sección nuevos («Productos», «Diferencias»): el pedido prohíbe cambiar rótulos, así que la jerarquía la dan el título, el encabezado de tabla y el resumen.
+
+- **L2 — Implementación y evidencia (2026-10-22)**: la paleta y la escala quedaron centralizadas en `src/lib/fonts/document-fonts.ts` (`DOCUMENT_COLOR` con `brand` `#6d28d9`, `ink` `#222222`, `muted` `#6a6a6a`, `hairline` `#e5e7eb`, `zebra` `#f7f7f7`; `DOCUMENT_FONT_SIZE` con título 20). **RED observado** por el escritor: título en `[0.13,0.13,0.13]` (gris), encabezado no blanco y `ROWS_PER_PAGE` 32; verde después: **76 casos en `src/lib/utils`**. **Prueba con binarios reales** (generados en `%TEMP%`, nunca en el repo): `inventario.pdf` (1 página, embebe `Poppins-Regular` y `Poppins-SemiBold`), `movimiento.pdf` (1 página, ambas), `ajuste.pdf` (1 página, ambas). **Decisión de alcance**: no se agregaron encabezados de sección nuevos («Productos», «Diferencias») porque serían rótulos que el usuario no pidió; por eso la regla de 13 pt queda definida pero sin uso hasta que haga falta. Los datos, rótulos, orden y cálculos no cambiaron.

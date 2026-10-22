@@ -11,7 +11,7 @@ Desde **Inventario** podés descargar un comprobante después de confirmar **Mov
 
 ## Contenido
 
-El diseño sigue el PDF de inventario: logo, banda con acento rosa, filas alternadas, totales y número de página.
+El diseño sigue el PDF de inventario: logo, título grande en violeta de marca, encabezado de tabla en blanco sobre banda violeta, filas separadas por una línea fina, resumen en violeta y número de página.
 
 - Encabezado: **Ingreso**, **Egreso** o **Movimiento de sucursal**; fecha y hora de Argentina; sucursal con su código. En traslados, origen y destino.
 - Motivo: texto registrado por el usuario en entrada/salida; si no escribió uno, el rótulo existente `ENTRADA`/`SALIDA`. En traslados, referencia `MOVE-…` de la operación.
@@ -23,7 +23,7 @@ El diseño sigue el PDF de inventario: logo, banda con acento rosa, filas altern
 
 ## Tipografía
 
-Los tres PDF de documento (inventario, comprobante de movimiento y comprobante de ajuste de control) comparten **Poppins** embebida (SIL OFL 1.1), Regular y SemiBold, desde `src/lib/fonts/poppins.ts` en base64: los generadores se importan dinámicamente en el navegador, así que la fuente viaja en el bundle y no se lee del filesystem. La escala está en `DOCUMENT_FONT_SIZE` (`src/lib/fonts/document-fonts.ts`): título 15 pt, contenido 12 pt, encabezados de columna y metadatos 10 pt, pie 9 pt. Para cambiar la fuente hay que regenerar el base64 (ver el encabezado de `poppins.ts`); los tests leen el texto por el CMap `/ToUnicode`, así que un cambio de tipografía no rompe las aserciones.
+Los tres PDF de documento (inventario, comprobante de movimiento y comprobante de ajuste de control) comparten **Poppins** embebida (SIL OFL 1.1), Regular y SemiBold, desde `src/lib/fonts/poppins.ts` en base64: los generadores se importan dinámicamente en el navegador, así que la fuente viaja en el bundle y no se lee del filesystem. La escala está en `DOCUMENT_FONT_SIZE` (`src/lib/fonts/document-fonts.ts`): título 20 pt, contenido 12 pt, encabezados de tabla y metadatos 10 pt, pie 9 pt; la paleta, en `DOCUMENT_COLOR` del mismo archivo (violeta de marca `#6d28d9`, texto `#222222`, metadatos `#6a6a6a`, separador `#e5e7eb`, fila alternada `#f7f7f7`). Para cambiar la fuente hay que regenerar el base64 (ver el encabezado de `poppins.ts`); los tests leen el texto por el CMap `/ToUnicode`, así que un cambio de tipografía no rompe las aserciones.
 
 ## Fallos y límites
 

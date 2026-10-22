@@ -16,12 +16,13 @@ Desde **Inventario** → botón **"Exportar productos"** el admin genera un PDF 
 | Componente | `ExportWizard` (client component, `src/app/inventario/components/ExportWizard.tsx`) |
 | Server Action | `exportBranchProductsPdf(branchId, selectedProductIds)` (`src/app/actions/inventory.ts`) |
 | Re-validación server-side | Se valida que la sucursal exista y que **todos** los productos seleccionados pertenezcan a esa sucursal con `stock > 0`. Si alguno no cumple, se rechaza **sin** generar el PDF. |
-| Generación | `generateProductsPdf(rows, meta)` (`src/lib/utils/pdf.ts`) con `pdf-lib`: tabla de columnas **Código \| Nombre \| Stock \| Precio**, filas alternadas, paginación automática. `meta` aporta `branchName`, `branchCode` y `date`. |
-| Tipografía | **Poppins** embebida (Regular y SemiBold, SIL OFL 1.1) desde `src/lib/fonts/poppins.ts` en base64, para que el PDF funcione también con el import dinámico en el navegador. Escala compartida en `DOCUMENT_FONT_SIZE` (`src/lib/fonts/document-fonts.ts`): título 15 pt, contenido 12 pt, encabezados de columna y metadatos 10 pt, pie 9 pt. |
-| Encabezado | Banda superior en cada página: logo del local (PNG en base64 en `src/lib/utils/pdf-logo.ts`, derivado de `public/logo.webp` porque `pdf-lib` no embebe webp), nombre de la sucursal con su código (`Sucursal Depósito (DEP)`) y la línea `Inventario al DD/MM/YYYY` con la fecha de exportación |
-| Filas | Mismo orden que la lista: por nombre de producto. Stock y Precio alineados a la derecha; un nombre que no entra en su columna se corta con `...` para no pisar el Stock |
-| Totales | Una sola vez, al pie de la última página: `N productos · M unidades` (`M` = suma del stock de las filas exportadas) |
-| Paginación | 32 filas por página (`ROWS_PER_PAGE`); el encabezado, el hueco, los títulos y la línea de totales reservada dejaron menos lugar para filas. Pie en **cada** página: `Página X de Y` |
+| Generación | `generateProductsPdf(rows, meta)` (`src/lib/utils/pdf.ts`) con `pdf-lib`: tabla de columnas **Código \| Nombre \| Stock \| Precio**, filas separadas por una línea fina y paginación automática. `meta` aporta `branchName`, `branchCode` y `date`. |
+| Tipografía | **Poppins** embebida (Regular y SemiBold, SIL OFL 1.1) desde `src/lib/fonts/poppins.ts` en base64, para que el PDF funcione también con el import dinámico en el navegador. Escala compartida en `DOCUMENT_FONT_SIZE` (`src/lib/fonts/document-fonts.ts`): título 20 pt, contenido 12 pt, encabezados de columna y metadatos 10 pt, pie 9 pt. |
+| Color | Paleta en `DOCUMENT_COLOR` (`src/lib/fonts/document-fonts.ts`): violeta de marca `#6d28d9` (7,1:1 con blanco) en el título, la banda del encabezado y la línea de resumen; texto `#222222`; metadatos y pie `#6a6a6a`; separador de filas `#e5e7eb`; fila alternada `#f7f7f7`. Sin bordes alrededor de la tabla. |
+| Encabezado | En cada página: el logo del local (PNG en base64 en `src/lib/utils/pdf-logo.ts`, derivado de `public/logo.webp` porque `pdf-lib` no embebe webp), el título grande con el nombre de la sucursal y su código (`Sucursal Depósito (DEP)`) y debajo la línea de metadatos `Inventario al DD/MM/YYYY` con la fecha de exportación |
+| Filas | Mismo orden que la lista: por nombre de producto. Encabezado de tabla blanco en negrita sobre banda violeta; filas alternadas `#f7f7f7`/blanco separadas por una línea fina, sin caja. Stock y Precio alineados a la derecha; un nombre que no entra en su columna se corta con `...` para no pisar el Stock |
+| Totales | Una sola vez, al pie de la última página: `N productos · M unidades` (`M` = suma del stock de las filas exportadas) en violeta de marca |
+| Paginación | 30 filas por página (`ROWS_PER_PAGE`); el bloque de título, el hueco, el encabezado de tabla y la línea de resumen reservada dejan ese lugar. Pie en **cada** página: `Página X de Y` |
 | Precios | Formato `es-AR`, moneda ARS (ej. `$1.250,00`) |
 | Salida | PDF en `base64`, descargado como Blob |
 | Nombre de archivo | `inventario-<branchCode>-<YYYYMMDD>.pdf` (ej. `inventario-DEP-20260806.pdf`) |
@@ -52,7 +53,7 @@ La cadena que imprime (31005 bytes → 41340 caracteres) se pega entre comillas 
 - [ ] El checkbox "Todos" del paso 2 selecciona todos los productos con stock de la sucursal (y ninguno sin stock), y lo destilda al volver a tocarlo.
 - [ ] Sin productos seleccionados, el paso 3 deshabilita *Generar PDF*.
 - [ ] El PDF muestra el logo del local, el nombre de la sucursal con su código (ej. `Sucursal Depósito (DEP)`) y `Inventario al DD/MM/YYYY`.
-- [ ] El PDF muestra Código, Nombre, Stock y Precio, ordenados por nombre; un nombre largo se corta con `...` y no pisa el Stock.
+- [ ] El PDF muestra Código, Nombre, Stock y Precio, ordenados por nombre; el encabezado de tabla va en blanco sobre banda violeta y las filas se separan con una línea fina; un nombre largo se corta con `...` y no pisa el Stock.
 - [ ] Al pie de la última página aparece `N productos · M unidades`, con `M` igual a la suma del stock exportado.
-- [ ] Con más de 32 productos, la tabla continúa en la siguiente sin truncarse y **cada** página dice `Página X de Y`.
+- [ ] Con más de 30 productos, la tabla continúa en la siguiente sin truncarse y **cada** página dice `Página X de Y`.
 - [ ] El nombre del archivo es `inventario-<branchCode>-<YYYYMMDD>.pdf`.
