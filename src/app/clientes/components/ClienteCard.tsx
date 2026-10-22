@@ -67,7 +67,7 @@ export function ClienteCard({ customer }: ClienteCardProps) {
   };
 
   return (
-    <div className="glass rounded-2xl border border-black/5 p-4">
+    <div className="glass rounded-2xl border border-hairline-soft p-4">
       <div className="flex justify-between items-start gap-3">
         <div className="min-w-0 flex-1">
           <h3 className="text-base font-semibold text-ink break-words">
@@ -75,21 +75,21 @@ export function ClienteCard({ customer }: ClienteCardProps) {
           </h3>
           <p className="text-sm text-ink-muted">
             Deuda:{" "}
-            <span className={hasDebt ? "text-[#b91c1c] font-medium" : "text-[#15803d]"}>
+            <span className={hasDebt ? "text-negative font-medium" : "text-positive"}>
               ${balance.toFixed(2)}
             </span>
           </p>
         </div>
         <div
           className={`shrink-0 inline-flex items-center px-3 py-1 rounded-full text-sm font-medium text-white ${
-            hasDebt ? "bg-[#b91c1c]" : "bg-[#15803d]"
+            hasDebt ? "bg-negative" : "bg-positive"
           }`}
         >
           {hasDebt ? "Deudor" : "Al día"}
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-black/5">
+      <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-hairline-soft">
         <button
           onClick={handleToggleHistory}
           disabled={loadingHistory}
@@ -108,7 +108,7 @@ export function ClienteCard({ customer }: ClienteCardProps) {
       </div>
 
       {showHistory && historyData && (
-        <div className="mt-3 pt-3 border-t border-black/5">
+        <div className="mt-3 pt-3 border-t border-hairline-soft">
           <div className="flex gap-1 mb-3">
             {/* Control segmentado: la pestaña elegida va `btn-active`, la otra `btn-secondary`. */}
             <button
@@ -135,7 +135,7 @@ export function ClienteCard({ customer }: ClienteCardProps) {
                 historyData.sales.map((sale) => (
                   <div
                     key={sale.id}
-                    className="p-2 bg-[#f9f9f9] rounded-lg text-sm"
+                    className="p-2 bg-surface-soft rounded-lg text-sm"
                   >
                     <div className="flex justify-between items-center gap-2">
                       <span className="text-ink-muted">{formatDate(sale.date)}</span>
@@ -146,8 +146,8 @@ export function ClienteCard({ customer }: ClienteCardProps) {
                       <span
                         className={`shrink-0 ${
                           sale.pendingBalance > 0
-                            ? "text-[#b91c1c]"
-                            : "text-[#15803d]"
+                            ? "text-negative"
+                            : "text-positive"
                         }`}
                       >
                         Pendiente: ${sale.pendingBalance.toFixed(2)}
@@ -169,12 +169,12 @@ export function ClienteCard({ customer }: ClienteCardProps) {
                 historyData.payments.map((payment) => (
                   <div
                     key={payment.id}
-                    className="p-2 bg-[#f9f9f9] rounded-lg text-sm flex justify-between items-center gap-2"
+                    className="p-2 bg-surface-soft rounded-lg text-sm flex justify-between items-center gap-2"
                   >
                     <span className="text-ink-muted">
                       {formatDate(payment.date)}
                     </span>
-                    <span className="font-medium text-[#15803d] shrink-0">
+                    <span className="font-medium text-positive shrink-0">
                       +${payment.amount.toFixed(2)}
                     </span>
                   </div>

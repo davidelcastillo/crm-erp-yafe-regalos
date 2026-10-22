@@ -144,26 +144,26 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
   };
 
   const inputClass =
-    "w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-[#ec4899] focus:ring-2 focus:ring-[#ec4899]/30 outline-none transition-all";
-  const labelClass = "block text-sm font-medium text-[#222222] mb-2";
+    "w-full px-4 py-3 rounded-xl border border-hairline focus:border-accent focus:ring-2 focus:ring-accent/30 outline-none transition-all";
+  const labelClass = "block text-sm font-medium text-ink mb-2";
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-end justify-center">
+    <div className="fixed inset-0 bg-scrim-strong backdrop-blur-sm z-[60] flex items-end justify-center">
       <div
-        className="bg-white w-full max-w-lg rounded-t-3xl p-6 animate-slide-up max-h-[90vh] overflow-y-auto"
+        className="bg-surface w-full max-w-lg rounded-t-3xl p-6 animate-slide-up max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-semibold text-[#222222]">
+          <h2 className="text-xl font-semibold text-ink">
             {isEdit ? "Editar Producto" : "Nuevo Producto"}
           </h2>
           <button
             type="button"
             onClick={onClose}
-            className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full hover:bg-[#f2f2f2] transition-colors touch-manipulation"
+            className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full hover:bg-surface-strong transition-colors touch-manipulation"
             aria-label="Cerrar"
           >
-            <svg className="w-6 h-6 text-[#6a6a6a]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-6 h-6 text-ink-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
@@ -204,7 +204,7 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
                   type="text"
                   value={formData.code}
                   readOnly
-                  className={`${inputClass} bg-[#f2f2f2] font-mono text-sm`}
+                  className={`${inputClass} bg-surface-strong font-mono text-sm`}
                   title="El código no se puede modificar"
                 />
               </div>
@@ -215,7 +215,7 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
                   type="text"
                   value={formData.codePrefix}
                   readOnly
-                  className={`${inputClass} bg-[#f2f2f2] font-mono text-sm`}
+                  className={`${inputClass} bg-surface-strong font-mono text-sm`}
                   title="El prefijo no se puede modificar"
                 />
               </div>
@@ -253,7 +253,7 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
                   required
                   style={{ textTransform: "uppercase" }}
                 />
-                <p className="text-xs text-[#6a6a6a] mt-1">
+                <p className="text-xs text-ink-muted mt-1">
                   2-4 letras. El sistema autogenera el código (ej: AA000, AA001…)
                 </p>
               </div>
@@ -288,10 +288,10 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
 
           {/* Active Toggle (edit mode only) */}
           {isEdit && (
-            <div className="flex items-center justify-between p-4 bg-[#f8f8f8] rounded-xl">
+            <div className="flex items-center justify-between p-4 bg-surface-soft rounded-xl">
               <div className="flex flex-col">
-                <span className="text-sm font-medium text-[#222222]">Activo</span>
-                <span className="text-xs text-[#6a6a6a]">
+                <span className="text-sm font-medium text-ink">Activo</span>
+                <span className="text-xs text-ink-muted">
                   Los productos inactivos no aparecen en compras, ventas ni movimientos.
                 </span>
               </div>
@@ -302,11 +302,11 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
                 aria-label="Activo"
                 onClick={() => handleActiveToggle(!isActive)}
                 className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors touch-manipulation min-w-[44px] min-h-[44px] ${
-                  isActive ? "bg-[#ec4899]" : "bg-[#dddddd]"
+                  isActive ? "bg-accent" : "bg-hairline-strong"
                 }`}
               >
                 <span
-                  className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
+                  className={`inline-block h-6 w-6 transform rounded-full bg-surface transition-transform ${
                     isActive ? "translate-x-5" : "translate-x-1"
                   }`}
                 />
@@ -318,7 +318,7 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-4 min-h-[48px] bg-[#222222] text-white font-medium rounded-xl hover:bg-[#3f3f3f] transition-colors disabled:opacity-50 touch-manipulation"
+              className="w-full py-4 min-h-[48px] bg-ink text-white font-medium rounded-xl hover:bg-ink-body transition-colors disabled:opacity-50 touch-manipulation"
             >
               {loading
                 ? "Guardando…"

@@ -69,11 +69,21 @@
   --positive: #15803d;
   --negative: #b91c1c;
   --warning: #b45309;
-  --danger: var(--palette-rausch-red);
+  --danger: #dc2626;
   --error: #c13515;
   --error-surface: #ffe4ea;
   --error-ink: #8f0020;
   --info: #3b82f6;
+  /* Tonos "vivos" de estado: son los de los badges con texto blanco y los puntos
+     indicadores. NO se usan para texto sobre fondo claro (no llegan a 4.5:1, ver
+     la regla en STYLE.md); para eso están `positive`, `negative` y `warning`. */
+  --positive-strong: #22c55e;
+  --negative-strong: #ef4444;
+  --warning-strong: #f59e0b;
+  /* Borde suave de marca: la pista del `Spinner` y el borde de foco suave. */
+  --accent-soft: #fbcfe8;
+  /* Borde de un control apagado (lo que no está marcado en un interruptor). */
+  --hairline-strong: #dddddd;
   --scrim: rgb(0 0 0 / 0.3);
   --scrim-strong: rgb(0 0 0 / 0.6);
 
@@ -134,6 +144,11 @@
   --color-error-surface: var(--error-surface);
   --color-error-ink: var(--error-ink);
   --color-info: var(--info);
+  --color-positive-strong: var(--positive-strong);
+  --color-negative-strong: var(--negative-strong);
+  --color-warning-strong: var(--warning-strong);
+  --color-accent-soft: var(--accent-soft);
+  --color-hairline-strong: var(--hairline-strong);
   --color-scrim: var(--scrim);
   --color-scrim-strong: var(--scrim-strong);
 

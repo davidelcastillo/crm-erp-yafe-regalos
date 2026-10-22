@@ -165,30 +165,30 @@ export function ExportWizard({ open, onClose, branches }: ExportWizardProps) {
 
   return (
     <div
-      className="fixed inset-0 bg-black/30 backdrop-blur-md z-[60] flex items-center justify-center"
+      className="fixed inset-0 bg-scrim backdrop-blur-md z-[60] flex items-center justify-center"
       role="dialog"
       aria-modal="true"
       aria-labelledby="export-wizard-title"
     >
       <div
-        className="bg-white w-full max-w-xl md:max-w-4xl rounded-2xl p-6 animate-scale-in max-h-[90vh] md:max-h-[85vh] overflow-y-auto"
+        className="bg-surface w-full max-w-xl md:max-w-4xl rounded-2xl p-6 animate-scale-in max-h-[90vh] md:max-h-[85vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-between items-center mb-4">
           <h2
             id="export-wizard-title"
-            className="text-xl font-semibold text-[#222222]"
+            className="text-xl font-semibold text-ink"
           >
             Exportar productos
           </h2>
           <button
             type="button"
             onClick={onClose}
-            className="btn btn-icon btn-round hover:bg-[#f2f2f2]"
+            className="btn btn-icon btn-round hover:bg-surface-strong"
             aria-label="Cerrar"
           >
             <svg
-              className="w-6 h-6 text-[#6a6a6a]"
+              className="w-6 h-6 text-ink-muted"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -203,16 +203,16 @@ export function ExportWizard({ open, onClose, branches }: ExportWizardProps) {
           </button>
         </div>
 
-        <p className="text-xs font-medium uppercase tracking-wide text-[#6a6a6a] mb-4">
+        <p className="text-xs font-medium uppercase tracking-wide text-ink-muted mb-4">
           Paso {step} de 3
         </p>
 
         {step === 1 && (
           <div>
-            <h3 className="text-base font-semibold text-[#222222] mb-3">
+            <h3 className="text-base font-semibold text-ink mb-3">
               Elegí la sucursal
             </h3>
-            <p className="block text-xs text-[#6a6a6a] mb-2">Sucursal a exportar</p>
+            <p className="block text-xs text-ink-muted mb-2">Sucursal a exportar</p>
             <BranchPicker
               branches={branches}
               value={branchId}
@@ -241,7 +241,7 @@ export function ExportWizard({ open, onClose, branches }: ExportWizardProps) {
 
         {step === 2 && (
           <div>
-            <h3 className="text-base font-semibold text-[#222222] mb-3">
+            <h3 className="text-base font-semibold text-ink mb-3">
               Seleccionar productos
             </h3>
 
@@ -250,14 +250,14 @@ export function ExportWizard({ open, onClose, branches }: ExportWizardProps) {
                 {!productsLoading &&
                   !productsError &&
                   availableProducts.length > 0 && (
-                    <label className="flex items-center gap-3 p-3 mb-2 min-h-[44px] rounded-xl bg-[#f8f8f8] cursor-pointer touch-manipulation">
+                    <label className="flex items-center gap-3 p-3 mb-2 min-h-[44px] rounded-xl bg-surface-soft cursor-pointer touch-manipulation">
                       <input
                         type="checkbox"
                         checked={allSelected}
                         onChange={toggleAll}
-                        className="w-5 h-5 accent-[#ec4899]"
+                        className="w-5 h-5 accent-accent"
                       />
-                      <span className="text-sm font-medium text-[#222222]">
+                      <span className="text-sm font-medium text-ink">
                         Todos
                       </span>
                     </label>
@@ -267,7 +267,7 @@ export function ExportWizard({ open, onClose, branches }: ExportWizardProps) {
                   <div className="flex items-center justify-center py-10">
                     <div className="flex items-center gap-2">
                       <svg
-                        className="w-5 h-5 text-[#3b82f6] animate-spin"
+                        className="w-5 h-5 text-info animate-spin"
                         viewBox="0 0 24 24"
                         stroke="currentColor"
                         fill="none"
@@ -285,7 +285,7 @@ export function ExportWizard({ open, onClose, branches }: ExportWizardProps) {
                           d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
                         />
                       </svg>
-                      <span className="text-sm text-[#6a6a6a]">
+                      <span className="text-sm text-ink-muted">
                         Cargando productos...
                       </span>
                     </div>
@@ -312,7 +312,7 @@ export function ExportWizard({ open, onClose, branches }: ExportWizardProps) {
                 {!productsLoading &&
                   !productsError &&
                   availableProducts.length === 0 && (
-                    <p className="py-8 text-center text-sm text-[#6a6a6a]">
+                    <p className="py-8 text-center text-sm text-ink-muted">
                       No hay productos con stock en esta sucursal
                     </p>
                   )}
@@ -328,23 +328,23 @@ export function ExportWizard({ open, onClose, branches }: ExportWizardProps) {
                       {availableProducts.map((row) => (
                         <label
                           key={row.id}
-                          className="flex items-center gap-3 p-3 min-h-[44px] rounded-xl hover:bg-[#f8f8f8] transition-colors cursor-pointer touch-manipulation"
+                          className="flex items-center gap-3 p-3 min-h-[44px] rounded-xl hover:bg-surface-soft transition-colors cursor-pointer touch-manipulation"
                         >
                           <input
                             type="checkbox"
                             checked={selectedIds.includes(row.id)}
                             onChange={() => toggleProduct(row.id)}
-                            className="w-5 h-5 accent-[#ec4899]"
+                            className="w-5 h-5 accent-accent"
                           />
                           <span className="flex-1 min-w-0">
-                            <span className="block text-sm font-medium text-[#222222] truncate">
+                            <span className="block text-sm font-medium text-ink truncate">
                               {row.name}
                             </span>
-                            <span className="block text-xs text-[#6a6a6a]">
+                            <span className="block text-xs text-ink-muted">
                               {row.code} · Stock: {row.stock}
                             </span>
                           </span>
-                          <span className="shrink-0 text-sm font-medium text-[#6a6a6a] tabular-nums">
+                          <span className="shrink-0 text-sm font-medium text-ink-muted tabular-nums">
                             ${row.price.toFixed(2)}
                           </span>
                         </label>
@@ -355,8 +355,8 @@ export function ExportWizard({ open, onClose, branches }: ExportWizardProps) {
 
               {/* Resumen de lo seleccionado: en celular cae debajo de la lista;
                   desde `md` va a la derecha. */}
-              <aside className="mt-4 rounded-2xl border border-black/10 bg-[#f7f7f7] p-4 md:mt-0 md:sticky md:top-4">
-                <h3 className="text-xs font-medium uppercase tracking-wide text-[#6a6a6a]">
+              <aside className="mt-4 rounded-2xl border border-hairline bg-surface-soft p-4 md:mt-0 md:sticky md:top-4">
+                <h3 className="text-xs font-medium uppercase tracking-wide text-ink-muted">
                   Selección
                 </h3>
                 <p className="mt-2 text-sm font-semibold text-brand-rosa-texto tabular-nums">
@@ -380,23 +380,23 @@ export function ExportWizard({ open, onClose, branches }: ExportWizardProps) {
 
         {step === 3 && (
           <div className="md:max-w-md">
-            <h3 className="text-base font-semibold text-[#222222] mb-3">
+            <h3 className="text-base font-semibold text-ink mb-3">
               Generar PDF
             </h3>
 
-            <div className="rounded-2xl border border-black/10 bg-[#f7f7f7] p-4 space-y-3">
-              <h3 className="text-xs font-medium uppercase tracking-wide text-[#6a6a6a]">
+            <div className="rounded-2xl border border-hairline bg-surface-soft p-4 space-y-3">
+              <h3 className="text-xs font-medium uppercase tracking-wide text-ink-muted">
                 Resumen
               </h3>
               <div className="flex justify-between items-baseline gap-4">
-                <span className="text-sm text-[#6a6a6a]">Sucursal</span>
-                <span className="text-sm font-semibold text-[#222222] break-words">
+                <span className="text-sm text-ink-muted">Sucursal</span>
+                <span className="text-sm font-semibold text-ink break-words">
                   {selectedBranch?.name ?? "-"}
                 </span>
               </div>
               <div className="flex justify-between items-baseline gap-4">
-                <span className="text-sm text-[#6a6a6a]">Seleccionados</span>
-                <span className="text-sm font-semibold text-[#222222] tabular-nums">
+                <span className="text-sm text-ink-muted">Seleccionados</span>
+                <span className="text-sm font-semibold text-ink tabular-nums">
                   {selectedCount} seleccionados
                 </span>
               </div>

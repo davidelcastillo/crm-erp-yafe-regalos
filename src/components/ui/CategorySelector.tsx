@@ -212,14 +212,14 @@ export function CategorySelector({
 
       {open && !loading && (
         <div
-          className="absolute z-50 mt-1 bg-surface border border-[#ebebeb] rounded-xl shadow-lg max-h-60 overflow-y-auto min-w-[200px]"
+          className="absolute z-50 mt-1 bg-surface border border-hairline-soft rounded-xl shadow-lg max-h-60 overflow-y-auto min-w-[200px]"
           role="listbox"
         >
           <button
             type="button"
             onClick={() => handleClick(null)}
             className={`w-full text-left px-4 py-3 min-h-[44px] text-sm hover:bg-surface-soft transition-colors ${
-              selectedId === null ? "bg-[#ec4899]/10 text-brand-rosa-texto font-medium" : "text-ink"
+              selectedId === null ? "bg-accent/10 text-brand-rosa-texto font-medium" : "text-ink"
             }`}
             role="option"
             aria-selected={selectedId === null}
@@ -232,7 +232,7 @@ export function CategorySelector({
               type="button"
               onClick={() => handleClick(o.id)}
               className={`w-full text-left px-4 py-3 min-h-[44px] text-sm hover:bg-surface-soft transition-colors ${
-                o.id === selectedId ? "bg-[#ec4899]/10 text-brand-rosa-texto font-medium" : "text-ink"
+                o.id === selectedId ? "bg-accent/10 text-brand-rosa-texto font-medium" : "text-ink"
               }`}
               role="option"
               aria-selected={o.id === selectedId}

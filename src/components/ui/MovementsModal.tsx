@@ -21,7 +21,7 @@ const TYPE_STYLES: Record<ProductMovement['type'], string> = {
   EXIT: 'bg-red-100 text-red-800',
   TRANSFER_IN: 'bg-blue-100 text-blue-800',
   TRANSFER_OUT: 'bg-blue-100 text-blue-800',
-  ADJUSTMENT: 'bg-gray-100 text-ink',
+  ADJUSTMENT: 'bg-surface-strong text-ink',
 };
 
 interface MovementsModalProps {
@@ -197,8 +197,8 @@ export function MovementsModal({ product, isOpen, onClose, branchId = null }: Mo
         {!loading && movements.length > 0 && (
           <div className="mt-4">
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+              <table className="min-w-full divide-y divide-hairline">
+                <thead className="bg-surface-soft">
                   <tr>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-ink-muted uppercase">
                       Fecha
@@ -214,7 +214,7 @@ export function MovementsModal({ product, isOpen, onClose, branchId = null }: Mo
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200">
+                <tbody className="divide-y divide-hairline">
                   {movements.map((movement) => (
                     <tr key={movement.id} className="bg-surface">
                       <td className="px-6 py-4 text-sm text-ink whitespace-nowrap">

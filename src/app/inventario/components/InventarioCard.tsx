@@ -26,12 +26,12 @@ function getStockStatus(stock: number): {
   label: string;
 } {
   if (stock === 0) {
-    return { color: "text-white", bgColor: "bg-[#ef4444]", label: "Sin stock" };
+    return { color: "text-white", bgColor: "bg-negative-strong", label: "Sin stock" };
   }
   if (stock <= 5) {
-    return { color: "text-white", bgColor: "bg-[#f59e0b]", label: "Stock bajo" };
+    return { color: "text-white", bgColor: "bg-warning-strong", label: "Stock bajo" };
   }
-  return { color: "text-white", bgColor: "bg-[#22c55e]", label: "En stock" };
+  return { color: "text-white", bgColor: "bg-positive-strong", label: "En stock" };
 }
 
 export function InventarioCard({ product, dataProductId, isHighlighted, onViewMovements, categories = [] }: InventarioCardProps) {
@@ -157,7 +157,7 @@ export function InventarioCard({ product, dataProductId, isHighlighted, onViewMo
    if (isEditing) {
      // Edit mode - show form
      return (
-       <div className="bg-white rounded-2xl p-4 shadow-sm border-2 border-[#3b82f6]">
+       <div className="bg-surface rounded-2xl p-4 shadow-sm border-2 border-info">
          <div className="flex flex-col gap-3">
            <div>
              <label className="block text-xs text-ink-muted mb-1">Nombre</label>
@@ -165,7 +165,7 @@ export function InventarioCard({ product, dataProductId, isHighlighted, onViewMo
                type="text"
                value={localName}
                onChange={(e) => setLocalName(e.target.value)}
-               className="w-full px-3 py-2 bg-surface-soft rounded-lg text-ink focus:outline-none focus:ring-2 focus:ring-[#3b82f6]/20"
+               className="w-full px-3 py-2 bg-surface-soft rounded-lg text-ink focus:outline-none focus:ring-2 focus:ring-info/20"
              />
            </div>
 
@@ -175,7 +175,7 @@ export function InventarioCard({ product, dataProductId, isHighlighted, onViewMo
                value={localDescription}
                onChange={(e) => setLocalDescription(e.target.value)}
                rows={2}
-               className="w-full px-3 py-2 bg-surface-soft rounded-lg text-ink focus:outline-none focus:ring-2 focus:ring-[#3b82f6]/20 resize-none"
+               className="w-full px-3 py-2 bg-surface-soft rounded-lg text-ink focus:outline-none focus:ring-2 focus:ring-info/20 resize-none"
              />
            </div>
 
@@ -187,7 +187,7 @@ export function InventarioCard({ product, dataProductId, isHighlighted, onViewMo
                  const val = e.target.value;
                  setLocalCategoryId(val === '' ? null : Number(val));
                }}
-               className="w-full px-3 py-2 bg-surface-soft rounded-lg text-ink focus:outline-none focus:ring-2 focus:ring-[#3b82f6]/20"
+               className="w-full px-3 py-2 bg-surface-soft rounded-lg text-ink focus:outline-none focus:ring-2 focus:ring-info/20"
              >
                <option value="">Sin categoría</option>
                {categories.map(cat => (
@@ -228,7 +228,7 @@ export function InventarioCard({ product, dataProductId, isHighlighted, onViewMo
                min="0"
                value={localPrice}
                onChange={(e) => setLocalPrice(parseFloat(e.target.value) || 0)}
-               className="w-full px-3 py-2 bg-surface-soft rounded-lg text-ink focus:outline-none focus:ring-2 focus:ring-[#3b82f6]/20"
+               className="w-full px-3 py-2 bg-surface-soft rounded-lg text-ink focus:outline-none focus:ring-2 focus:ring-info/20"
              />
            </div>
 
@@ -262,7 +262,7 @@ export function InventarioCard({ product, dataProductId, isHighlighted, onViewMo
 
 // View mode - show product info
    return (
-     <div className={`glass rounded-2xl border border-black/5 p-4 ${isHighlighted ? "ring-2 ring-[#3b82f6]" : ""}`} data-product-id={dataProductId}>
+     <div className={`glass rounded-2xl border border-hairline-soft p-4 ${isHighlighted ? "ring-2 ring-info" : ""}`} data-product-id={dataProductId}>
        <div className="flex items-start justify-between gap-3">
          <div className="min-w-0 flex-1">
            <div className="flex items-center gap-2 mb-1">

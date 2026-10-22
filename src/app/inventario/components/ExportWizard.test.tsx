@@ -335,7 +335,7 @@ describe("ExportWizard — layout de escritorio", () => {
       .getByText("Sucursal")
       .closest("[class*='rounded-2xl']") as HTMLElement | null;
     expect(resumen).not.toBeNull();
-    expect(resumen).toHaveClass("rounded-2xl", "border-black/10", "bg-[#f7f7f7]", "p-4");
+    expect(resumen).toHaveClass("rounded-2xl", "border-hairline", "bg-surface-soft", "p-4");
   });
 
   it("no estira la acción principal a lo ancho del panel desde `md`", async () => {

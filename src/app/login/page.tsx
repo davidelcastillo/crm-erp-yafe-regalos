@@ -8,7 +8,7 @@ export default function LoginPage() {
       <div className="relative bg-gradient-to-r from-blue-200 to-pink-400 pt-20 pb-26 flex flex-col items-center justify-center z-10">
         
         {/* Tu Logo (con estilo cristal para que combine) */}
-        <div className="w-16 h-16 bg-white/30 backdrop-blur-md rounded-2xl flex items-center justify-center mb-2 shadow-lg border border-white/50 relative overflow-hidden">
+        <div className="w-16 h-16 bg-surface/30 backdrop-blur-md rounded-2xl flex items-center justify-center mb-2 shadow-lg border border-white/50 relative overflow-hidden">
           <Image
             src="/logo.webp"
             alt="Logo Feria Conexx"
@@ -33,8 +33,8 @@ export default function LoginPage() {
         </div>
       </div>
       <LoginForm />
-      {/* <div className="w-full bg-white rounded-xl shadow-md p-6 space-y-6 sm:w-[400px]">
-        <h2 className="text-2xl font-bold text-center text-[#222222]">
+      {/* <div className="w-full bg-surface rounded-xl shadow-md p-6 space-y-6 sm:w-[400px]">
+        <h2 className="text-2xl font-bold text-center text-ink">
           Iniciar Sesión
         </h2>
         <LoginForm />

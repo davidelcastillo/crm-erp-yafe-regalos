@@ -229,7 +229,7 @@ export function LabelSelector({ isOpen, onClose, branches }: LabelSelectorProps)
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Buscar por nombre o código"
                 aria-label="Buscar producto"
-                className="w-full px-3 py-3 mb-3 min-h-[48px] rounded-xl border border-hairline focus:border-accent focus:ring-2 focus:ring-[#ec4899]/30 outline-none transition-all text-sm touch-manipulation"
+                className="w-full px-3 py-3 mb-3 min-h-[48px] rounded-xl border border-hairline focus:border-accent focus:ring-2 focus:ring-accent/30 outline-none transition-all text-sm touch-manipulation"
               />
 
               {loading && <Spinner label="Cargando productos..." />}
@@ -296,7 +296,7 @@ export function LabelSelector({ isOpen, onClose, branches }: LabelSelectorProps)
                         }
                         disabled={!selectedIds.includes(row.id) || generating}
                         aria-label={`Cantidad ${row.name}`}
-                        className="w-20 px-3 py-3 rounded-xl border border-hairline focus:border-accent focus:ring-2 focus:ring-[#ec4899]/30 outline-none transition-all text-sm disabled:opacity-40 disabled:cursor-not-allowed tabular-nums text-right"
+                        className="w-20 px-3 py-3 rounded-xl border border-hairline focus:border-accent focus:ring-2 focus:ring-accent/30 outline-none transition-all text-sm disabled:opacity-40 disabled:cursor-not-allowed tabular-nums text-right"
                       />
                     </div>
                   ))}

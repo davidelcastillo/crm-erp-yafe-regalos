@@ -22,7 +22,7 @@ export default async function SucursalesPage() {
   // botón en la barra desde desktop y fila en el menú ☰ en celular.
   // La lista llega del servidor y el alta/edición vive dentro de `BranchManager`.
   return (
-    <div className="min-h-screen bg-white pb-20">
+    <div className="min-h-screen bg-surface pb-20">
       {/* Server Component: la banda de movimiento (S10/S11) vive en `BrandBand`. */}
       <BrandBand
         header={

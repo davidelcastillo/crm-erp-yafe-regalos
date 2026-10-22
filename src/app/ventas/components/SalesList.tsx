@@ -69,7 +69,7 @@ export function SaleCard({ sale, onExpand, expanded }: SaleCardProps) {
               {sale.items.map(item => item.product.name).join(', ')}
             </p>
             {sale.branch && (
-              <span className="inline-block max-w-full truncate align-top mt-1 px-2 py-0.5 bg-[#3b82f6]/10 text-[#3b82f6] rounded text-xs font-medium">
+              <span className="inline-block max-w-full truncate align-top mt-1 px-2 py-0.5 bg-info/10 text-info rounded text-xs font-medium">
                 {sale.branch.name}
               </span>
             )}
@@ -82,7 +82,7 @@ export function SaleCard({ sale, onExpand, expanded }: SaleCardProps) {
           </div>
           <div className="flex shrink-0 flex-col items-end gap-2">
             <span className="text-lg font-bold text-green-700">+ ${total.toFixed(2)}</span>
-            <span className={`px-2 py-0.5 rounded text-xs font-medium ${paymentMethodColors[paymentMethod] || "bg-gray-100 text-gray-800"}`}>
+            <span className={`px-2 py-0.5 rounded text-xs font-medium ${paymentMethodColors[paymentMethod] || "bg-surface-strong text-ink"}`}>
               {paymentMethod}
             </span>
             <svg className={`w-5 h-5 text-ink-muted transition-transform duration-200 ease-standard ${expanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">

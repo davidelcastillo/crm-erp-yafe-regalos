@@ -50,7 +50,7 @@ export function ProductAnalytics({ products }: ProductAnalyticsProps) {
   };
 
   return (
-    <div className="glass rounded-2xl border border-black/5 p-4">
+    <div className="glass rounded-2xl border border-hairline-soft p-4">
       <h2 className="text-lg font-semibold text-ink mb-4">
         Análisis por Producto
       </h2>
@@ -60,7 +60,7 @@ export function ProductAnalytics({ products }: ProductAnalyticsProps) {
         value={selectedProductId || ""}
         onChange={(e) => handleProductChange(Number(e.target.value))}
         aria-label="Elegir producto"
-        className="mb-4 min-h-[44px] w-full rounded-xl bg-surface-soft px-3 py-2.5 text-base text-ink focus:outline-none focus:ring-2 focus:ring-[#ec4899]/30"
+        className="mb-4 min-h-[44px] w-full rounded-xl bg-surface-soft px-3 py-2.5 text-base text-ink focus:outline-none focus:ring-2 focus:ring-accent/30"
       >
         <option value="">Seleccionar producto...</option>
         {products.map((product) => (
@@ -76,7 +76,7 @@ export function ProductAnalytics({ products }: ProductAnalyticsProps) {
       ) : analytics ? (
         <div className="space-y-4">
           {/* Purchase Stats */}
-          <div className="p-3 bg-[#f9f9f9] rounded-lg">
+          <div className="p-3 bg-surface-soft rounded-lg">
             <h3 className="text-sm font-medium text-ink-muted mb-2">Compras</h3>
             <div className="grid grid-cols-2 gap-2 text-sm">
               <div>
@@ -95,7 +95,7 @@ export function ProductAnalytics({ products }: ProductAnalyticsProps) {
           </div>
 
           {/* Sale Stats */}
-          <div className="p-3 bg-[#f9f9f9] rounded-lg">
+          <div className="p-3 bg-surface-soft rounded-lg">
             <h3 className="text-sm font-medium text-ink-muted mb-2">Ventas</h3>
             <div className="grid grid-cols-2 gap-2 text-sm">
               <div>
@@ -122,7 +122,7 @@ export function ProductAnalytics({ products }: ProductAnalyticsProps) {
             <div className="text-sm text-ink-muted">Rentabilidad del Producto</div>
             <div
               className={`text-2xl font-bold ${
-                analytics.profit >= 0 ? "text-[#15803d]" : "text-[#dc2626]"
+                analytics.profit >= 0 ? "text-positive" : "text-danger"
               }`}
             >
               {formatCurrency(analytics.profit)}

@@ -40,18 +40,18 @@ export default async function BranchInventoryPage({
   const movementsResult = await getExternalBranchMovementsSinceControl({ branchId });
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-surface">
       {/* Catalogo publico: sin acciones de cuenta (no hay sesion en esta vista). */}
       <div className="pb-16 brand-gradient">
         <header className="px-3 pt-6">
           <div className="rounded-2xl glass-strong px-4 py-3">
-            <p className="text-xs font-medium uppercase tracking-wide text-[#6a6a6a]">
+            <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">
               Catálogo
             </p>
-            <h1 className="text-2xl font-bold text-[#222222]">
+            <h1 className="text-2xl font-bold text-ink">
               Inventario de la sucursal
             </h1>
-            <p className="text-sm text-[#6a6a6a]">
+            <p className="text-sm text-ink-muted">
               {inventoryResult.branchName ?? `Sucursal #${branchId}`}
             </p>
           </div>

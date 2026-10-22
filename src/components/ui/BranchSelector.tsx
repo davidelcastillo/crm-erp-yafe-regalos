@@ -124,7 +124,7 @@ export function BranchSelector({
               type="button"
               onClick={() => handleSelect(null)}
               className={`w-full text-left px-4 py-2 text-sm hover:bg-surface-soft transition-colors ${
-                selectedBranchId === null ? "bg-[#3b82f6]/10 text-info font-medium" : "text-ink"
+                selectedBranchId === null ? "bg-info/10 text-info font-medium" : "text-ink"
               }`}
               role="option"
               aria-selected={selectedBranchId === null}
@@ -138,7 +138,7 @@ export function BranchSelector({
               type="button"
               onClick={() => handleSelect(b.id)}
               className={`w-full text-left px-4 py-2 text-sm hover:bg-surface-soft transition-colors ${
-                selectedBranchId === b.id ? "bg-[#3b82f6]/10 text-info font-medium" : "text-ink"
+                selectedBranchId === b.id ? "bg-info/10 text-info font-medium" : "text-ink"
               }`}
               role="option"
               aria-selected={selectedBranchId === b.id}

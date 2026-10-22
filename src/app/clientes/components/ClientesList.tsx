@@ -56,7 +56,7 @@ export function ClientesList({ initialCustomers }: ClientesListProps) {
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             /* 16px de fuente: por debajo de eso iOS hace zoom al enfocar el input. */
-            className="w-full min-h-[44px] pl-12 pr-4 py-3 bg-surface-soft rounded-xl text-base text-ink placeholder-ink-soft focus:outline-none focus:ring-2 focus:ring-[#ec4899]/30 touch-manipulation"
+            className="w-full min-h-[44px] pl-12 pr-4 py-3 bg-surface-soft rounded-xl text-base text-ink placeholder-ink-soft focus:outline-none focus:ring-2 focus:ring-accent/30 touch-manipulation"
             aria-label="Buscar por nombre o apellido"
             autoComplete="off"
           />
@@ -65,16 +65,16 @@ export function ClientesList({ initialCustomers }: ClientesListProps) {
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-2">
-        <div className="glass rounded-xl border border-black/5 p-3 text-center">
+        <div className="glass rounded-xl border border-hairline-soft p-3 text-center">
           <div className="text-xl font-bold text-ink">{stats.total}</div>
           <div className="text-xs text-ink-muted">Clientes</div>
         </div>
-        <div className="glass rounded-xl border border-black/5 p-3 text-center">
-          <div className="text-xl font-bold text-[#b45309]">{stats.withDebt}</div>
+        <div className="glass rounded-xl border border-hairline-soft p-3 text-center">
+          <div className="text-xl font-bold text-warning">{stats.withDebt}</div>
           <div className="text-xs text-ink-muted">Con deuda</div>
         </div>
-        <div className="glass rounded-xl border border-black/5 p-3 text-center">
-          <div className="text-xl font-bold text-[#b91c1c]">
+        <div className="glass rounded-xl border border-hairline-soft p-3 text-center">
+          <div className="text-xl font-bold text-negative">
             ${stats.totalDebt.toFixed(0)}
           </div>
           <div className="text-xs text-ink-muted">Total</div>
@@ -84,7 +84,7 @@ export function ClientesList({ initialCustomers }: ClientesListProps) {
       {/* List */}
       <div className="flex flex-col gap-3">
         {filteredCustomers.length === 0 ? (
-          <div className="glass rounded-2xl border border-black/5 text-center py-8 text-ink-muted">
+          <div className="glass rounded-2xl border border-hairline-soft text-center py-8 text-ink-muted">
             {searchTerm
               ? "No se encontraron clientes"
               : "No hay clientes aún. Toca + para agregar uno."}

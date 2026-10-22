@@ -26,7 +26,7 @@ export const Spinner = ({ label = "Cargando...", size = "md", className = "" }: 
     aria-label={label}
   >
     <span
-      className={`${TAMANOS[size]} animate-spin rounded-full border-[#fbcfe8] border-t-[#ec4899]`}
+      className={`${TAMANOS[size]} animate-spin rounded-full border-accent-soft border-t-accent`}
     />
     <span className="text-sm text-ink-muted">{label}</span>
   </div>

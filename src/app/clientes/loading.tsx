@@ -9,7 +9,7 @@ import { CardSkeleton, Skeleton } from "@/components/ui/Skeleton";
  */
 export default function Loading() {
   return (
-    <div className="min-h-screen bg-white pb-20">
+    <div className="min-h-screen bg-surface pb-20">
       <div className="pb-16 brand-gradient">
         <div className="px-3 pt-6" aria-hidden="true">
           <Skeleton className="h-[60px] rounded-2xl" />

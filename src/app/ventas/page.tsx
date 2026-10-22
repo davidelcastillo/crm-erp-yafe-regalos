@@ -36,7 +36,7 @@ const DEBOUNCE_MS = 300;
  * página, para que no salte al terminar (S2).
  */
 const VentasLoading = () => (
-  <div className="min-h-screen bg-white pb-20">
+  <div className="min-h-screen bg-surface pb-20">
     <div className="pb-16 brand-gradient">
       <div className="px-3 pt-6" aria-hidden="true">
         <Skeleton className="h-[60px] rounded-2xl" />
@@ -150,7 +150,7 @@ export default function VentasPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white pb-20 relative">
+    <div className="min-h-screen bg-surface pb-20 relative">
       <main className="">
         <div className="relative isolate pb-16">
           {/* El degradé de marca es una capa de fondo: se retira al hacer scroll
@@ -206,7 +206,7 @@ export default function VentasPage() {
           <div className="mt-4 px-3">
             <div className="rounded-2xl glass-strong px-4 py-3">
               <div className="relative w-full">
-                <svg className="w-5 h-5 text-[#6a6a6a] absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="w-5 h-5 text-ink-muted absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
                 </svg>
                 <input
@@ -214,7 +214,7 @@ export default function VentasPage() {
                   placeholder="Buscar producto..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="w-full min-h-[44px] pl-12 pr-4 py-3 bg-[#f8f8f8] rounded-xl text-base text-[#222222] placeholder-[#929292] focus:outline-none focus:ring-2 focus:ring-[#ec4899]/30 touch-manipulation"
+                  className="w-full min-h-[44px] pl-12 pr-4 py-3 bg-surface-soft rounded-xl text-base text-ink placeholder-ink-soft focus:outline-none focus:ring-2 focus:ring-accent/30 touch-manipulation"
                   aria-label="Buscar producto"
                   autoComplete="off"
                 />
@@ -227,16 +227,16 @@ export default function VentasPage() {
           {sales.length === 0 ? (
             <div className="text-center py-12">
               <div className="w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center">
-                <svg className="w-8 h-8 text-[#6a6a6a]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-8 h-8 text-ink-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <rect x="2.5" y="6.5" width="19" height="11" rx="2" strokeWidth={2} />
                   <circle cx="12" cy="12" r="2.5" strokeWidth={2} />
                   <path strokeLinecap="round" strokeWidth={2} d="M6.5 12h.01M17.5 12h.01" />
                 </svg>
               </div>
-              <p className="text-[#6a6a6a]">
+              <p className="text-ink-muted">
                 {debouncedSearch ? 'No se encontraron ventas' : 'No hay ventas registradas'}
               </p>
-              <p className="text-sm text-[#6a6a6a] mt-1">
+              <p className="text-sm text-ink-muted mt-1">
                 {debouncedSearch
                   ? 'Probá con otro producto o código'
                   : 'Toca el botón + para registrar una venta'}

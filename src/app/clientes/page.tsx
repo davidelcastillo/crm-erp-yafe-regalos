@@ -12,7 +12,7 @@ export default async function ClientesPage() {
   const customers: Customer[] = result.success && result.data ? result.data : [];
 
   return (
-    <div className="min-h-screen bg-white pb-20">
+    <div className="min-h-screen bg-surface pb-20">
       <main>
         {/* La página es un Server Component: la banda de movimiento vive en
             `BrandBand`, que es el único trozo cliente (S10/S11). */}

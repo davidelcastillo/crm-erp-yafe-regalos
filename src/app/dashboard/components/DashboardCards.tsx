@@ -21,7 +21,7 @@ export function DashboardCards({ stats, branchLabel = "(Todas)" }: DashboardCard
     return (
       <div className="grid grid-cols-2 gap-3">
         {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="glass rounded-2xl border border-black/5 p-4">
+          <div key={i} className="glass rounded-2xl border border-hairline-soft p-4">
             <Skeleton className="h-3 w-2/5" />
             <Skeleton className="mt-3 h-6 w-4/5" />
           </div>
@@ -45,22 +45,22 @@ export function DashboardCards({ stats, branchLabel = "(Todas)" }: DashboardCard
     {
       label: "Ingresos",
       value: formatCurrency(stats.totalIncome),
-      color: "text-[#22c55e]",
+      color: "text-positive-strong",
     },
     {
       label: "Egresos",
       value: formatCurrency(stats.totalExpense),
-      color: "text-[#ef4444]",
+      color: "text-negative-strong",
     },
     {
       label: "Ganancia Neta",
       value: formatCurrency(stats.netProfit),
-      color: stats.netProfit >= 0 ? "text-[#22c55e]" : "text-[#ef4444]",
+      color: stats.netProfit >= 0 ? "text-positive-strong" : "text-negative-strong",
     },
     {
       label: "Cobrar",
       value: formatCurrency(stats.accountsReceivable),
-      color: "text-[#f59e0b]",
+      color: "text-warning-strong",
     },
   ];
 
@@ -75,7 +75,7 @@ export function DashboardCards({ stats, branchLabel = "(Todas)" }: DashboardCard
             no cambia. El monto entra animado cuando cambia el período (S9). */}
         {cards.map((card, index) => (
           <Reveal key={index} index={index}>
-            <div className="glass rounded-2xl border border-black/5 p-4">
+            <div className="glass rounded-2xl border border-hairline-soft p-4">
               <div className="text-xs text-ink-muted mb-1">{card.label}</div>
               <ValueChange key={card.value} className={`block text-lg font-bold break-words ${card.color}`}>
                 {card.value}

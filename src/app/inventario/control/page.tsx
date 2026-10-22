@@ -288,7 +288,7 @@ export default function ControlStockPage() {
   const ocupado = iniciando || guardando || cerrando;
 
   return (
-    <div className="min-h-screen bg-white pb-20">
+    <div className="min-h-screen bg-surface pb-20">
       <main>
         <div className="relative isolate pb-16">
           {/* Superficie decorativa: se atenua al scrollear (S10). Los controles
@@ -320,7 +320,7 @@ export default function ControlStockPage() {
           </Link>
 
           {error && (
-            <p role="alert" className="mb-4 rounded-xl bg-[#ffe4ea] px-4 py-3 text-sm text-[#8f0020]">
+            <p role="alert" className="mb-4 rounded-xl bg-error-surface px-4 py-3 text-sm text-error-ink">
               {error}
             </p>
           )}
@@ -424,7 +424,7 @@ export default function ControlStockPage() {
 
               {cierre && (
                 <section className="mt-4 rounded-2xl border border-hairline bg-surface-soft p-4">
-                  <p className="text-sm font-semibold text-[#15803d]">
+                  <p className="text-sm font-semibold text-positive">
                     Control cerrado: {cierre.adjustedCount} ajustados · {cierre.pendingCount} pendientes.
                   </p>
                   {cierre.pendingCount > 0 && (
@@ -443,7 +443,7 @@ export default function ControlStockPage() {
                 {control.items.map((item) => {
                   const diferencia = item.countedStock - item.systemStock;
                   return (
-                    <li key={item.productId} className="rounded-2xl border border-hairline bg-white p-3">
+                    <li key={item.productId} className="rounded-2xl border border-hairline bg-surface p-3">
                       <div className="flex items-start gap-3">
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-sm font-semibold text-ink">
@@ -464,7 +464,7 @@ export default function ControlStockPage() {
                             disabled={control.status === "CLOSED"}
                             value={item.countedStock}
                             onChange={(event) => cambiarConteo(item.productId, Number(event.target.value))}
-                            className="h-11 w-20 rounded-xl border border-hairline bg-white px-3 text-right text-sm text-ink disabled:bg-surface-strong"
+                            className="h-11 w-20 rounded-xl border border-hairline bg-surface px-3 text-right text-sm text-ink disabled:bg-surface-strong"
                           />
                         </div>
                       </div>
@@ -518,7 +518,7 @@ export default function ControlStockPage() {
                     onChange={(event) => setMotivo(event.target.value)}
                     maxLength={500}
                     placeholder="Ej.: cierre quincenal, faltante por rotura"
-                    className="mt-2 h-11 w-full rounded-xl border border-hairline bg-white px-3 text-sm text-ink"
+                    className="mt-2 h-11 w-full rounded-xl border border-hairline bg-surface px-3 text-sm text-ink"
                   />
 
                   <div className="mt-3 flex flex-col gap-2 md:flex-row">

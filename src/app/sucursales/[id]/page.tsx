@@ -29,7 +29,7 @@ export default async function BranchDetailPage({
 
   // If no branches exist, just show the manager (empty state)
   return (
-    <div className="min-h-screen bg-white pb-20">
+    <div className="min-h-screen bg-surface pb-20">
       {/* Server Component: la banda de movimiento (S10/S11) vive en `BrandBand`. */}
       <BrandBand header={<PageHeader title="Sucursales" />} />
 

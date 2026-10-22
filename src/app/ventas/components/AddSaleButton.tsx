@@ -270,28 +270,28 @@ export function AddSaleButton({ products, onSuccess }: AddSaleButtonProps) {
        </button>
 
 {isOpen && (
-         <div className="fixed inset-0 bg-black/30 backdrop-blur-md z-[60] flex items-end justify-center md:items-center">
+         <div className="fixed inset-0 bg-scrim backdrop-blur-md z-[60] flex items-end justify-center md:items-center">
           <div
-            className="bg-white w-full max-w-lg md:max-w-4xl rounded-t-3xl md:rounded-2xl p-6 animate-slide-up md:animate-scale-in max-h-[90vh] md:max-h-[85vh] overflow-y-auto"
+            className="bg-surface w-full max-w-lg md:max-w-4xl rounded-t-3xl md:rounded-2xl p-6 animate-slide-up md:animate-scale-in max-h-[90vh] md:max-h-[85vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
              <div className="flex justify-between items-center mb-6">
-               <h2 className="text-xl font-semibold text-[#222222]">Nueva Venta</h2>
+               <h2 className="text-xl font-semibold text-ink">Nueva Venta</h2>
                <button
                  type="button"
                  onClick={() => setIsOpen(false)}
-                 className="btn btn-icon btn-round hover:bg-[#f2f2f2]"
+                 className="btn btn-icon btn-round hover:bg-surface-strong"
                  aria-label="Cerrar"
                >
-                 <svg className="w-6 h-6 text-[#6a6a6a]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                 <svg className="w-6 h-6 text-ink-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                  </svg>
                </button>
              </div>
             {paso === "sucursal" ? (
               <div>
-                <p className="text-[#6a6a6a] mb-2">Primero elegí la sucursal de la venta</p>
-                <p className="text-sm text-[#6a6a6a] mb-4">Después cargás los productos y el pago.</p>
+                <p className="text-ink-muted mb-2">Primero elegí la sucursal de la venta</p>
+                <p className="text-sm text-ink-muted mb-4">Después cargás los productos y el pago.</p>
 
                 <BranchPicker
                   branches={branches}
@@ -316,13 +316,13 @@ export function AddSaleButton({ products, onSuccess }: AddSaleButtonProps) {
               </div>
             ) : products.length === 0 ? (
               <div className="text-center py-8">
-                <p className="text-[#6a6a6a] mb-4">No hay productos registrados</p>
-                <p className="text-sm text-[#6a6a6a]">Primero creá un producto en la sección Inventario</p>
+                <p className="text-ink-muted mb-4">No hay productos registrados</p>
+                <p className="text-sm text-ink-muted">Primero creá un producto en la sección Inventario</p>
               </div>
             ) : (
               <form onSubmit={handleSubmit} className="space-y-4">
                 {/* La sucursal se eligió en el paso 1: acá va como etiqueta, no como selector. */}
-                <p className="text-sm text-[#6a6a6a]">Sucursal: {sucursalNombre}</p>
+                <p className="text-sm text-ink-muted">Sucursal: {sucursalNombre}</p>
 
                 {/* Desde `md` el paso 2 abre en dos columnas: a la izquierda el
                     buscador y los productos agregados, a la derecha el pago, el
@@ -330,9 +330,9 @@ export function AddSaleButton({ products, onSuccess }: AddSaleButtonProps) {
                 <div className="md:grid md:grid-cols-2 md:gap-5 md:items-start">
                   <div className="space-y-4">
                     {items.map((item, index) => (
-                      <div key={item.id} className="rounded-2xl border border-black/10 bg-[#f7f7f7] p-4 space-y-3">
+                      <div key={item.id} className="rounded-2xl border border-hairline bg-surface-soft p-4 space-y-3">
                         <div className="flex justify-between items-center">
-                          <span className="text-xs font-medium uppercase tracking-wide text-[#6a6a6a]">
+                          <span className="text-xs font-medium uppercase tracking-wide text-ink-muted">
                             Producto {index + 1}
                           </span>
                           {items.length > 1 && (
@@ -349,45 +349,45 @@ export function AddSaleButton({ products, onSuccess }: AddSaleButtonProps) {
                         <button
                           type="button"
                           onClick={() => openProductSearch(item.id)}
-                          className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-[#ec4899] focus:ring-2 focus:ring-[#ec4899]/30 outline-none transition-all bg-white text-left hover:bg-[#f8f8f8]"
+                          className="w-full px-4 py-3 rounded-xl border border-hairline focus:border-accent focus:ring-2 focus:ring-accent/30 outline-none transition-all bg-surface text-left hover:bg-surface-soft"
                         >
                           {getProductDisplay(item)}
                         </button>
 
                         <div className="grid grid-cols-2 gap-3">
                           <div>
-                            <label className="block text-xs text-[#6a6a6a] mb-1">Precio</label>
+                            <label className="block text-xs text-ink-muted mb-1">Precio</label>
                             <div className="relative">
-                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6a6a6a] text-sm">$</span>
+                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted text-sm">$</span>
                               <input
                                 type="number"
                                 step="0.01"
                                 min="0"
                                 value={item.price}
                                 onChange={(e) => updateItem(item.id, "price", e.target.value)}
-                                className="w-full pl-7 pr-3 py-2 rounded-lg border border-gray-200 focus:border-[#ec4899] outline-none transition-all text-sm tabular-nums text-right"
+                                className="w-full pl-7 pr-3 py-2 rounded-lg border border-hairline focus:border-accent outline-none transition-all text-sm tabular-nums text-right"
                                 placeholder="0.00"
                                 required
                               />
                             </div>
                           </div>
                           <div>
-                            <label className="block text-xs text-[#6a6a6a] mb-1">Cantidad</label>
+                            <label className="block text-xs text-ink-muted mb-1">Cantidad</label>
                             <input
                               type="number"
                               min="1"
                               value={item.quantity}
                               onChange={(e) => updateItem(item.id, "quantity", e.target.value)}
-                              className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:border-[#ec4899] outline-none transition-all text-sm tabular-nums text-right"
+                              className="w-full px-3 py-2 rounded-lg border border-hairline focus:border-accent outline-none transition-all text-sm tabular-nums text-right"
                               placeholder="0"
                               required
                             />
                           </div>
                         </div>
 
-                        <div className="flex justify-between items-center pt-2 border-t border-gray-200">
-                          <span className="text-sm text-[#6a6a6a]">Subtotal</span>
-                          <span className="font-medium text-[#222222] tabular-nums">
+                        <div className="flex justify-between items-center pt-2 border-t border-hairline">
+                          <span className="text-sm text-ink-muted">Subtotal</span>
+                          <span className="font-medium text-ink tabular-nums">
                             ${calculateSubtotal(item.price, item.quantity).toFixed(2)}
                           </span>
                         </div>
@@ -408,8 +408,8 @@ export function AddSaleButton({ products, onSuccess }: AddSaleButtonProps) {
 
                   <div className="mt-4 space-y-4 md:mt-0 md:sticky md:top-4">
                     {/* Payment Method Selector */}
-                    <div className="rounded-2xl border border-black/10 bg-[#f7f7f7] p-4">
-                      <label className="block text-xs font-medium uppercase tracking-wide text-[#6a6a6a] mb-3">
+                    <div className="rounded-2xl border border-hairline bg-surface-soft p-4">
+                      <label className="block text-xs font-medium uppercase tracking-wide text-ink-muted mb-3">
                         Método de Pago
                       </label>
                       {/* Control segmentado: el medio elegido va `btn-active`, el otro `btn-ghost` (blanco con borde, porque este control vive dentro de un panel gris). */}
@@ -431,14 +431,14 @@ export function AddSaleButton({ products, onSuccess }: AddSaleButtonProps) {
                     </div>
 
                     {/* Customer Selection */}
-                    <div className="rounded-2xl border border-black/10 bg-[#f7f7f7] p-4">
-                      <label className="block text-xs font-medium uppercase tracking-wide text-[#6a6a6a] mb-2">
+                    <div className="rounded-2xl border border-hairline bg-surface-soft p-4">
+                      <label className="block text-xs font-medium uppercase tracking-wide text-ink-muted mb-2">
                         Cliente (opcional)
                       </label>
                       <select
                         value={selectedCustomerId}
                         onChange={(e) => setSelectedCustomerId(e.target.value)}
-                        className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-[#ec4899] focus:ring-2 focus:ring-[#ec4899]/30 outline-none transition-all bg-white"
+                        className="w-full px-4 py-3 rounded-xl border border-hairline focus:border-accent focus:ring-2 focus:ring-accent/30 outline-none transition-all bg-surface"
                       >
                         <option value="">Cliente Anónimo</option>
                         {customers.map((customer) => (
@@ -451,12 +451,12 @@ export function AddSaleButton({ products, onSuccess }: AddSaleButtonProps) {
 
                     {/* Amount Paid (for all payment methods) */}
                     {paymentMethod === "MIXTO" && (
-                      <div className="rounded-2xl border border-black/10 bg-[#f7f7f7] p-4">
+                      <div className="rounded-2xl border border-hairline bg-surface-soft p-4">
                         <div className="grid grid-cols-2 gap-3">
                           <div>
-                            <label htmlFor="cashAmount" className="block text-sm font-medium text-[#222222] mb-2">Efectivo</label>
+                            <label htmlFor="cashAmount" className="block text-sm font-medium text-ink mb-2">Efectivo</label>
                             <div className="relative">
-                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6a6a6a] text-sm">$</span>
+                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted text-sm">$</span>
                               <input
                                 id="cashAmount"
                                 type="number"
@@ -464,15 +464,15 @@ export function AddSaleButton({ products, onSuccess }: AddSaleButtonProps) {
                                 min="0"
                                 value={cashAmount}
                                 onChange={(e) => setCashAmount(e.target.value)}
-                                className="w-full pl-7 pr-3 py-3 rounded-xl border border-gray-200 focus:border-[#ec4899] focus:ring-2 focus:ring-[#ec4899]/30 outline-none transition-all tabular-nums text-right"
+                                className="w-full pl-7 pr-3 py-3 rounded-xl border border-hairline focus:border-accent focus:ring-2 focus:ring-accent/30 outline-none transition-all tabular-nums text-right"
                                 placeholder="0.00"
                               />
                             </div>
                           </div>
                           <div>
-                            <label htmlFor="transferAmount" className="block text-sm font-medium text-[#222222] mb-2">Transferencia</label>
+                            <label htmlFor="transferAmount" className="block text-sm font-medium text-ink mb-2">Transferencia</label>
                             <div className="relative">
-                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6a6a6a] text-sm">$</span>
+                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted text-sm">$</span>
                               <input
                                 id="transferAmount"
                                 type="number"
@@ -480,7 +480,7 @@ export function AddSaleButton({ products, onSuccess }: AddSaleButtonProps) {
                                 min="0"
                                 value={transferAmount}
                                 onChange={(e) => setTransferAmount(e.target.value)}
-                                className="w-full pl-7 pr-3 py-3 rounded-xl border border-gray-200 focus:border-[#ec4899] focus:ring-2 focus:ring-[#ec4899]/30 outline-none transition-all tabular-nums text-right"
+                                className="w-full pl-7 pr-3 py-3 rounded-xl border border-hairline focus:border-accent focus:ring-2 focus:ring-accent/30 outline-none transition-all tabular-nums text-right"
                                 placeholder="0.00"
                               />
                             </div>

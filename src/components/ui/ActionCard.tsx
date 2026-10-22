@@ -19,7 +19,7 @@ export interface ActionCardProps {
 }
 
 const CARD_CLASS =
-  "flex flex-1 min-w-0 min-h-[72px] items-center gap-3 rounded-2xl glass px-4 py-3 text-left transition-colors hover:bg-white/80 touch-manipulation";
+  "flex flex-1 min-w-0 min-h-[72px] items-center gap-3 rounded-2xl glass px-4 py-3 text-left transition-colors hover:bg-surface/80 touch-manipulation";
 
 export const ActionCard = ({ label, hint, icon, onClick, href }: ActionCardProps) => {
   const contenido = (

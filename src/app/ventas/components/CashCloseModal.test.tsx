@@ -188,7 +188,7 @@ describe("CashCloseModal — layout de escritorio", () => {
     const cerrar = screen.getByRole("button", { name: "Cerrar caja" });
     const tarjeta = cerrar.closest('[class*="rounded-2xl"]');
     expect(tarjeta).not.toBeNull();
-    expect(tarjeta).toHaveClass("rounded-2xl", "border-black/10", "bg-[#f7f7f7]", "p-4");
+    expect(tarjeta).toHaveClass("rounded-2xl", "border-hairline", "bg-surface-soft", "p-4");
     // El número que importa va en su propio panel, con la acción.
     expect(tarjeta).toHaveTextContent("A retirar");
     expect(tarjeta).toHaveTextContent("Efectivo del período");

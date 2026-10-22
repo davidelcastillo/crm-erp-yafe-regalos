@@ -55,7 +55,7 @@ const OPCIONES_IMPRIMIR: MenuOption[] = [
  * página, para que no salte al terminar (S2).
  */
 const InventarioLoading = () => (
-  <div className="min-h-screen bg-white pb-20">
+  <div className="min-h-screen bg-surface pb-20">
     <div className="pb-16 brand-gradient">
       <div className="px-3 pt-6">
         <Skeleton className="h-[60px] rounded-2xl" />
@@ -254,7 +254,7 @@ export default function InventarioPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-white pb-20">
+      <div className="min-h-screen bg-surface pb-20">
         <main className="px-6 py-8">
           <div className="bg-red-50 border border-red-200 rounded-lg p-4">
             <p className="text-red-700">{error}</p>
@@ -271,7 +271,7 @@ export default function InventarioPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white pb-20">
+    <div className="min-h-screen bg-surface pb-20">
       <main>
         <div className="relative isolate pb-16">
           {/* El degradé de marca es una capa de fondo: se retira al hacer scroll
@@ -370,7 +370,7 @@ export default function InventarioPage() {
                   placeholder="Buscar producto..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="w-full min-h-[44px] pl-12 pr-4 py-3 bg-surface-soft rounded-xl text-base text-ink placeholder-ink-soft focus:outline-none focus:ring-2 focus:ring-[#ec4899]/30 touch-manipulation"
+                  className="w-full min-h-[44px] pl-12 pr-4 py-3 bg-surface-soft rounded-xl text-base text-ink placeholder-ink-soft focus:outline-none focus:ring-2 focus:ring-accent/30 touch-manipulation"
                   aria-label="Buscar producto"
                   autoComplete="off"
                 />

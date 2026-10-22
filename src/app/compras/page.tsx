@@ -20,7 +20,7 @@ import { motion, useReducedMotion, useScroll, useTransform } from 'motion/react'
  * acciones ni buscador, así que el esqueleto tampoco los inventa.
  */
 const ComprasLoading = () => (
-  <div className="min-h-screen bg-white pb-20">
+  <div className="min-h-screen bg-surface pb-20">
     <div className="pb-16 brand-gradient">
       <div className="px-3 pt-6" aria-hidden="true">
         <Skeleton className="h-[60px] rounded-2xl" />
@@ -77,7 +77,7 @@ export default function ComprasPage() {
   }
 
  return (
-    <div className="min-h-screen bg-white pb-20 relative">
+    <div className="min-h-screen bg-surface pb-20 relative">
       <main className="">
         <div className="relative isolate pb-16">
           {/* El degradé de marca es una capa de fondo: se retira al hacer scroll

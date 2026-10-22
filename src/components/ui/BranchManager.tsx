@@ -51,7 +51,7 @@ const EMPTY_FORM: BranchForm = {
 
 // 16px (`text-base`) es obligatorio: por debajo, iOS hace zoom al enfocar.
 const INPUT_CLASS =
-  "w-full min-h-[44px] px-4 py-3 bg-surface-soft rounded-xl text-base text-ink focus:outline-none focus:ring-2 focus:ring-[#ec4899]/30";
+  "w-full min-h-[44px] px-4 py-3 bg-surface-soft rounded-xl text-base text-ink focus:outline-none focus:ring-2 focus:ring-accent/30";
 
 function escapeHtml(value: string) {
   return value

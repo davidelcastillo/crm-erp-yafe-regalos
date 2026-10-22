@@ -131,7 +131,7 @@ export function ProductSearch(props: ProductSearchProps) {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={handleKeyDown}
-          className="w-full px-4 py-3 bg-surface-soft rounded-xl text-base text-ink placeholder-[#999] focus:outline-none focus:ring-2 focus:ring-[#3b82f6]/20"
+          className="w-full px-4 py-3 bg-surface-soft rounded-xl text-base text-ink placeholder-ink-soft focus:outline-none focus:ring-2 focus:ring-info/20"
           aria-label="Buscar producto"
           autoComplete="off"
         />
@@ -232,7 +232,7 @@ export function ProductSearch(props: ProductSearchProps) {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={handleKeyDown}
-          className="w-full px-4 py-3 bg-surface-soft rounded-xl text-base text-ink placeholder-[#999] focus:outline-none focus:ring-2 focus:ring-[#3b82f6]/20 mb-4"
+          className="w-full px-4 py-3 bg-surface-soft rounded-xl text-base text-ink placeholder-ink-soft focus:outline-none focus:ring-2 focus:ring-info/20 mb-4"
           aria-label="Buscar producto por código o nombre"
           autoComplete="off"
         />

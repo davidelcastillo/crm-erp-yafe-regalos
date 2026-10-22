@@ -55,7 +55,7 @@ export const BranchPicker = ({
             onClick={() => onChange(branch.id)}
             className={`w-full min-h-[44px] rounded-2xl bg-surface px-4 py-3 text-left font-medium text-ink transition-all touch-manipulation disabled:opacity-40 disabled:cursor-not-allowed ${
               elegida
-                ? "border-2 border-accent ring-2 ring-[#ec4899]/40"
+                ? "border-2 border-accent ring-2 ring-accent/40"
                 : "border border-hairline"
             }`}
           >

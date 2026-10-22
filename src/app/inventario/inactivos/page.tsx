@@ -100,7 +100,7 @@ export default function InactivosPage() {
   );
 
   return (
-    <div className="min-h-screen bg-white pb-20">
+    <div className="min-h-screen bg-surface pb-20">
       <main>
         <div className="pb-16 brand-gradient">
           <PageHeader
@@ -140,7 +140,7 @@ export default function InactivosPage() {
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   /* 16px de fuente: por debajo de eso iOS hace zoom al enfocar el input. */
-                  className="w-full min-h-[44px] pl-12 pr-4 py-3 bg-surface-soft rounded-xl text-base text-ink placeholder-ink-soft focus:outline-none focus:ring-2 focus:ring-[#ec4899]/30 touch-manipulation"
+                  className="w-full min-h-[44px] pl-12 pr-4 py-3 bg-surface-soft rounded-xl text-base text-ink placeholder-ink-soft focus:outline-none focus:ring-2 focus:ring-accent/30 touch-manipulation"
                   placeholder="Buscar por nombre o código..."
                   aria-label="Buscar producto"
                   autoComplete="off"
@@ -159,7 +159,7 @@ export default function InactivosPage() {
           {error && (
             <div
               role="alert"
-              className="mt-4 rounded-xl border border-black/5 bg-[#ffe4ea] px-4 py-3 text-sm text-[#8f0020]"
+              className="mt-4 rounded-xl border border-hairline-soft bg-error-surface px-4 py-3 text-sm text-error-ink"
             >
               {error}
             </div>
@@ -176,20 +176,20 @@ export default function InactivosPage() {
             </div>
           ) : visibleProducts.length === 0 ? (
             /* Mismo tono de vacío que el resto de las listas. */
-            <p className="py-12 text-center text-[#6a6a6a]">No hay productos inactivos</p>
+            <p className="py-12 text-center text-ink-muted">No hay productos inactivos</p>
           ) : (
             <ul className="mt-4 space-y-4">
               {visibleProducts.map((product) => (
-                <li key={product.id} className="glass rounded-2xl border border-black/5 p-4">
+                <li key={product.id} className="glass rounded-2xl border border-hairline-soft p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
-                      <h2 className="text-base font-semibold text-[#222222] break-words">
+                      <h2 className="text-base font-semibold text-ink break-words">
                         {product.name}
                       </h2>
-                      <p className="mt-0.5 text-sm text-[#6a6a6a] break-words">
+                      <p className="mt-0.5 text-sm text-ink-muted break-words">
                         Código: {product.code ?? '-'}
                       </p>
-                      <p className="mt-1 text-base font-semibold text-[#222222]">
+                      <p className="mt-1 text-base font-semibold text-ink">
                         ${Number(product.price ?? 0).toFixed(2)}
                       </p>
                     </div>

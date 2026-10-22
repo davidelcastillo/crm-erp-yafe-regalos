@@ -55,7 +55,7 @@ export const PageHeader = ({ title, actions, right, menuItems = [] }: PageHeader
   };
 
   const menuItemClass =
-    "flex min-h-[48px] items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium text-ink hover:bg-white/60 transition-colors touch-manipulation";
+    "flex min-h-[48px] items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium text-ink hover:bg-surface/60 transition-colors touch-manipulation";
 
   return (
     <>
@@ -72,7 +72,7 @@ export const PageHeader = ({ title, actions, right, menuItems = [] }: PageHeader
             aria-expanded={isOpen}
             /* `md:hidden!`: el base `btn` fija `display: inline-flex` fuera de capas,
                así que pisa a las utilidades de visibilidad de Tailwind. */
-            className="btn btn-icon md:hidden -ml-2 text-ink hover:bg-white/60"
+            className="btn btn-icon md:hidden -ml-2 text-ink hover:bg-surface/60"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
@@ -121,7 +121,7 @@ export const PageHeader = ({ title, actions, right, menuItems = [] }: PageHeader
                 type="button"
                 onClick={() => setIsOpen(false)}
                 aria-label="Cerrar menú"
-                className="btn btn-icon btn-round -mr-1 text-ink-muted hover:bg-white/60"
+                className="btn btn-icon btn-round -mr-1 text-ink-muted hover:bg-surface/60"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -168,7 +168,7 @@ export const PageHeader = ({ title, actions, right, menuItems = [] }: PageHeader
               <button
                 type="button"
                 onClick={handleLogout}
-                className="flex min-h-[48px] items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium text-error hover:bg-white/60 transition-colors touch-manipulation"
+                className="flex min-h-[48px] items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium text-error hover:bg-surface/60 transition-colors touch-manipulation"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                   <path

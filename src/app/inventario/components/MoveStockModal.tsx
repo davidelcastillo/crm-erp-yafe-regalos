@@ -201,30 +201,30 @@ export const MoveStockModal = ({
 
   return (
     <div
-      className="fixed inset-0 bg-black/30 backdrop-blur-md z-[60] flex items-center justify-center"
+      className="fixed inset-0 bg-scrim backdrop-blur-md z-[60] flex items-center justify-center"
       role="dialog"
       aria-modal="true"
       aria-labelledby="move-stock-title"
     >
       <div
-        className="bg-white w-full max-w-xl md:max-w-3xl rounded-2xl p-6 animate-scale-in max-h-[90vh] md:max-h-[85vh] overflow-y-auto"
+        className="bg-surface w-full max-w-xl md:max-w-3xl rounded-2xl p-6 animate-scale-in max-h-[90vh] md:max-h-[85vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-between items-center mb-4">
           <h2
             id="move-stock-title"
-            className="text-xl font-semibold text-[#222222]"
+            className="text-xl font-semibold text-ink"
           >
             Mover Stock
           </h2>
           <button
             type="button"
             onClick={onClose}
-            className="btn btn-icon btn-round hover:bg-[#f2f2f2]"
+            className="btn btn-icon btn-round hover:bg-surface-strong"
             aria-label="Cerrar"
           >
             <svg
-              className="w-6 h-6 text-[#6a6a6a]"
+              className="w-6 h-6 text-ink-muted"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -239,13 +239,13 @@ export const MoveStockModal = ({
           </button>
         </div>
 
-        {error && <p className="mb-4 text-sm text-[#c13515]">{error}</p>}
+        {error && <p className="mb-4 text-sm text-error">{error}</p>}
 
         {/* Paso 1: es un solo bloque, así que desde `md` las cards de sucursal van
             en dos columnas y la acción deja de estirarse a lo ancho del panel. */}
         {step === 1 && (
           <div>
-            <p className="block text-xs text-[#6a6a6a] mb-2">Sucursal origen</p>
+            <p className="block text-xs text-ink-muted mb-2">Sucursal origen</p>
             <BranchPicker
               branches={branches}
               value={sourceBranchId}
@@ -271,7 +271,7 @@ export const MoveStockModal = ({
             va a la derecha; en celular se apilan en ese mismo orden. */}
         {step === 2 && (
           <div>
-            <p className="block text-xs text-[#6a6a6a] mb-2">Sucursal destino</p>
+            <p className="block text-xs text-ink-muted mb-2">Sucursal destino</p>
             <BranchPicker
               branches={branches}
               value={destBranchId}
@@ -284,7 +284,7 @@ export const MoveStockModal = ({
 
             <div className="md:grid md:grid-cols-2 md:gap-5 md:items-start">
               <section className="mt-4">
-                <p className="block text-xs text-[#6a6a6a] mb-2">
+                <p className="block text-xs text-ink-muted mb-2">
                   Productos con stock en la sucursal de origen
                 </p>
 
@@ -294,15 +294,15 @@ export const MoveStockModal = ({
                   onChange={(e) => setBusqueda(e.target.value)}
                   placeholder="Buscar por nombre o código"
                   aria-label="Buscar producto"
-                  className="mb-3 min-h-[48px] w-full rounded-xl border border-gray-200 px-3 py-3 text-sm outline-none transition-all focus:border-[#ec4899] focus:ring-2 focus:ring-[#ec4899]/30 touch-manipulation"
+                  className="mb-3 min-h-[48px] w-full rounded-xl border border-hairline px-3 py-3 text-sm outline-none transition-all focus:border-accent focus:ring-2 focus:ring-accent/30 touch-manipulation"
                 />
 
                 {productOptions.length === 0 ? (
-                  <p className="py-8 text-center text-sm text-[#6a6a6a]">
+                  <p className="py-8 text-center text-sm text-ink-muted">
                     No hay productos con stock en esta sucursal
                   </p>
                 ) : visibles.length === 0 ? (
-                  <p className="py-8 text-center text-sm text-[#6a6a6a]">
+                  <p className="py-8 text-center text-sm text-ink-muted">
                     No encontramos productos con ese nombre o código
                   </p>
                 ) : (
@@ -310,7 +310,7 @@ export const MoveStockModal = ({
                     {visibles.map((p) => (
                       <div
                         key={p.id}
-                        className="flex items-center gap-3 p-3 min-h-[44px] rounded-xl hover:bg-[#f8f8f8] transition-colors"
+                        className="flex items-center gap-3 p-3 min-h-[44px] rounded-xl hover:bg-surface-soft transition-colors"
                       >
                         <input
                           type="checkbox"
@@ -318,20 +318,20 @@ export const MoveStockModal = ({
                           checked={selectedIds.includes(p.id)}
                           onChange={() => toggleSelection(p.id)}
                           aria-label={`Seleccionar ${p.name}`}
-                          className="w-5 h-5 accent-[#ec4899]"
+                          className="w-5 h-5 accent-accent"
                         />
                         <div className="flex-1 min-w-0">
                           <label
                             htmlFor={`ms-check-${p.id}`}
-                            className="block text-sm font-medium text-[#222222] truncate cursor-pointer"
+                            className="block text-sm font-medium text-ink truncate cursor-pointer"
                           >
                             {p.name}
                           </label>
-                          <span className="block text-xs text-[#6a6a6a]">
+                          <span className="block text-xs text-ink-muted">
                             Stock: {p.stock}
                           </span>
                           {rowErrors[p.id] && (
-                            <span className="block text-xs text-[#c13515] mt-1">
+                            <span className="block text-xs text-error mt-1">
                               {rowErrors[p.id]}
                             </span>
                           )}
@@ -346,7 +346,7 @@ export const MoveStockModal = ({
                           }
                           disabled={!selectedIds.includes(p.id) || pending}
                           aria-label={`Cantidad ${p.name}`}
-                          className="w-20 px-3 py-3 rounded-xl border border-gray-200 focus:border-[#ec4899] focus:ring-2 focus:ring-[#ec4899]/30 outline-none transition-all text-sm disabled:opacity-40 disabled:cursor-not-allowed tabular-nums text-right"
+                          className="w-20 px-3 py-3 rounded-xl border border-hairline focus:border-accent focus:ring-2 focus:ring-accent/30 outline-none transition-all text-sm disabled:opacity-40 disabled:cursor-not-allowed tabular-nums text-right"
                         />
                       </div>
                     ))}
@@ -354,19 +354,19 @@ export const MoveStockModal = ({
                 )}
               </section>
 
-              <section className="mt-4 rounded-2xl border border-black/10 bg-[#f7f7f7] p-4 md:sticky md:top-4">
-                <h3 className="text-xs font-medium uppercase tracking-wide text-[#6a6a6a]">
+              <section className="mt-4 rounded-2xl border border-hairline bg-surface-soft p-4 md:sticky md:top-4">
+                <h3 className="text-xs font-medium uppercase tracking-wide text-ink-muted">
                   Resumen
                 </h3>
-                <p className="mt-2 text-sm text-[#3f3f3f] tabular-nums">
+                <p className="mt-2 text-sm text-ink-body tabular-nums">
                   {summaryText}
                 </p>
 
-                <div className="mt-3 flex items-baseline justify-between gap-4 border-t border-black/10 pt-3">
-                  <span className="text-sm font-medium text-[#222222]">
+                <div className="mt-3 flex items-baseline justify-between gap-4 border-t border-hairline pt-3">
+                  <span className="text-sm font-medium text-ink">
                     Unidades a mover
                   </span>
-                  <span className="text-2xl font-bold text-[#222222] tabular-nums">
+                  <span className="text-2xl font-bold text-ink tabular-nums">
                     {summary.total}
                   </span>
                 </div>

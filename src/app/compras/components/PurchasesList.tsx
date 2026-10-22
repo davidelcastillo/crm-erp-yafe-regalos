@@ -43,7 +43,7 @@ export function PurchaseCard({ purchase, onExpand, expanded }: PurchaseCardProps
   const total = purchase.totalAmount;
 
     return (
-    <div className="glass rounded-2xl border border-black/5">
+    <div className="glass rounded-2xl border border-hairline-soft">
       <div className="p-4 cursor-pointer" onClick={onExpand}>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
@@ -52,7 +52,7 @@ export function PurchaseCard({ purchase, onExpand, expanded }: PurchaseCardProps
               {purchase.items.map(item => item.product.name).join(', ')}
             </p>
             {purchase.branch && (
-              <span className="inline-block max-w-full truncate align-top mt-1 px-2 py-0.5 bg-[#3b82f6]/10 text-[#3b82f6] rounded text-xs font-medium">
+              <span className="inline-block max-w-full truncate align-top mt-1 px-2 py-0.5 bg-info/10 text-info rounded text-xs font-medium">
                 {purchase.branch.name}
               </span>
             )}
@@ -89,7 +89,7 @@ export function PurchaseCard({ purchase, onExpand, expanded }: PurchaseCardProps
                 </div>
               </div>
             ))}
-            <div className="pt-3 border-t border-gray-200 flex justify-between items-center">
+            <div className="pt-3 border-t border-hairline flex justify-between items-center">
               <span className="font-semibold text-ink">Total</span>
               <span className="font-bold text-red-800">-${total.toFixed(2)}</span>
             </div>

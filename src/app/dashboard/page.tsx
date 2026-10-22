@@ -39,7 +39,7 @@ interface Stats {
  * la página, para que no salte al terminar (S2).
  */
 const DashboardLoading = () => (
-  <div className="min-h-screen bg-white pb-20">
+  <div className="min-h-screen bg-surface pb-20">
     <div className="pb-16 brand-gradient">
       <div className="px-3 pt-6" aria-hidden="true">
         <Skeleton className="h-[60px] rounded-2xl" />
@@ -159,7 +159,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white pb-20">
+    <div className="min-h-screen bg-surface pb-20">
       <main>
         <div className="relative isolate pb-16">
           {/* El degradé de marca es una capa de fondo: se retira al hacer scroll
@@ -215,7 +215,7 @@ export default function DashboardPage() {
                       type="date"
                       value={startDate}
                       onChange={(e) => setStartDate(e.target.value)}
-                      className="h-11 px-3 bg-[#ffffff] border border-[#dddddd] rounded-xl text-sm text-ink touch-manipulation"
+                      className="h-11 px-3 bg-surface border border-hairline rounded-xl text-sm text-ink touch-manipulation"
                     />
                   </label>
                   <label className="flex flex-col gap-1">
@@ -224,7 +224,7 @@ export default function DashboardPage() {
                       type="date"
                       value={endDate}
                       onChange={(e) => setEndDate(e.target.value)}
-                      className="h-11 px-3 bg-[#ffffff] border border-[#dddddd] rounded-xl text-sm text-ink touch-manipulation"
+                      className="h-11 px-3 bg-surface border border-hairline rounded-xl text-sm text-ink touch-manipulation"
                     />
                   </label>
                 </div>

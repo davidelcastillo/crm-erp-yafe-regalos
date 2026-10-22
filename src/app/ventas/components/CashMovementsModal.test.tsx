@@ -221,13 +221,13 @@ describe("CashMovementsModal — layout de escritorio", () => {
     const registro = screen
       .getByRole("button", { name: "Registrar ingreso" })
       .closest("form");
-    expect(registro).toHaveClass("rounded-2xl", "border-black/10", "bg-[#f7f7f7]", "p-4");
+    expect(registro).toHaveClass("rounded-2xl", "border-hairline", "bg-surface-soft", "p-4");
 
     const libro = screen.getByText(/Últimos movimientos de Principal/).closest("section");
     expect(libro).toHaveClass(
       "rounded-2xl",
-      "border-black/10",
-      "bg-[#f7f7f7]",
+      "border-hairline",
+      "bg-surface-soft",
       "p-4",
       "md:mt-0"
     );

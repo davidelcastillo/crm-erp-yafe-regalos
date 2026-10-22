@@ -72,7 +72,7 @@ export function InventarioList({ products, onViewMovements, searchActive = false
       {/* Filtro de stock bajo. El select de orden vive en `InventoryFilters`,
           junto al de categoría: así los dos selectores comparten contenedor
           y tamaño (S2). */}
-      <div className="glass rounded-2xl border border-black/5 p-4">
+      <div className="glass rounded-2xl border border-hairline-soft p-4">
         {/* Control segmentado: la opción elegida va `btn-active`, la otra `btn-secondary`. */}
         <button
           onClick={() => setShowOnlyLowStock(!showOnlyLowStock)}
@@ -85,21 +85,21 @@ export function InventarioList({ products, onViewMovements, searchActive = false
 
       {/* Stats Summary */}
       <div className="grid grid-cols-3 gap-2">
-        <div className="glass rounded-xl border border-black/5 p-3 text-center">
+        <div className="glass rounded-xl border border-hairline-soft p-3 text-center">
           {/* Un valor que cambia entra animado (S9): un solo nodo de texto. */}
           <ValueChange key={stats.total} className="block text-xl font-bold text-ink">
             {stats.total}
           </ValueChange>
           <div className="text-xs text-ink-muted">Productos</div>
         </div>
-        <div className="glass rounded-xl border border-black/5 p-3 text-center">
+        <div className="glass rounded-xl border border-hairline-soft p-3 text-center">
           {/* #b45309 es el ámbar que llega a 4.5:1 sobre estas superficies. */}
-          <ValueChange key={stats.lowStock} className="block text-xl font-bold text-[#b45309]">
+          <ValueChange key={stats.lowStock} className="block text-xl font-bold text-warning">
             {stats.lowStock}
           </ValueChange>
           <div className="text-xs text-ink-muted">Stock bajo</div>
         </div>
-        <div className="glass rounded-xl border border-black/5 p-3 text-center">
+        <div className="glass rounded-xl border border-hairline-soft p-3 text-center">
           <ValueChange key={stats.totalUnits} className="block text-xl font-bold text-ink">
             {stats.totalUnits}
           </ValueChange>

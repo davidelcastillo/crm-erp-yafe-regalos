@@ -33,11 +33,11 @@ export function toChartPoints(data: DayData[]) {
 export function DashboardChart({ data, rangeLabel }: DashboardChartProps) {
   if (!data || data.length === 0) {
     return (
-      <div className="glass rounded-2xl border border-black/5 p-4">
-        <h2 className="text-lg font-semibold text-[#222222] mb-4 break-words">
+      <div className="glass rounded-2xl border border-hairline-soft p-4">
+        <h2 className="text-lg font-semibold text-ink mb-4 break-words">
           Ingresos vs Egresos ({rangeLabel})
         </h2>
-        <div className="h-64 flex items-center justify-center text-[#6a6a6a]">
+        <div className="h-64 flex items-center justify-center text-ink-muted">
           No hay datos disponibles
         </div>
       </div>
@@ -47,8 +47,8 @@ export function DashboardChart({ data, rangeLabel }: DashboardChartProps) {
   const chartData = toChartPoints(data);
 
   return (
-    <div className="glass min-w-0 rounded-2xl border border-black/5 p-4">
-      <h2 className="text-lg font-semibold text-[#222222] mb-4 break-words">
+    <div className="glass min-w-0 rounded-2xl border border-hairline-soft p-4">
+      <h2 className="text-lg font-semibold text-ink mb-4 break-words">
         Ingresos vs Egresos ({rangeLabel})
       </h2>
       <div className="h-64 w-full min-w-0">
