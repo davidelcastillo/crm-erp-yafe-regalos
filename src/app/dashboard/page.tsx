@@ -11,9 +11,10 @@ import { ProductAnalytics } from "./components/ProductAnalytics";
 import { BranchSelector } from "@/components/ui/BranchSelector";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Spinner } from "@/components/ui/Spinner";
-import { CardSkeleton } from "@/components/ui/Skeleton";
+import { CardSkeleton, Skeleton } from "@/components/ui/Skeleton";
 import { useBranch } from "@/lib/context/BranchContext";
 import { toFullLabel } from "@/lib/dates";
+import { motion, useReducedMotion, useScroll, useTransform } from "motion/react";
 
 type PeriodType = "cierre" | "7" | "30" | "90" | "custom";
 
@@ -32,6 +33,33 @@ interface Stats {
   accountsReceivable: number;
 }
 
+/**
+ * Carga: la banda de marca, la forma del encabezado y la hoja con la forma de
+ * las tarjetas que van a llegar, en el mismo orden y con las mismas medidas que
+ * la página, para que no salte al terminar (S2).
+ */
+const DashboardLoading = () => (
+  <div className="min-h-screen bg-white pb-20">
+    <div className="pb-16 brand-gradient">
+      <div className="px-3 pt-6" aria-hidden="true">
+        <Skeleton className="h-[60px] rounded-2xl" />
+      </div>
+    </div>
+    <div className="glass rounded-t-[2.5rem] -mt-12 px-5 pt-6">
+      <Spinner label="Cargando dashboard..." />
+      {/* La fila del período, que es el filtro que la página tiene arriba. */}
+      <div className="mt-4">
+        <Skeleton className="h-[44px] rounded-xl" />
+      </div>
+      <div className="mt-6 space-y-4">
+        <CardSkeleton />
+        <CardSkeleton />
+        <CardSkeleton />
+      </div>
+    </div>
+  </div>
+);
+
 export default function DashboardPage() {
   const { branches } = useBranch();
   const [branchId, setBranchId] = useState<number | null>(null);
@@ -44,6 +72,14 @@ export default function DashboardPage() {
   >([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Movimiento de la página: el encabezado se mueve solo y el degradé de marca
+  // se retira cuando la hoja lo tapa (S10, S11). Con movimiento reducido queda
+  // quieto; los controles nunca se atenúan.
+  const { scrollY } = useScroll();
+  const headerY = useTransform(scrollY, [0, 160], [0, 16]);
+  const brandOpacity = useTransform(scrollY, [0, 140], [1, 0.45]);
+  const reduceMotion = useReducedMotion();
 
   useEffect(() => {
     let cancelled = false;
@@ -118,37 +154,34 @@ export default function DashboardPage() {
           : "Sin rango elegido"
         : `Últimos ${period} días`;
 
-  // Carga: la banda de marca y la hoja con la forma de las tarjetas que van a llegar.
   if (loading) {
-    return (
-      <div className="min-h-screen bg-white pb-20">
-        <div className="h-28 brand-gradient" />
-        <div className="glass rounded-t-[2.5rem] -mt-12 px-5 pt-8">
-          <Spinner label="Cargando dashboard..." />
-          <div className="mt-6 space-y-4">
-            <CardSkeleton />
-            <CardSkeleton />
-            <CardSkeleton />
-          </div>
-        </div>
-      </div>
-    );
+    return <DashboardLoading />;
   }
 
   return (
     <div className="min-h-screen bg-white pb-20">
       <main>
-        <div className="pb-16 brand-gradient">
-          <PageHeader
-            title="Dashboard"
-            right={
-              <BranchSelector
-                block
-                onChange={(id) => setBranchId(id)}
-                label="Filtrar por sucursal"
-              />
-            }
+        <div className="relative isolate pb-16">
+          {/* El degradé de marca es una capa de fondo: se retira al hacer scroll
+              (S10), pero el selector y los filtros no se tocan. */}
+          <motion.div
+            className="brand-gradient pointer-events-none absolute inset-0"
+            aria-hidden="true"
+            style={reduceMotion ? undefined : { opacity: brandOpacity }}
           />
+
+          <motion.div style={reduceMotion ? undefined : { y: headerY }}>
+            <PageHeader
+              title="Dashboard"
+              right={
+                <BranchSelector
+                  block
+                  onChange={(id) => setBranchId(id)}
+                  label="Filtrar por sucursal"
+                />
+              }
+            />
+          </motion.div>
         </div>
 
         <div className="glass rounded-t-[2.5rem] border-t border-white/80 -mt-12 px-5 pt-6 pb-8 shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
@@ -156,7 +189,7 @@ export default function DashboardPage() {
             {/* Selector de período: el mismo rango gobierna las tarjetas y el gráfico. */}
             <div className="flex flex-wrap items-end gap-3">
               <div className="flex min-w-0 flex-col gap-1">
-                <span className="text-xs text-[#6a6a6a] font-medium">Periodo</span>
+                <span className="text-xs text-ink-muted font-medium">Periodo</span>
                 <div className="flex flex-wrap gap-2">
                   {PERIOD_OPTIONS.map((opt) => (
                     <button
@@ -177,21 +210,21 @@ export default function DashboardPage() {
               {period === "custom" && (
                 <div className="flex flex-wrap items-end gap-2">
                   <label className="flex flex-col gap-1">
-                    <span className="text-xs text-[#6a6a6a] font-medium">Desde</span>
+                    <span className="text-xs text-ink-muted font-medium">Desde</span>
                     <input
                       type="date"
                       value={startDate}
                       onChange={(e) => setStartDate(e.target.value)}
-                      className="h-11 px-3 bg-[#ffffff] border border-[#dddddd] rounded-xl text-sm text-[#222222] touch-manipulation"
+                      className="h-11 px-3 bg-[#ffffff] border border-[#dddddd] rounded-xl text-sm text-ink touch-manipulation"
                     />
                   </label>
                   <label className="flex flex-col gap-1">
-                    <span className="text-xs text-[#6a6a6a] font-medium">Hasta</span>
+                    <span className="text-xs text-ink-muted font-medium">Hasta</span>
                     <input
                       type="date"
                       value={endDate}
                       onChange={(e) => setEndDate(e.target.value)}
-                      className="h-11 px-3 bg-[#ffffff] border border-[#dddddd] rounded-xl text-sm text-[#222222] touch-manipulation"
+                      className="h-11 px-3 bg-[#ffffff] border border-[#dddddd] rounded-xl text-sm text-ink touch-manipulation"
                     />
                   </label>
                 </div>

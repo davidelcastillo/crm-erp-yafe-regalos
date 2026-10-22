@@ -51,7 +51,7 @@ export function ProductAnalytics({ products }: ProductAnalyticsProps) {
 
   return (
     <div className="glass rounded-2xl border border-black/5 p-4">
-      <h2 className="text-lg font-semibold text-[#222222] mb-4">
+      <h2 className="text-lg font-semibold text-ink mb-4">
         Análisis por Producto
       </h2>
 
@@ -60,7 +60,7 @@ export function ProductAnalytics({ products }: ProductAnalyticsProps) {
         value={selectedProductId || ""}
         onChange={(e) => handleProductChange(Number(e.target.value))}
         aria-label="Elegir producto"
-        className="mb-4 min-h-[44px] w-full rounded-xl bg-[#f8f8f8] px-3 py-2.5 text-base text-[#222222] focus:outline-none focus:ring-2 focus:ring-[#ec4899]/30"
+        className="mb-4 min-h-[44px] w-full rounded-xl bg-surface-soft px-3 py-2.5 text-base text-ink focus:outline-none focus:ring-2 focus:ring-[#ec4899]/30"
       >
         <option value="">Seleccionar producto...</option>
         {products.map((product) => (
@@ -77,18 +77,18 @@ export function ProductAnalytics({ products }: ProductAnalyticsProps) {
         <div className="space-y-4">
           {/* Purchase Stats */}
           <div className="p-3 bg-[#f9f9f9] rounded-lg">
-            <h3 className="text-sm font-medium text-[#6a6a6a] mb-2">Compras</h3>
+            <h3 className="text-sm font-medium text-ink-muted mb-2">Compras</h3>
             <div className="grid grid-cols-2 gap-2 text-sm">
               <div>
-                <span className="text-[#6a6a6a]">Unidades:</span>
+                <span className="text-ink-muted">Unidades:</span>
                 <span className="ml-2 font-medium">{analytics.totalPurchased}</span>
               </div>
               <div>
-                <span className="text-[#6a6a6a]">Costo total:</span>
+                <span className="text-ink-muted">Costo total:</span>
                 <span className="ml-2 font-medium">{formatCurrency(analytics.totalPurchaseCost)}</span>
               </div>
               <div>
-                <span className="text-[#6a6a6a]">Precio promedio:</span>
+                <span className="text-ink-muted">Precio promedio:</span>
                 <span className="ml-2 font-medium">{formatCurrency(analytics.avgPurchasePrice)}</span>
               </div>
             </div>
@@ -96,18 +96,18 @@ export function ProductAnalytics({ products }: ProductAnalyticsProps) {
 
           {/* Sale Stats */}
           <div className="p-3 bg-[#f9f9f9] rounded-lg">
-            <h3 className="text-sm font-medium text-[#6a6a6a] mb-2">Ventas</h3>
+            <h3 className="text-sm font-medium text-ink-muted mb-2">Ventas</h3>
             <div className="grid grid-cols-2 gap-2 text-sm">
               <div>
-                <span className="text-[#6a6a6a]">Unidades:</span>
+                <span className="text-ink-muted">Unidades:</span>
                 <span className="ml-2 font-medium">{analytics.totalSold}</span>
               </div>
               <div>
-                <span className="text-[#6a6a6a]">Ingreso total:</span>
+                <span className="text-ink-muted">Ingreso total:</span>
                 <span className="ml-2 font-medium">{formatCurrency(analytics.totalSaleRevenue)}</span>
               </div>
               <div>
-                <span className="text-[#6a6a6a]">Precio promedio:</span>
+                <span className="text-ink-muted">Precio promedio:</span>
                 <span className="ml-2 font-medium">{formatCurrency(analytics.avgSalePrice)}</span>
               </div>
             </div>
@@ -119,7 +119,7 @@ export function ProductAnalytics({ products }: ProductAnalyticsProps) {
               analytics.profit >= 0 ? "bg-green-50" : "bg-red-50"
             }`}
           >
-            <div className="text-sm text-[#6a6a6a]">Rentabilidad del Producto</div>
+            <div className="text-sm text-ink-muted">Rentabilidad del Producto</div>
             <div
               className={`text-2xl font-bold ${
                 analytics.profit >= 0 ? "text-[#15803d]" : "text-[#dc2626]"
@@ -130,7 +130,7 @@ export function ProductAnalytics({ products }: ProductAnalyticsProps) {
           </div>
         </div>
       ) : (
-        <div className="text-center py-4 text-[#6a6a6a]">
+        <div className="text-center py-4 text-ink-muted">
           Selecciona un producto para ver su análisis
         </div>
       )}

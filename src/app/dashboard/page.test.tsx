@@ -117,6 +117,76 @@ describe('DashboardPage — carga', () => {
   });
 });
 
+// La forma del encabezado mientras carga (S2): sin ella la hoja salta al terminar.
+describe('DashboardPage — esqueleto del encabezado (S2)', () => {
+  it('mientras carga muestra la forma del encabezado y la reemplaza al terminar', async () => {
+    const { container } = render(<DashboardPage />);
+
+    // La píldora del encabezado, con la medida de la página real.
+    expect(container.querySelector('[aria-hidden="true"] .h-\\[60px\\]')).not.toBeNull();
+    // Y la hoja arranca donde arranca la de la página: `-mt-12 px-5 pt-6`.
+    const hoja = container.querySelector('.glass');
+    expect(hoja).toHaveClass('-mt-12', 'px-5', 'pt-6');
+
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Dashboard' })
+    ).toBeInTheDocument();
+  });
+});
+
+// Parallax del encabezado y retiro del degradé (S10, S11): lo que se atenúa es
+// superficie decorativa, nunca un control.
+describe('DashboardPage — parallax y obscuration (S10, S11)', () => {
+  it('el degradé es una capa decorativa dentro de la banda y el encabezado va en su envoltorio', async () => {
+    const { container } = render(<DashboardPage />);
+    await screen.findByRole('heading', { level: 1, name: 'Dashboard' });
+
+    const capa = container.querySelector('.brand-gradient');
+    expect(capa).toHaveAttribute('aria-hidden', 'true');
+    expect(capa).toHaveClass('pointer-events-none', 'absolute', 'inset-0');
+    expect(capa?.parentElement).toHaveClass('relative', 'isolate');
+
+    // El encabezado se mueve solo: no está pegado al mismo nodo que la capa.
+    const encabezado = container.querySelector('header');
+    expect(encabezado).not.toBeNull();
+    expect(encabezado?.parentElement).not.toBe(capa?.parentElement);
+  });
+});
+
+// Cascada del recorrido (S7) y cambio de valor (S9) en las tarjetas del resumen.
+describe('DashboardPage — tarjetas del resumen (S7, S9)', () => {
+  it('cada tarjeta va en su propio envoltorio y el monto queda en un solo nodo', async () => {
+    mockGetStats.mockResolvedValueOnce({
+      success: true,
+      data: {
+        totalIncome: 1500,
+        totalExpense: 800,
+        netProfit: 700,
+        accountsReceivable: 250,
+      },
+    });
+
+    render(<DashboardPage />);
+    await screen.findByText('Ingresos');
+
+    const grilla = screen.getByRole('heading', { name: 'Resumen' })
+      .parentElement?.nextElementSibling as HTMLElement;
+    expect(grilla.children).toHaveLength(4);
+
+    // La raíz de la card no cambia: la que anima la entrada es el envoltorio.
+    for (const envoltorio of Array.from(grilla.children)) {
+      expect(envoltorio).not.toHaveClass('glass');
+      expect(envoltorio.firstElementChild).toHaveClass('glass');
+    }
+
+    // El monto entra animado y sigue siendo un único nodo de texto.
+    const monto = screen.getByText(/\$ 1\.500/);
+    expect(monto.tagName).toBe('SPAN');
+    expect(monto).toHaveClass('block');
+    expect(monto.childNodes).toHaveLength(1);
+  });
+});
+
 describe('DashboardPage — resumen', () => {
   it('muestra el título y las tarjetas con sus valores', async () => {
     mockGetStats.mockResolvedValueOnce({

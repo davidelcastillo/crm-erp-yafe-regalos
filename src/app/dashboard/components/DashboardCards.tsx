@@ -1,6 +1,8 @@
 "use client";
 
 import { Skeleton } from "@/components/ui/Skeleton";
+import { Reveal } from "@/components/ui/Reveal";
+import { ValueChange } from "@/components/ui/ValueChange";
 
 interface Stats {
   totalIncome: number;
@@ -65,18 +67,21 @@ export function DashboardCards({ stats, branchLabel = "(Todas)" }: DashboardCard
   return (
     <section>
       <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
-        <h2 className="text-lg font-semibold text-[#222222]">Resumen</h2>
-        <span className="text-sm text-[#6a6a6a] break-words">{branchLabel}</span>
+        <h2 className="text-lg font-semibold text-ink">Resumen</h2>
+        <span className="text-sm text-ink-muted break-words">{branchLabel}</span>
       </div>
       <div className="grid grid-cols-2 gap-3">
+        {/* Cada tarjeta entra en cascada con su posición (S7); la raíz de la card
+            no cambia. El monto entra animado cuando cambia el período (S9). */}
         {cards.map((card, index) => (
-          <div
-            key={index}
-            className="glass rounded-2xl border border-black/5 p-4"
-          >
-            <div className="text-xs text-[#6a6a6a] mb-1">{card.label}</div>
-            <div className={`text-lg font-bold break-words ${card.color}`}>{card.value}</div>
-          </div>
+          <Reveal key={index} index={index}>
+            <div className="glass rounded-2xl border border-black/5 p-4">
+              <div className="text-xs text-ink-muted mb-1">{card.label}</div>
+              <ValueChange key={card.value} className={`block text-lg font-bold break-words ${card.color}`}>
+                {card.value}
+              </ValueChange>
+            </div>
+          </Reveal>
         ))}
       </div>
     </section>

@@ -8,9 +8,34 @@ import { AddPurchaseButton } from './components/AddPurchaseButton';
 import { BranchSelector } from '@/components/ui/BranchSelector';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Spinner } from '@/components/ui/Spinner';
-import { CardSkeleton } from '@/components/ui/Skeleton';
+import { CardSkeleton, Skeleton } from '@/components/ui/Skeleton';
 import { useReloadKey } from '@/lib/hooks/useReloadKey';
 import { useEffect, useState } from 'react';
+import { motion, useReducedMotion, useScroll, useTransform } from 'motion/react';
+
+/**
+ * Carga: la banda de marca, la forma del encabezado y la hoja con la forma de la
+ * lista que va a llegar, en el mismo orden y con las mismas medidas que la
+ * página, para que no salte al terminar (S2). La página no tiene banda de
+ * acciones ni buscador, así que el esqueleto tampoco los inventa.
+ */
+const ComprasLoading = () => (
+  <div className="min-h-screen bg-white pb-20">
+    <div className="pb-16 brand-gradient">
+      <div className="px-3 pt-6" aria-hidden="true">
+        <Skeleton className="h-[60px] rounded-2xl" />
+      </div>
+    </div>
+    <div className="glass rounded-t-[2.5rem] -mt-12 px-5 pt-8">
+      <Spinner label="Cargando compras..." />
+      <div className="mt-6 space-y-4">
+        <CardSkeleton />
+        <CardSkeleton />
+        <CardSkeleton />
+      </div>
+    </div>
+  </div>
+);
 
 export default function ComprasPage() {
   const [reloadKey, bump] = useReloadKey();
@@ -18,6 +43,14 @@ export default function ComprasPage() {
   const [purchases, setPurchases] = useState<never[]>([]);
   const [loading, setLoading] = useState(true);
   const [branchId, setBranchId] = useState<number | null>(null);
+
+  // Movimiento de la página: el encabezado se mueve solo y el degradé de marca
+  // se retira cuando la hoja lo tapa (S10, S11). Con movimiento reducido queda
+  // quieto; el selector de sucursal nunca se atenúa.
+  const { scrollY } = useScroll();
+  const headerY = useTransform(scrollY, [0, 160], [0, 16]);
+  const brandOpacity = useTransform(scrollY, [0, 140], [1, 0.45]);
+  const reduceMotion = useReducedMotion();
 
   useEffect(() => {
     let cancelled = false;
@@ -40,47 +73,45 @@ export default function ComprasPage() {
   }, [branchId, reloadKey]);
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-white pb-20">
-        <div className="h-28 brand-gradient" />
-        <div className="glass rounded-t-[2.5rem] -mt-12 px-5 pt-8">
-          <Spinner label="Cargando compras..." />
-          <div className="mt-6 space-y-4">
-            <CardSkeleton />
-            <CardSkeleton />
-            <CardSkeleton />
-          </div>
-        </div>
-      </div>
-    );
+    return <ComprasLoading />;
   }
 
  return (
     <div className="min-h-screen bg-white pb-20 relative">
       <main className="">
-        <div className="pb-16 brand-gradient">
-        <PageHeader
-          title="Compras"
-          right={
-            <BranchSelector
-              block
-              onChange={(id) => setBranchId(id)}
-              label="Filtrar por sucursal"
+        <div className="relative isolate pb-16">
+          {/* El degradé de marca es una capa de fondo: se retira al hacer scroll
+              (S10), pero el selector de sucursal no se toca. */}
+          <motion.div
+            className="brand-gradient pointer-events-none absolute inset-0"
+            aria-hidden="true"
+            style={reduceMotion ? undefined : { opacity: brandOpacity }}
+          />
+
+          <motion.div style={reduceMotion ? undefined : { y: headerY }}>
+            <PageHeader
+              title="Compras"
+              right={
+                <BranchSelector
+                  block
+                  onChange={(id) => setBranchId(id)}
+                  label="Filtrar por sucursal"
+                />
+              }
             />
-          }
-        />
-      </div>
+          </motion.div>
+        </div>
 
         <div className="glass border-t border-white/80 rounded-t-[2.5rem] -mt-12 px-5 pt-8 shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
           {purchases.length === 0 ? (
             <div className="text-center py-12">
               <div className="w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center">
-                <svg className="w-8 h-8 text-[#6a6a6a]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="w-8 h-8 text-ink-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
                 </svg>
               </div>
-              <p className="text-[#6a6a6a]">No hay compras registradas</p>
-              <p className="text-sm text-[#6a6a6a] mt-1">Toca el botón + para registrar una compra</p>
+              <p className="text-ink-muted">No hay compras registradas</p>
+              <p className="text-sm text-ink-muted mt-1">Toca el botón + para registrar una compra</p>
             </div>
           ) : (
             <PurchasesList purchases={purchases} />
