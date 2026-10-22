@@ -5,7 +5,7 @@
  * jsdom's foreign-realm Uint8Array, so this suite runs in the node environment.
  */
 import { PDFDocument, PDFDict, PDFName, PDFRawStream } from 'pdf-lib';
-import zlib from 'zlib';
+import { readPdfContent } from '@/lib/fonts/pdf-test-reader';
 import {
   buildExportFileName,
   formatPrice,
@@ -31,28 +31,11 @@ const META: PdfMeta = {
 
 const loadPdf = (base64: string) => PDFDocument.load(Buffer.from(base64, 'base64'));
 
-// pdf-lib writes every page's content stream deflated, and non-ASCII text as hex
-// strings, so the only way to read the printed text back is to inflate the
-// streams and decode those hex strings.
-const pdfText = (base64: string): string => {
-  const buf = Buffer.from(base64, 'base64');
-  const raw = buf.toString('latin1');
-  const deflated: string[] = [];
-  const streamStart = /stream\r?\n/g;
-  let match: RegExpExecArray | null;
-  while ((match = streamStart.exec(raw)) !== null) {
-    const start = match.index + match[0].length;
-    const end = raw.indexOf('endstream', start);
-    if (end < 0) continue;
-    try {
-      deflated.push(zlib.inflateSync(buf.subarray(start, end)).toString('latin1'));
-    } catch {
-      // Streams stored without compression carry no text content.
-    }
-  }
-  return deflated
-    .join('\n')
-    .replace(/<([0-9A-Fa-f]+)>/g, (_all, hex: string) => Buffer.from(hex, 'hex').toString('latin1'));
+// Con Poppins embebida los `Tj` son ids de glifo: el lector compartido los
+// traduce con el CMap /ToUnicode, así que las aserciones de texto no cambian.
+const pdfText = async (base64: string): Promise<string> => {
+  const content = await readPdfContent(Buffer.from(base64, 'base64'));
+  return content.text.join('\n');
 };
 
 const imageXObjects = (pdfDoc: PDFDocument, pageIndex = 0): PDFRawStream[] => {
@@ -104,7 +87,7 @@ describe('generateProductsPdf', () => {
   });
 
   test('prints the branch name and the export date in the header', async () => {
-    const text = pdfText(await generateProductsPdf(makeRows(3), META));
+    const text = await pdfText(await generateProductsPdf(makeRows(3), META));
 
     expect(text).toContain('Sucursal Depósito');
     expect(text).toContain('DEP');
@@ -112,7 +95,7 @@ describe('generateProductsPdf', () => {
   });
 
   test('prints the selected product count and their total units', async () => {
-    const text = pdfText(await generateProductsPdf(makeRows(33), META));
+    const text = await pdfText(await generateProductsPdf(makeRows(33), META));
 
     // makeRows() gives stock 0..32, so the 33 rows add up to 528 units.
     expect(text).toContain('33 productos');
@@ -120,10 +103,20 @@ describe('generateProductsPdf', () => {
   });
 
   test('numbers every page of a multi-page export', async () => {
-    const text = pdfText(await generateProductsPdf(makeRows(80), META));
+    const text = await pdfText(await generateProductsPdf(makeRows(80), META));
 
     expect(text).toContain('Página 1 de 3');
     expect(text).toContain('Página 3 de 3');
+  });
+
+  test('embebe Poppins Regular y SemiBold en lugar de Helvetica', async () => {
+    const { fonts } = await readPdfContent(
+      Buffer.from(await generateProductsPdf(makeRows(3), META), 'base64')
+    );
+
+    expect(fonts.join(' ')).toContain('Poppins-Regular');
+    expect(fonts.join(' ')).toContain('Poppins-SemiBold');
+    expect(fonts.join(' ')).not.toContain('Helvetica');
   });
 });
 

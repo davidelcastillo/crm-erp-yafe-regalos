@@ -1,7 +1,6 @@
 /** @jest-environment node */
-import { PDFDocument, PDFArray, PDFRawStream } from 'pdf-lib';
-import { inflateSync } from 'node:zlib';
 import type { StockControlReceipt } from '@/lib/stock-control-receipt';
+import { readPdfContent as readPdf } from '@/lib/fonts/pdf-test-reader';
 import { generateStockControlPdf } from './stock-control-pdf';
 
 const receipt: StockControlReceipt = {
@@ -18,32 +17,6 @@ const receipt: StockControlReceipt = {
     { code: 'QE7948-22', name: 'Jabón de avena', systemStock: 7, countedStock: 5, difference: -2, decision: 'PENDING' },
   ],
 };
-
-/** Texto y color de cada `Tj` de los streams inflados. */
-async function readPdf(bytes: Uint8Array) {
-  const doc = await PDFDocument.load(bytes);
-  const text: string[] = [];
-  const colors = new Map<string, number[]>();
-
-  for (const page of doc.getPages()) {
-    const contents = page.node.Contents();
-    const streams = contents instanceof PDFArray ? contents.asArray() : contents ? [contents] : [];
-    for (const ref of streams) {
-      const stream = doc.context.lookup(ref) as PDFRawStream;
-      const raw = inflateSync(stream.getContents()).toString('latin1');
-      for (const match of raw.matchAll(/<([A-Fa-f0-9]+)> Tj/g)) {
-        const value = Buffer.from(match[1], 'hex').toString('latin1');
-        text.push(value);
-        const operator = [...raw.slice(0, match.index).matchAll(/([\d.]+) ([\d.]+) ([\d.]+) rg/g)].pop();
-        if (operator && !colors.has(value)) {
-          colors.set(value, [operator[1], operator[2], operator[3]].map((part) => Math.round(Number(part) * 100) / 100));
-        }
-      }
-    }
-  }
-
-  return { doc, text, colors };
-}
 
 describe('generateStockControlPdf (S10)', () => {
   test('imprime sucursal, fecha, motivo y el detalle de cada diferencia', async () => {
@@ -114,5 +87,13 @@ describe('generateStockControlPdf (S10)', () => {
     expect(doc.getPageCount()).toBeGreaterThan(1);
     // El pie numera la última hoja con el total real de hojas.
     expect(text).toContain(`Página ${doc.getPageCount()} de ${doc.getPageCount()}`);
+  });
+
+  test('embebe Poppins Regular y SemiBold en lugar de Helvetica', async () => {
+    const { fonts } = await readPdf(await generateStockControlPdf(receipt));
+
+    expect(fonts.join(' ')).toContain('Poppins-Regular');
+    expect(fonts.join(' ')).toContain('Poppins-SemiBold');
+    expect(fonts.join(' ')).not.toContain('Helvetica');
   });
 });

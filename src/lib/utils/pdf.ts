@@ -1,11 +1,6 @@
 // src/lib/utils/pdf.ts
-import {
-  PDFDocument,
-  rgb,
-  StandardFonts,
-  type PDFFont,
-  type PDFPage,
-} from 'pdf-lib';
+import { PDFDocument, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
+import { DOCUMENT_FONT_SIZE, embedDocumentFonts } from '@/lib/fonts/document-fonts';
 import { LOGO_PNG_BASE64 } from './pdf-logo';
 
 export interface ProductRow {
@@ -113,8 +108,8 @@ export async function generateProductsPdf(
   meta: PdfMeta
 ): Promise<string> {
   const pdfDoc = await PDFDocument.create();
-  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-  const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  const { font, bold } = await embedDocumentFonts(pdfDoc);
+  const { title, body, label: labelSize, footer: footerSize } = DOCUMENT_FONT_SIZE;
   const logo = await pdfDoc.embedPng(LOGO_PNG_BASE64);
 
   const tableWidth = PAGE_WIDTH - 2 * MARGIN;
@@ -164,13 +159,13 @@ export async function generateProductsPdf(
     });
     const textX = MARGIN + 10 + LOGO_SIZE + 12;
     page.drawText(
-      clip(`${meta.branchName} (${meta.branchCode})`, bold, 14, PAGE_WIDTH - MARGIN - textX),
-      { x: textX, y: bandTop - 28, size: 14, font: bold, color: color(INK) }
+      clip(`${meta.branchName} (${meta.branchCode})`, bold, title, PAGE_WIDTH - MARGIN - textX),
+      { x: textX, y: bandTop - 28, size: title, font: bold, color: color(INK) }
     );
     page.drawText(`Inventario al ${formatDate(meta.date)}`, {
       x: textX,
-      y: bandTop - 43,
-      size: 9,
+      y: bandTop - 44,
+      size: labelSize,
       font,
       color: color(MUTED),
     });
@@ -192,16 +187,16 @@ export async function generateProductsPdf(
       color: color(HAIRLINE),
     });
     const y = rowsTop - 14;
-    page.drawText('Código', { x: MARGIN + 4, y, size: 9, font: bold, color: color(INK) });
+    page.drawText('Código', { x: MARGIN + 4, y, size: labelSize, font: bold, color: color(INK) });
     page.drawText('Nombre', {
       x: MARGIN + COL_CODE + 4,
       y,
-      size: 9,
+      size: labelSize,
       font: bold,
       color: color(INK),
     });
-    drawRight(page, 'Stock', MARGIN + COL_CODE + COL_NAME + COL_STOCK - 4, y, 9, bold, INK);
-    drawRight(page, 'Precio', PAGE_WIDTH - MARGIN - 4, y, 9, bold, INK);
+    drawRight(page, 'Stock', MARGIN + COL_CODE + COL_NAME + COL_STOCK - 4, y, labelSize, bold, INK);
+    drawRight(page, 'Precio', PAGE_WIDTH - MARGIN - 4, y, labelSize, bold, INK);
   };
 
   const drawRow = (page: PDFPage, row: ProductRow, indexOnPage: number) => {
@@ -216,11 +211,11 @@ export async function generateProductsPdf(
       });
     }
     const y = top + 6;
-    page.drawText(row.code, { x: MARGIN + 4, y, size: 9, font, color: color(INK) });
-    page.drawText(clip(row.name, font, 9, COL_NAME - 8), {
+    page.drawText(row.code, { x: MARGIN + 4, y, size: body, font, color: color(INK) });
+    page.drawText(clip(row.name, font, body, COL_NAME - 8), {
       x: MARGIN + COL_CODE + 4,
       y,
-      size: 9,
+      size: body,
       font,
       color: color(INK),
     });
@@ -229,11 +224,11 @@ export async function generateProductsPdf(
       String(row.stock),
       MARGIN + COL_CODE + COL_NAME + COL_STOCK - 4,
       y,
-      9,
+      body,
       font,
       INK
     );
-    drawRight(page, formatPrice(row.price), PAGE_WIDTH - MARGIN - 4, y, 9, font, INK);
+    drawRight(page, formatPrice(row.price), PAGE_WIDTH - MARGIN - 4, y, body, font, INK);
   };
 
   const drawTotals = (page: PDFPage) => {
@@ -248,8 +243,8 @@ export async function generateProductsPdf(
       page,
       `${rows.length} productos · ${units} unidades`,
       PAGE_WIDTH - MARGIN,
-      MARGIN + 10,
-      10,
+      MARGIN + 8,
+      body,
       bold,
       BRAND_TEXT
     );
@@ -258,9 +253,9 @@ export async function generateProductsPdf(
   const drawFooter = (page: PDFPage, pageNumber: number) => {
     const label = `Página ${pageNumber} de ${totalPages}`;
     page.drawText(label, {
-      x: (PAGE_WIDTH - font.widthOfTextAtSize(label, 8)) / 2,
+      x: (PAGE_WIDTH - font.widthOfTextAtSize(label, footerSize)) / 2,
       y: 20,
-      size: 8,
+      size: footerSize,
       font,
       color: color(FAINT),
     });
