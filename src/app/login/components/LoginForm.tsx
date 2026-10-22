@@ -58,7 +58,7 @@ export default function LoginForm() {
         <form className="space-y-6" onSubmit={handleSubmit}>
           <div className="flex flex-col gap-4 mb-6">
             {/* Input Username (Translúcido) */}
-            <div className="bg-surface/60 backdrop-blur-md border border-white/80 rounded-full px-5 py-4 shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex items-center transition-all focus-within:bg-surface/80 focus-within:border-pink-300">
+            <div className="bg-surface/60 backdrop-blur-md border border-white/80 rounded-full px-5 py-4 shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex items-center transition-all focus-within:bg-surface/80 focus-within:border-accent/30">
               <input
                 id="email"
                 name="email"
@@ -74,7 +74,7 @@ export default function LoginForm() {
             </div>
 
             {/* Input Password (Translúcido) */}
-            <div className="bg-surface/60 backdrop-blur-md border border-white/80 rounded-full px-5 py-4 shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex items-center justify-between transition-all focus-within:bg-surface/80 focus-within:border-pink-300">
+            <div className="bg-surface/60 backdrop-blur-md border border-white/80 rounded-full px-5 py-4 shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex items-center justify-between transition-all focus-within:bg-surface/80 focus-within:border-accent/30">
               <input
                 id="password"
                 name="password"
@@ -93,7 +93,7 @@ export default function LoginForm() {
                 onClick={() => setShowPassword((prev) => !prev)}
                 aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
                 aria-pressed={showPassword}
-                className="text-ink-soft hover:text-pink-500 transition-colors touch-manipulation"
+                className="text-ink-soft hover:text-accent transition-colors touch-manipulation"
               >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
               </button>
@@ -124,7 +124,7 @@ export default function LoginForm() {
           <button 
           type="submit"
           disabled={pending}
-          className="w-full py-4 rounded-full border-2 border-pink-400 text-pink-500 font-bold text-lg hover:bg-pink-400 hover:text-white active:scale-[0.98] active:bg-pink-400 active:text-white transition-all mb-6 shadow-sm touch-manipulation">
+          className="w-full py-4 rounded-full border-2 border-accent text-accent font-bold text-lg hover:bg-accent hover:text-white active:scale-[0.98] active:bg-accent active:text-white transition-all mb-6 shadow-sm touch-manipulation">
             {pending ? 'Iniciando sesión...' : 'Iniciar sesión'}
           </button>
           
@@ -169,7 +169,7 @@ export default function LoginForm() {
     //     )}
 
     //     {success && (
-    //       <p role="status" className="mt-2 text-sm text-green-600">{success}</p>
+    //       <p role="status" className="mt-2 text-sm text-positive">{success}</p>
     //     )}
 
     //     <div className="flex items-center">

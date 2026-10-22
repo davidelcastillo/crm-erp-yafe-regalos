@@ -76,11 +76,11 @@ function MovementsDetails({
         {movements.map((movement) => (
           <li
             key={movement.id}
-            className="flex items-center justify-between gap-2 text-xs text-[#6a6a6a]"
+            className="flex items-center justify-between gap-2 text-xs text-ink-muted"
           >
             <span className="shrink-0">{formatDay(movement.date)}</span>
             <span className="min-w-0 flex-1 truncate">{MOVEMENT_LABELS[movement.type]}</span>
-            <span className="shrink-0 font-semibold text-[#222222]">{movement.quantity} uds</span>
+            <span className="shrink-0 font-semibold text-ink">{movement.quantity} uds</span>
           </li>
         ))}
       </ul>
@@ -108,7 +108,7 @@ export default function ExternalInventoryTable({
 
   if (inventoryData.length === 0) {
     return (
-      <div className="text-center py-12 text-[#6a6a6a]">
+      <div className="text-center py-12 text-ink-muted">
         No hay productos en el inventario de esta sucursal
       </div>
     );
@@ -139,7 +139,7 @@ export default function ExternalInventoryTable({
               onChange={(event) => setSearch(event.target.value)}
               maxLength={200}
               placeholder="Código o nombre"
-              className="w-full min-h-[44px] pl-12 pr-4 py-3 bg-surface-soft rounded-xl text-base text-ink placeholder-ink-soft focus:outline-none focus:ring-2 focus:ring-[#ec4899]/30 touch-manipulation"
+              className="w-full min-h-[44px] pl-12 pr-4 py-3 bg-surface-soft rounded-xl text-base text-ink placeholder-ink-soft focus:outline-none focus:ring-2 focus:ring-accent/30 touch-manipulation"
             />
           </span>
         </label>
@@ -148,7 +148,7 @@ export default function ExternalInventoryTable({
         <ProductSortToggle value={sortMode} onChange={setSortMode} />
       </div>
       {visible.length === 0 && (
-        <p role="status" className="py-6 text-center text-[#6a6a6a]">
+        <p role="status" className="py-6 text-center text-ink-muted">
           No se encontraron productos para esta búsqueda
         </p>
       )}
@@ -159,18 +159,18 @@ export default function ExternalInventoryTable({
           <div key={item.code} className="rounded-2xl glass p-4">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
-                <h3 className="text-base font-semibold text-[#222222] break-words">
+                <h3 className="text-base font-semibold text-ink break-words">
                   {item.name}
                 </h3>
-                <span className="mt-1 inline-block max-w-full break-words px-2 py-0.5 bg-[#f2f2f2] rounded text-xs font-mono text-[#6a6a6a]">
+                <span className="mt-1 inline-block max-w-full break-words px-2 py-0.5 bg-surface-strong rounded text-xs font-mono text-ink-muted">
                   {item.code}
                 </span>
               </div>
               <div className="flex shrink-0 flex-col items-end gap-1">
-                <span className="text-sm font-semibold text-[#222222]">
+                <span className="text-sm font-semibold text-ink">
                   {item.stock} uds
                 </span>
-                <span className="text-sm font-semibold text-[#222222]">
+                <span className="text-sm font-semibold text-ink">
                   ${item.price.toFixed(2)}
                 </span>
               </div>
@@ -190,7 +190,7 @@ export default function ExternalInventoryTable({
       <div className="hidden md:block overflow-x-auto">
         <table className="w-full text-sm">
           {showHeaders && (
-            <thead className="bg-gray-50 font-medium text-gray-600">
+            <thead className="bg-surface-soft font-medium text-ink-muted">
               <tr>
                 <th className="w-[60px] p-3 text-left">Código</th>
                 <th className="p-3 text-left">Producto</th>
@@ -199,11 +199,11 @@ export default function ExternalInventoryTable({
               </tr>
             </thead>
           )}
-          <tbody className="divide-y divide-gray-200">
+          <tbody className="divide-y divide-hairline">
             {visible.map((item) => (
-              <tr key={item.code} className="hover:bg-gray-50">
+              <tr key={item.code} className="hover:bg-surface-soft">
                 <td className="px-4 py-3 font-mono">{item.code}</td>
-                <td className="px-4 py-3 break-words text-[#222222]">
+                <td className="px-4 py-3 break-words text-ink">
                   {item.name}
                   {controlClosedAt && movementsByCode[item.code]?.length ? (
                     <MovementsDetails
@@ -212,10 +212,10 @@ export default function ExternalInventoryTable({
                     />
                   ) : null}
                 </td>
-                <td className="px-4 py-3 text-center font-semibold text-[#222222]">
+                <td className="px-4 py-3 text-center font-semibold text-ink">
                   {item.stock}
                 </td>
-                <td className="px-4 py-3 text-right font-semibold text-[#222222]">
+                <td className="px-4 py-3 text-right font-semibold text-ink">
                   ${item.price.toFixed(2)}
                 </td>
               </tr>

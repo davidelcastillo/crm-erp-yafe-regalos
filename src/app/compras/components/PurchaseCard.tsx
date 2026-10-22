@@ -54,7 +54,7 @@ export function PurchaseCard({ purchase, onExpand, expanded }: PurchaseCardProps
             </p>
           </div>
           <div className="flex flex-col items-end gap-2">
-            <span className="text-lg font-bold text-red-800">
+            <span className="text-lg font-bold text-negative">
               - ${total.toFixed(2)}
             </span>
             <svg 
@@ -88,7 +88,7 @@ export function PurchaseCard({ purchase, onExpand, expanded }: PurchaseCardProps
                 </div>
                 <div className="text-right">
                   <p className="text-ink font-medium">${item.subtotal.toFixed(2)}</p>
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-50 text-green-700">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-positive/10 text-positive">
                     +{item.quantity}
                   </span>
                 </div>
@@ -96,7 +96,7 @@ export function PurchaseCard({ purchase, onExpand, expanded }: PurchaseCardProps
             ))}
             <div className="pt-3 border-t border-hairline flex justify-between items-center">
               <span className="font-semibold text-ink">Total</span>
-              <span className="font-bold text-red-800">-${total.toFixed(2)}</span>
+              <span className="font-bold text-negative">-${total.toFixed(2)}</span>
             </div>
           </div>
         </div>

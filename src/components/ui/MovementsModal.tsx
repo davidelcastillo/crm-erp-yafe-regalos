@@ -15,12 +15,12 @@ const TYPE_LABELS: Record<ProductMovement['type'], string> = {
 
 // Entradas verdes, salidas rojas, pases entre sucursales azules, ajustes grises.
 const TYPE_STYLES: Record<ProductMovement['type'], string> = {
-  PURCHASE: 'bg-green-100 text-green-800',
-  ENTRY: 'bg-green-100 text-green-800',
-  SALE: 'bg-red-100 text-red-800',
-  EXIT: 'bg-red-100 text-red-800',
-  TRANSFER_IN: 'bg-blue-100 text-blue-800',
-  TRANSFER_OUT: 'bg-blue-100 text-blue-800',
+  PURCHASE: 'bg-positive/15 text-positive',
+  ENTRY: 'bg-positive/15 text-positive',
+  SALE: 'bg-negative/15 text-negative',
+  EXIT: 'bg-negative/15 text-negative',
+  TRANSFER_IN: 'bg-info/10 text-info',
+  TRANSFER_OUT: 'bg-info/10 text-info',
   ADJUSTMENT: 'bg-surface-strong text-ink',
 };
 
@@ -186,7 +186,7 @@ export function MovementsModal({ product, isOpen, onClose, branchId = null }: Mo
         )}
 
         {error && (
-          <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm" role="alert">
+          <div className="mt-4 p-3 bg-negative/10 border border-negative/30 rounded-lg text-negative text-sm" role="alert">
             {error}
           </div>
         )}

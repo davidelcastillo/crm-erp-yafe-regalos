@@ -256,8 +256,8 @@ export default function InventarioPage() {
     return (
       <div className="min-h-screen bg-surface pb-20">
         <main className="px-6 py-8">
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <p className="text-red-700">{error}</p>
+          <div className="bg-negative/10 border border-negative/30 rounded-lg p-4">
+            <p className="text-negative">{error}</p>
             <button
               onClick={() => window.location.reload()}
               className="btn btn-secondary mt-2"

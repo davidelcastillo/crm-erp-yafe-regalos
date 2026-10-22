@@ -47,9 +47,9 @@ export function SaleCard({ sale, onExpand, expanded }: SaleCardProps) {
   const total = sale.totalAmount;
 
   const paymentMethodColors: Record<string, string> = {
-    EFECTIVO: "bg-green-100 text-green-800",
-    TRANSFERENCIA: "bg-blue-100 text-blue-800",
-    MIXTO: "bg-purple-100 text-purple-800",
+    EFECTIVO: "bg-positive/15 text-positive",
+    TRANSFERENCIA: "bg-info/10 text-info",
+    MIXTO: "bg-accent/10 text-accent",
   };
 
   const paymentMethod = sale.paymentMethod ?? "EFECTIVO";
@@ -81,7 +81,7 @@ export function SaleCard({ sale, onExpand, expanded }: SaleCardProps) {
             )}
           </div>
           <div className="flex shrink-0 flex-col items-end gap-2">
-            <span className="text-lg font-bold text-green-700">+ ${total.toFixed(2)}</span>
+            <span className="text-lg font-bold text-positive">+ ${total.toFixed(2)}</span>
             <span className={`px-2 py-0.5 rounded text-xs font-medium ${paymentMethodColors[paymentMethod] || "bg-surface-strong text-ink"}`}>
               {paymentMethod}
             </span>
@@ -115,13 +115,13 @@ export function SaleCard({ sale, onExpand, expanded }: SaleCardProps) {
                 </div>
                 <div className="shrink-0 text-right">
                   <p className="text-ink font-medium">${item.subtotal.toFixed(2)}</p>
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-700">-{item.quantity}</span>
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-negative/10 text-negative">-{item.quantity}</span>
                 </div>
               </div>
             ))}
             <div className="pt-3 border-t border-hairline flex justify-between items-center">
               <span className="font-semibold text-ink">Total</span>
-              <span className="font-bold text-green-700">+${total.toFixed(2)}</span>
+              <span className="font-bold text-positive">+${total.toFixed(2)}</span>
             </div>
           </div>
           </motion.div>

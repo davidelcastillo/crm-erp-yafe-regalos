@@ -505,8 +505,8 @@
    Estas clases tienen el color escrito a mano (blanco), así que necesitan su par
    oscuro. Van dentro de `@layer components` y después de las clases base: misma
    capa, más especificidad, así las utilidades de Tailwind las siguen superando.
-   `.btn-primary`, `.btn-danger` y `.btn-fab` no aparecen: pasan el contraste
-   sobre fondo oscuro tal como están.
+   `.btn-primary` y `.btn-danger` no aparecen: pasan el contraste sobre fondo
+   oscuro tal como están.
    ============================================================================ */
 [data-theme="dark"] .glass {
   background-color: rgb(21 23 28 / 0.72);
@@ -523,6 +523,72 @@
     rgb(191 219 254 / 0.1),
     rgb(244 114 182 / 0.1)
   );
+}
+
+/* Degradé de marca en oscuro: los tonos 800 en vez de los 200/400 del tema
+   claro, que sobre `--surface` encandilan. El texto no cambia: en oscuro
+   `text-ink` ya es claro, así que un mismo componente sirve en los dos temas. */
+[data-theme="dark"] .brand-gradient {
+  background-image: linear-gradient(to right, #6b21a8, #9d174d);
+}
+
+/* Sobre un degradé oscuro el hover aclara, no oscurece: si no, el botón parece
+   deshabilitado justo cuando el dedo está encima. */
+[data-theme="dark"] .brand-gradient-hover:hover {
+  filter: brightness(1.12) saturate(1.02);
+}
+
+/* El FAB repite el degradé a mano y su icono era `near-black`: sobre el degradé
+   oscuro el trazo tiene que ser claro. */
+[data-theme="dark"] .btn-fab {
+  background-image: linear-gradient(to right, #6b21a8, #9d174d);
+  color: var(--ink);
+}
+
+[data-theme="dark"] .btn-fab:hover {
+  filter: brightness(1.12) saturate(1.02);
+}
+
+/* SweetAlert dibuja su propio DOM desde JS: no se le pueden poner clases desde
+   el componente, así que el tema se resuelve acá. Los colores del `Swal.fire`
+   no se tocan: son la marca y no dependen del tema. */
+[data-theme="dark"] .swal2-popup {
+  background-color: var(--surface);
+  color: var(--ink);
+}
+
+[data-theme="dark"] .swal2-title,
+[data-theme="dark"] .swal2-html-container {
+  color: var(--ink);
+}
+
+[data-theme="dark"] .swal2-actions button {
+  color: var(--ink);
+}
+
+/* Después de la regla de arriba y con más especificidad (0,3,0 contra 0,2,1):
+   si no, el confirm se queda con el `color: var(--ink)` de los botones. */
+[data-theme="dark"] .swal2-actions .swal2-confirm {
+  background-color: var(--palette-brand-action);
+  color: #ffffff;
+}
+
+[data-theme="dark"] .swal2-actions .swal2-cancel {
+  background-color: var(--surface-strong);
+  color: var(--ink);
+}
+
+[data-theme="dark"] .swal2-input,
+[data-theme="dark"] .swal2-select,
+[data-theme="dark"] .swal2-textarea {
+  background-color: var(--surface-strong);
+  color: var(--ink);
+  border-color: var(--hairline);
+}
+
+[data-theme="dark"] .swal2-validation-message {
+  background-color: var(--error-surface);
+  color: var(--error-ink);
 }
 
 [data-theme="dark"] .btn-secondary {

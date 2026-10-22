@@ -3,9 +3,9 @@ import Image from 'next/image';
 
 export default function LoginPage() {
   return (
-    <main className="min-h-screen bg-pink-50 flex flex-col font-sans relative overflow-hidden">
+    <main className="min-h-screen bg-accent/10 flex flex-col font-sans relative overflow-hidden">
       {/* 1. HEADER CON GRADIENTE Y ONDA SVG */}
-      <div className="relative bg-gradient-to-r from-blue-200 to-pink-400 pt-20 pb-26 flex flex-col items-center justify-center z-10">
+      <div className="relative brand-gradient pt-20 pb-26 flex flex-col items-center justify-center z-10">
         
         {/* Tu Logo (con estilo cristal para que combine) */}
         <div className="w-16 h-16 bg-surface/30 backdrop-blur-md rounded-2xl flex items-center justify-center mb-2 shadow-lg border border-white/50 relative overflow-hidden">
@@ -22,7 +22,7 @@ export default function LoginPage() {
         <h1 className="text-white text-2xl font-bold tracking-wider">FERIA CONEXX</h1>
 
         {/* Separador de Onda (SVG Wave). 
-            El fill="#fdf2f8" corresponde al color exacto de Tailwind para bg-pink-50 */}
+            El fill="#fdf2f8" es el tinte de marca (`bg-accent/10`) que sigue el tema */}
         <div className="absolute bottom-0 w-full overflow-hidden leading-[0]">
           <svg viewBox="0 0 1200 120" preserveAspectRatio="none" className="relative block w-full h-[50px] md:h-[60px]">
             <path 

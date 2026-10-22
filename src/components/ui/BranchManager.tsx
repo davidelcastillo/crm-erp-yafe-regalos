@@ -195,7 +195,7 @@ export function BranchManager({ branches }: { branches: Branch[] }) {
           </div>
 
           {error && (
-            <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-3 text-red-700 text-sm">
+            <div className="mb-4 bg-negative/10 border border-negative/30 rounded-lg p-3 text-negative text-sm">
               {error}
             </div>
           )}
@@ -340,7 +340,7 @@ export function BranchManager({ branches }: { branches: Branch[] }) {
       </div>
 
       {error && (
-        <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-3 text-red-700 text-sm">
+        <div className="mb-4 bg-negative/10 border border-negative/30 rounded-lg p-3 text-negative text-sm">
           {error}
         </div>
       )}

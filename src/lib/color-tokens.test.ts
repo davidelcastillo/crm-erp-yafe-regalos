@@ -11,7 +11,7 @@ import { join } from "node:path";
  * `bg-surface`, `text-ink-muted`, `border-hairline`, `bg-accent`, …
  */
 const RAIZ = join(__dirname, "..");
-const CARPETAS = ["app", "components"];
+const CARPETAS = ["app", "components", "lib/components"];
 const PROHIBIDOS: RegExp[] = [
   // Cualquier color arbitrario de Tailwind: text-[#222222], bg-[#f8f8f8], …
   /\[#/,
@@ -19,6 +19,12 @@ const PROHIBIDOS: RegExp[] = [
   /\bbg-white\b/,
   // Los grises de Tailwind tampoco siguen el tema.
   /\b(?:bg|text|border|divide|ring|placeholder|from|to|via)-gray-\d+/,
+  // El resto de la paleta de Tailwind, por el mismo motivo: `bg-green-50` es un
+  // blanco verdoso que se queda igual en oscuro. Los estados van por sus tokens
+  // con tinte (`bg-positive/10`, `text-negative`), que cambian de tema solos.
+  /\b(?:bg|text|border|divide|ring|placeholder|from|to|via|fill|stroke)-(?:green|red|blue|yellow|purple|pink|emerald|amber|orange|sky|indigo|violet|rose|lime|teal|cyan|fuchsia)-\d+/,
+  // El negro literal, por lo mismo que el blanco: el texto usa `text-ink`.
+  /\btext-black\b/,
 ];
 
 /** Todos los `.tsx` de las carpetas vigiladas, sin los tests. */
@@ -53,11 +59,14 @@ const ofensas = (archivos: string[]): string[] =>
   );
 
 describe("los componentes no fijan colores a mano", () => {
-  it("detecta las tres formas de fijar un color (el barrido no se puede quedar mudo)", () => {
+  it("detecta las formas de fijar un color (el barrido no se puede quedar mudo)", () => {
     const muestra = [
       '<div className="text-[#222222]" />',
       '<div className="bg-white rounded-xl" />',
       '<div className="border-gray-100" />',
+      // El agujero por donde se colaron las cajas blancas del tema oscuro.
+      '<span className="bg-green-50 text-green-800" />',
+      '<td className="text-black" />',
     ];
     for (const linea of muestra) {
       expect(PROHIBIDOS.some((patron) => patron.test(linea))).toBe(true);
@@ -68,6 +77,8 @@ describe("los componentes no fijan colores a mano", () => {
       '<div className="bg-surface text-ink-muted border-hairline" />',
       '<div className="bg-surface/70 text-white" />',
       '<button className="bg-accent text-white" />',
+      // Los estados con tinte son los que reemplazan a la paleta de Tailwind.
+      '<span className="bg-positive/10 text-negative border-positive/30" />',
     ];
     for (const linea of correctas) {
       expect(PROHIBIDOS.some((patron) => patron.test(linea))).toBe(false);

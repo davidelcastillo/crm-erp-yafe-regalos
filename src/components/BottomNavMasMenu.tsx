@@ -9,7 +9,7 @@ const MasMenuItem = ({ label, href, active }: { label: string; href: string; act
     className={`
       flex w-full items-center justify-start px-4 py-3 text-sm font-medium
       transition-colors duration-150
-      ${active ? "bg-gradient-to-r from-blue-200 to-pink-400 text-ink" : "text-ink-muted hover:bg-surface-strong"}
+      ${active ? "brand-gradient text-ink" : "text-ink-muted hover:bg-surface-strong"}
     `}
   >
     <span className="flex-1">{label}</span>

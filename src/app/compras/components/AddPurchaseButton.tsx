@@ -332,14 +332,15 @@ export function AddPurchaseButton({ products: initialProducts, onSuccess }: AddP
                 </div>
 
                 {/* Columna derecha: el total y la acción. En celular queda debajo de los
-                    ítems, en el orden de siempre. El total conserva su fondo oscuro:
-                    el gris de las tarjetas no se leería con texto blanco. */}
+                    ítems, en el orden de siempre. El total sigue siendo el bloque
+                    inverso (fondo `ink`, texto `surface`): con `text-white` fijo, en
+                    tema oscuro quedaba blanco sobre blanco. */}
                 <div className="mt-4 space-y-4 md:mt-0 md:sticky md:top-4">
                   {/* Total */}
                   <div className="p-4 bg-ink rounded-xl">
                     <div className="flex justify-between items-center">
-                      <span className="text-white font-medium">Total</span>
-                      <span className="text-white text-xl font-bold tabular-nums">
+                      <span className="text-surface font-medium">Total</span>
+                      <span className="text-surface text-xl font-bold tabular-nums">
                         ${calculateTotal().toFixed(2)}
                       </span>
                     </div>

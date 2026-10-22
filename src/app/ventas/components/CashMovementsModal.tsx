@@ -310,7 +310,7 @@ export const CashMovementsModal = ({
               <dl className="mt-3 space-y-2">
                 <div className="flex items-baseline justify-between gap-4">
                   <dt className="text-sm text-ink-body">Ingresos</dt>
-                  <dd className="text-sm font-semibold text-green-700 tabular-nums">
+                  <dd className="text-sm font-semibold text-positive tabular-nums">
                     {plata(totales.ingresos)}
                   </dd>
                 </div>
@@ -356,7 +356,7 @@ export const CashMovementsModal = ({
                     </div>
                     <span
                       className={`text-sm font-semibold whitespace-nowrap tabular-nums ${
-                        m.type === "INGRESO" ? "text-green-700" : "text-error"
+                        m.type === "INGRESO" ? "text-positive" : "text-error"
                       }`}
                     >
                       {m.type === "INGRESO" ? "+" : "-"}

@@ -136,7 +136,7 @@ export function ProductSearch(props: ProductSearchProps) {
           autoComplete="off"
         />
         {error && (
-          <p className="mt-2 text-sm text-red-500" role="alert">{error}</p>
+          <p className="mt-2 text-sm text-negative" role="alert">{error}</p>
         )}
         {loading && (
           <div className="mt-2 flex items-center gap-2 text-sm text-ink-muted">
@@ -178,7 +178,7 @@ export function ProductSearch(props: ProductSearchProps) {
                   <div className="flex items-center gap-2 text-xs text-ink-muted mt-0.5">
                     <span className="px-2 py-0.5 bg-surface-strong rounded">{product.code}</span>
                     <span>${product.price.toFixed(2)}</span>
-                    <span className={product.stock <= 5 ? "text-red-500" : ""}>
+                    <span className={product.stock <= 5 ? "text-negative" : ""}>
                       Stock: {product.stock}
                     </span>
                   </div>
@@ -238,7 +238,7 @@ export function ProductSearch(props: ProductSearchProps) {
         />
 
         {error && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm" role="alert">
+          <div className="mb-4 p-3 bg-negative/10 border border-negative/30 rounded-lg text-negative text-sm" role="alert">
             {error}
           </div>
         )}
@@ -284,7 +284,7 @@ export function ProductSearch(props: ProductSearchProps) {
                   <div className="flex items-center gap-2 text-sm text-ink-muted mt-1">
                     <span className="px-2 py-0.5 bg-surface-strong rounded font-mono text-xs">{product.code}</span>
                     <span className="font-medium">${product.price.toFixed(2)}</span>
-                    <span className={product.stock <= 5 ? "text-red-500 font-medium" : ""}>
+                    <span className={product.stock <= 5 ? "text-negative font-medium" : ""}>
                       Stock: {product.stock}
                     </span>
                   </div>

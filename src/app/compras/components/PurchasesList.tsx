@@ -60,7 +60,7 @@ export function PurchaseCard({ purchase, onExpand, expanded }: PurchaseCardProps
           <div className="flex shrink-0 flex-col items-end gap-2">
             {/* El monto total entra animado cuando la card se vuelve a pintar (S9),
                 y queda en un solo nodo de texto. */}
-            <ValueChange key={total} className="text-lg font-bold text-red-800">
+            <ValueChange key={total} className="text-lg font-bold text-negative">
               {`- $${total.toFixed(2)}`}
             </ValueChange>
             <svg className={`w-5 h-5 text-ink-muted transition-transform ${expanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -85,13 +85,13 @@ export function PurchaseCard({ purchase, onExpand, expanded }: PurchaseCardProps
                 </div>
                 <div className="shrink-0 text-right">
                   <p className="text-ink font-medium">${item.subtotal.toFixed(2)}</p>
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-50 text-green-700">+{item.quantity}</span>
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-positive/10 text-positive">+{item.quantity}</span>
                 </div>
               </div>
             ))}
             <div className="pt-3 border-t border-hairline flex justify-between items-center">
               <span className="font-semibold text-ink">Total</span>
-              <span className="font-bold text-red-800">-${total.toFixed(2)}</span>
+              <span className="font-bold text-negative">-${total.toFixed(2)}</span>
             </div>
           </div>
         </div>

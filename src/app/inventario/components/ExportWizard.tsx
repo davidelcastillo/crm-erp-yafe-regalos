@@ -224,7 +224,7 @@ export function ExportWizard({ open, onClose, branches }: ExportWizardProps) {
               label="Sucursal a exportar"
             />
             {branchError && (
-              <p className="mt-2 text-sm text-red-600">{branchError}</p>
+              <p className="mt-2 text-sm text-negative">{branchError}</p>
             )}
             <div className="md:flex md:justify-end">
               <button
@@ -294,7 +294,7 @@ export function ExportWizard({ open, onClose, branches }: ExportWizardProps) {
 
                 {!productsLoading && productsError && (
                   <div className="text-center py-8">
-                    <p className="text-sm text-red-600 mb-4">{productsError}</p>
+                    <p className="text-sm text-negative mb-4">{productsError}</p>
                     <button
                       type="button"
                       onClick={() => {

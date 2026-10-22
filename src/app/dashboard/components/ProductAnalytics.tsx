@@ -194,7 +194,7 @@ export function ProductAnalytics({ products }: ProductAnalyticsProps) {
           {/* Profit */}
           <div
             className={`p-4 rounded-lg ${
-              analytics.profit >= 0 ? "bg-green-50" : "bg-red-50"
+              analytics.profit >= 0 ? "bg-positive/10" : "bg-negative/10"
             }`}
           >
             <div className="text-sm text-ink-muted">Rentabilidad del Producto</div>

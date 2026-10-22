@@ -490,30 +490,30 @@ export function AddSaleButton({ products, onSuccess }: AddSaleButtonProps) {
                     )}
 
                     {/* Totals */}
-                    <div className="p-4 bg-green-50 rounded-xl border border-green-200">
+                    <div className="p-4 bg-positive/10 rounded-xl border border-positive/30">
                       <div className="flex justify-between items-center mb-2">
-                        <span className="text-green-800 font-medium">Total Venta</span>
+                        <span className="text-positive font-medium">Total Venta</span>
                         <ValueChange
                           key={`total-${calculateTotal()}`}
-                          className="text-green-700 font-bold tabular-nums"
+                          className="text-positive font-bold tabular-nums"
                         >
                           ${calculateTotal().toFixed(2)}
                         </ValueChange>
                       </div>
                       <div className="flex justify-between items-center mb-2">
-                        <span className="text-green-800">Monto Pagado</span>
+                        <span className="text-positive">Monto Pagado</span>
                         <ValueChange
                           key={`pagado-${calcularPago().amountPaid}`}
-                          className="text-green-600 tabular-nums"
+                          className="text-positive tabular-nums"
                         >
                           -${calcularPago().amountPaid.toFixed(2)}
                         </ValueChange>
                       </div>
-                      <div className="flex justify-between items-center pt-2 border-t border-green-200">
-                        <span className="text-green-800 font-medium">Saldo Pendiente</span>
+                      <div className="flex justify-between items-center pt-2 border-t border-positive/30">
+                        <span className="text-positive font-medium">Saldo Pendiente</span>
                         <ValueChange
                           key={`saldo-${calcularPago().pendingBalance}`}
-                          className="text-green-700 text-xl font-bold tabular-nums"
+                          className="text-positive text-xl font-bold tabular-nums"
                         >
                           ${calcularPago().pendingBalance.toFixed(2)}
                         </ValueChange>

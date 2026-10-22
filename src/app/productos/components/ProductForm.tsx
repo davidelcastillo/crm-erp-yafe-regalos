@@ -318,7 +318,7 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-4 min-h-[48px] bg-ink text-white font-medium rounded-xl hover:bg-ink-body transition-colors disabled:opacity-50 touch-manipulation"
+              className="w-full py-4 min-h-[48px] bg-ink text-surface font-medium rounded-xl hover:bg-ink-body hover:text-surface transition-colors disabled:opacity-50 touch-manipulation"
             >
               {loading
                 ? "Guardando…"
