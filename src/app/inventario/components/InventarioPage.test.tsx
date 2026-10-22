@@ -205,10 +205,10 @@ describe("InventarioPage — FAB crear producto (spec inventory-ui)", () => {
     fireEvent.click(screen.getByRole("button", { name: /todas las sucursales/i }));
     fireEvent.click(await screen.findByRole("option", { name: "Principal" }));
 
-    // Filtro de categoría: "Limpieza" (id 1).
-    fireEvent.change(screen.getByDisplayValue("Todas las categorías"), {
-      target: { value: "1" },
-    });
+    // Filtro de categoría: "Limpieza" (id 1). El filtro es un desplegable del
+    // sistema (activo en rosa), no un `<select>` nativo: se abre y se elige.
+    fireEvent.click(screen.getByRole("button", { name: "Categoría" }));
+    fireEvent.click(screen.getByRole("button", { name: "Limpieza" }));
 
     // Búsqueda "jabón" (debounce 300 ms real → waitFor lo espera).
     fireEvent.change(screen.getByLabelText(/buscar producto/i), {
@@ -276,9 +276,11 @@ describe("InventarioPage — FAB crear producto (spec inventory-ui)", () => {
     await waitFor(() => {
       expect(mockCreateCategory).toHaveBeenCalledWith({ name: "Alimentos" });
     });
-    // La nueva categoría queda disponible en el selector (refresh real).
+    // La nueva categoría queda disponible en el selector (refresh real): hay
+    // que abrir el desplegable para verla.
+    fireEvent.click(screen.getByRole("button", { name: "Categoría" }));
     expect(
-      await screen.findByRole("option", { name: "Alimentos" })
+      await screen.findByRole("button", { name: "Alimentos" })
     ).toBeInTheDocument();
     // Swal de éxito.
     await waitFor(() => {
@@ -316,7 +318,8 @@ describe("InventarioPage — FAB crear producto (spec inventory-ui)", () => {
       );
     });
     // "Alimentos" aparece UNA sola vez en el selector (no hubo duplicado local).
-    expect(screen.getAllByRole("option", { name: "Alimentos" })).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: "Categoría" }));
+    expect(screen.getAllByRole("button", { name: "Alimentos" })).toHaveLength(1);
   });
 });
 

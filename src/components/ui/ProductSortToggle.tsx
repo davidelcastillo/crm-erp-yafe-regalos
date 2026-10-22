@@ -15,7 +15,8 @@ const OPTIONS: Array<{ value: ProductSortMode; label: string }> = [
 
 /**
  * Control segmentado compartido por las listas de productos (S4): código por
- * defecto y cambio a última fecha de modificación.
+ * defecto y cambio a última fecha de modificación. El segmento activo usa el
+ * mismo rosa que el selector de sucursal (S18/U3), no una caja propia.
  */
 export function ProductSortToggle({ value, onChange, className = "" }: ProductSortToggleProps) {
   return (
@@ -31,7 +32,9 @@ export function ProductSortToggle({ value, onChange, className = "" }: ProductSo
           onClick={() => onChange(option.value)}
           aria-pressed={value === option.value}
           className={`min-h-[44px] rounded-lg px-3 text-sm font-medium transition-colors touch-manipulation ${
-            value === option.value ? "bg-surface text-ink shadow-sm" : "text-ink-muted"
+            value === option.value
+              ? "bg-accent/10 text-brand-rosa-texto"
+              : "text-ink-muted"
           }`}
         >
           {option.label}

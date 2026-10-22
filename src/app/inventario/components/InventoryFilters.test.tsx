@@ -1,9 +1,10 @@
 /**
  * @jest-environment jsdom
  *
- * S2: los dos selectores de la lista (categoría y orden) comparten el control
- * del sistema (`.field-select`) y el mismo contenedor. Si uno se cambia de
- * clases o se muda a otra tarjeta, dejan de medir lo mismo.
+ * S18/U3: los dos filtros de la lista (Categoría y Ordenar por) usan el
+ * desplegable del sistema (`FilterSelect`), que pinta la opción activa con el
+ * rosa de la marca como el selector de sucursal. Ya no son `<select>` nativos:
+ * ahí el rosa no se puede pintar. Siguen compartiendo el grid de dos columnas.
  */
 import { render, screen, fireEvent } from "@testing-library/react";
 import { InventoryFilters, INVENTORY_SORT_OPTIONS } from "./InventoryFilters";
@@ -20,27 +21,73 @@ const renderFilters = (overrides: Partial<Parameters<typeof InventoryFilters>[0]
     />
   );
 
-describe("InventoryFilters — categoría y orden con el mismo control (S2)", () => {
-  it("los dos selectores usan la clase del sistema", () => {
+describe("InventoryFilters — filtros con el desplegable del sistema (S18/U3)", () => {
+  it("los dos filtros son FilterSelect y comparten el grid de dos columnas", () => {
     renderFilters();
 
-    const categoria = screen.getByLabelText("Categoría");
-    const orden = screen.getByLabelText("Ordenar por");
+    const categoria = screen.getByRole("button", { name: "Categoría" });
+    const orden = screen.getByRole("button", { name: "Ordenar por" });
 
-    expect(categoria).toHaveClass("field-select");
-    expect(orden).toHaveClass("field-select");
+    // Un solo `aria-expanded` cada uno: los dos son el control del sistema,
+    // no un `<select>`.
+    expect(categoria).toHaveAttribute("aria-expanded", "false");
+    expect(orden).toHaveAttribute("aria-expanded", "false");
+    expect(categoria).not.toHaveClass("field-select");
     // Mismo contenedor: el grid que los pone uno al lado del otro desde `sm`.
-    expect(categoria.parentElement?.parentElement).toBe(orden.parentElement?.parentElement);
+    const grid = categoria.closest("div.grid");
+    expect(grid).not.toBeNull();
+    expect(grid).toBe(orden.closest("div.grid"));
   });
 
-  it("ofrece las opciones de orden de la lista y avisa el cambio", () => {
+  it("el filtro de categoría arranca en «Todas» y ofrece la lista de categorías", () => {
+    renderFilters({ categories: [{ id: 1, name: "Limpieza" }, { id: 7, name: "Alimentos" }] });
+
+    const categoria = screen.getByRole("button", { name: "Categoría" });
+    expect(categoria).toHaveTextContent("Todas las categorías");
+
+    fireEvent.click(categoria);
+    expect(screen.getByRole("button", { name: "Todas las categorías" })).toHaveAttribute(
+      "aria-current",
+      "true"
+    );
+    expect(screen.getByRole("button", { name: "Limpieza" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Alimentos" })).toBeInTheDocument();
+  });
+
+  it("elegir «Todas las categorías» avisa null", () => {
+    const onFilterChange = jest.fn();
+    renderFilters({ selectedCategoryId: 7, onFilterChange });
+
+    fireEvent.click(screen.getByRole("button", { name: "Categoría" }));
+    fireEvent.click(screen.getByRole("button", { name: "Todas las categorías" }));
+
+    expect(onFilterChange).toHaveBeenCalledWith(null);
+  });
+
+  it("elegir una categoría avisa su id numérico", () => {
+    const onFilterChange = jest.fn();
+    renderFilters({ categories: [{ id: 7, name: "Alimentos" }], onFilterChange });
+
+    fireEvent.click(screen.getByRole("button", { name: "Categoría" }));
+    fireEvent.click(screen.getByRole("button", { name: "Alimentos" }));
+
+    expect(onFilterChange).toHaveBeenCalledWith(7);
+  });
+
+  it("el filtro de orden ofrece las opciones de la lista y avisa el valor", () => {
     const onSortChange = jest.fn();
     renderFilters({ onSortChange });
 
-    const orden = screen.getByLabelText("Ordenar por");
-    expect(orden.querySelectorAll("option")).toHaveLength(INVENTORY_SORT_OPTIONS.length);
+    fireEvent.click(screen.getByRole("button", { name: "Ordenar por" }));
+    expect(screen.getByRole("button", { name: "Código" })).toHaveAttribute(
+      "aria-current",
+      "true"
+    );
+    for (const option of INVENTORY_SORT_OPTIONS) {
+      expect(screen.getByRole("button", { name: option.label })).toBeInTheDocument();
+    }
 
-    fireEvent.change(orden, { target: { value: "stock-desc" } });
+    fireEvent.click(screen.getByRole("button", { name: "Stock: mayor a menor" }));
     expect(onSortChange).toHaveBeenCalledWith("stock-desc");
   });
 });

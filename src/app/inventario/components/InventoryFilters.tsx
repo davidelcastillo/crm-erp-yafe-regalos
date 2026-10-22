@@ -1,4 +1,6 @@
-import type { ChangeEvent } from 'react';
+"use client";
+
+import { FilterSelect } from '@/components/ui/FilterSelect';
 
 export interface InventoryFiltersProps {
   categories: Array<{ id: number; name: string }>;
@@ -10,7 +12,7 @@ export interface InventoryFiltersProps {
 
 /**
  * Opciones de orden de las listas de inventario. Nombres y valores en un solo
- * lugar: el `<select>` de la página y el ordenamiento de `InventarioList` no
+ * lugar: el filtro de la página y el ordenamiento de `InventarioList` no
  * pueden desincronizarse.
  */
 export const INVENTORY_SORT_OPTIONS = [
@@ -23,6 +25,9 @@ export const INVENTORY_SORT_OPTIONS = [
 
 export type InventorySortOption = (typeof INVENTORY_SORT_OPTIONS)[number]['value'];
 
+/** Valor del filtro de categoría que significa «sin filtrar». */
+const TODAS = '';
+
 export const InventoryFilters = ({
   categories,
   selectedCategoryId,
@@ -30,50 +35,31 @@ export const InventoryFilters = ({
   sortBy,
   onSortChange,
 }: InventoryFiltersProps) => {
-  const handleCategoryChange = (e: ChangeEvent<HTMLSelectElement>) => {
-    const val = e.target.value;
-    onFilterChange(val === '' ? null : Number(val));
-  };
-
   return (
     <div className="space-y-3">
-      {/* Categoría y orden comparten contenedor y control (`.field-select`): en
+      {/* Categoría y orden comparten contenedor y control (`FilterSelect`): en
           celular van apilados a lo ancho y desde `sm` en dos columnas iguales. */}
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
-          <label htmlFor="inventario-categoria" className="field-label">
-            Categoría
-          </label>
-          <select
-            id="inventario-categoria"
-            value={selectedCategoryId ?? ''}
-            onChange={handleCategoryChange}
-            className="field-select"
-          >
-            <option value="">Todas las categorías</option>
-            {categories.map(c => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
+          <span className="field-label">Categoría</span>
+          <FilterSelect
+            label="Categoría"
+            value={selectedCategoryId === null ? TODAS : String(selectedCategoryId)}
+            options={[
+              { value: TODAS, label: 'Todas las categorías' },
+              ...categories.map((c) => ({ value: String(c.id), label: c.name })),
+            ]}
+            onChange={(value) => onFilterChange(value === TODAS ? null : Number(value))}
+          />
         </div>
         <div>
-          <label htmlFor="inventario-orden" className="field-label">
-            Ordenar por
-          </label>
-          <select
-            id="inventario-orden"
+          <span className="field-label">Ordenar por</span>
+          <FilterSelect
+            label="Ordenar por"
             value={sortBy}
-            onChange={(e) => onSortChange(e.target.value as InventorySortOption)}
-            className="field-select"
-          >
-            {INVENTORY_SORT_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+            options={[...INVENTORY_SORT_OPTIONS]}
+            onChange={(value) => onSortChange(value as InventorySortOption)}
+          />
         </div>
       </div>
     </div>
