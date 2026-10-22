@@ -142,7 +142,7 @@ it("closes purchase modal when clicking outside", async () => {
     expect(screen.getByText(/nueva compra/i)).toBeInTheDocument();
     
     // Click on backdrop (outside the modal content)
-    const backdrop = document.body.querySelector('.fixed.inset-0.bg-black\\/30.backdrop-blur-md');
+    const backdrop = document.body.querySelector('.fixed.inset-0.bg-scrim.backdrop-blur-md');
     if (backdrop) {
       fireEvent.click(backdrop);
     }
@@ -465,7 +465,7 @@ it("closes product creation modal when clicking outside", () => {
     
     // Click on product modal backdrop (the dark background behind the modal)
     // The backdrop is the div with onClick handler that closes the modal
-    const backdrop = document.body.querySelector('.fixed.inset-0.bg-black\\/60.backdrop-blur-sm');
+    const backdrop = document.body.querySelector('.fixed.inset-0.bg-scrim-strong.backdrop-blur-sm');
     if (backdrop) {
       fireEvent.click(backdrop);
     }

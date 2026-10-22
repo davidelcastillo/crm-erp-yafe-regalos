@@ -62,9 +62,12 @@ jest.mock("@/actions/label-print", () => ({
   generateProductLabels: jest.fn(),
 }));
 
+// `push` estable: el paso «Control de stock» navega por router.
+const mockPush = jest.fn();
+
 jest.mock("next/navigation", () => ({
   useRouter: jest.fn(() => ({
-    push: jest.fn(),
+    push: mockPush,
     refresh: jest.fn(),
   })),
   usePathname: jest.fn(() => "/inventario"),
@@ -359,47 +362,85 @@ describe("InventarioPage — acceso a inactivos desde PC (S1)", () => {
   });
 });
 
-describe("InventarioPage — acceso a etiquetas de precio (S3)", () => {
-  it("la barra de PC tiene «Etiquetas» al lado de Exportar y abre el wizard", async () => {
+describe("InventarioPage — un solo acceso a impresión (T3a-2)", () => {
+  it("la barra de PC tiene «Imprimir» y su paso de etiquetas abre el wizard", async () => {
     await renderPage();
 
-    const botones = screen.getAllByRole("button", { name: "Etiquetas" });
+    const botones = screen.getAllByRole("button", { name: /^Imprimir/ });
     const barraDePc = botones.filter((boton) =>
       boton.parentElement?.className.includes("md:flex")
     );
     expect(barraDePc).toHaveLength(1);
 
     fireEvent.click(barraDePc[0]);
+    fireEvent.click(await screen.findByRole("button", { name: /Etiquetas de precio/ }));
 
     expect(await screen.findByText("Etiquetas de precio")).toBeInTheDocument();
     expect(screen.getByText(/paso 1 de 2/i)).toBeInTheDocument();
   });
 
-  it("la grilla de celular tiene su tarjeta de acción", async () => {
+  it("la banda de celular tiene una sola tarjeta «Imprimir» con su pista", async () => {
     await renderPage();
 
-    const tarjetas = screen
-      .getAllByRole("button", { name: /Precios para imprimir/ })
-      .filter((boton) => boton.className.includes("text-left"));
-
-    expect(tarjetas).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: /Lista y etiquetas/ })).toHaveLength(1);
   });
 });
 
-describe("InventarioPage — banda de acciones en celular (S3)", () => {
-  it("cierra 2x2: cuatro controles y ningún «Inactivos» suelto al final", async () => {
+describe("InventarioPage — un solo acceso a stock (T3a-2)", () => {
+  it("la banda ofrece exactamente dos acciones: «Stock» e «Imprimir»", async () => {
     await renderPage();
 
     const banda = screen.getByRole("group", { name: "Acciones de la página" });
 
-    // Cuatro tarjetas: Mover Stock, Entrada/Salida, Exportar y Etiquetas.
+    // Dos temas, no cuatro variantes del mismo trámite.
     const controles = within(banda).getAllByRole("button");
-    expect(controles).toHaveLength(4);
-    // «Inactivos» ya no es la quinta tarjeta (quedaba sola en 2+1).
+    expect(controles).toHaveLength(2);
+    expect(within(banda).getByRole("button", { name: /^Stock/ })).toBeInTheDocument();
+    expect(within(banda).getByRole("button", { name: /^Imprimir/ })).toBeInTheDocument();
+    // Ni una de las cuatro acciones viejas quedó suelta en la banda.
+    for (const vieja of ["Mover stock", "Entrada / Salida", "Exportar", "Etiquetas"]) {
+      expect(within(banda).queryByRole("button", { name: new RegExp(vieja) })).toBeNull();
+    }
+    // «Inactivos» sigue en el menú ☰, no como tarjeta suelta (2+1).
     expect(within(banda).queryAllByRole("link")).toHaveLength(0);
     expect(banda.textContent).not.toMatch(/inactivos/i);
   });
 
+  it("«Stock» abre el menú con las tres opciones adentro", async () => {
+    await renderPage();
+
+    fireEvent.click(screen.getAllByRole("button", { name: /^Stock/ })[0]);
+
+    const menu = await screen.findByRole("dialog", { name: "Stock" });
+    expect(
+      within(menu).getAllByRole("button", {
+        name: /Mover stock|Entrada \/ Salida|Control de stock/,
+      })
+    ).toHaveLength(3);
+  });
+
+  it("«Control de stock» navega a /inventario/control y cierra el menú", async () => {
+    await renderPage();
+
+    fireEvent.click(screen.getAllByRole("button", { name: /^Stock/ })[0]);
+    fireEvent.click(await screen.findByRole("button", { name: /Control de stock/ }));
+
+    expect(mockPush).toHaveBeenCalledWith("/inventario/control");
+    expect(screen.queryByRole("dialog", { name: "Stock" })).not.toBeInTheDocument();
+  });
+
+  it("«Mover stock» abre el diálogo de siempre y ya no muestra el menú", async () => {
+    await renderPage();
+
+    fireEvent.click(screen.getAllByRole("button", { name: /^Stock/ })[0]);
+    fireEvent.click(await screen.findByRole("button", { name: /Mover stock/ }));
+
+    expect(await screen.findByRole("dialog", { name: "Mover Stock" })).toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "Stock" })).not.toBeInTheDocument();
+  });
+});
+
+describe("InventarioPage — «Inactivos» sigue en el menú ☰ (S3)", () => {
   it("«Inactivos» se alcanza desde el menú ☰", async () => {
     await renderPage();
 
@@ -410,5 +451,37 @@ describe("InventarioPage — banda de acciones en celular (S3)", () => {
       "href",
       "/inventario/inactivos"
     );
+  });
+
+  // Prueba visual del usuario (S18, U3): «Sacar control de stock del menu de
+  // hamburguesa, ya esta en los botones principales». Queda un solo acceso.
+  it("«Control de stock» ya no está en el menú ☰ porque vive en la banda", async () => {
+    await renderPage();
+
+    fireEvent.click(screen.getByLabelText("Abrir menú"));
+    const menu = screen.getByLabelText("Menú de Inventario");
+
+    expect(within(menu).queryByText(/control de stock/i)).toBeNull();
+
+    // No se perdió: sigue siendo el tercer paso del acceso «Stock».
+    fireEvent.click(screen.getByLabelText("Cerrar menú"));
+    fireEvent.click(screen.getAllByRole("button", { name: /^Stock/ })[0]);
+    expect(
+      within(await screen.findByRole("dialog", { name: "Stock" })).getByRole("button", {
+        name: /Control de stock/,
+      })
+    ).toBeInTheDocument();
+  });
+});
+
+describe("Inventario: buscador en su propia tarjeta (S16)", () => {
+  it("el buscador vive en una tarjeta de vidrio propia, fuera de la hoja de la lista", async () => {
+    render(<InventarioPage />);
+
+    // Aparece recién cuando la página terminó de cargar (antes muestra esqueletos).
+    const buscador = await screen.findByPlaceholderText("Buscar producto...");
+    // Su bloque es el de vidrio reforzado, separado del que contiene la lista.
+    expect(buscador.closest(".glass-strong")).not.toBeNull();
+    expect(buscador.closest('[class*="rounded-t-"]')).toBeNull();
   });
 });

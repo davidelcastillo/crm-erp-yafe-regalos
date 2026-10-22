@@ -3,7 +3,7 @@
  * tarjetas y también el gráfico. Antes el gráfico pedía siempre `days: 30` sin
  * importar lo que se eligiera (bug 5 del usuario).
  */
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import DashboardPage from './page';
 
 const mockGetStats = jest.fn();
@@ -13,6 +13,8 @@ const mockGetProducts = jest.fn();
 jest.mock('../actions/dashboard', () => ({
   getStats: (...args: unknown[]) => mockGetStats(...args),
   getPerformanceData: (...args: unknown[]) => mockGetPerformanceData(...args),
+  // El caso de `ProductAnalytics` (S18) renderiza el componente real, que lo pide al elegir.
+  getProductAnalytics: jest.fn(async () => ({ success: true, data: null })),
 }));
 
 jest.mock('../actions/product', () => ({
@@ -117,6 +119,76 @@ describe('DashboardPage — carga', () => {
   });
 });
 
+// La forma del encabezado mientras carga (S2): sin ella la hoja salta al terminar.
+describe('DashboardPage — esqueleto del encabezado (S2)', () => {
+  it('mientras carga muestra la forma del encabezado y la reemplaza al terminar', async () => {
+    const { container } = render(<DashboardPage />);
+
+    // La píldora del encabezado, con la medida de la página real.
+    expect(container.querySelector('[aria-hidden="true"] .h-\\[60px\\]')).not.toBeNull();
+    // Y la hoja arranca donde arranca la de la página: `-mt-12 px-5 pt-6`.
+    const hoja = container.querySelector('.glass');
+    expect(hoja).toHaveClass('-mt-12', 'px-5', 'pt-6');
+
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Dashboard' })
+    ).toBeInTheDocument();
+  });
+});
+
+// Parallax del encabezado y retiro del degradé (S10, S11): lo que se atenúa es
+// superficie decorativa, nunca un control.
+describe('DashboardPage — parallax y obscuration (S10, S11)', () => {
+  it('el degradé es una capa decorativa dentro de la banda y el encabezado va en su envoltorio', async () => {
+    const { container } = render(<DashboardPage />);
+    await screen.findByRole('heading', { level: 1, name: 'Dashboard' });
+
+    const capa = container.querySelector('.brand-gradient');
+    expect(capa).toHaveAttribute('aria-hidden', 'true');
+    expect(capa).toHaveClass('pointer-events-none', 'absolute', 'inset-0');
+    expect(capa?.parentElement).toHaveClass('relative', 'isolate');
+
+    // El encabezado se mueve solo: no está pegado al mismo nodo que la capa.
+    const encabezado = container.querySelector('header');
+    expect(encabezado).not.toBeNull();
+    expect(encabezado?.parentElement).not.toBe(capa?.parentElement);
+  });
+});
+
+// Cascada del recorrido (S7) y cambio de valor (S9) en las tarjetas del resumen.
+describe('DashboardPage — tarjetas del resumen (S7, S9)', () => {
+  it('cada tarjeta va en su propio envoltorio y el monto queda en un solo nodo', async () => {
+    mockGetStats.mockResolvedValueOnce({
+      success: true,
+      data: {
+        totalIncome: 1500,
+        totalExpense: 800,
+        netProfit: 700,
+        accountsReceivable: 250,
+      },
+    });
+
+    render(<DashboardPage />);
+    await screen.findByText('Ingresos');
+
+    const grilla = screen.getByRole('heading', { name: 'Resumen' })
+      .parentElement?.nextElementSibling as HTMLElement;
+    expect(grilla.children).toHaveLength(4);
+
+    // La raíz de la card no cambia: la que anima la entrada es el envoltorio.
+    for (const envoltorio of Array.from(grilla.children)) {
+      expect(envoltorio).not.toHaveClass('glass');
+      expect(envoltorio.firstElementChild).toHaveClass('glass');
+    }
+
+    // El monto entra animado y sigue siendo un único nodo de texto.
+    const monto = screen.getByText(/\$ 1\.500/);
+    expect(monto.tagName).toBe('SPAN');
+    expect(monto).toHaveClass('block');
+    expect(monto.childNodes).toHaveLength(1);
+  });
+});
+
 describe('DashboardPage — resumen', () => {
   it('muestra el título y las tarjetas con sus valores', async () => {
     mockGetStats.mockResolvedValueOnce({
@@ -141,5 +213,53 @@ describe('DashboardPage — resumen', () => {
     expect(screen.getByText(/\$ 800/)).toBeInTheDocument();
     expect(screen.getByText(/\$ 700/)).toBeInTheDocument();
     expect(screen.getByText(/\$ 250/)).toBeInTheDocument();
+  });
+});
+
+// Prueba visual del usuario (S18, U1): «el selector de productos cuando le hago
+// click para seleccionar es demasiado grande y se sale de la pantalla». Era un
+// `<select>` nativo: la lista la dibuja el sistema operativo y se abría tan ancha
+// como el nombre más largo, sin poder acotarla. Se reemplaza por un desplegable
+// del sistema, con alto máximo, scroll interno y ancho de la tarjeta.
+// La página mockea el componente, así que acá se renderiza el real.
+describe('ProductAnalytics — selector de producto acotado (S18)', () => {
+  const { ProductAnalytics } = jest.requireActual('./components/ProductAnalytics') as typeof import('./components/ProductAnalytics');
+
+  const productos = [
+    { id: 1, name: 'Producto con un nombre larguísimo que antes ensanchaba la lista' },
+  ] as never[];
+
+  const abrirSelector = () => {
+    const { container } = render(<ProductAnalytics products={productos} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Elegir producto' }));
+    return container;
+  };
+
+  it('abre un desplegable del sistema, no la lista nativa del navegador', () => {
+    const container = abrirSelector();
+
+    // Son botones de verdad dentro de un panel propio: cada opción se alcanza con
+    // Tab y se activa con Enter, sin que el sistema operativo dibuje la lista.
+    const opcion = screen.getByRole('button', { name: /nombre larguísimo/ });
+    expect(opcion).toHaveClass('truncate');
+    expect(container.querySelector('select')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Elegir producto' })).toHaveAttribute(
+      'aria-expanded',
+      'true'
+    );
+
+    // Alto máximo con scroll adentro y el ancho del trigger: nada se sale de la pantalla.
+    expect(opcion.parentElement).toHaveClass('max-h-60', 'overflow-y-auto', 'w-full', 'absolute');
+  });
+
+  it('al elegir un producto cierra la lista y deja la elección a la vista', async () => {
+    abrirSelector();
+
+    fireEvent.click(screen.getByRole('button', { name: /nombre larguísimo/ }));
+
+    expect(screen.queryByRole('button', { name: /nombre larguísimo/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Elegir producto' })).toHaveTextContent(
+      /nombre larguísimo/
+    );
   });
 });

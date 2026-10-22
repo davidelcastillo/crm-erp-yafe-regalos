@@ -22,7 +22,7 @@ export function ProductSortToggle({ value, onChange, className = "" }: ProductSo
     <div
       role="group"
       aria-label="Ordenar por"
-      className={`inline-flex rounded-xl bg-[#f8f8f8] p-1 ${className}`}
+      className={`inline-flex rounded-xl bg-surface-soft p-1 ${className}`}
     >
       {OPTIONS.map((option) => (
         <button
@@ -31,7 +31,7 @@ export function ProductSortToggle({ value, onChange, className = "" }: ProductSo
           onClick={() => onChange(option.value)}
           aria-pressed={value === option.value}
           className={`min-h-[44px] rounded-lg px-3 text-sm font-medium transition-colors touch-manipulation ${
-            value === option.value ? "bg-white text-[#222222] shadow-sm" : "text-[#6a6a6a]"
+            value === option.value ? "bg-surface text-ink shadow-sm" : "text-ink-muted"
           }`}
         >
           {option.label}

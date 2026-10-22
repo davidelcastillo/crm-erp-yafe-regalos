@@ -4,6 +4,7 @@ import { requireAdmin } from "@/lib/auth-guard";
 
 import { prisma } from "@/lib/prisma";
 import { parseArray, parseObject } from "@/lib/parse-prisma";
+import { readProductMovements, type ProductMovementRow } from "@/lib/product-movements";
 import { sortProducts } from "@/lib/product-order";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -285,102 +286,73 @@ export async function searchProducts(data: unknown) {
  * @param productId The product ID
  * @returns Promise resolving to an array of movement objects
  */
-export async function getProductMovements(productId: number) {
+/** Rango del historial: desde el último control de stock o desde la creación (S4). */
+const productMovementsOptionsSchema = z.object({
+  range: z.enum(["created", "last-control"]).default("created"),
+  branchId: z.number().int().positive().nullable().default(null),
+});
+
+/**
+ * Historial de movimientos del producto. El rango «desde el último control» es
+ * por sucursal: sin sucursal —o si esa sucursal nunca tuvo un control cerrado—
+ * cae a «desde la creación», y el `meta` lo dice para que la UI lo aclare en
+ * lugar de mostrar una lista vacía sin explicación.
+ */
+export async function getProductMovements(
+  productId: number,
+  options?: { range?: "created" | "last-control"; branchId?: number | null }
+) {
   try {
     const auth = await requireAdmin();
     if (!auth.ok) return { success: false as const, error: auth.error };
 
-    // Fetch purchases with related purchase data
-    const purchaseItems = await prisma.purchaseItem.findMany({
-      where: { productId },
-      include: {
-        purchase: {
-          select: {
-            id: true,
-            date: true,
-            branch: { select: { name: true } },
-          },
-        },
-      },
-      orderBy: {
-        purchase: {
-          date: 'desc',
-        },
-      },
-    });
+    const { range, branchId } = productMovementsOptionsSchema.parse(options ?? {});
 
-    // Fetch sales with related sale data
-    const saleItems = await prisma.saleItem.findMany({
-      where: { productId },
-      include: {
-        sale: {
-          select: {
-            id: true,
-            date: true,
-            branch: { select: { name: true } },
-          },
-        },
-      },
-      orderBy: {
-        sale: {
-          date: 'desc',
-        },
-      },
+    const product = await prisma.product.findUnique({
+      where: { id: productId },
+      select: { createdAt: true },
     });
+    if (!product) return { success: false as const, error: "Producto no encontrado" };
 
-    // Libro de la sucursal: transferencias entre sucursales y ajustes de stock.
-    // Las ENTRY de una compra se descartan porque esa compra ya es una fila del
-    // historial (si no, la misma operación aparecería dos veces).
-    const branchMovements = await prisma.branchMovement.findMany({
-      where: {
-        productId,
-        NOT: [
-          { movementType: 'ENTRY', reference: { startsWith: 'PURCHASE-' } },
-          { movementType: 'EXIT', reference: { startsWith: 'SALE-' } },
-        ],
-      },
-      include: { branch: { select: { name: true } } },
-      orderBy: { createdAt: 'desc' },
+    const control =
+      range === "last-control" && branchId !== null
+        ? await prisma.stockControl.findFirst({
+            where: { branchId, status: "CLOSED", closedAt: { not: null } },
+            orderBy: { closedAt: "desc" },
+            select: { closedAt: true },
+          })
+        : null;
+    const controlClosedAt = control?.closedAt ?? null;
+    const desde = controlClosedAt ?? product.createdAt;
+
+    const rows = await readProductMovements({
+      productIds: [productId],
+      since: desde,
+      branchId,
     });
-
-    // Map purchases to movement objects
-    const purchases: ProductMovement[] = purchaseItems.map(item => ({
-      id: `purchase-${item.id}`,
-      type: 'PURCHASE' as const,
-      date: item.purchase.date.toISOString(),
-      quantity: item.quantity,
-      referenceId: item.purchase.id,
-      reference: null,
-      branchName: item.purchase.branch?.name ?? null,
+    // El historial interno no necesita el código del producto: ya es el abierto.
+    const allMovements: ProductMovement[] = rows.map((row) => ({
+      id: row.id,
+      type: row.type,
+      date: row.date,
+      quantity: row.quantity,
+      referenceId: row.referenceId,
+      reference: row.reference,
+      branchName: row.branchName,
     }));
 
-    // Map sales to movement objects
-    const sales: ProductMovement[] = saleItems.map(item => ({
-      id: `sale-${item.id}`,
-      type: 'SALE' as const,
-      date: item.sale.date.toISOString(),
-      quantity: item.quantity,
-      referenceId: item.sale.id,
-      reference: null,
-      branchName: item.sale.branch?.name ?? null,
-    }));
-
-    const deSucursal: ProductMovement[] = branchMovements.map(movement => ({
-      id: `movement-${movement.id}`,
-      type: movement.movementType,
-      date: movement.createdAt.toISOString(),
-      quantity: movement.quantity,
-      referenceId: null,
-      reference: movement.reference,
-      branchName: movement.branch?.name ?? null,
-    }));
-
-    // Combine and sort by date descending
-    const allMovements = [...purchases, ...sales, ...deSucursal].sort((a, b) =>
-      new Date(b.date).getTime() - new Date(a.date).getTime()
-    );
-
-    return { success: true, data: parseArray(allMovements) };
+    return {
+      success: true,
+      data: parseArray(allMovements),
+      // La UI necesita saber qué rango se aplicó de verdad y desde cuándo.
+      meta: {
+        range: controlClosedAt ? ("last-control" as const) : ("created" as const),
+        requestedRange: range,
+        since: desde.toISOString(),
+        controlClosedAt: controlClosedAt?.toISOString() ?? null,
+        branchId,
+      },
+    };
   } catch (error) {
     console.error("Error fetching product movements:", error);
     return { success: false, error: "Error al obtener los movimientos del producto" };
@@ -389,18 +361,10 @@ export async function getProductMovements(productId: number) {
 
 // Movimiento del historial de un producto: documentos (compra/venta) y
 // movimientos del libro de sucursal (transferencias y ajustes).
-export type ProductMovement = {
-  id: string;
-  type: 'PURCHASE' | 'SALE' | 'ENTRY' | 'EXIT' | 'TRANSFER_IN' | 'TRANSFER_OUT' | 'ADJUSTMENT';
-  date: string; // ISO string
-  quantity: number;
-  /** Id del documento cuando el movimiento viene de una compra o una venta. */
-  referenceId: number | null;
-  /** Referencia del libro de sucursal (ej. "MOVE-1699999999999", "ADJUSTMENT"). */
-  reference: string | null;
-  /** Sucursal donde se registró el movimiento. */
-  branchName: string | null;
-};
+export type ProductMovement = Omit<
+  ProductMovementRow,
+  "productId" | "productCode"
+>;
 
 // ===========================================================================
 // Fase 3: Producto activo/inactivo + actualizar extendido (categoryId, active)

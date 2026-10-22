@@ -67,8 +67,8 @@ export default function BottomNav() {
              const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
              const Icon = item.icon;
              // El activo se marca con el circulo de marca detras del icono (texto oscuro sobre el degradé claro).
-             const linkClassName = `flex flex-col items-center justify-center flex-1 h-full transition-all duration-200 ease-in-out ${isActive ? "text-[#222222]" : "text-[#6a6a6a] hover:text-[#3f3f3f]"}`;
-             const spanClassName = `text-xs mt-1 font-medium ${isActive ? "text-[#222222]" : "text-[#6a6a6a]"}`;
+             const linkClassName = `flex flex-col items-center justify-center flex-1 h-full transition-all duration-200 ease-in-out ${isActive ? "text-ink" : "text-ink-muted hover:text-ink-body"}`;
+             const spanClassName = `text-xs mt-1 font-medium ${isActive ? "text-ink" : "text-ink-muted"}`;
              return (
                <Link
                  key={item.href}

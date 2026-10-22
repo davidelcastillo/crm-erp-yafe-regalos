@@ -33,7 +33,7 @@ export const BranchPicker = ({
   columns = 1,
 }: BranchPickerProps) => {
   if (branches.length === 0) {
-    return <p className="py-6 text-center text-sm text-[#6a6a6a]">{emptyLabel}</p>;
+    return <p className="py-6 text-center text-sm text-ink-muted">{emptyLabel}</p>;
   }
 
   return (
@@ -53,10 +53,10 @@ export const BranchPicker = ({
             aria-pressed={elegida}
             disabled={excluida}
             onClick={() => onChange(branch.id)}
-            className={`w-full min-h-[44px] rounded-2xl bg-white px-4 py-3 text-left font-medium text-[#222222] transition-all touch-manipulation disabled:opacity-40 disabled:cursor-not-allowed ${
+            className={`w-full min-h-[44px] rounded-2xl bg-surface px-4 py-3 text-left font-medium text-ink transition-all touch-manipulation disabled:opacity-40 disabled:cursor-not-allowed ${
               elegida
-                ? "border-2 border-[#ec4899] ring-2 ring-[#ec4899]/40"
-                : "border border-gray-200"
+                ? "border-2 border-accent ring-2 ring-accent/40"
+                : "border border-hairline"
             }`}
           >
             {branch.name}

@@ -164,38 +164,38 @@ export function LabelSelector({ isOpen, onClose, branches }: LabelSelectorProps)
 
   return (
     <div
-      className="fixed inset-0 bg-black/30 backdrop-blur-md z-[60] flex items-center justify-center"
+      className="fixed inset-0 bg-scrim backdrop-blur-md z-[60] flex items-center justify-center"
       role="dialog"
       aria-modal="true"
       aria-labelledby="label-selector-title"
     >
       <div
-        className="bg-white w-full max-w-xl md:max-w-4xl rounded-2xl p-6 animate-scale-in max-h-[90vh] md:max-h-[85vh] overflow-y-auto"
+        className="bg-surface w-full max-w-xl md:max-w-4xl rounded-2xl p-6 animate-scale-in max-h-[90vh] md:max-h-[85vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-between items-center mb-4">
-          <h2 id="label-selector-title" className="text-xl font-semibold text-[#222222]">
+          <h2 id="label-selector-title" className="text-xl font-semibold text-ink">
             Etiquetas de precio
           </h2>
           <button
             type="button"
             onClick={handleClose}
-            className="btn btn-icon btn-round hover:bg-[#f2f2f2]"
+            className="btn btn-icon btn-round hover:bg-surface-strong"
             aria-label="Cerrar"
           >
-            <svg className="w-6 h-6 text-[#6a6a6a]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-6 h-6 text-ink-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
 
-        <p className="text-xs font-medium uppercase tracking-wide text-[#6a6a6a] mb-4">
+        <p className="text-xs font-medium uppercase tracking-wide text-ink-muted mb-4">
           Paso {step} de 2
         </p>
 
         {step === 1 && (
           <div>
-            <h3 className="text-base font-semibold text-[#222222] mb-3">Elegí la sucursal</h3>
+            <h3 className="text-base font-semibold text-ink mb-3">Elegí la sucursal</h3>
             <BranchPicker
               branches={branches}
               value={branchId}
@@ -219,7 +219,7 @@ export function LabelSelector({ isOpen, onClose, branches }: LabelSelectorProps)
         {step === 2 && (
           <div className="md:grid md:grid-cols-2 md:gap-5 md:items-start">
             <section className="min-w-0">
-              <h3 className="text-base font-semibold text-[#222222] mb-3">
+              <h3 className="text-base font-semibold text-ink mb-3">
                 Elegí los productos
               </h3>
 
@@ -229,30 +229,30 @@ export function LabelSelector({ isOpen, onClose, branches }: LabelSelectorProps)
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Buscar por nombre o código"
                 aria-label="Buscar producto"
-                className="w-full px-3 py-3 mb-3 min-h-[48px] rounded-xl border border-gray-200 focus:border-[#ec4899] focus:ring-2 focus:ring-[#ec4899]/30 outline-none transition-all text-sm touch-manipulation"
+                className="w-full px-3 py-3 mb-3 min-h-[48px] rounded-xl border border-hairline focus:border-accent focus:ring-2 focus:ring-accent/30 outline-none transition-all text-sm touch-manipulation"
               />
 
               {loading && <Spinner label="Cargando productos..." />}
 
               {!loading && loadError && (
-                <p className="py-8 text-center text-sm text-[#c13515]">{loadError}</p>
+                <p className="py-8 text-center text-sm text-error">{loadError}</p>
               )}
 
               {!loading && !loadError && rows.length === 0 && (
-                <p className="py-8 text-center text-sm text-[#6a6a6a]">
+                <p className="py-8 text-center text-sm text-ink-muted">
                   No hay productos con stock en esta sucursal
                 </p>
               )}
 
               {!loading && !loadError && rows.length > 0 && (
-                <label className="flex items-center gap-3 p-3 mb-2 min-h-[44px] rounded-xl bg-[#f8f8f8] cursor-pointer touch-manipulation">
+                <label className="flex items-center gap-3 p-3 mb-2 min-h-[44px] rounded-xl bg-surface-soft cursor-pointer touch-manipulation">
                   <input
                     type="checkbox"
                     checked={allSelected}
                     onChange={toggleAll}
-                    className="w-5 h-5 accent-[#ec4899]"
+                    className="w-5 h-5 accent-accent"
                   />
-                  <span className="text-sm font-medium text-[#222222]">Todos</span>
+                  <span className="text-sm font-medium text-ink">Todos</span>
                 </label>
               )}
 
@@ -265,7 +265,7 @@ export function LabelSelector({ isOpen, onClose, branches }: LabelSelectorProps)
                   {visibles.map((row) => (
                     <div
                       key={row.id}
-                      className="flex items-center gap-3 p-3 min-h-[44px] rounded-xl hover:bg-[#f8f8f8] transition-colors"
+                      className="flex items-center gap-3 p-3 min-h-[44px] rounded-xl hover:bg-surface-soft transition-colors"
                     >
                       <input
                         type="checkbox"
@@ -273,16 +273,16 @@ export function LabelSelector({ isOpen, onClose, branches }: LabelSelectorProps)
                         checked={selectedIds.includes(row.id)}
                         onChange={() => toggleSelection(row.id)}
                         aria-label={`Seleccionar ${row.name}`}
-                        className="w-5 h-5 accent-[#ec4899]"
+                        className="w-5 h-5 accent-accent"
                       />
                       <div className="flex-1 min-w-0">
                         <label
                           htmlFor={`label-check-${row.id}`}
-                          className="block text-sm font-medium text-[#222222] truncate cursor-pointer"
+                          className="block text-sm font-medium text-ink truncate cursor-pointer"
                         >
                           {row.name}
                         </label>
-                        <span className="block text-xs text-[#6a6a6a]">
+                        <span className="block text-xs text-ink-muted">
                           {row.code} · Stock: {row.stock}
                         </span>
                       </div>
@@ -296,7 +296,7 @@ export function LabelSelector({ isOpen, onClose, branches }: LabelSelectorProps)
                         }
                         disabled={!selectedIds.includes(row.id) || generating}
                         aria-label={`Cantidad ${row.name}`}
-                        className="w-20 px-3 py-3 rounded-xl border border-gray-200 focus:border-[#ec4899] focus:ring-2 focus:ring-[#ec4899]/30 outline-none transition-all text-sm disabled:opacity-40 disabled:cursor-not-allowed tabular-nums text-right"
+                        className="w-20 px-3 py-3 rounded-xl border border-hairline focus:border-accent focus:ring-2 focus:ring-accent/30 outline-none transition-all text-sm disabled:opacity-40 disabled:cursor-not-allowed tabular-nums text-right"
                       />
                     </div>
                   ))}
@@ -304,7 +304,7 @@ export function LabelSelector({ isOpen, onClose, branches }: LabelSelectorProps)
               )}
 
               {!loading && !loadError && rows.length > 0 && visibles.length === 0 && (
-                <p className="py-6 text-center text-sm text-[#6a6a6a]">
+                <p className="py-6 text-center text-sm text-ink-muted">
                   No hay productos que coincidan con la búsqueda
                 </p>
               )}
@@ -312,8 +312,8 @@ export function LabelSelector({ isOpen, onClose, branches }: LabelSelectorProps)
 
             {/* Resumen en vivo: en celular cae debajo de la lista; desde `md`
                 va a la derecha y queda pegado. */}
-            <aside className="mt-4 rounded-2xl border border-black/10 bg-[#f7f7f7] p-4 md:mt-0 md:sticky md:top-4">
-              <h3 className="text-xs font-medium uppercase tracking-wide text-[#6a6a6a]">
+            <aside className="mt-4 rounded-2xl border border-hairline bg-surface-soft p-4 md:mt-0 md:sticky md:top-4">
+              <h3 className="text-xs font-medium uppercase tracking-wide text-ink-muted">
                 Resumen
               </h3>
 
@@ -323,7 +323,7 @@ export function LabelSelector({ isOpen, onClose, branches }: LabelSelectorProps)
               </p>
 
               {generateError && (
-                <p className="mt-3 text-sm text-[#c13515]" role="alert">
+                <p className="mt-3 text-sm text-error" role="alert">
                   {generateError}
                 </p>
               )}

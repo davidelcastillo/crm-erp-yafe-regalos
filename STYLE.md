@@ -596,6 +596,7 @@ El modal se diseña primero para el pulgar y se **adapta** desde `md:`, así que
 - Una sola fila en mobile: botón **☰**, título y, si hace falta, el selector de sucursal (`PageHeader`).
 - Las **acciones de la página** (por ejemplo «Caja» y «Cerrar caja») van como **tarjetas de vidrio** debajo del encabezado en mobile (`ActionCard`) y como botones dentro de la barra desde desktop (`actions`). No se esconden en el menú: son la razón por la que se entra a la página.
 - El **cierre de sesión** vive dentro del menú ☰ en mobile y visible en la barra en desktop; va en gris (`bg-[#f2f2f2]`), no compite con las acciones de marca.
+- **Una acción por tema, con pasos adentro.** Si dos botones abren la misma funcionalidad (por ejemplo «Caja» y «Cerrar caja», que son el mismo libro de plata), va **una sola** tarjeta —y un solo botón en la barra— que abre un **primer paso donde se elige** qué hacer y después el modal de siempre. Así la banda no crece con variantes de lo mismo, y la acción sigue a la vista (no se esconde en el menú). Referencia: `OptionsMenuModal` (un solo componente para la caja de `/ventas`, el stock y la impresión de `/inventario`).
 - **Ojo con las acciones del encabezado**: el slot `actions` se muestra **solo desde desktop** (es `hidden md:flex`). Toda acción que solo esté ahí es inalcanzable en el teléfono: o se duplica como `ActionCard` en la banda, o se pasa también en `menuItems`. Es el error más fácil de cometer al migrar una página.
 - En una **página de detalle o formulario** (no una lista) alcanza con el menú: las acciones van en `actions` (desktop) **y** en `menuItems` (mobile).
 - El **selector de sucursal** va en su propia línea en mobile (ancho completo) y **al nivel del título desde desktop**: la barra del encabezado envuelve (`flex-wrap`) y el contenido de la derecha es `w-full md:w-auto`.
@@ -633,6 +634,17 @@ Un badge por caso, con un color propio y contraste medido:
 - El texto de un badge es chico (11–12px), así que exige **4.5:1** (WCAG 2.1 AA para texto normal). El piso de **3:1** aplica a texto grande y a lo **no textual** (bordes, íconos, indicadores).
 - Un color por caso: no se repite el fondo entre estados y el estado nunca se comunica **solo** por color — el badge siempre lleva su palabra.
 - Los valores viven en `src/lib/status-tones.ts` y se aplican con `style={{ backgroundColor, color }}`: las clases dinámicas de Tailwind (`bg-[${hex}]`) no las genera el JIT. La regla queda fijada por `src/lib/status-tones.test.ts`.
+
+## Movimiento y tokens de superficie
+
+- **Tokens semánticos:** `bg-surface`, `bg-surface-soft`, `bg-surface-strong`, `bg-surface-sunken`, `text-ink`, `text-ink-muted`, `text-ink-soft`, `border-hairline`, `border-hairline-soft`. En un componente nuevo no se escribe un hex: si falta un tono, se agrega el token en `globals.css` y su contraste acá.
+- **Curvas y duraciones:** `ease-standard` (lo funcional: un valor que cambia, un botón que se transforma), `ease-enter` (lo que aparece) y `ease-exit` (lo que se va), con 150 / 250 / 400 ms. Son las de Material Design 3 y están en `globals.css` (`--motion-*`) y en `src/lib/motion.ts`, con los mismos números, para que una transición de Tailwind y una de Motion no se sientan distintas.
+- **Transiciones con nombre por intención**, no por componente: `transitions.value`, `transitions.transform`, `transitions.surface`, `transitions.reveal`.
+- **Aparición (`Reveal`):** sube 12 px y aparece una vez, con retardo en cascada según la posición en la lista (`stagger`, tope 0,24 s). Se usa en las cards de una lista, no en cada fila de una tabla ni en elementos que ya están en pantalla al cargar.
+- **Movimiento reducido:** la preferencia apaga animaciones y transiciones de todo el sistema con una regla global en `globals.css` —no de a una clase— y `Reveal` muestra el contenido sin animar. En un entorno sin `IntersectionObserver` también se muestra el contenido: esconderlo sería peor que no animarlo.
+- **Se animan `opacity` y `transform`**, nunca `height`, `top`, `left` ni `width`: esas propiedades fuerzan layout en cada cuadro.
+- **Todo overlay vive en un portal al `body`.** Un `z-50` sólo gana dentro de su contexto de apilado: apenas un ancestro tiene `transform` (el parallax del encabezado), `filter`, `backdrop-filter` o `isolation` (la banda `isolate` del degradé), el menú ☰ y los modales quedan encerrados ahí y las cards del listado —más abajo en el documento— les pasan por encima. Por eso `PageHeader` monta su menú con `createPortal(document.body)`; cualquier overlay nuevo hace lo mismo.
+- **Lo que se atenúa al scrollear es superficie decorativa**, nunca un control: un botón al 45 % de opacidad se lee como deshabilitado aunque siga funcionando. En `/ventas` se retira el degradé de marca y los botones, el selector y el buscador quedan a plena opacidad.
 
 ## Responsive Behavior
 

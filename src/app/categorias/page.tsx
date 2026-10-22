@@ -128,7 +128,7 @@ export default function CategoriesPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white pb-20">
+    <div className="min-h-screen bg-surface pb-20">
       <main>
         <div className="pb-16 brand-gradient">
           <PageHeader
@@ -164,7 +164,7 @@ export default function CategoriesPage() {
           {error && (
             <div
               role="alert"
-              className="mb-4 rounded-xl border border-black/5 bg-[#ffe4ea] px-4 py-3 text-sm text-[#8f0020]"
+              className="mb-4 rounded-xl border border-hairline-soft bg-error-surface px-4 py-3 text-sm text-error-ink"
             >
               {error}
             </div>
@@ -183,7 +183,7 @@ export default function CategoriesPage() {
             <div className="text-center py-12">
               <div className="w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center">
                 <svg
-                  className="w-8 h-8 text-[#6a6a6a]"
+                  className="w-8 h-8 text-ink-muted"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -197,32 +197,32 @@ export default function CategoriesPage() {
                   />
                 </svg>
               </div>
-              <p className="text-[#6a6a6a]">No hay categorías</p>
+              <p className="text-ink-muted">No hay categorías</p>
             </div>
           ) : (
             <ul className="space-y-4">
               {categories.map((cat) => (
-                <li key={cat.id} className="glass rounded-2xl border border-black/5 p-4">
+                <li key={cat.id} className="glass rounded-2xl border border-hairline-soft p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex min-w-0 flex-1 items-center gap-2">
-                      <h2 className="text-base font-semibold text-[#222222] break-words">
+                      <h2 className="text-base font-semibold text-ink break-words">
                         {cat.name}
                       </h2>
                       {/* El ID se seguía leyendo en la tabla vieja: se conserva, chico. */}
-                      <code className="shrink-0 px-2 py-0.5 bg-[#f2f2f2] rounded text-xs font-mono text-[#6a6a6a]">
+                      <code className="shrink-0 px-2 py-0.5 bg-surface-strong rounded text-xs font-mono text-ink-muted">
                         #{cat.id}
                       </code>
                     </div>
                     <div className="shrink-0 text-right">
-                      <p className="text-xs text-[#6a6a6a]">Productos</p>
-                      <p className="mt-0.5 text-base font-semibold text-[#222222]">
+                      <p className="text-xs text-ink-muted">Productos</p>
+                      <p className="mt-0.5 text-base font-semibold text-ink">
                         {cat._count?.products ?? 0}
                       </p>
                     </div>
                   </div>
 
                   {/* Las dos acciones se envuelven: en un celular chico no entran en una fila fija. */}
-                  <div className="mt-3 flex flex-wrap gap-2 border-t border-black/5 pt-3">
+                  <div className="mt-3 flex flex-wrap gap-2 border-t border-hairline-soft pt-3">
                     <Link
                       href={`/categorias/${cat.id}`}
                       className="btn btn-secondary flex-1 whitespace-nowrap"

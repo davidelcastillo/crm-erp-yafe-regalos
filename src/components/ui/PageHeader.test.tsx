@@ -64,6 +64,16 @@ describe("PageHeader", () => {
     expect(within(menu()).getByRole("button", { name: "Cerrar sesión" })).toBeInTheDocument();
   });
 
+  it("monta el menú en el body para que no lo tapen las cards del listado", () => {
+    renderHeader();
+    fireEvent.click(screen.getByLabelText("Abrir menú"));
+
+    // Es un overlay: si quedara dentro del árbol de la página, un ancestro con
+    // `transform`, `filter` o `isolation` (el parallax del encabezado) encerraría
+    // su `z-50` en ese contexto de apilado y las cards pintarían encima.
+    expect(menu().parentElement).toBe(document.body);
+  });
+
   it("Escape cierra el menú", () => {
     renderHeader();
     fireEvent.click(screen.getByLabelText("Abrir menú"));
@@ -95,6 +105,16 @@ describe("PageHeader", () => {
       "href",
       "/inventario/inactivos"
     );
+  });
+
+  it("el interruptor de tema vive en la píldora del encabezado, no dentro del menú ☰", () => {
+    renderHeader();
+
+    // El tema lo elige el usuario: si quedara detrás del menú, en el celular no
+    // se alcanzaría sin abrirlo. Debe estar a la vista en los dos layouts.
+    const toggle = screen.getByRole("button", { name: /^Activar tema (oscuro|claro)$/ });
+    expect(toggle).toBeInTheDocument();
+    expect(toggle.closest("[role='dialog']")).toBeNull();
   });
 
   it("una fila del menú se cierra al tocarla y dispara su acción", () => {

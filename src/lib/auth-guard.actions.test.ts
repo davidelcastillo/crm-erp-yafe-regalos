@@ -7,7 +7,11 @@
  * El guardián corre antes de Zod y de Prisma (S5 de
  * `odd/tasks/autorizacion-acciones.md`), así que el payload de entrada es
  * irrelevante cuando la sesión está denegada: por eso basta con `{}` para las
- * 59 acciones, sin fabricar un payload válido por acción.
+ * acciones internas, sin fabricar un payload válido por acción.
+ *
+ * Sumar un módulo nuevo de acciones obliga a importarlo acá (ver `MODULES`): el
+ * barrido compara las funciones exportadas en disco contra las importadas y
+ * falla nombrando el archivo y la acción que falta.
  *
  * Esta suite cubre lo que el barrido estructural (`auth-guard.coverage.test.ts`)
  * no puede: que el resultado del guardián se **use**. Una acción que llame a
@@ -26,6 +30,7 @@ import * as inventoryActions from "@/app/actions/inventory";
 import * as productActions from "@/app/actions/product";
 import * as purchaseActions from "@/app/actions/purchase";
 import * as saleActions from "@/app/actions/sale";
+import * as stockControlActions from "@/app/actions/stockControl";
 import * as labelPrintActions from "@/actions/label-print";
 
 // Ninguna acción denegada debe llegar a Prisma; el mock vacío hace que, si
@@ -51,6 +56,7 @@ const MODULES: Record<string, Record<string, unknown>> = {
   "product.ts": productActions as unknown as Record<string, unknown>,
   "purchase.ts": purchaseActions as unknown as Record<string, unknown>,
   "sale.ts": saleActions as unknown as Record<string, unknown>,
+  "stockControl.ts": stockControlActions as unknown as Record<string, unknown>,
   "label-print.ts": labelPrintActions as unknown as Record<string, unknown>,
 };
 
@@ -75,7 +81,7 @@ describe("ninguna acción interna atiende sin sesión admin", () => {
     requireAdmin.mockResolvedValue({ ok: false, error: "No autorizado" });
   });
 
-  test("las 59 acciones exportadas devuelven «No autorizado»", async () => {
+  test("las 64 acciones exportadas devuelven «No autorizado»", async () => {
     const problems: string[] = [];
     let visited = 0;
 
@@ -101,6 +107,6 @@ describe("ninguna acción interna atiende sin sesión admin", () => {
     }
 
     expect(problems).toEqual([]);
-    expect(visited).toBeGreaterThanOrEqual(59);
+    expect(visited).toBeGreaterThanOrEqual(64);
   });
 });

@@ -67,3 +67,22 @@ describe('ComprasPage', () => {
     expect(mockGetPurchases).toHaveBeenLastCalledWith({ branchId: 1 });
   });
 });
+
+describe("Compras: forma de la carga y degradé decorativo (S2/S10)", () => {
+  it("mientras carga muestra la píldora del encabezado y los esqueletos de la lista", () => {
+    mockGetProducts.mockReturnValue(new Promise(() => {}));
+    mockGetPurchases.mockReturnValue(new Promise(() => {}));
+
+    const { container } = render(<ComprasPage />);
+
+    expect(screen.getByText("Cargando compras...")).toBeInTheDocument();
+    const clases = Array.from(
+      container.querySelectorAll("[aria-hidden='true'] .animate-pulse")
+    ).map((bloque) => bloque.className);
+    expect(clases.some((clase) => clase.includes("h-[60px]"))).toBe(true);
+    expect(clases.length).toBeGreaterThanOrEqual(4);
+
+    mockGetProducts.mockReset();
+    mockGetPurchases.mockReset();
+  });
+});

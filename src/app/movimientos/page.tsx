@@ -42,7 +42,7 @@ export default function MovementsPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-white pb-20">
+    <div className="min-h-screen bg-surface pb-20">
       <main>
         <div className="pb-16 brand-gradient">
           <PageHeader
@@ -84,7 +84,7 @@ export default function MovementsPage() {
           {error && (
             <div
               role="alert"
-              className="mb-4 rounded-xl border border-black/5 bg-[#ffe4ea] px-4 py-3 text-sm text-[#8f0020]"
+              className="mb-4 rounded-xl border border-hairline-soft bg-error-surface px-4 py-3 text-sm text-error-ink"
             >
               {error}
             </div>
@@ -104,7 +104,7 @@ export default function MovementsPage() {
             <div className="text-center py-12">
               <div className="w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center">
                 <svg
-                  className="w-8 h-8 text-[#6a6a6a]"
+                  className="w-8 h-8 text-ink-muted"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -118,49 +118,49 @@ export default function MovementsPage() {
                   />
                 </svg>
               </div>
-              <p className="text-[#6a6a6a]">No hay movimientos</p>
+              <p className="text-ink-muted">No hay movimientos</p>
             </div>
           ) : (
             <ul className="space-y-4">
               {movements.map((m) => (
-                <li key={m.id} className="glass rounded-2xl border border-black/5 p-4">
+                <li key={m.id} className="glass rounded-2xl border border-hairline-soft p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
-                      <p className="text-xs text-[#6a6a6a]">Producto</p>
-                      <p className="mt-0.5 text-base font-semibold text-[#222222] break-words">
+                      <p className="text-xs text-ink-muted">Producto</p>
+                      <p className="mt-0.5 text-base font-semibold text-ink break-words">
                         {m.product?.name ?? 'Desconocido'}
                       </p>
                     </div>
                     <div className="shrink-0 text-right">
-                      <p className="text-xs text-[#6a6a6a]">Cantidad</p>
-                      <p className="mt-0.5 text-base font-semibold text-[#222222]">{m.quantity}</p>
+                      <p className="text-xs text-ink-muted">Cantidad</p>
+                      <p className="mt-0.5 text-base font-semibold text-ink">{m.quantity}</p>
                       {/* El signo y el tipo salen del movimiento tal cual vienen. */}
-                      <p className="mt-0.5 text-xs text-[#6a6a6a]">
+                      <p className="mt-0.5 text-xs text-ink-muted">
                         {new Date(m.createdAt).toLocaleDateString()}
                       </p>
                     </div>
                   </div>
 
-                  <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 border-t border-black/5 pt-3 text-xs">
+                  <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 border-t border-hairline-soft pt-3 text-xs">
                     <div className="min-w-0">
-                      <dt className="text-[#6a6a6a]">Sucursal</dt>
-                      <dd className="mt-0.5 text-[#222222] break-words">
+                      <dt className="text-ink-muted">Sucursal</dt>
+                      <dd className="mt-0.5 text-ink break-words">
                         {m.branch?.name ?? 'Desconocido'}
                       </dd>
                     </div>
                     <div className="min-w-0">
-                      <dt className="text-[#6a6a6a]">Tipo</dt>
-                      <dd className="mt-0.5 text-[#222222] break-words capitalize">
+                      <dt className="text-ink-muted">Tipo</dt>
+                      <dd className="mt-0.5 text-ink break-words capitalize">
                         {m.movementType}
                       </dd>
                     </div>
                     <div className="min-w-0">
-                      <dt className="text-[#6a6a6a]">Referencia</dt>
-                      <dd className="mt-0.5 text-[#222222] break-words">{m.reference ?? '-'}</dd>
+                      <dt className="text-ink-muted">Referencia</dt>
+                      <dd className="mt-0.5 text-ink break-words">{m.reference ?? '-'}</dd>
                     </div>
                     <div className="min-w-0">
-                      <dt className="text-[#6a6a6a]">Responsable</dt>
-                      <dd className="mt-0.5 text-[#222222] break-words">{m.performedBy ?? '-'}</dd>
+                      <dt className="text-ink-muted">Responsable</dt>
+                      <dd className="mt-0.5 text-ink break-words">{m.performedBy ?? '-'}</dd>
                     </div>
                   </dl>
                 </li>

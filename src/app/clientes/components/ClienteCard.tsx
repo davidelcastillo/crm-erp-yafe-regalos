@@ -67,29 +67,29 @@ export function ClienteCard({ customer }: ClienteCardProps) {
   };
 
   return (
-    <div className="glass rounded-2xl border border-black/5 p-4">
+    <div className="glass rounded-2xl border border-hairline-soft p-4">
       <div className="flex justify-between items-start gap-3">
         <div className="min-w-0 flex-1">
-          <h3 className="text-base font-semibold text-[#222222] break-words">
+          <h3 className="text-base font-semibold text-ink break-words">
             {customer.name} {customer.surname}
           </h3>
-          <p className="text-sm text-[#6a6a6a]">
+          <p className="text-sm text-ink-muted">
             Deuda:{" "}
-            <span className={hasDebt ? "text-[#b91c1c] font-medium" : "text-[#15803d]"}>
+            <span className={hasDebt ? "text-negative font-medium" : "text-positive"}>
               ${balance.toFixed(2)}
             </span>
           </p>
         </div>
         <div
           className={`shrink-0 inline-flex items-center px-3 py-1 rounded-full text-sm font-medium text-white ${
-            hasDebt ? "bg-[#b91c1c]" : "bg-[#15803d]"
+            hasDebt ? "bg-negative" : "bg-positive"
           }`}
         >
           {hasDebt ? "Deudor" : "Al día"}
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-black/5">
+      <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-hairline-soft">
         <button
           onClick={handleToggleHistory}
           disabled={loadingHistory}
@@ -108,7 +108,7 @@ export function ClienteCard({ customer }: ClienteCardProps) {
       </div>
 
       {showHistory && historyData && (
-        <div className="mt-3 pt-3 border-t border-black/5">
+        <div className="mt-3 pt-3 border-t border-hairline-soft">
           <div className="flex gap-1 mb-3">
             {/* Control segmentado: la pestaña elegida va `btn-active`, la otra `btn-secondary`. */}
             <button
@@ -128,26 +128,26 @@ export function ClienteCard({ customer }: ClienteCardProps) {
           {activeTab === "sales" && (
             <div className="space-y-2 max-h-48 overflow-y-auto">
               {historyData.sales.length === 0 ? (
-                <p className="text-sm text-[#6a6a6a] text-center py-2">
+                <p className="text-sm text-ink-muted text-center py-2">
                   Sin ventas registradas
                 </p>
               ) : (
                 historyData.sales.map((sale) => (
                   <div
                     key={sale.id}
-                    className="p-2 bg-[#f9f9f9] rounded-lg text-sm"
+                    className="p-2 bg-surface-soft rounded-lg text-sm"
                   >
                     <div className="flex justify-between items-center gap-2">
-                      <span className="text-[#6a6a6a]">{formatDate(sale.date)}</span>
+                      <span className="text-ink-muted">{formatDate(sale.date)}</span>
                       <span className="font-medium shrink-0">${sale.totalAmount.toFixed(2)}</span>
                     </div>
-                    <div className="flex justify-between items-center gap-2 text-xs text-[#6a6a6a]">
+                    <div className="flex justify-between items-center gap-2 text-xs text-ink-muted">
                       <span>Pagado: ${sale.amountPaid.toFixed(2)}</span>
                       <span
                         className={`shrink-0 ${
                           sale.pendingBalance > 0
-                            ? "text-[#b91c1c]"
-                            : "text-[#15803d]"
+                            ? "text-negative"
+                            : "text-positive"
                         }`}
                       >
                         Pendiente: ${sale.pendingBalance.toFixed(2)}
@@ -162,19 +162,19 @@ export function ClienteCard({ customer }: ClienteCardProps) {
           {activeTab === "payments" && (
             <div className="space-y-2 max-h-48 overflow-y-auto">
               {historyData.payments.length === 0 ? (
-                <p className="text-sm text-[#6a6a6a] text-center py-2">
+                <p className="text-sm text-ink-muted text-center py-2">
                   Sin pagos registrados
                 </p>
               ) : (
                 historyData.payments.map((payment) => (
                   <div
                     key={payment.id}
-                    className="p-2 bg-[#f9f9f9] rounded-lg text-sm flex justify-between items-center gap-2"
+                    className="p-2 bg-surface-soft rounded-lg text-sm flex justify-between items-center gap-2"
                   >
-                    <span className="text-[#6a6a6a]">
+                    <span className="text-ink-muted">
                       {formatDate(payment.date)}
                     </span>
-                    <span className="font-medium text-[#15803d] shrink-0">
+                    <span className="font-medium text-positive shrink-0">
                       +${payment.amount.toFixed(2)}
                     </span>
                   </div>

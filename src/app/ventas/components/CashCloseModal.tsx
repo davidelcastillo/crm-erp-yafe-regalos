@@ -112,26 +112,26 @@ export const CashCloseModal = ({
 
   return (
     <div
-      className="fixed inset-0 bg-black/30 backdrop-blur-md z-[60] flex items-center justify-center"
+      className="fixed inset-0 bg-scrim backdrop-blur-md z-[60] flex items-center justify-center"
       role="dialog"
       aria-modal="true"
       aria-labelledby="cash-close-title"
     >
       <div
-        className="bg-white w-full max-w-xl md:max-w-3xl rounded-2xl p-6 animate-scale-in max-h-[90vh] md:max-h-[85vh] overflow-y-auto"
+        className="bg-surface w-full max-w-xl md:max-w-3xl rounded-2xl p-6 animate-scale-in max-h-[90vh] md:max-h-[85vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-between items-center mb-4">
-          <h2 id="cash-close-title" className="text-xl font-semibold text-[#222222]">
+          <h2 id="cash-close-title" className="text-xl font-semibold text-ink">
             Cerrar caja
           </h2>
           <button
             type="button"
             onClick={handleClose}
-            className="btn btn-icon btn-round hover:bg-[#f2f2f2]"
+            className="btn btn-icon btn-round hover:bg-surface-strong"
             aria-label="Cerrar"
           >
-            <svg className="w-6 h-6 text-[#6a6a6a]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-6 h-6 text-ink-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
@@ -142,7 +142,7 @@ export const CashCloseModal = ({
             en dos columnas en vez de dejar media pantalla en blanco. */}
         {!resumen && (
           <div>
-            <p className="block text-xs text-[#6a6a6a] mb-2">Sucursal a cerrar</p>
+            <p className="block text-xs text-ink-muted mb-2">Sucursal a cerrar</p>
             <BranchPicker
               branches={branches}
               value={branchId}
@@ -156,9 +156,9 @@ export const CashCloseModal = ({
               emptyLabel="No hay sucursales activas para elegir."
             />
 
-            {error && <p className="mt-3 text-sm text-[#c13515]">{error}</p>}
+            {error && <p className="mt-3 text-sm text-error">{error}</p>}
 
-            {loading && <p className="mt-4 text-sm text-[#6a6a6a]">Calculando el cierre...</p>}
+            {loading && <p className="mt-4 text-sm text-ink-muted">Calculando el cierre...</p>}
 
             {!loading && (
               <div className="md:flex md:justify-end">
@@ -182,10 +182,10 @@ export const CashCloseModal = ({
             {/* Contexto del corte, arriba de las columnas para que las dos
                 arranquen alineadas. */}
             <div className="mt-4">
-              <p className="text-sm font-semibold text-[#222222] break-words">
+              <p className="text-sm font-semibold text-ink break-words">
                 {resumen.branchName}
               </p>
-              <p className="mt-0.5 text-xs text-[#6a6a6a]">
+              <p className="mt-0.5 text-xs text-ink-muted">
                 {resumen.since
                   ? `Ventas desde el último cierre (${fechaCierre(resumen.since)})`
                   : "Es el primer cierre de esta sucursal"}
@@ -194,16 +194,16 @@ export const CashCloseModal = ({
 
             <div className="mt-4 md:grid md:grid-cols-2 md:gap-5 md:items-start">
               {/* Detalle del corte: etiqueta chica y montos alineados a la derecha. */}
-              <section className="rounded-2xl border border-black/10 bg-[#f7f7f7] p-4">
-                <h3 className="text-xs font-medium uppercase tracking-wide text-[#6a6a6a]">
+              <section className="rounded-2xl border border-hairline bg-surface-soft p-4">
+                <h3 className="text-xs font-medium uppercase tracking-wide text-ink-muted">
                   Detalle del corte
                 </h3>
 
                 <dl className="mt-3 space-y-2">
                   {resumen.cashTotal > 0 && (
                     <div className="flex items-baseline justify-between gap-4">
-                      <dt className="text-sm text-[#3f3f3f]">Efectivo</dt>
-                      <dd className="text-sm font-semibold text-[#222222] tabular-nums">
+                      <dt className="text-sm text-ink-body">Efectivo</dt>
+                      <dd className="text-sm font-semibold text-ink tabular-nums">
                         {plata(resumen.cashTotal)}
                       </dd>
                     </div>
@@ -211,8 +211,8 @@ export const CashCloseModal = ({
 
                   {resumen.transferTotal > 0 && (
                     <div className="flex items-baseline justify-between gap-4">
-                      <dt className="text-sm text-[#3f3f3f]">Transferencia</dt>
-                      <dd className="text-sm font-semibold text-[#222222] tabular-nums">
+                      <dt className="text-sm text-ink-body">Transferencia</dt>
+                      <dd className="text-sm font-semibold text-ink tabular-nums">
                         {plata(resumen.transferTotal)}
                       </dd>
                     </div>
@@ -220,44 +220,44 @@ export const CashCloseModal = ({
 
                   {resumen.mixedTotal > 0 && (
                     <div className="flex items-baseline justify-between gap-4">
-                      <dt className="text-sm text-[#3f3f3f]">
+                      <dt className="text-sm text-ink-body">
                         Mixto
-                        <span className="block text-xs text-[#6a6a6a]">
+                        <span className="block text-xs text-ink-muted">
                           La venta no guarda cuánto fue de cada medio: verificá ese total aparte.
                         </span>
                       </dt>
-                      <dd className="text-sm font-semibold text-[#222222] tabular-nums">
+                      <dd className="text-sm font-semibold text-ink tabular-nums">
                         {plata(resumen.mixedTotal)}
                       </dd>
                     </div>
                   )}
                 </dl>
 
-                <div className="mt-3 flex items-baseline justify-between gap-4 border-t border-black/10 pt-3">
-                  <span className="text-sm font-medium text-[#222222]">Total de ventas</span>
-                  <span className="text-base font-semibold text-[#222222] tabular-nums">
+                <div className="mt-3 flex items-baseline justify-between gap-4 border-t border-hairline pt-3">
+                  <span className="text-sm font-medium text-ink">Total de ventas</span>
+                  <span className="text-base font-semibold text-ink tabular-nums">
                     {plata(resumen.total)}
                   </span>
                 </div>
 
-                <p className="mt-2 text-xs text-[#6a6a6a]">
+                <p className="mt-2 text-xs text-ink-muted">
                   {resumen.salesCount} {resumen.salesCount === 1 ? "venta" : "ventas"} desde el
                   último cierre
                 </p>
               </section>
 
               {/* Lo que se retira: el número que importa, grande, y la acción. */}
-              <section className="mt-4 rounded-2xl border border-black/10 bg-[#f7f7f7] p-4 md:mt-0">
-                <h3 className="text-xs font-medium uppercase tracking-wide text-[#6a6a6a]">
+              <section className="mt-4 rounded-2xl border border-hairline bg-surface-soft p-4 md:mt-0">
+                <h3 className="text-xs font-medium uppercase tracking-wide text-ink-muted">
                   A retirar
                 </h3>
-                <p className="mt-1 text-3xl font-bold text-[#222222] tabular-nums">
+                <p className="mt-1 text-3xl font-bold text-ink tabular-nums">
                   {plata(resumen.cashTotal)}
                 </p>
-                <p className="mt-1 text-xs text-[#6a6a6a]">Efectivo del período</p>
+                <p className="mt-1 text-xs text-ink-muted">Efectivo del período</p>
 
                 {resumen.transferTotal > 0 && (
-                  <p className="mt-3 text-sm text-[#3f3f3f]">
+                  <p className="mt-3 text-sm text-ink-body">
                     Verificá{" "}
                     <span className="font-semibold tabular-nums">
                       {plata(resumen.transferTotal)}

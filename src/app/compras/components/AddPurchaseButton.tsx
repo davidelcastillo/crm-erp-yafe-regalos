@@ -166,22 +166,22 @@ export function AddPurchaseButton({ products: initialProducts, onSuccess }: AddP
 
 {isOpen && (
           <div 
-            className={`fixed inset-0 ${showProductModal ? 'bg-black/20 backdrop-blur-md' : 'bg-black/30 backdrop-blur-md'} z-[60] flex items-end justify-center md:items-center`}
+            className={`fixed inset-0 ${showProductModal ? 'bg-black/20 backdrop-blur-md' : 'bg-scrim backdrop-blur-md'} z-[60] flex items-end justify-center md:items-center`}
             onClick={() => setIsOpen(false)}
           >
           <div 
-            className="bg-white w-full max-w-lg md:max-w-4xl rounded-t-3xl md:rounded-2xl p-6 animate-slide-up md:animate-scale-in max-h-[90vh] md:max-h-[85vh] overflow-y-auto"
+            className="bg-surface w-full max-w-lg md:max-w-4xl rounded-t-3xl md:rounded-2xl p-6 animate-slide-up md:animate-scale-in max-h-[90vh] md:max-h-[85vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-semibold text-[#222222]">Nueva Compra</h2>
+              <h2 className="text-xl font-semibold text-ink">Nueva Compra</h2>
               <button
                 type="button"
                 onClick={() => setIsOpen(false)}
-                className="btn btn-icon btn-round hover:bg-[#f2f2f2]"
+                className="btn btn-icon btn-round hover:bg-surface-strong"
                 aria-label="Cerrar"
               >
-                <svg className="w-6 h-6 text-[#6a6a6a]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="w-6 h-6 text-ink-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
@@ -189,8 +189,8 @@ export function AddPurchaseButton({ products: initialProducts, onSuccess }: AddP
 
             {products.length === 0 ? (
               <div className="text-center py-8">
-                <p className="text-[#6a6a6a] mb-4">No hay productos registrados</p>
-                <p className="text-sm text-[#6a6a6a]">Primero creá un producto en la sección Inventario</p>
+                <p className="text-ink-muted mb-4">No hay productos registrados</p>
+                <p className="text-sm text-ink-muted">Primero creá un producto en la sección Inventario</p>
               </div>
             ) : (
               <form
@@ -206,10 +206,10 @@ export function AddPurchaseButton({ products: initialProducts, onSuccess }: AddP
                   {items.map((item, index) => (
                     <div
                       key={item.id}
-                      className="rounded-2xl border border-black/10 bg-[#f7f7f7] p-4 space-y-3"
+                      className="rounded-2xl border border-hairline bg-surface-soft p-4 space-y-3"
                     >
                       <div className="flex justify-between items-center">
-                        <span className="text-xs font-medium uppercase tracking-wide text-[#6a6a6a]">
+                        <span className="text-xs font-medium uppercase tracking-wide text-ink-muted">
                           Producto {index + 1}
                         </span>
                         {items.length > 1 && (
@@ -253,14 +253,14 @@ export function AddPurchaseButton({ products: initialProducts, onSuccess }: AddP
                       />
 
                       <div>
-                        <label htmlFor={`branch-${item.id}`} className="block text-xs text-[#6a6a6a] mb-2">
+                        <label htmlFor={`branch-${item.id}`} className="block text-xs text-ink-muted mb-2">
                           Sucursal
                         </label>
                         <select
                           id={`branch-${item.id}`}
                           value={item.branchId}
                           onChange={(e) => updateItem(item.id, "branchId", e.target.value)}
-                          className="w-full px-3 py-3 min-h-[48px] rounded-lg border border-gray-200 focus:border-[#ec4899] outline-none transition-all text-sm touch-manipulation"
+                          className="w-full px-3 py-3 min-h-[48px] rounded-lg border border-hairline focus:border-accent outline-none transition-all text-sm touch-manipulation"
                           required
                         >
                           <option value="">Seleccionar sucursal</option>
@@ -274,11 +274,11 @@ export function AddPurchaseButton({ products: initialProducts, onSuccess }: AddP
 
                       <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <label htmlFor={`price-${item.id}`} className="block text-xs text-[#6a6a6a] mb-2">
+                          <label htmlFor={`price-${item.id}`} className="block text-xs text-ink-muted mb-2">
                             Precio
                           </label>
                           <div className="relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6a6a6a] text-sm">$</span>
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted text-sm">$</span>
                             <input
                               id={`price-${item.id}`}
                               type="number"
@@ -286,14 +286,14 @@ export function AddPurchaseButton({ products: initialProducts, onSuccess }: AddP
                               min="0"
                               value={item.price}
                               onChange={(e) => updateItem(item.id, "price", e.target.value)}
-                              className="w-full pl-7 pr-3 py-3 min-h-[48px] rounded-lg border border-gray-200 focus:border-[#ec4899] outline-none transition-all text-sm touch-manipulation tabular-nums text-right"
+                              className="w-full pl-7 pr-3 py-3 min-h-[48px] rounded-lg border border-hairline focus:border-accent outline-none transition-all text-sm touch-manipulation tabular-nums text-right"
                               placeholder="0.00"
                               required
                             />
                           </div>
                         </div>
                         <div>
-                          <label htmlFor={`quantity-${item.id}`} className="block text-xs text-[#6a6a6a] mb-2">
+                          <label htmlFor={`quantity-${item.id}`} className="block text-xs text-ink-muted mb-2">
                             Cantidad
                           </label>
                           <input
@@ -302,16 +302,16 @@ export function AddPurchaseButton({ products: initialProducts, onSuccess }: AddP
                             min="1"
                             value={item.quantity}
                             onChange={(e) => updateItem(item.id, "quantity", e.target.value)}
-                            className="w-full px-3 py-3 min-h-[48px] rounded-lg border border-gray-200 focus:border-[#ec4899] outline-none transition-all text-sm touch-manipulation tabular-nums text-right"
+                            className="w-full px-3 py-3 min-h-[48px] rounded-lg border border-hairline focus:border-accent outline-none transition-all text-sm touch-manipulation tabular-nums text-right"
                             placeholder="0"
                             required
                           />
                         </div>
                       </div>
 
-                      <div className="flex justify-between items-center pt-2 border-t border-gray-200">
-                        <span className="text-sm text-[#6a6a6a]">Subtotal</span>
-                        <span className="font-medium text-[#222222] tabular-nums">
+                      <div className="flex justify-between items-center pt-2 border-t border-hairline">
+                        <span className="text-sm text-ink-muted">Subtotal</span>
+                        <span className="font-medium text-ink tabular-nums">
                           ${calculateSubtotal(item.price, item.quantity).toFixed(2)}
                         </span>
                       </div>
@@ -332,14 +332,15 @@ export function AddPurchaseButton({ products: initialProducts, onSuccess }: AddP
                 </div>
 
                 {/* Columna derecha: el total y la acción. En celular queda debajo de los
-                    ítems, en el orden de siempre. El total conserva su fondo oscuro:
-                    el gris de las tarjetas no se leería con texto blanco. */}
+                    ítems, en el orden de siempre. El total sigue siendo el bloque
+                    inverso (fondo `ink`, texto `surface`): con `text-white` fijo, en
+                    tema oscuro quedaba blanco sobre blanco. */}
                 <div className="mt-4 space-y-4 md:mt-0 md:sticky md:top-4">
                   {/* Total */}
-                  <div className="p-4 bg-[#222222] rounded-xl">
+                  <div className="p-4 bg-ink rounded-xl">
                     <div className="flex justify-between items-center">
-                      <span className="text-white font-medium">Total</span>
-                      <span className="text-white text-xl font-bold tabular-nums">
+                      <span className="text-surface font-medium">Total</span>
+                      <span className="text-surface text-xl font-bold tabular-nums">
                         ${calculateTotal().toFixed(2)}
                       </span>
                     </div>
@@ -362,18 +363,18 @@ export function AddPurchaseButton({ products: initialProducts, onSuccess }: AddP
       {/* Product Creation Modal */}
       {showProductModal && (
         <div 
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70] flex items-end justify-center md:items-center"
+          className="fixed inset-0 bg-scrim-strong backdrop-blur-sm z-[70] flex items-end justify-center md:items-center"
           onClick={() => {
             setShowProductModal(false);
             setEditingItemId(null);
           }}
         >
           <div 
-            className="bg-white w-full max-w-lg rounded-t-3xl md:rounded-2xl p-6 animate-slide-up md:animate-scale-in max-h-[90vh] overflow-y-auto"
+            className="bg-surface w-full max-w-lg rounded-t-3xl md:rounded-2xl p-6 animate-slide-up md:animate-scale-in max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-semibold text-[#222222]">
+              <h2 className="text-xl font-semibold text-ink">
                 {editingItemId ? "Crear producto para edición" : "Nuevo Producto"}
               </h2>
               <button
@@ -382,10 +383,10 @@ export function AddPurchaseButton({ products: initialProducts, onSuccess }: AddP
                   setShowProductModal(false);
                   setEditingItemId(null);
                 }}
-                className="btn btn-icon btn-round hover:bg-[#f2f2f2]"
+                className="btn btn-icon btn-round hover:bg-surface-strong"
                 aria-label="Cerrar"
               >
-                <svg className="w-6 h-6 text-[#6a6a6a]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="w-6 h-6 text-ink-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>

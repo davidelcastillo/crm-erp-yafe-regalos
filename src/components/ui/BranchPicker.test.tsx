@@ -28,7 +28,8 @@ describe("BranchPicker", () => {
       "aria-pressed",
       "true"
     );
-    expect(screen.getByRole("button", { name: "Centro" }).className).toContain("#ec4899");
+    // El anillo de marca va en `border-accent` (token), no en el hex literal.
+    expect(screen.getByRole("button", { name: "Centro" }).className).toContain("border-accent");
   });
 
   it("avisa la sucursal elegida al tocarla", () => {

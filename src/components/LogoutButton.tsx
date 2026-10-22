@@ -41,8 +41,8 @@ export default function LogoutButton() {
       className="
         flex items-center justify-center gap-2
         p-2 rounded-md
-        hover:bg-gray-100
-        focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500
+        hover:bg-surface-strong
+        focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent
         transition-colors
         disabled:opacity-50
         disabled:cursor-not-allowed

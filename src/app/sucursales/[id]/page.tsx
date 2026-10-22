@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getBranches } from "@/app/actions/branch";
 import { BranchManager } from "@/components/ui/BranchManager";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { BrandBand } from "@/components/ui/BrandBand";
 import type { Branch } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
@@ -28,10 +29,9 @@ export default async function BranchDetailPage({
 
   // If no branches exist, just show the manager (empty state)
   return (
-    <div className="min-h-screen bg-white pb-20">
-      <div className="pb-16 brand-gradient">
-        <PageHeader title="Sucursales" />
-      </div>
+    <div className="min-h-screen bg-surface pb-20">
+      {/* Server Component: la banda de movimiento (S10/S11) vive en `BrandBand`. */}
+      <BrandBand header={<PageHeader title="Sucursales" />} />
 
       <div className="glass rounded-t-[2.5rem] border-t border-white/80 -mt-12 px-5 pt-6 pb-8 shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
         <BranchManager branches={branches} />

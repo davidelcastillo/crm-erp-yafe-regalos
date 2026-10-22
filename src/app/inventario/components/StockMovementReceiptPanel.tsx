@@ -40,7 +40,7 @@ export function StockMovementReceiptPanel({
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 px-4 backdrop-blur-md">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-scrim px-4 backdrop-blur-md">
       <section role="dialog" aria-modal="true" aria-labelledby="stock-receipt-title" aria-busy={generating}
         onKeyDown={(event) => {
           if (event.key === "Escape" && !generating) onClose();
@@ -56,16 +56,16 @@ export function StockMovementReceiptPanel({
             first?.focus();
           }
         }}
-        className="w-full max-w-xl rounded-2xl bg-white p-6 max-h-[90vh] overflow-y-auto">
-        <h2 id="stock-receipt-title" className="text-xl font-semibold text-[#222222]">{label} registrado</h2>
-        <p className="mt-3 text-base text-[#3f3f3f]">
+        className="w-full max-w-xl rounded-2xl bg-surface p-6 max-h-[90vh] overflow-y-auto">
+        <h2 id="stock-receipt-title" className="text-xl font-semibold text-ink">{label} registrado</h2>
+        <p className="mt-3 text-base text-ink-body">
           {isTransfer ? `${receipt.sourceBranchName} → ${receipt.branchName}` : receipt.branchName}
         </p>
-        <p className="mt-2 text-sm text-[#6a6a6a]">
+        <p className="mt-2 text-sm text-ink-muted">
           El stock ya se actualizó. Podés descargar el comprobante antes de cerrar.
           Descargarlo no vuelve a registrar el movimiento.
         </p>
-        {error && <p role="alert" className="mt-4 text-sm text-[#c13515]">{error}</p>}
+        {error && <p role="alert" className="mt-4 text-sm text-error">{error}</p>}
         <div className="mt-6 flex flex-col gap-3 md:flex-row md:justify-end md:flex-wrap">
           {isTransfer && (
             <>

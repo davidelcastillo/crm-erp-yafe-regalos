@@ -58,9 +58,6 @@ describe('InactivosPage', () => {
     render(<InactivosPage />);
     await screen.findByText('Producto Alfa');
 
-    // El slot `actions` solo se ve desde desktop: la misma acción tiene que estar en el menú.
-    expect(screen.getByRole('link', { name: 'Volver a inventario' })).toBeInTheDocument();
-
     fireEvent.click(screen.getByRole('button', { name: /abrir menú/i }));
 
     const menu = screen.getByRole('dialog', { name: /menú de productos inactivos/i });
@@ -68,6 +65,25 @@ describe('InactivosPage', () => {
       'href',
       '/inventario'
     );
+  });
+
+  // Prueba visual del usuario (S18, U3): «pongamos un boton de volver a inventario
+  // en /inactivos y que no este oculto en la hamburgesa ese boton par voler».
+  it('ofrece el regreso a la vista arriba de la hoja, sin abrir el menú ☰', async () => {
+    render(<InactivosPage />);
+    await screen.findByText('Producto Alfa');
+
+    const volver = screen.getByRole('link', { name: 'Volver a inventario' });
+
+    expect(volver).toHaveAttribute('href', '/inventario');
+    // Mismo patrón que /inventario/control: target táctil de 44 px y sin target.
+    expect(volver).toHaveClass('min-h-[44px]', 'inline-flex', 'items-center');
+    // Vive arriba de la hoja de vidrio de la lista, no dentro de un overlay.
+    expect(volver.closest('.glass')).not.toBeNull();
+    expect(within(volver.closest('.glass') as HTMLElement).queryByRole('dialog')).toBeNull();
+
+    // Y no depende de abrir el menú: ya está en el documento antes de tocarlo.
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
   // S4: por defecto se ordena por código y se puede pasar a última modificación.
@@ -102,5 +118,16 @@ describe('InactivosPage', () => {
 
     await waitFor(() => expect(screen.queryByText('Producto Alfa')).not.toBeInTheDocument());
     expect(screen.getByText('Producto Beta')).toBeInTheDocument();
+  });
+});
+
+describe('InactivosPage — buscador en su propia tarjeta (S16)', () => {
+  it('el buscador vive en una tarjeta de vidrio propia, fuera de la hoja de la lista', async () => {
+    render(<InactivosPage />);
+
+    const buscador = await screen.findByLabelText(/buscar producto/i);
+    // Su bloque es el de vidrio reforzado, separado del que contiene las cards.
+    expect(buscador.closest('.glass-strong')).not.toBeNull();
+    expect(buscador.closest('[class*="rounded-t-"]')).toBeNull();
   });
 });

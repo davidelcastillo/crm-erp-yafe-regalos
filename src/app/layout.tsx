@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import BottomNav from "../components/BottomNav";
 import { BranchProviderWrapper } from "@/lib/context/BranchProviderWrapper";
+import { THEME_BOOTSTRAP_SCRIPT } from "@/lib/theme";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -33,9 +34,17 @@ export default function RootLayout({
   return (
     <html
       lang="es"
+      /* El script de arranque escribe `data-theme` antes de que React hidrate:
+         sin esto, React avisa que el atributo del servidor no coincide. */
+      suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-[#ffffff]">
+      {/* El tema se aplica antes del primer pintado: leerlo desde un efecto de React
+          mostraría la página en claro y después saltaría a oscuro. */}
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP_SCRIPT }} />
+      </head>
+      <body className="min-h-full flex flex-col bg-surface">
         <BranchProviderWrapper>
           <main className="flex-1">{children}</main>
           <BottomNav />

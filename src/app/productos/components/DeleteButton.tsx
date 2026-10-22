@@ -35,7 +35,7 @@ export function DeleteButton({ productId }: DeleteButtonProps) {
   return (
     <button
       onClick={handleDeactivate}
-      className="flex-1 py-2 px-3 text-sm font-medium text-gray-800 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+      className="flex-1 py-2 px-3 text-sm font-medium text-ink bg-surface-soft rounded-lg hover:bg-surface-strong transition-colors"
     >
       Desactivar
     </button>

@@ -54,11 +54,11 @@ export default function LoginForm() {
 
   return (
     <div className="flex-1 w-full max-w-md mx-auto px-6 pt-8 pb-6 flex flex-col z-10 relative">
-        <h2 className="text-3xl font-bold text-[#222222] text-center mb-8">Bienvenida Estefi!</h2>
+        <h2 className="text-3xl font-bold text-ink text-center mb-8">Bienvenida Estefi!</h2>
         <form className="space-y-6" onSubmit={handleSubmit}>
           <div className="flex flex-col gap-4 mb-6">
             {/* Input Username (Translúcido) */}
-            <div className="bg-white/60 backdrop-blur-md border border-white/80 rounded-full px-5 py-4 shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex items-center transition-all focus-within:bg-white/80 focus-within:border-pink-300">
+            <div className="bg-surface/60 backdrop-blur-md border border-white/80 rounded-full px-5 py-4 shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex items-center transition-all focus-within:bg-surface/80 focus-within:border-accent/30">
               <input
                 id="email"
                 name="email"
@@ -67,14 +67,14 @@ export default function LoginForm() {
                 required
                 placeholder="Correo electrónico"
                 aria-label="Correo electrónico"
-                className="w-full bg-transparent outline-none text-gray-700 placeholder-[#6a6a6a] font-medium"
+                className="w-full bg-transparent outline-none text-ink placeholder-ink-muted font-medium"
                 value={formState.email}
                 onChange={handleChange}
               />
             </div>
 
             {/* Input Password (Translúcido) */}
-            <div className="bg-white/60 backdrop-blur-md border border-white/80 rounded-full px-5 py-4 shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex items-center justify-between transition-all focus-within:bg-white/80 focus-within:border-pink-300">
+            <div className="bg-surface/60 backdrop-blur-md border border-white/80 rounded-full px-5 py-4 shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex items-center justify-between transition-all focus-within:bg-surface/80 focus-within:border-accent/30">
               <input
                 id="password"
                 name="password"
@@ -82,7 +82,7 @@ export default function LoginForm() {
                 autoComplete="current-password"
                 placeholder="Contraseña"
                 aria-label="Contraseña"
-                className="w-full bg-transparent outline-none text-gray-700 placeholder-[#6a6a6a] font-medium"
+                className="w-full bg-transparent outline-none text-ink placeholder-ink-muted font-medium"
                 value={formState.password}
                 onChange={handleChange}
               />
@@ -93,7 +93,7 @@ export default function LoginForm() {
                 onClick={() => setShowPassword((prev) => !prev)}
                 aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
                 aria-pressed={showPassword}
-                className="text-gray-400 hover:text-pink-500 transition-colors touch-manipulation"
+                className="text-ink-soft hover:text-accent transition-colors touch-manipulation"
               >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
               </button>
@@ -102,7 +102,7 @@ export default function LoginForm() {
 
           {/* Recordarme y Olvidé contraseña */}
           <div className="flex justify-between items-center mb-10 px-2 text-sm">
-            <label className="flex items-center gap-2 text-gray-600 cursor-pointer font-medium">
+            <label className="flex items-center gap-2 text-ink-muted cursor-pointer font-medium">
               {/* Un pequeño toque: acento rosa en el checkbox */}
               <input
                 type="checkbox"
@@ -114,17 +114,17 @@ export default function LoginForm() {
           </div>
 
           {error && (
-            <p role="alert" className="mt-2 text-sm text-[#c13515]">{error}</p>
+            <p role="alert" className="mt-2 text-sm text-error">{error}</p>
           )}
 
           {success && (
-            <p role="status" className="mt-2 text-sm text-[#15803d]">{success}</p>
+            <p role="status" className="mt-2 text-sm text-positive">{success}</p>
           )}
           {/* Botón de Login: en celular se hunde un poco al tocarlo (feedback táctil). */}
           <button 
           type="submit"
           disabled={pending}
-          className="w-full py-4 rounded-full border-2 border-pink-400 text-pink-500 font-bold text-lg hover:bg-pink-400 hover:text-white active:scale-[0.98] active:bg-pink-400 active:text-white transition-all mb-6 shadow-sm touch-manipulation">
+          className="w-full py-4 rounded-full border-2 border-accent text-accent font-bold text-lg hover:bg-accent hover:text-white active:scale-[0.98] active:bg-accent active:text-white transition-all mb-6 shadow-sm touch-manipulation">
             {pending ? 'Iniciando sesión...' : 'Iniciar sesión'}
           </button>
           
@@ -133,7 +133,7 @@ export default function LoginForm() {
     // <div className="w-full max-w-md">
     //   <form className="space-y-6" onSubmit={handleSubmit}>
     //     <div>
-    //       <label htmlFor="email" className="block mb-2 text-sm font-medium text-[#6a6a6a]">
+    //       <label htmlFor="email" className="block mb-2 text-sm font-medium text-ink-muted">
     //         Correo electrónico
     //       </label>
     //       <input
@@ -142,14 +142,14 @@ export default function LoginForm() {
     //         type="email"
     //         autoComplete="email"
     //         required
-    //         className="block w-full h-14 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-[#222222] placeholder:text-[#6a6a6a] focus:border-[#ec4899] focus:ring-2 focus:ring-[#ec4899]/30 focus:outline-none transition-all sm:text-sm sm:leading-6"
+    //         className="block w-full h-14 rounded-xl border border-hairline bg-surface px-3 py-2 text-sm font-medium text-ink placeholder:text-ink-muted focus:border-accent focus:ring-2 focus:ring-accent/30 focus:outline-none transition-all sm:text-sm sm:leading-6"
     //         value={formState.email}
     //         onChange={handleChange}
     //       />
     //     </div>
 
     //     <div>
-    //       <label htmlFor="password" className="block mb-2 text-sm font-medium text-[#6a6a6a]">
+    //       <label htmlFor="password" className="block mb-2 text-sm font-medium text-ink-muted">
     //         Contraseña
     //       </label>
     //       <input
@@ -158,18 +158,18 @@ export default function LoginForm() {
     //         type="password"
     //         autoComplete="current-password"
     //         required
-    //         className="block w-full h-14 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-[#222222] placeholder:text-[#6a6a6a] focus:border-[#ec4899] focus:ring-2 focus:ring-[#ec4899]/30 focus:outline-none transition-all sm:text-sm sm:leading-6"
+    //         className="block w-full h-14 rounded-xl border border-hairline bg-surface px-3 py-2 text-sm font-medium text-ink placeholder:text-ink-muted focus:border-accent focus:ring-2 focus:ring-accent/30 focus:outline-none transition-all sm:text-sm sm:leading-6"
     //         value={formState.password}
     //         onChange={handleChange}
     //       />
     //     </div>
 
     //     {error && (
-    //       <p role="alert" className="mt-2 text-sm text-[#c13515]">{error}</p>
+    //       <p role="alert" className="mt-2 text-sm text-error">{error}</p>
     //     )}
 
     //     {success && (
-    //       <p role="status" className="mt-2 text-sm text-green-600">{success}</p>
+    //       <p role="status" className="mt-2 text-sm text-positive">{success}</p>
     //     )}
 
     //     <div className="flex items-center">
@@ -179,11 +179,11 @@ export default function LoginForm() {
     //             id="remember-me"
     //             name="remember-me"
     //             type="checkbox"
-    //             className="h-5 w-5 text-[#ec4899] focus:ring-[#ec4899] border-gray-300 rounded"
+    //             className="h-5 w-5 text-accent focus:ring-accent border-hairline rounded"
     //           />
     //         </div>
     //         <div className="ml-3 text-sm">
-    //           <label htmlFor="remember-me" className="font-medium text-[#222222]">
+    //           <label htmlFor="remember-me" className="font-medium text-ink">
     //             Recordarme
     //           </label>
     //         </div>
@@ -194,7 +194,7 @@ export default function LoginForm() {
     //       <button
     //         type="submit"
     //         disabled={pending}
-    //         className="w-full h-12 flex justify-center items-center border border-transparent text-sm font-medium rounded-xl shadow-sm brand-gradient brand-gradient-hover text-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#ec4899]/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+    //         className="w-full h-12 flex justify-center items-center border border-transparent text-sm font-medium rounded-xl shadow-sm brand-gradient brand-gradient-hover text-ink focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
     //       >
     //         {pending ? 'Iniciando sesión...' : 'Iniciar sesión'}
     //       </button>

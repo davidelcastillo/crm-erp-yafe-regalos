@@ -75,50 +75,50 @@ export const RegistrarPagoModal = ({
 
   return (
     <div
-      className="fixed inset-0 bg-black/30 backdrop-blur-md z-[60] flex items-center justify-center"
+      className="fixed inset-0 bg-scrim backdrop-blur-md z-[60] flex items-center justify-center"
       role="dialog"
       aria-modal="true"
       aria-labelledby="registrar-pago-title"
     >
-      <div className="bg-white w-full max-w-xl md:max-w-md rounded-2xl p-6 animate-scale-in max-h-[90vh] md:max-h-[85vh] overflow-y-auto">
+      <div className="bg-surface w-full max-w-xl md:max-w-md rounded-2xl p-6 animate-scale-in max-h-[90vh] md:max-h-[85vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-4 gap-3">
-          <h2 id="registrar-pago-title" className="text-xl font-semibold text-[#222222]">
+          <h2 id="registrar-pago-title" className="text-xl font-semibold text-ink">
             Registrar pago
           </h2>
           <button
             type="button"
             onClick={onClose}
             disabled={pending}
-            className="btn btn-icon btn-round hover:bg-[#f2f2f2]"
+            className="btn btn-icon btn-round hover:bg-surface-strong"
             aria-label="Cerrar"
           >
-            <svg className="w-6 h-6 text-[#6a6a6a]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-6 h-6 text-ink-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
 
-        <div className="rounded-2xl border border-black/10 bg-[#f7f7f7] p-4">
-          <p className="text-xs font-medium uppercase tracking-wide text-[#6a6a6a]">Cliente</p>
-          <p className="text-base font-semibold text-[#222222] break-words">
+        <div className="rounded-2xl border border-hairline bg-surface-soft p-4">
+          <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">Cliente</p>
+          <p className="text-base font-semibold text-ink break-words">
             {customer.name} {customer.surname}
           </p>
-          <p className="mt-3 text-xs font-medium uppercase tracking-wide text-[#6a6a6a]">Deuda</p>
-          <p className="text-2xl font-bold tabular-nums text-[#b91c1c]">${deuda.toFixed(2)}</p>
-          <p className="mt-3 text-sm text-[#6a6a6a]">
+          <p className="mt-3 text-xs font-medium uppercase tracking-wide text-ink-muted">Deuda</p>
+          <p className="text-2xl font-bold tabular-nums text-negative">${deuda.toFixed(2)}</p>
+          <p className="mt-3 text-sm text-ink-muted">
             Se registra el pago completo de la deuda. No se aceptan pagos parciales.
           </p>
         </div>
 
         {error && (
-          <p role="alert" className="mt-4 rounded-xl bg-[#ffe4ea] px-4 py-3 text-sm text-[#8f0020]">
+          <p role="alert" className="mt-4 rounded-xl bg-error-surface px-4 py-3 text-sm text-error-ink">
             {error}
           </p>
         )}
 
         {registrado ? (
           <div className="mt-4 space-y-3">
-            <p role="status" className="rounded-xl bg-[#f2f2f2] px-4 py-3 text-sm text-[#15803d]">
+            <p role="status" className="rounded-xl bg-surface-strong px-4 py-3 text-sm text-positive">
               Pago registrado: ${deuda.toFixed(2)} acreditados a la deuda de {customer.name}.
             </p>
             <button type="button" onClick={onClose} className="btn btn-primary w-full md:w-auto">

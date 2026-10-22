@@ -19,7 +19,11 @@ El diseño sigue el PDF de inventario: logo, banda con acento rosa, filas altern
 - **Cantidad**: unidades ingresadas, retiradas o trasladadas, no el stock total. El signo y el color dependen del documento: la sucursal que recibe muestra `+N` en verde y la que envía `-N` en rojo. En **Ingreso** es `+` y en **Egreso** `-`; en **Movimiento de sucursal** el signo lo decide el comprobante que descargás. Las demás columnas usan el color de texto habitual.
 - **Stock final**: saldo confirmado de esa sucursal. En un traslado, el comprobante de la sucursal que recibe muestra el saldo del destino y el de la sucursal que envía muestra el **saldo que le queda a la sucursal de origen**. Es el saldo de esa operación, no una consulta al stock que haya después de otros movimientos.
 - **Precio unit.**: precio de venta del producto al registrar la operación, en ARS; no costo ni importe total del movimiento.
-- Totales: cantidad de productos y suma de unidades movidas. Paginación automática; un nombre demasiado largo se abrevia con puntos suspensivos. El motivo se distribuye en líneas sin recortarlo. Helvetica no incluye emojis: los caracteres no representables se muestran como `?`.
+- Totales: cantidad de productos y suma de unidades movidas. Paginación automática; un nombre demasiado largo se abrevia con puntos suspensivos. El motivo se distribuye en líneas sin recortarlo. Poppins tampoco incluye emojis: los caracteres no representables se muestran como `?`.
+
+## Tipografía
+
+Los tres PDF de documento (inventario, comprobante de movimiento y comprobante de ajuste de control) comparten **Poppins** embebida (SIL OFL 1.1), Regular y SemiBold, desde `src/lib/fonts/poppins.ts` en base64: los generadores se importan dinámicamente en el navegador, así que la fuente viaja en el bundle y no se lee del filesystem. La escala está en `DOCUMENT_FONT_SIZE` (`src/lib/fonts/document-fonts.ts`): título 15 pt, contenido 12 pt, encabezados de columna y metadatos 10 pt, pie 9 pt. Para cambiar la fuente hay que regenerar el base64 (ver el encabezado de `poppins.ts`); los tests leen el texto por el CMap `/ToUnicode`, así que un cambio de tipografía no rompe las aserciones.
 
 ## Fallos y límites
 

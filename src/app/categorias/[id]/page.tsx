@@ -13,7 +13,7 @@ import { CardSkeleton } from '@/components/ui/Skeleton';
 
 /** Envoltorio de la pagina: banda de marca con el encabezado y hoja de vidrio. */
 const PageShell = ({ children }: { children: React.ReactNode }) => (
-  <div className="min-h-screen bg-white pb-20">
+  <div className="min-h-screen bg-surface pb-20">
     <div className="pb-16 brand-gradient">
       <PageHeader title="Editar categoría" />
     </div>
@@ -135,7 +135,7 @@ export default function CategoryEditPage() {
   if (!category) {
     return (
       <PageShell>
-        <p className="py-6 text-center text-sm text-[#6a6a6a]">Categoría no encontrada</p>
+        <p className="py-6 text-center text-sm text-ink-muted">Categoría no encontrada</p>
         <Link
           href="/categorias"
           className="btn btn-secondary mx-auto w-fit"
@@ -147,7 +147,7 @@ export default function CategoryEditPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white pb-20">
+    <div className="min-h-screen bg-surface pb-20">
       <div className="pb-16 brand-gradient">
         <PageHeader
           title="Editar categoría"
@@ -170,7 +170,7 @@ export default function CategoryEditPage() {
 
       <div className="glass rounded-t-[2.5rem] border-t border-white/80 -mt-12 px-5 pt-6 pb-8 shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
         {error && (
-          <div role="alert" className="mb-4 rounded-xl bg-[#ffe4ea] p-4 text-sm text-[#8f0020]">
+          <div role="alert" className="mb-4 rounded-xl bg-error-surface p-4 text-sm text-error-ink">
             {error}
           </div>
         )}
@@ -179,7 +179,7 @@ export default function CategoryEditPage() {
           <div>
             <label
               htmlFor="categoria-nombre"
-              className="mb-1 block text-sm font-medium text-[#3f3f3f]"
+              className="mb-1 block text-sm font-medium text-ink-body"
             >
               Nombre
             </label>
@@ -188,7 +188,7 @@ export default function CategoryEditPage() {
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="min-h-[44px] w-full rounded-xl bg-[#f8f8f8] px-3 py-2.5 text-base text-[#222222] focus:outline-none focus:ring-2 focus:ring-[#ec4899]/30"
+              className="min-h-[44px] w-full rounded-xl bg-surface-soft px-3 py-2.5 text-base text-ink focus:outline-none focus:ring-2 focus:ring-accent/30"
               disabled={formPending}
               required
             />

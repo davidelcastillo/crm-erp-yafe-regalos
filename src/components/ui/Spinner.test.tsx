@@ -23,7 +23,7 @@ describe("Spinner", () => {
 
     const anillo = container.querySelector(".animate-spin");
     expect(anillo).toBeInTheDocument();
-    expect(anillo?.className).toContain("#ec4899");
-    expect(anillo?.className).toContain("#fbcfe8");
+    expect(anillo?.className).toContain("border-t-accent");
+    expect(anillo?.className).toContain("border-accent-soft");
   });
 });

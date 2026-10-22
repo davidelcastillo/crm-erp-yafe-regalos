@@ -91,7 +91,7 @@ const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         onChange={handleInputChange}
         onFocus={() => setIsOpen(true)}
         placeholder="Buscar producto..."
-        className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-[#ec4899] focus:ring-2 focus:ring-[#ec4899]/30 outline-none transition-all bg-white"
+        className="w-full px-4 py-3 rounded-xl border border-hairline focus:border-accent focus:ring-2 focus:ring-accent/30 outline-none transition-all bg-surface"
       />
       
       {renderCreateButton && (
@@ -108,17 +108,17 @@ const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       )}
       
       {isOpen && filteredProducts.length > 0 && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
+        <div className="absolute z-50 w-full mt-1 bg-surface border border-hairline rounded-xl shadow-lg max-h-48 overflow-y-auto">
           {filteredProducts.map((product) => (
             <button
               key={product.id}
               type="button"
               onClick={() => handleSelect(product)}
-              className="w-full px-4 py-3 text-left hover:bg-[#f9f9f9] flex justify-between items-center transition-colors"
+              className="w-full px-4 py-3 text-left hover:bg-surface-soft flex justify-between items-center transition-colors"
             >
-              <span className="font-medium text-[#222222]">{product.name}</span>
+              <span className="font-medium text-ink">{product.name}</span>
               {product.code && (
-                <span className="text-sm text-[#6a6a6a]">{product.code}</span>
+                <span className="text-sm text-ink-muted">{product.code}</span>
               )}
             </button>
           ))}
@@ -126,7 +126,7 @@ const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       )}
       
       {selectedProduct && (
-        <p className="mt-1 text-xs text-[#6a6a6a]">
+        <p className="mt-1 text-xs text-ink-muted">
           {selectedProduct.name}{selectedProduct.code ? ` (${selectedProduct.code})` : ""}
         </p>
       )}

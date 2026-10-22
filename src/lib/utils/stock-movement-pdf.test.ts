@@ -1,7 +1,7 @@
 /** @jest-environment node */
-import { PDFDocument, PDFDict, PDFName, PDFRawStream, PDFArray } from 'pdf-lib';
-import { inflateSync } from 'node:zlib';
+import { PDFDict, PDFName, PDFRawStream } from 'pdf-lib';
 import type { StockMovementReceipt } from '@/lib/stock-movement-receipt';
+import { readPdfContent as readPdf } from '@/lib/fonts/pdf-test-reader';
 import { generateStockMovementPdf } from './stock-movement-pdf';
 
 const receipt: StockMovementReceipt = {
@@ -9,29 +9,6 @@ const receipt: StockMovementReceipt = {
   branchName: 'Sucursal Centro', branchCode: 'CEN', reference: 'Conteo físico',
   rows: [{ code: 'PR001', name: 'Producto de prueba', quantity: 3, stock: 17, price: 1250, sourceStock: 22 }],
 };
-
-async function readPdf(bytes: Uint8Array) {
-  const doc = await PDFDocument.load(bytes);
-  const text: string[] = [];
-  const colors = new Map<string, number[]>();
-  for (const page of doc.getPages()) {
-    const contents = page.node.Contents();
-    const streams = contents instanceof PDFArray ? contents.asArray() : contents ? [contents] : [];
-    for (const ref of streams) {
-      const stream = doc.context.lookup(ref) as PDFRawStream;
-      const raw = inflateSync(stream.getContents()).toString('latin1');
-      for (const match of raw.matchAll(/<([A-Fa-f0-9]+)> Tj/g)) {
-        const value = Buffer.from(match[1], 'hex').toString('latin1');
-        text.push(value);
-        const operator = [...raw.slice(0, match.index).matchAll(/([\d.]+) ([\d.]+) ([\d.]+) rg/g)].pop();
-        if (operator && !colors.has(value)) {
-          colors.set(value, [operator[1], operator[2], operator[3]].map((part) => Math.round(Number(part) * 100) / 100));
-        }
-      }
-    }
-  }
-  return { doc, text, colors };
-}
 
 describe('generateStockMovementPdf', () => {
   test.each(['ENTRY', 'EXIT', 'TRANSFER'] as const)('imprime %s con datos confirmados y precio unitario', async (movementType) => {
@@ -97,5 +74,12 @@ describe('generateStockMovementPdf', () => {
       ...receipt, reference: '<script>alert(1)</script> 📦',
     }));
     expect(text.join(' ')).toContain('<script>alert(1)</script> ?');
+  });
+
+  test('embebe Poppins Regular y SemiBold en lugar de Helvetica', async () => {
+    const { fonts } = await readPdf(await generateStockMovementPdf(receipt));
+    expect(fonts.join(' ')).toContain('Poppins-Regular');
+    expect(fonts.join(' ')).toContain('Poppins-SemiBold');
+    expect(fonts.join(' ')).not.toContain('Helvetica');
   });
 });
