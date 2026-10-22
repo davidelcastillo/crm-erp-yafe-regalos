@@ -114,9 +114,9 @@
 
 /* Entrance animation for centered modals: soft fade + scale (mobile-first). */
 @theme {
-  --animate-scale-in: scale-in 0.2s ease-out;
-  --animate-fade-in: fade-in 0.2s ease-out;
-  --animate-fade-in-right: fade-in-right 0.25s ease-out;
+  --animate-scale-in: scale-in 250ms var(--motion-ease-enter);
+  --animate-fade-in: fade-in 200ms var(--motion-ease-enter);
+  --animate-fade-in-right: fade-in-right 250ms var(--motion-ease-enter);
 
   @keyframes scale-in {
     from {

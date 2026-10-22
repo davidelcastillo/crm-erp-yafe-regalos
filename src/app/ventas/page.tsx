@@ -6,23 +6,38 @@ import { getSales } from '../actions/sale';
 import { getBranchOptions } from '../actions/branch';
 import { SalesList } from './components/SalesList';
 import { AddSaleButton } from './components/AddSaleButton';
+import { CashMenuModal } from './components/CashMenuModal';
 import { CashMovementsModal } from './components/CashMovementsModal';
 import { CashCloseModal } from './components/CashCloseModal';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { ActionCard } from '@/components/ui/ActionCard';
 import { Spinner } from '@/components/ui/Spinner';
-import { CardSkeleton } from '@/components/ui/Skeleton';
+import { CardSkeleton, Skeleton } from '@/components/ui/Skeleton';
 import { BranchSelector } from '@/components/ui/BranchSelector';
 import { useReloadKey } from '@/lib/hooks/useReloadKey';
 import { useEffect, useState } from 'react';
+import { motion, useReducedMotion, useScroll, useTransform } from 'motion/react';
+
+/** Paso del acceso único a la caja (S4): el menú o ya una de sus acciones. */
+type CashStep = 'menu' | 'movimientos' | 'cierre';
 
 const PAGE_SIZE = 20;
 const DEBOUNCE_MS = 300;
 
-/** Carga: la banda de marca y la hoja con la forma de la lista que va a llegar. */
+/**
+ * Carga: la banda de marca, la forma del encabezado y la hoja con la forma de la
+ * lista que va a llegar, en el mismo orden y con las mismas medidas que la
+ * página, para que no salte al terminar (S2).
+ */
 const VentasLoading = () => (
   <div className="min-h-screen bg-white pb-20">
-    <div className="h-28 brand-gradient" />
+    <div className="pb-16 brand-gradient">
+      <div className="px-3 pt-6" aria-hidden="true">
+        <Skeleton className="h-[60px] rounded-2xl" />
+        <Skeleton className="mt-4 h-[72px] rounded-2xl" />
+        <Skeleton className="mt-4 h-[68px] rounded-2xl" />
+      </div>
+    </div>
     <div className="glass rounded-t-[2.5rem] -mt-12 px-5 pt-8">
       <Spinner label="Cargando ventas..." />
       <div className="mt-6 space-y-4">
@@ -48,8 +63,14 @@ export default function VentasPage() {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   // Sucursales y acceso a la caja (plata), pedidos en S14.
   const [branches, setBranches] = useState<BranchOption[]>([]);
-  const [cashModalOpen, setCashModalOpen] = useState(false);
-  const [closeModalOpen, setCloseModalOpen] = useState(false);
+  // Un solo acceso a la caja (S4): abre el menú y desde ahí el paso elegido.
+  const [cashStep, setCashStep] = useState<CashStep | null>(null);
+  // Movimiento de la página: el encabezado se mueve solo, y el fondo de marca se
+  // retira cuando la hoja lo tapa. Con movimiento reducido queda quieto.
+  const { scrollY } = useScroll();
+  const headerY = useTransform(scrollY, [0, 160], [0, 16]);
+  const brandOpacity = useTransform(scrollY, [0, 140], [1, 0.45]);
+  const reduceMotion = useReducedMotion();
 
   // Las sucursales se cargan una vez: las necesita el modal de caja.
   useEffect(() => {
@@ -125,35 +146,36 @@ export default function VentasPage() {
   return (
     <div className="min-h-screen bg-white pb-20 relative">
       <main className="">
-        <div className="pb-16 brand-gradient">
-          <PageHeader
-            title="Ventas"
-            right={
-              <BranchSelector
-                block
-                onChange={(id) => setBranchId(id)}
-                label="Filtrar por sucursal"
-              />
-            }
-            actions={
-              <>
+        <div className="relative isolate pb-16">
+          {/* El degradé de marca es una capa de fondo: se retira al hacer scroll
+              (S10), pero los botones, el selector y el buscador no se tocan. */}
+          <motion.div
+            className="brand-gradient pointer-events-none absolute inset-0"
+            aria-hidden="true"
+            style={reduceMotion ? undefined : { opacity: brandOpacity }}
+          />
+
+          <motion.div style={reduceMotion ? undefined : { y: headerY }}>
+            <PageHeader
+              title="Ventas"
+              right={
+                <BranchSelector
+                  block
+                  onChange={(id) => setBranchId(id)}
+                  label="Filtrar por sucursal"
+                />
+              }
+              actions={
                 <button
                   type="button"
-                  onClick={() => setCashModalOpen(true)}
+                  onClick={() => setCashStep('menu')}
                   className="btn btn-primary"
                 >
                   Caja
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setCloseModalOpen(true)}
-                  className="btn btn-primary"
-                >
-                  Cerrar caja
-                </button>
-              </>
-            }
-          />
+              }
+            />
+          </motion.div>
 
           {/* Acciones de la pagina: en su propio div, como el del buscador, con el
               fondo de marca a la vista. En desktop pasan a la barra. */}
@@ -161,24 +183,13 @@ export default function VentasPage() {
             <div className="flex gap-3">
               <ActionCard
                 label="Caja"
-                hint="Ingresos y egresos"
-                onClick={() => setCashModalOpen(true)}
+                hint="Movimientos y cierre"
+                onClick={() => setCashStep('menu')}
                 icon={
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <rect x="2.5" y="6.5" width="19" height="11" rx="2" strokeWidth={2} />
                     <circle cx="12" cy="12" r="2.5" strokeWidth={2} />
                     <path strokeLinecap="round" strokeWidth={2} d="M6.5 12h.01M17.5 12h.01" />
-                  </svg>
-                }
-              />
-              <ActionCard
-                label="Cerrar caja"
-                hint="Corte por sucursal"
-                onClick={() => setCloseModalOpen(true)}
-                icon={
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <rect x="3" y="7" width="18" height="13" rx="2" strokeWidth={2} />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 11h18M9.5 15.5l1.75 1.75L15 13.5" />
                   </svg>
                 }
               />
@@ -245,15 +256,20 @@ export default function VentasPage() {
         </div>
       </main>
       <AddSaleButton products={products} onSuccess={bump} />
+      <CashMenuModal
+        open={cashStep === 'menu'}
+        onClose={() => setCashStep(null)}
+        onPick={(step) => setCashStep(step)}
+      />
       <CashMovementsModal
-        open={cashModalOpen}
-        onClose={() => setCashModalOpen(false)}
+        open={cashStep === 'movimientos'}
+        onClose={() => setCashStep(null)}
         branches={branches}
         onConfirm={bump}
       />
       <CashCloseModal
-        open={closeModalOpen}
-        onClose={() => setCloseModalOpen(false)}
+        open={cashStep === 'cierre'}
+        onClose={() => setCashStep(null)}
         branches={branches}
         onConfirm={bump}
       />

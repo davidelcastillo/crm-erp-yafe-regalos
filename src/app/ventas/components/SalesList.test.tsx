@@ -30,26 +30,24 @@ const ventaBase: Venta = {
   ],
 };
 
-/** La card es el div raíz de la venta, dentro del contenedor del listado. */
-const cardDe = (container: HTMLElement) =>
-  container.firstElementChild?.firstElementChild as HTMLElement;
+/** La card es el bloque con forma de tarjeta que contiene el título de la venta;
+ *  puede estar envuelta por `Reveal`, así que se busca desde el título hacia arriba. */
+const cardDe = () => screen.getByRole("heading", { level: 3 }).closest("div.rounded-2xl") as HTMLElement;
 
 describe("SalesList: marca de la caja anterior (S17)", () => {
   it("muestra el rótulo y el fondo oscurecido en una venta de la caja anterior", () => {
-    const { container } = render(
-      <SalesList sales={[{ ...ventaBase, previousCash: true }]} />
-    );
+    render(<SalesList sales={[{ ...ventaBase, previousCash: true }]} />);
 
     expect(screen.getByText("Caja anterior")).toBeInTheDocument();
-    expect(cardDe(container).className).toContain("bg-[#f2f2f2]");
+    expect(cardDe().className).toContain("bg-surface-strong");
   });
 
   it("no muestra el rótulo y deja el fondo claro en una venta sin caja anterior", () => {
-    const { container } = render(<SalesList sales={[ventaBase]} />);
+    render(<SalesList sales={[ventaBase]} />);
 
     expect(screen.queryByText("Caja anterior")).not.toBeInTheDocument();
     // Superficie normal (token `glass`), no la oscurecida de la caja anterior.
-    expect(cardDe(container).className).toContain("glass");
-    expect(cardDe(container).className).not.toContain("bg-[#f2f2f2]");
+    expect(cardDe().className).toContain("glass");
+    expect(cardDe().className).not.toContain("bg-surface-strong");
   });
 });
