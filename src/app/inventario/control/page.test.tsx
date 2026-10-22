@@ -180,6 +180,8 @@ describe("Control de stock por sucursal", () => {
     await waitFor(() =>
       expect(mockGuardar).toHaveBeenCalledWith({
         controlId: 9,
+        // El cierre guarda el conteo con su motivo antes de cerrar.
+        reason: "cierre quincenal",
         items: [
           { productId: 10, countedStock: 3, decision: "ACCEPTED" },
           { productId: 11, countedStock: 10, decision: "ACCEPTED" },
@@ -230,5 +232,31 @@ describe("Control de stock por sucursal", () => {
       })
     );
     expect(mockCerrar).not.toHaveBeenCalled();
+  });
+
+  it("el motivo del ajuste se guarda con el borrador (S10)", async () => {
+    await abrirControl();
+
+    fireEvent.change(screen.getByLabelText(/Motivo del ajuste/), {
+      target: { value: "  cierre quincenal  " },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Guardar borrador" }));
+
+    await waitFor(() =>
+      expect(mockGuardar).toHaveBeenCalledWith(
+        expect.objectContaining({ controlId: 9, reason: "cierre quincenal" })
+      )
+    );
+  });
+
+  it("al retomar un borrador el motivo guardado vuelve al campo", async () => {
+    mockDetalle.mockResolvedValue({
+      success: true,
+      data: { ...control, reason: "cierre quincenal" },
+    } as never);
+
+    await abrirControl();
+
+    expect(screen.getByLabelText(/Motivo del ajuste/)).toHaveValue("cierre quincenal");
   });
 });

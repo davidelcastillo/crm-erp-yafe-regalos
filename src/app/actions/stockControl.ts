@@ -208,7 +208,7 @@ export async function saveStockControlCounts(data: unknown) {
     const auth = await requireAdmin();
     if (!auth.ok) return { success: false as const, error: auth.error };
 
-    const { controlId, items } = saveStockControlCountsSchema.parse(data);
+    const { controlId, items, reason } = saveStockControlCountsSchema.parse(data);
 
     const control = await prisma.stockControl.findUnique({
       where: { id: controlId },
@@ -218,6 +218,13 @@ export async function saveStockControlCounts(data: unknown) {
     if (control.status === "CLOSED") return alreadyClosed;
 
     const saved = await prisma.$transaction(async (tx) => {
+      // El motivo viaja con el borrador: retomarlo tiene que devolver el texto ya
+      // escrito, no un campo vacío (S10).
+      const texto = reason?.trim() ?? "";
+      if (texto) {
+        await tx.stockControl.update({ where: { id: controlId }, data: { reason: texto } });
+      }
+
       let count = 0;
       for (const item of items) {
         const result = await tx.stockControlItem.updateMany({

@@ -25,6 +25,7 @@ const mockStockControlFindFirst = jest.fn();
 const mockStockControlFindUnique = jest.fn();
 const mockStockControlCreate = jest.fn();
 const mockStockControlUpdateMany = jest.fn();
+const mockStockControlUpdate = jest.fn();
 const mockStockControlItemUpdateMany = jest.fn();
 const mockTransaction = jest.fn(
   async (callback: (tx: unknown) => Promise<unknown>) => {
@@ -33,6 +34,7 @@ const mockTransaction = jest.fn(
       branchMovement: { create: (...args: unknown[]) => mockBranchMovementCreate(...args) },
       stockControl: {
         updateMany: (...args: unknown[]) => mockStockControlUpdateMany(...args),
+        update: (...args: unknown[]) => mockStockControlUpdate(...args),
       },
       stockControlItem: {
         updateMany: (...args: unknown[]) => mockStockControlItemUpdateMany(...args),
@@ -58,6 +60,7 @@ jest.mock("@/lib/prisma", () => ({
       findFirst: (...args: unknown[]) => mockStockControlFindFirst(...args),
       findUnique: (...args: unknown[]) => mockStockControlFindUnique(...args),
       create: (...args: unknown[]) => mockStockControlCreate(...args),
+      update: (...args: unknown[]) => mockStockControlUpdate(...args),
     },
     stockControlItem: {
       updateMany: (...args: unknown[]) => mockStockControlItemUpdateMany(...args),
@@ -277,6 +280,33 @@ describe("saveStockControlCounts", () => {
       where: { controlId: 7, productId: 12 },
       data: { countedStock: 1, decision: "PENDING" },
     });
+  });
+
+  it("guarda el motivo del ajuste junto con el borrador (S10)", async () => {
+    mockStockControlFindUnique.mockResolvedValue({ id: 7, status: "DRAFT" });
+
+    const result = await saveStockControlCounts({
+      controlId: 7,
+      reason: "cierre quincenal",
+      items: [{ productId: 11, countedStock: 3, decision: "PENDING" }],
+    });
+
+    expect(result).toEqual({ success: true, data: { saved: 1 } });
+    expect(mockStockControlUpdate).toHaveBeenCalledWith({
+      where: { id: 7 },
+      data: { reason: "cierre quincenal" },
+    });
+  });
+
+  it("sin motivo no escribe nada en el control", async () => {
+    mockStockControlFindUnique.mockResolvedValue({ id: 7, status: "DRAFT" });
+
+    await saveStockControlCounts({
+      controlId: 7,
+      items: [{ productId: 11, countedStock: 3, decision: "PENDING" }],
+    });
+
+    expect(mockStockControlUpdate).not.toHaveBeenCalled();
   });
 
   it("rechaza guardar en un control ya cerrado sin escribir nada", async () => {

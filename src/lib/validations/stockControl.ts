@@ -35,6 +35,11 @@ export const saveStockControlCountsSchema = z.object({
       }),
     })
   ),
+  /**
+   * Motivo del ajuste (S10). Se guarda con el borrador: el texto escrito no se
+   * pierde al retomar el control y es el que termina en el PDF del cierre.
+   */
+  reason: z.string().max(500, "El motivo es demasiado largo").optional(),
 });
 
 export const closeStockControlSchema = z.object({

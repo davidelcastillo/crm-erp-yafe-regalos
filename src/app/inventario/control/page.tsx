@@ -141,6 +141,7 @@ export default function ControlStockPage() {
       }
       setControl(detalle.data as unknown as Control);
       setReusado(abierto.data.reused);
+      setMotivo((detalle.data as unknown as Control).reason ?? "");
     } finally {
       setIniciando(false);
     }
@@ -198,6 +199,8 @@ export default function ControlStockPage() {
 
   const borrador = () => ({
     controlId: control!.id,
+    // El motivo se guarda con el borrador para no perderlo al retomar el control.
+    reason: motivo.trim() || undefined,
     items: control!.items.map((item) => ({
       productId: item.productId,
       countedStock: item.countedStock,
