@@ -2,6 +2,7 @@
 import { getBranches } from "@/app/actions/branch";
 import { BranchManager } from "@/components/ui/BranchManager";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { BrandBand } from "@/components/ui/BrandBand";
 import type { Branch } from "@prisma/client";
 import Link from "next/link";
 
@@ -22,17 +23,20 @@ export default async function SucursalesPage() {
   // La lista llega del servidor y el alta/edición vive dentro de `BranchManager`.
   return (
     <div className="min-h-screen bg-white pb-20">
-      <div className="pb-16 brand-gradient">
-        <PageHeader
-          title="Sucursales"
-          actions={
-            <Link href="/clientes" className="btn btn-primary">
-              Clientes
-            </Link>
-          }
-          menuItems={[{ label: "Clientes", href: "/clientes" }]}
-        />
-      </div>
+      {/* Server Component: la banda de movimiento (S10/S11) vive en `BrandBand`. */}
+      <BrandBand
+        header={
+          <PageHeader
+            title="Sucursales"
+            actions={
+              <Link href="/clientes" className="btn btn-primary">
+                Clientes
+              </Link>
+            }
+            menuItems={[{ label: "Clientes", href: "/clientes" }]}
+          />
+        }
+      />
 
       <div className="glass rounded-t-[2.5rem] border-t border-white/80 -mt-12 px-5 pt-6 pb-8 shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
         <BranchManager branches={branches} />

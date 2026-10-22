@@ -2,6 +2,7 @@ import { getCustomers } from "../actions/customer";
 import { ClientesList } from "./components/ClientesList";
 import { AddClienteButton } from "./components/AddClienteButton";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { BrandBand } from "@/components/ui/BrandBand";
 import { Customer } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
@@ -13,9 +14,9 @@ export default async function ClientesPage() {
   return (
     <div className="min-h-screen bg-white pb-20">
       <main>
-        <div className="pb-16 brand-gradient">
-          <PageHeader title="Clientes" />
-        </div>
+        {/* La página es un Server Component: la banda de movimiento vive en
+            `BrandBand`, que es el único trozo cliente (S10/S11). */}
+        <BrandBand header={<PageHeader title="Clientes" />} />
 
         <div className="glass border-t border-white/80 rounded-t-[2.5rem] -mt-12 px-5 pt-6 pb-8 shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
           <ClientesList initialCustomers={customers} />

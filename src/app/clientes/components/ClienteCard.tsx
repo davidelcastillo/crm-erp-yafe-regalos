@@ -70,10 +70,10 @@ export function ClienteCard({ customer }: ClienteCardProps) {
     <div className="glass rounded-2xl border border-black/5 p-4">
       <div className="flex justify-between items-start gap-3">
         <div className="min-w-0 flex-1">
-          <h3 className="text-base font-semibold text-[#222222] break-words">
+          <h3 className="text-base font-semibold text-ink break-words">
             {customer.name} {customer.surname}
           </h3>
-          <p className="text-sm text-[#6a6a6a]">
+          <p className="text-sm text-ink-muted">
             Deuda:{" "}
             <span className={hasDebt ? "text-[#b91c1c] font-medium" : "text-[#15803d]"}>
               ${balance.toFixed(2)}
@@ -128,7 +128,7 @@ export function ClienteCard({ customer }: ClienteCardProps) {
           {activeTab === "sales" && (
             <div className="space-y-2 max-h-48 overflow-y-auto">
               {historyData.sales.length === 0 ? (
-                <p className="text-sm text-[#6a6a6a] text-center py-2">
+                <p className="text-sm text-ink-muted text-center py-2">
                   Sin ventas registradas
                 </p>
               ) : (
@@ -138,10 +138,10 @@ export function ClienteCard({ customer }: ClienteCardProps) {
                     className="p-2 bg-[#f9f9f9] rounded-lg text-sm"
                   >
                     <div className="flex justify-between items-center gap-2">
-                      <span className="text-[#6a6a6a]">{formatDate(sale.date)}</span>
+                      <span className="text-ink-muted">{formatDate(sale.date)}</span>
                       <span className="font-medium shrink-0">${sale.totalAmount.toFixed(2)}</span>
                     </div>
-                    <div className="flex justify-between items-center gap-2 text-xs text-[#6a6a6a]">
+                    <div className="flex justify-between items-center gap-2 text-xs text-ink-muted">
                       <span>Pagado: ${sale.amountPaid.toFixed(2)}</span>
                       <span
                         className={`shrink-0 ${
@@ -162,7 +162,7 @@ export function ClienteCard({ customer }: ClienteCardProps) {
           {activeTab === "payments" && (
             <div className="space-y-2 max-h-48 overflow-y-auto">
               {historyData.payments.length === 0 ? (
-                <p className="text-sm text-[#6a6a6a] text-center py-2">
+                <p className="text-sm text-ink-muted text-center py-2">
                   Sin pagos registrados
                 </p>
               ) : (
@@ -171,7 +171,7 @@ export function ClienteCard({ customer }: ClienteCardProps) {
                     key={payment.id}
                     className="p-2 bg-[#f9f9f9] rounded-lg text-sm flex justify-between items-center gap-2"
                   >
-                    <span className="text-[#6a6a6a]">
+                    <span className="text-ink-muted">
                       {formatDate(payment.date)}
                     </span>
                     <span className="font-medium text-[#15803d] shrink-0">

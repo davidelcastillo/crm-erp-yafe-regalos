@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { Customer } from "@prisma/client";
 import { ClienteCard } from "./ClienteCard";
+import { Reveal } from "@/components/ui/Reveal";
 
 interface ClientesListProps {
   initialCustomers: Customer[];
@@ -65,32 +66,34 @@ export function ClientesList({ initialCustomers }: ClientesListProps) {
       {/* Stats */}
       <div className="grid grid-cols-3 gap-2">
         <div className="glass rounded-xl border border-black/5 p-3 text-center">
-          <div className="text-xl font-bold text-[#222222]">{stats.total}</div>
-          <div className="text-xs text-[#6a6a6a]">Clientes</div>
+          <div className="text-xl font-bold text-ink">{stats.total}</div>
+          <div className="text-xs text-ink-muted">Clientes</div>
         </div>
         <div className="glass rounded-xl border border-black/5 p-3 text-center">
           <div className="text-xl font-bold text-[#b45309]">{stats.withDebt}</div>
-          <div className="text-xs text-[#6a6a6a]">Con deuda</div>
+          <div className="text-xs text-ink-muted">Con deuda</div>
         </div>
         <div className="glass rounded-xl border border-black/5 p-3 text-center">
           <div className="text-xl font-bold text-[#b91c1c]">
             ${stats.totalDebt.toFixed(0)}
           </div>
-          <div className="text-xs text-[#6a6a6a]">Total</div>
+          <div className="text-xs text-ink-muted">Total</div>
         </div>
       </div>
 
       {/* List */}
       <div className="flex flex-col gap-3">
         {filteredCustomers.length === 0 ? (
-          <div className="glass rounded-2xl border border-black/5 text-center py-8 text-[#6a6a6a]">
+          <div className="glass rounded-2xl border border-black/5 text-center py-8 text-ink-muted">
             {searchTerm
               ? "No se encontraron clientes"
               : "No hay clientes aún. Toca + para agregar uno."}
           </div>
         ) : (
-          filteredCustomers.map((customer) => (
-            <ClienteCard key={customer.id} customer={customer} />
+          filteredCustomers.map((customer, index) => (
+            <Reveal key={customer.id} index={index}>
+              <ClienteCard customer={customer} />
+            </Reveal>
           ))
         )}
       </div>
