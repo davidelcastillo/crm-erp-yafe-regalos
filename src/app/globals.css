@@ -101,6 +101,52 @@
   --motion-duration-fast: 150ms;
   --motion-duration-base: 250ms;
   --motion-duration-slow: 400ms;
+
+  /* El tema lo maneja `data-theme` (script de arranque en `layout.tsx`), no la
+     preferencia del sistema: así el usuario puede elegir lo contrario. */
+  color-scheme: light;
+}
+
+/* ============================================================================
+   TEMA OSCURO (S12)
+
+   Mismo sistema, otro par de valores: cada token semántico recibe su tono oscuro
+   y ningún componente cambia. El bloque va después de `:root` porque la
+   especificidad es la misma y gana el último. Los contrastes medidos están en la
+   tabla de STYLE.md.
+   ============================================================================ */
+[data-theme="dark"] {
+  --surface: #15171c;
+  --surface-soft: #1c1f26;
+  --surface-strong: #242832;
+  --surface-sunken: #191c22;
+  --ink: #f4f5f7;
+  --ink-body: #d5d8de;
+  --ink-muted: #a3a9b5;
+  --ink-soft: #8a909c;
+  --hairline: rgb(255 255 255 / 0.14);
+  --hairline-soft: rgb(255 255 255 / 0.08);
+  --hairline-strong: #3b414d;
+  --accent: #f472b6;
+  --accent-soft: #5b2a41;
+  --positive: #4ade80;
+  --negative: #f87171;
+  --warning: #fbbf24;
+  /* El rojo de error como TEXTO: en oscuro el `#dc2626` se queda en ~3:1. */
+  --danger: #f87171;
+  --error: #ff9aa2;
+  --error-surface: #3a1d22;
+  --error-ink: #ffc2c7;
+  --info: #7cb0ff;
+  --scrim: rgb(0 0 0 / 0.6);
+  --scrim-strong: rgb(0 0 0 / 0.8);
+  --background: var(--surface);
+  --foreground: var(--ink);
+  /* La sombra del tema claro no se lee sobre fondo oscuro: acá la profundidad la
+     da el borde de 1 px. */
+  --shadow-card: rgba(0,0,0,0.4) 0 0 0 1px, rgba(0,0,0,0.5) 0 2px 6px, rgba(0,0,0,0.6) 0 4px 8px;
+  --shadow-hover: rgba(0,0,0,0.5) 0 4px 12px;
+  color-scheme: dark;
 }
 
 @theme inline {
@@ -450,20 +496,80 @@
   margin-bottom: 0.25rem;
   font-size: 0.875rem;
   font-weight: 500;
-  color: var(--palette-near-black);
+  color: var(--ink);
+}
+
+/* ============================================================================
+   VIDRIO Y CONTROLES EN TEMA OSCURO (S12)
+
+   Estas clases tienen el color escrito a mano (blanco), así que necesitan su par
+   oscuro. Van dentro de `@layer components` y después de las clases base: misma
+   capa, más especificidad, así las utilidades de Tailwind las siguen superando.
+   `.btn-primary`, `.btn-danger` y `.btn-fab` no aparecen: pasan el contraste
+   sobre fondo oscuro tal como están.
+   ============================================================================ */
+[data-theme="dark"] .glass {
+  background-color: rgb(21 23 28 / 0.72);
+}
+
+[data-theme="dark"] .glass-strong {
+  background-color: rgb(24 27 33 / 0.82);
+}
+
+[data-theme="dark"] .glass-nav {
+  background-color: rgb(21 23 28 / 0.78);
+  background-image: linear-gradient(
+    to right,
+    rgb(191 219 254 / 0.1),
+    rgb(244 114 182 / 0.1)
+  );
+}
+
+[data-theme="dark"] .btn-secondary {
+  background-color: var(--surface-strong);
+  color: var(--ink);
+}
+
+[data-theme="dark"] .btn-secondary:hover:not(:disabled) {
+  background-color: #2f3440;
+}
+
+[data-theme="dark"] .btn-ghost {
+  background-color: var(--surface);
+  color: var(--ink);
+  border-color: var(--hairline);
+}
+
+[data-theme="dark"] .btn-ghost:hover:not(:disabled) {
+  background-color: var(--surface-soft);
+}
+
+[data-theme="dark"] .btn-active {
+  background-color: var(--ink);
+  color: var(--surface);
+}
+
+[data-theme="dark"] .field-select {
+  background-color: var(--surface-strong);
+  color: var(--ink);
 }
 
 } /* fin de @layer components */
 
 /* Native <select> <option> best-effort styling (browser rendering varies). */
 select option {
-  background-color: #ffffff;
-  color: #222222;
+  background-color: var(--surface);
+  color: var(--ink);
+}
+
+[data-theme="dark"] select option {
+  background-color: var(--surface-soft);
+  color: var(--ink);
 }
 
 select option:checked {
-  background-color: #ffe7eb; /* soft Rausch tint */
-  color: #222222;
+  background-color: var(--accent-soft);
+  color: var(--ink);
 }
 
 /* Movimiento reducido: es una preferencia de accesibilidad, no un detalle. Se
@@ -488,10 +594,3 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Disable dark mode for now - mobile-first light theme */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: var(--palette-white);
-    --foreground: var(--palette-near-black);
-  }
-}

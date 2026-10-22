@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { logout } from "@/actions/auth";
+import { ThemeToggle } from "./ThemeToggle";
 
 /**
  * Encabezado de página del rebranding: una sola fila en mobile (botón ☰, título
@@ -78,6 +79,10 @@ export const PageHeader = ({ title, actions, right, menuItems = [] }: PageHeader
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
+
+          {/* El tema lo elige el usuario, así que se alcanza sin abrir el menú ☰:
+              va en la píldora, a la vista en celular y en escritorio. */}
+          <ThemeToggle />
 
           <h1 className="flex-1 text-2xl font-bold text-ink">{title}</h1>
 

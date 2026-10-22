@@ -107,6 +107,16 @@ describe("PageHeader", () => {
     );
   });
 
+  it("el interruptor de tema vive en la píldora del encabezado, no dentro del menú ☰", () => {
+    renderHeader();
+
+    // El tema lo elige el usuario: si quedara detrás del menú, en el celular no
+    // se alcanzaría sin abrirlo. Debe estar a la vista en los dos layouts.
+    const toggle = screen.getByRole("button", { name: /^Activar tema (oscuro|claro)$/ });
+    expect(toggle).toBeInTheDocument();
+    expect(toggle.closest("[role='dialog']")).toBeNull();
+  });
+
   it("una fila del menú se cierra al tocarla y dispara su acción", () => {
     const onClick = jest.fn();
     render(
