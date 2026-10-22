@@ -116,17 +116,34 @@ export default function ExternalInventoryTable({
 
   return (
     <div className="space-y-4">
-      <label className="block text-sm font-medium text-[#222222]">
-        Buscar productos por código o nombre
-        <input
-          type="search"
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          maxLength={200}
-          placeholder="Código o nombre"
-          className="mt-2 w-full min-h-12 rounded-xl border border-black/10 bg-white px-4 text-base focus-visible:outline-2 focus-visible:outline-pink-500"
-        />
-      </label>
+      {/* El buscador es un bloque propio, separado de las cards y la tabla. Su
+          estado vive acá porque la página del catálogo es un Server Component y
+          subirlo a la banda obligaría a volverla cliente (S16). */}
+      <div className="mb-4 rounded-2xl glass-strong px-4 py-3">
+        <label className="block text-sm font-medium text-ink">
+          Buscar productos por código o nombre
+          {/* `span` y no `div`: adentro de un `label` solo va contenido en línea. */}
+          <span className="relative mt-2 block w-full">
+            <svg
+              className="w-5 h-5 text-ink-muted absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              aria-hidden="true"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
+            </svg>
+            <input
+              type="search"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              maxLength={200}
+              placeholder="Código o nombre"
+              className="w-full min-h-[44px] pl-12 pr-4 py-3 bg-surface-soft rounded-xl text-base text-ink placeholder-ink-soft focus:outline-none focus:ring-2 focus:ring-[#ec4899]/30 touch-manipulation"
+            />
+          </span>
+        </label>
+      </div>
       <div className="flex justify-center">
         <ProductSortToggle value={sortMode} onChange={setSortMode} />
       </div>

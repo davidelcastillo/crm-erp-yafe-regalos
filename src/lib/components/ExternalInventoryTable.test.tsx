@@ -129,6 +129,20 @@ describe("ExternalInventoryTable", () => {
   });
 });
 
+describe("ExternalInventoryTable — buscador en su propia tarjeta (S16)", () => {
+  it("el buscador tiene su tarjeta de vidrio, separada de la lista", () => {
+    const { container } = render(<ExternalInventoryTable inventoryData={items} />);
+
+    const tarjeta = screen.getByRole("searchbox").closest(".glass-strong");
+
+    // Es un bloque de vidrio reforzado…
+    expect(tarjeta).not.toBeNull();
+    // …y ni las cards de mobile ni la tabla de escritorio viven adentro.
+    expect(tarjeta?.contains(container.querySelector("div.md\\:hidden"))).toBe(false);
+    expect(tarjeta?.contains(container.querySelector("table"))).toBe(false);
+  });
+});
+
 /**
  * S3/S5: el catálogo público muestra el detalle de los movimientos del producto
  * desde el último control de stock —fecha, tipo y cantidad—, y si la sucursal no

@@ -115,46 +115,45 @@ export default function InactivosPage() {
               { label: 'Volver a inventario', href: '/inventario' },
             ]}
           />
+
+          {/* Buscador en su propia tarjeta de vidrio, dentro de la banda y
+              separado de la hoja de la lista (S16): mismo estilo que /ventas. */}
+          <div className="mt-4 px-3">
+            <div className="rounded-2xl glass-strong px-4 py-3">
+              <div className="relative w-full">
+                <svg
+                  className="w-5 h-5 text-ink-muted absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  aria-hidden="true"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z"
+                  />
+                </svg>
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  /* 16px de fuente: por debajo de eso iOS hace zoom al enfocar el input. */
+                  className="w-full min-h-[44px] pl-12 pr-4 py-3 bg-surface-soft rounded-xl text-base text-ink placeholder-ink-soft focus:outline-none focus:ring-2 focus:ring-[#ec4899]/30 touch-manipulation"
+                  placeholder="Buscar por nombre o código..."
+                  aria-label="Buscar producto"
+                  autoComplete="off"
+                />
+              </div>
+            </div>
+          </div>
         </div>
 
         <div className="glass rounded-t-[2.5rem] border-t border-white/80 -mt-12 px-5 pt-6 pb-8 shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
-          {/* Buscador: la tarjeta lo separa de las cards de la lista. */}
-          <div className="glass rounded-2xl border border-black/5 p-4">
-            <label
-              htmlFor="inactivos-search"
-              className="mb-2 block text-sm font-medium text-[#222222]"
-            >
-              Buscar producto
-            </label>
-            <div className="relative">
-              <svg
-                className="w-5 h-5 text-[#6a6a6a] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                aria-hidden="true"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z"
-                />
-              </svg>
-              <input
-                id="inactivos-search"
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                /* 16px de fuente: por debajo de eso iOS hace zoom al enfocar el input. */
-                className="block w-full min-h-[44px] pl-11 pr-4 py-2.5 bg-[#f8f8f8] rounded-xl text-base text-[#222222] placeholder-[#6a6a6a] focus:outline-none focus:ring-2 focus:ring-[#ec4899]/30 touch-manipulation"
-                placeholder="Buscar por nombre o código..."
-                autoComplete="off"
-              />
-            </div>
-            <div className="mt-3 flex justify-center">
-              <ProductSortToggle value={sortMode} onChange={setSortMode} />
-            </div>
+          {/* El orden se queda en la hoja: es un filtro de la lista, no la búsqueda. */}
+          <div className="flex justify-center">
+            <ProductSortToggle value={sortMode} onChange={setSortMode} />
           </div>
 
           {error && (

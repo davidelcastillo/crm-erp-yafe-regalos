@@ -104,3 +104,14 @@ describe('InactivosPage', () => {
     expect(screen.getByText('Producto Beta')).toBeInTheDocument();
   });
 });
+
+describe('InactivosPage — buscador en su propia tarjeta (S16)', () => {
+  it('el buscador vive en una tarjeta de vidrio propia, fuera de la hoja de la lista', async () => {
+    render(<InactivosPage />);
+
+    const buscador = await screen.findByLabelText(/buscar producto/i);
+    // Su bloque es el de vidrio reforzado, separado del que contiene las cards.
+    expect(buscador.closest('.glass-strong')).not.toBeNull();
+    expect(buscador.closest('[class*="rounded-t-"]')).toBeNull();
+  });
+});

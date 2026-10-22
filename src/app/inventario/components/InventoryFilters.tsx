@@ -4,8 +4,6 @@ export interface InventoryFiltersProps {
   categories: Array<{ id: number; name: string }>;
   selectedCategoryId: number | null;
   onFilterChange: (categoryId: number | null) => void;
-  search: string;
-  onSearchChange: (search: string) => void;
   sortBy: InventorySortOption;
   onSortChange: (sortBy: InventorySortOption) => void;
 }
@@ -29,8 +27,6 @@ export const InventoryFilters = ({
   categories,
   selectedCategoryId,
   onFilterChange,
-  search,
-  onSearchChange,
   sortBy,
   onSortChange,
 }: InventoryFiltersProps) => {
@@ -41,21 +37,6 @@ export const InventoryFilters = ({
 
   return (
     <div className="space-y-3">
-      <div className="relative">
-        <svg className="w-5 h-5 text-ink-muted absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
-        </svg>
-        <input
-          type="text"
-          placeholder="Buscar producto..."
-          value={search}
-          onChange={(e) => onSearchChange(e.target.value)}
-          /* 16px de fuente: por debajo de eso iOS hace zoom al enfocar el input. */
-          className="w-full min-h-[44px] pl-11 pr-4 py-2.5 bg-surface-soft rounded-xl text-base text-ink placeholder-ink-soft focus:outline-none focus:ring-2 focus:ring-[#ec4899]/30 touch-manipulation"
-          aria-label="Buscar producto"
-          autoComplete="off"
-        />
-      </div>
       {/* Categoría y orden comparten contenedor y control (`.field-select`): en
           celular van apilados a lo ancho y desde `sm` en dos columnas iguales. */}
       <div className="grid gap-3 sm:grid-cols-2">

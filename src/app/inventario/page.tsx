@@ -350,6 +350,33 @@ export default function InventarioPage() {
               />
             </div>
           </div>
+
+          {/* Buscador en su propia tarjeta de vidrio, separado de la hoja de la
+              lista (S16): es el mismo estilo que el de /ventas. */}
+          <div className="mt-4 px-3">
+            <div className="rounded-2xl glass-strong px-4 py-3">
+              <div className="relative w-full">
+                <svg
+                  className="w-5 h-5 text-ink-muted absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  aria-hidden="true"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
+                </svg>
+                <input
+                  type="text"
+                  placeholder="Buscar producto..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full min-h-[44px] pl-12 pr-4 py-3 bg-surface-soft rounded-xl text-base text-ink placeholder-ink-soft focus:outline-none focus:ring-2 focus:ring-[#ec4899]/30 touch-manipulation"
+                  aria-label="Buscar producto"
+                  autoComplete="off"
+                />
+              </div>
+            </div>
+          </div>
         </div>
 
         <div className="glass border-t border-white/80 rounded-t-[2.5rem] -mt-12 px-5 pt-6 pb-8 shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
@@ -364,8 +391,6 @@ export default function InventarioPage() {
             onFilterChange={(cId) => {
               setSelectedCategoryId(cId);
             }}
-            search={search}
-            onSearchChange={setSearch}
             sortBy={sortBy}
             onSortChange={setSortBy}
           />

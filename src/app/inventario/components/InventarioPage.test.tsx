@@ -453,3 +453,15 @@ describe("InventarioPage — «Inactivos» sigue en el menú ☰ (S3)", () => {
     );
   });
 });
+
+describe("Inventario: buscador en su propia tarjeta (S16)", () => {
+  it("el buscador vive en una tarjeta de vidrio propia, fuera de la hoja de la lista", async () => {
+    render(<InventarioPage />);
+
+    // Aparece recién cuando la página terminó de cargar (antes muestra esqueletos).
+    const buscador = await screen.findByPlaceholderText("Buscar producto...");
+    // Su bloque es el de vidrio reforzado, separado del que contiene la lista.
+    expect(buscador.closest(".glass-strong")).not.toBeNull();
+    expect(buscador.closest('[class*="rounded-t-"]')).toBeNull();
+  });
+});

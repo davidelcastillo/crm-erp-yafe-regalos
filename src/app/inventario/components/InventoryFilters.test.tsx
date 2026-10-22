@@ -14,8 +14,6 @@ const renderFilters = (overrides: Partial<Parameters<typeof InventoryFilters>[0]
       categories={[{ id: 1, name: "Limpieza" }]}
       selectedCategoryId={null}
       onFilterChange={jest.fn()}
-      search=""
-      onSearchChange={jest.fn()}
       sortBy="code"
       onSortChange={jest.fn()}
       {...overrides}
