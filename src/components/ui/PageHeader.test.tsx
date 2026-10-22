@@ -64,6 +64,16 @@ describe("PageHeader", () => {
     expect(within(menu()).getByRole("button", { name: "Cerrar sesión" })).toBeInTheDocument();
   });
 
+  it("monta el menú en el body para que no lo tapen las cards del listado", () => {
+    renderHeader();
+    fireEvent.click(screen.getByLabelText("Abrir menú"));
+
+    // Es un overlay: si quedara dentro del árbol de la página, un ancestro con
+    // `transform`, `filter` o `isolation` (el parallax del encabezado) encerraría
+    // su `z-50` en ese contexto de apilado y las cards pintarían encima.
+    expect(menu().parentElement).toBe(document.body);
+  });
+
   it("Escape cierra el menú", () => {
     renderHeader();
     fireEvent.click(screen.getByLabelText("Abrir menú"));

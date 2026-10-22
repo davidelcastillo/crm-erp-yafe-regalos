@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { logout } from "@/actions/auth";
 
 /**
@@ -34,7 +35,13 @@ export interface PageHeaderProps {
 
 export const PageHeader = ({ title, actions, right, menuItems = [] }: PageHeaderProps) => {
   const [isOpen, setIsOpen] = useState(false);
+  // El menú se monta en el body, no acá: ver el comentario del portal más abajo.
+  const [mounted, setMounted] = useState(false);
   const router = useRouter();
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Escape cierra el menú, igual que los modales.
   useEffect(() => {
@@ -94,7 +101,12 @@ export const PageHeader = ({ title, actions, right, menuItems = [] }: PageHeader
         </div>
       </header>
 
-      {isOpen && (
+      {/* El menú va en un portal al `body`: es un overlay, y dentro del árbol de la
+          página cualquier ancestro con `transform`, `filter`, `backdrop-filter` o
+          `isolation` (el parallax del encabezado, la banda `isolate` de /ventas) lo
+          encierra en su contexto de apilado y su `z-50` deja de valer frente a las
+          cards del listado, que están más abajo en el documento. */}
+      {isOpen && mounted && createPortal(
         <div
           className="fixed inset-0 z-50 flex md:hidden"
           role="dialog"
@@ -176,7 +188,8 @@ export const PageHeader = ({ title, actions, right, menuItems = [] }: PageHeader
               </button>
             </nav>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );

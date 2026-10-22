@@ -643,6 +643,7 @@ Un badge por caso, con un color propio y contraste medido:
 - **Aparición (`Reveal`):** sube 12 px y aparece una vez, con retardo en cascada según la posición en la lista (`stagger`, tope 0,24 s). Se usa en las cards de una lista, no en cada fila de una tabla ni en elementos que ya están en pantalla al cargar.
 - **Movimiento reducido:** la preferencia apaga animaciones y transiciones de todo el sistema con una regla global en `globals.css` —no de a una clase— y `Reveal` muestra el contenido sin animar. En un entorno sin `IntersectionObserver` también se muestra el contenido: esconderlo sería peor que no animarlo.
 - **Se animan `opacity` y `transform`**, nunca `height`, `top`, `left` ni `width`: esas propiedades fuerzan layout en cada cuadro.
+- **Todo overlay vive en un portal al `body`.** Un `z-50` sólo gana dentro de su contexto de apilado: apenas un ancestro tiene `transform` (el parallax del encabezado), `filter`, `backdrop-filter` o `isolation` (la banda `isolate` del degradé), el menú ☰ y los modales quedan encerrados ahí y las cards del listado —más abajo en el documento— les pasan por encima. Por eso `PageHeader` monta su menú con `createPortal(document.body)`; cualquier overlay nuevo hace lo mismo.
 - **Lo que se atenúa al scrollear es superficie decorativa**, nunca un control: un botón al 45 % de opacidad se lee como deshabilitado aunque siga funcionando. En `/ventas` se retira el degradé de marca y los botones, el selector y el buscador quedan a plena opacidad.
 
 ## Responsive Behavior
