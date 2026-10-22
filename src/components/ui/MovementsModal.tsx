@@ -113,7 +113,7 @@ export function MovementsModal({ product, isOpen, onClose, branchId = null }: Mo
       aria-labelledby="movements-modal-title"
     >
       <div
-        className="bg-white w-full max-w-xl md:max-w-2xl rounded-t-3xl md:rounded-b-3xl p-6 animate-slide-up max-h-[90vh] md:max-h-[85vh] overflow-y-auto"
+        className="bg-white w-full max-w-xl md:max-w-2xl rounded-t-3xl md:rounded-b-3xl p-6 animate-fade-in max-h-[90vh] md:max-h-[85vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-between items-center mb-6">
