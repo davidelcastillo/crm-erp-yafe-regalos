@@ -3,7 +3,7 @@ import Image from 'next/image';
 
 export default function LoginPage() {
   return (
-    <main className="min-h-screen bg-accent/10 flex flex-col font-sans relative overflow-hidden">
+    <main className="min-h-screen bg-surface-tint flex flex-col font-sans relative overflow-hidden">
       {/* 1. HEADER CON GRADIENTE Y ONDA SVG */}
       <div className="relative brand-gradient pt-20 pb-26 flex flex-col items-center justify-center z-10">
         
@@ -21,13 +21,14 @@ export default function LoginPage() {
         </div>
         <h1 className="text-white text-2xl font-bold tracking-wider">FERIA CONEXX</h1>
 
-        {/* Separador de Onda (SVG Wave). 
-            El fill="#fdf2f8" es el tinte de marca (`bg-accent/10`) que sigue el tema */}
+        {/* Separador de onda. Se rellena con el mismo tinte que el fondo de la
+            página (`bg-surface-tint`), así se funde en claro y en oscuro: con un
+            hex fijo, en oscuro quedaba una banda blanca. */}
         <div className="absolute bottom-0 w-full overflow-hidden leading-[0]">
           <svg viewBox="0 0 1200 120" preserveAspectRatio="none" className="relative block w-full h-[50px] md:h-[60px]">
             <path 
               d="M321.39,56.44c58-10.79,114.16-30.13,172-41.86,82.39-16.72,168.19-17.73,250.45-.39C823.78,31,906.67,72,985.66,92.83c70.05,18.48,146.53,26.09,214.34,3V120H0V95.8C59.71,118.08,130.83,115.42,188.8,102.72,235.27,92.53,277.51,70.5,321.39,56.44Z" 
-              fill="#fdf2f8"
+              className="fill-surface-tint"
             ></path>
           </svg>
         </div>

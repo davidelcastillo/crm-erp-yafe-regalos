@@ -17,6 +17,8 @@ const PROHIBIDOS: RegExp[] = [
   /\[#/,
   // El blanco literal no es una superficie: en oscuro tiene que ser `bg-surface`.
   /\bbg-white\b/,
+  // Un SVG con el color en el atributo escapa a las clases: se caza aparte.
+  /(?:fill|stroke)="#/,
   // Los grises de Tailwind tampoco siguen el tema.
   /\b(?:bg|text|border|divide|ring|placeholder|from|to|via)-gray-\d+/,
   // El resto de la paleta de Tailwind, por el mismo motivo: `bg-green-50` es un
@@ -64,6 +66,7 @@ describe("los componentes no fijan colores a mano", () => {
       '<div className="text-[#222222]" />',
       '<div className="bg-white rounded-xl" />',
       '<div className="border-gray-100" />',
+      '<path fill="#fdf2f8" />',
       // El agujero por donde se colaron las cajas blancas del tema oscuro.
       '<span className="bg-green-50 text-green-800" />',
       '<td className="text-black" />',

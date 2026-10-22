@@ -55,6 +55,10 @@
   --hairline-soft: rgb(0 0 0 / 0.05);
   /* Cuerpo de texto: el gris de `#3f3f3f`, que es el que usa la prosa larga. */
   --ink-body: var(--palette-focused-gray);
+  /* Tinte rosa de las páginas con degradé (el login): es el `accent` al 10 %
+     sobre la superficie. Existe como token para que la onda del SVG pueda
+     rellenarse con el mismo color en los dos temas. */
+  --surface-tint: #fdf2f8;
 
   /* ==========================================================================
      COLORES DE ESTADO Y DE MARCA
@@ -129,6 +133,7 @@
   --hairline-strong: #3b414d;
   --accent: #f472b6;
   --accent-soft: #5b2a41;
+  --surface-tint: #2b202b;
   --positive: #4ade80;
   --negative: #f87171;
   --warning: #fbbf24;
@@ -181,6 +186,7 @@
   --color-hairline: var(--hairline);
   --color-hairline-soft: var(--hairline-soft);
   --color-ink-body: var(--ink-body);
+  --color-surface-tint: var(--surface-tint);
   --color-accent: var(--accent);
   --color-positive: var(--positive);
   --color-negative: var(--negative);

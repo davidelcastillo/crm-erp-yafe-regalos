@@ -31,8 +31,21 @@ export async function createServerClient(sessionMaxAge?: number) {
         },
         setAll(cookiesToSet: { name: string; value: string; options: CookieOptions }[]) {
           for (const { name, value, options } of cookiesToSet) {
+            // El cálculo se hace fuera del `try` a propósito: un error del
+            // cálculo de maxAge es un bug nuestro y tiene que verse.
             const maxAge = resolveSessionMaxAge({ name, value, sessionMaxAge, storageKey, remembered });
-            cookieStore.set({ name, value, ...(maxAge !== undefined ? { ...options, maxAge } : options) });
+            const cookie = { name, value, ...(maxAge !== undefined ? { ...options, maxAge } : options) };
+
+            try {
+              cookieStore.set(cookie);
+            } catch {
+              // Next sólo deja escribir cookies en una Server Action o en un
+              // Route Handler. Cuando un render de página (por ejemplo
+              // /sucursales, que llama a una acción del servidor) pide el
+              // usuario y el token se refresca, Supabase intenta escribirlas y
+              // acá no se puede: el proxy (`src/proxy.ts`) reescribe la sesión
+              // en la próxima request, así que se ignora y el render sigue.
+            }
           }
         },
       },

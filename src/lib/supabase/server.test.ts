@@ -100,3 +100,21 @@ describe("createServerClient cookie store", () => {
     expect(mockSet).toHaveBeenCalledWith({ name: "redirect-to", value: "/dashboard" });
   });
 });
+
+describe("un render de servidor no puede escribir cookies", () => {
+  it("no explota cuando el store es de sólo lectura (Next lo prohíbe fuera de una acción)", async () => {
+    // El cliente arma su `setAll` al crearse: hay que crearlo antes de usar el store.
+    await createServerClient();
+    mockSet.mockImplementation(() => {
+      throw new Error("Cookies can only be modified in a Server Action or Route Handler");
+    });
+
+    // Un render como /sucursales llama a una server action que pide el usuario;
+    // si el token se refresca, Supabase intenta escribir la cookie y Next la
+    // rechaza. El refresh lo hace el proxy en la próxima request, así que acá
+    // sólo hay que no romper el render.
+    expect(() => sessionCookieWrite()).not.toThrow();
+
+    mockSet.mockReset();
+  });
+});

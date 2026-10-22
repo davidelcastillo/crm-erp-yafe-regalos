@@ -54,27 +54,27 @@ export function DashboardChart({ data, rangeLabel }: DashboardChartProps) {
       <div className="h-64 w-full min-w-0">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={chartData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--hairline)" />
             <XAxis
               dataKey="date"
               tick={{ fontSize: 10 }}
-              stroke="#9ca3af" />
+              stroke="var(--ink-soft)" />
             <YAxis
               tick={{ fontSize: 10 }}
-              stroke="#9ca3af"
+              stroke="var(--ink-soft)"
               tickFormatter={(value) => `$${value}`} />
             <Tooltip
               contentStyle={{
-                backgroundColor: "#ffffff",
-                border: "1px solid rgba(0,0,0,0.08)",
+                backgroundColor: "var(--surface)",
+                border: "1px solid var(--hairline)",
                 borderRadius: "12px",
                 fontSize: 12,
-                color: "#222222",
+                color: "var(--ink)",
               }}
               formatter={(value) => [`$${Number(value).toFixed(2)}`, ""]} />
             <Legend />
-            <Bar dataKey="income" name="Ingresos" fill="#22c55e" radius={[4, 4, 0, 0]} />
-            <Bar dataKey="expense" name="Egresos" fill="#ef4444" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="income" name="Ingresos" fill="var(--positive-strong)" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="expense" name="Egresos" fill="var(--negative-strong)" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>
