@@ -265,9 +265,13 @@ export default function InventarioPage() {
                 <Link href="/inventario/inactivos" className="btn btn-primary">
                   Inactivos
                 </Link>
+                <Link href="/inventario/control" className="btn btn-primary">
+                  Control de stock
+                </Link>
               </>
             }
             menuItems={[
+              { label: "Control de stock", href: "/inventario/control" },
               { label: "Inactivos", href: "/inventario/inactivos" },
               { label: "Categorías", href: "/categorias" },
               { label: "Nueva categoría", onClick: handleCreateCategory },
