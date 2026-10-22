@@ -128,3 +128,56 @@ describe("ExternalInventoryTable", () => {
     expect(screen.queryByRole("columnheader", { name: "Stock" })).not.toBeInTheDocument();
   });
 });
+
+/**
+ * S3/S5: el catálogo público muestra el detalle de los movimientos del producto
+ * desde el último control de stock —fecha, tipo y cantidad—, y si la sucursal no
+ * tuvo control cerrado no aparece la sección.
+ */
+describe("ExternalInventoryTable — movimientos desde el último control", () => {
+  const movimientos = {
+    PR001: [
+      { id: "purchase-1", type: "PURCHASE" as const, date: "2026-01-12T10:00:00.000Z", quantity: 5 },
+      { id: "movement-2", type: "TRANSFER_OUT" as const, date: "2026-01-11T18:00:00.000Z", quantity: 2 },
+    ],
+  };
+
+  it("muestra cuántos movimientos hubo desde el control y su detalle", () => {
+    render(
+      <ExternalInventoryTable
+        inventoryData={items}
+        movementsByCode={movimientos}
+        controlClosedAt="2026-01-11T12:00:00.000Z"
+      />
+    );
+
+    // Celular y escritorio: las dos vistas llevan el mismo detalle.
+    expect(
+      screen.getAllByText(/2 movimientos desde el control del 11\/01\/2026/)
+    ).toHaveLength(2);
+    expect(screen.getAllByText("Compra")).toHaveLength(2);
+    expect(screen.getAllByText("5 uds").length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByText("Transferencia salida")).toHaveLength(2);
+  });
+
+  it("sin control cerrado no hay sección de movimientos", () => {
+    render(
+      <ExternalInventoryTable inventoryData={items} movementsByCode={movimientos} controlClosedAt={null} />
+    );
+
+    expect(screen.queryByText(/movimientos desde el control/)).not.toBeInTheDocument();
+    expect(screen.queryByText("Compra")).not.toBeInTheDocument();
+  });
+
+  it("un producto sin movimientos no muestra el detalle", () => {
+    render(
+      <ExternalInventoryTable
+        inventoryData={[{ ...items[0], code: "ZZ999" }]}
+        movementsByCode={movimientos}
+        controlClosedAt="2026-01-11T12:00:00.000Z"
+      />
+    );
+
+    expect(screen.queryByText(/movimientos desde el control/)).not.toBeInTheDocument();
+  });
+});

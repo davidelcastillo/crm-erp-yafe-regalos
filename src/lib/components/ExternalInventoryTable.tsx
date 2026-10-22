@@ -13,14 +13,86 @@ export interface InventoryItem {
   updatedAt?: string | null;
 }
 
+/** Un movimiento como se publica en el catálogo: fecha, tipo y cantidad (S3). */
+export type ExternalMovement = {
+  id: string;
+  type:
+    | "PURCHASE"
+    | "SALE"
+    | "ENTRY"
+    | "EXIT"
+    | "TRANSFER_IN"
+    | "TRANSFER_OUT"
+    | "ADJUSTMENT";
+  date: string;
+  quantity: number;
+};
+
+const MOVEMENT_LABELS: Record<ExternalMovement["type"], string> = {
+  PURCHASE: "Compra",
+  SALE: "Venta",
+  ENTRY: "Entrada",
+  EXIT: "Salida",
+  TRANSFER_IN: "Transferencia entrada",
+  TRANSFER_OUT: "Transferencia salida",
+  ADJUSTMENT: "Ajuste",
+};
+
 interface ExternalInventoryTableProps {
   inventoryData: InventoryItem[];
   showHeaders?: boolean;
+  /** Movimientos desde el último control, por código de producto (S3). */
+  movementsByCode?: Record<string, ExternalMovement[]>;
+  /** Fecha ISO del último control cerrado; sin control no hay sección (S5). */
+  controlClosedAt?: string | null;
+}
+
+const formatDay = (iso: string) =>
+  new Intl.DateTimeFormat("es-AR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    timeZone: "America/Argentina/Buenos_Aires",
+  }).format(new Date(iso));
+
+/**
+ * Movimientos del producto desde el último control (S3). Se publican fecha, tipo
+ * y cantidad: nunca quién lo hizo ni la referencia del documento.
+ */
+function MovementsDetails({
+  movements,
+  controlClosedAt,
+}: {
+  movements: ExternalMovement[];
+  controlClosedAt: string;
+}) {
+  return (
+    <details className="mt-2">
+      <summary className="cursor-pointer text-xs font-semibold text-brand-rosa-texto">
+        {movements.length === 1 ? "1 movimiento" : `${movements.length} movimientos`} desde el
+        control del {formatDay(controlClosedAt)}
+      </summary>
+      <ul className="mt-2 space-y-1">
+        {movements.map((movement) => (
+          <li
+            key={movement.id}
+            className="flex items-center justify-between gap-2 text-xs text-[#6a6a6a]"
+          >
+            <span className="shrink-0">{formatDay(movement.date)}</span>
+            <span className="min-w-0 flex-1 truncate">{MOVEMENT_LABELS[movement.type]}</span>
+            <span className="shrink-0 font-semibold text-[#222222]">{movement.quantity} uds</span>
+          </li>
+        ))}
+      </ul>
+    </details>
+  );
 }
 
 export default function ExternalInventoryTable({
   inventoryData,
   showHeaders = true,
+  movementsByCode = {},
+  controlClosedAt = null,
 }: ExternalInventoryTableProps) {
   const [search, setSearch] = useState("");
   // S4: por código por defecto, con cambio a última modificación.
@@ -86,6 +158,12 @@ export default function ExternalInventoryTable({
                 </span>
               </div>
             </div>
+            {controlClosedAt && movementsByCode[item.code]?.length ? (
+              <MovementsDetails
+                movements={movementsByCode[item.code]}
+                controlClosedAt={controlClosedAt}
+              />
+            ) : null}
           </div>
         ))}
       </div>
@@ -110,6 +188,12 @@ export default function ExternalInventoryTable({
                 <td className="px-4 py-3 font-mono">{item.code}</td>
                 <td className="px-4 py-3 break-words text-[#222222]">
                   {item.name}
+                  {controlClosedAt && movementsByCode[item.code]?.length ? (
+                    <MovementsDetails
+                      movements={movementsByCode[item.code]}
+                      controlClosedAt={controlClosedAt}
+                    />
+                  ) : null}
                 </td>
                 <td className="px-4 py-3 text-center font-semibold text-[#222222]">
                   {item.stock}

@@ -1,6 +1,10 @@
 import { notFound } from 'next/navigation';
-import { getExternalBranchInventory } from '@/app/actions/inventory.external';
+import {
+  getExternalBranchInventory,
+  getExternalBranchMovementsSinceControl,
+} from '@/app/actions/inventory.external';
 import ExternalInventoryTable, {
+  type ExternalMovement,
   type InventoryItem,
 } from '@/lib/components/ExternalInventoryTable';
 
@@ -30,6 +34,11 @@ export default async function BranchInventoryPage({
     notFound();
   }
 
+  // S3/S5: los movimientos desde el último control son parte del catálogo, pero
+  // solo si la sucursal tuvo un control cerrado. Si la consulta falla, el
+  // catálogo se muestra igual, sin la sección: no se rompe la vista pública.
+  const movementsResult = await getExternalBranchMovementsSinceControl({ branchId });
+
   return (
     <div className="min-h-screen bg-white">
       {/* Catalogo publico: sin acciones de cuenta (no hay sesion en esta vista). */}
@@ -52,6 +61,14 @@ export default async function BranchInventoryPage({
       <div className="glass rounded-t-[2.5rem] border-t border-white/80 -mt-12 px-5 pt-6 pb-8 shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
         <ExternalInventoryTable
           inventoryData={(inventoryResult.data || []) as unknown as InventoryItem[]}
+          movementsByCode={
+            movementsResult.success
+              ? ((movementsResult.data ?? {}) as Record<string, ExternalMovement[]>)
+              : {}
+          }
+          controlClosedAt={
+            movementsResult.success ? movementsResult.controlClosedAt ?? null : null
+          }
         />
       </div>
     </div>
