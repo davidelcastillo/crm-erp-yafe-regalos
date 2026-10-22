@@ -198,7 +198,7 @@ describe("ExportWizard", () => {
     expect(screen.getByText(/1 seleccionados/i)).toBeInTheDocument();
   });
 
-  it("ordena la lista por código y pasa el orden elegido al PDF (S4)", async () => {
+  it("ordena la lista por código y exporta en ese orden, sin selector (S4/S17)", async () => {
     URL.createObjectURL = jest.fn(() => "blob:test");
     URL.revokeObjectURL = jest.fn();
     const originalClick = HTMLAnchorElement.prototype.click;
@@ -242,13 +242,14 @@ describe("ExportWizard", () => {
           (checkbox) => checkbox.closest("label")?.textContent ?? ""
         );
 
-      // Default: por código, no en el orden en que llegaron las filas.
+      // Por código, no en el orden en que llegaron las filas.
       expect(codigos()[0]).toContain("AAA001");
       expect(codigos()[1]).toContain("AAA099");
       expect(codigos()[2]).toContain("BBB888");
 
-      fireEvent.click(screen.getByRole("button", { name: "Última modificación" }));
-      expect(codigos()[0]).toContain("BBB888");
+      // El modal de exportar ya no ofrece elegir el orden: es la única lista del
+      // sistema con ese control, así que se sacó para que todas se comporten igual.
+      expect(screen.queryByRole("group", { name: "Ordenar por" })).not.toBeInTheDocument();
 
       fireEvent.click(checkboxesDeProductos()[0]);
       fireEvent.click(screen.getByRole("button", { name: /siguiente/i }));
@@ -256,7 +257,7 @@ describe("ExportWizard", () => {
 
       await waitFor(() => {
         expect(mockExportBranchProductsPdf).toHaveBeenCalledWith(
-          expect.objectContaining({ branchId: 1, sortBy: "updated" })
+          expect.objectContaining({ branchId: 1, sortBy: "code" })
         );
       });
     } finally {

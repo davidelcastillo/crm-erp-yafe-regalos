@@ -8,8 +8,7 @@ import {
   exportBranchProductsPdf,
 } from "@/app/actions/inventory";
 import { BranchPicker } from "@/components/ui/BranchPicker";
-import { ProductSortToggle } from "@/components/ui/ProductSortToggle";
-import { sortProducts, type ProductSortMode } from "@/lib/product-order";
+import { sortProducts } from "@/lib/product-order";
 
 type BranchOption = { id: number; name: string };
 
@@ -37,8 +36,6 @@ export function ExportWizard({ open, onClose, branches }: ExportWizardProps) {
   const [loadAttempt, setLoadAttempt] = useState(0);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [generating, setGenerating] = useState(false);
-  // S4: por código por defecto; el orden elegido también ordena el PDF.
-  const [sortMode, setSortMode] = useState<ProductSortMode>("code");
 
   const selectedBranch = useMemo(
     () => branches.find((b) => b.id === branchId) ?? null,
@@ -71,8 +68,8 @@ export function ExportWizard({ open, onClose, branches }: ExportWizardProps) {
   }, [open, step, branchId, loadAttempt]);
 
   const availableProducts = useMemo(
-    () => sortProducts(rows.filter((row) => row.stock > 0), sortMode),
-    [rows, sortMode]
+    () => sortProducts(rows.filter((row) => row.stock > 0), "code"),
+    [rows]
   );
 
   const selectedCount = selectedIds.length;
@@ -124,7 +121,7 @@ export function ExportWizard({ open, onClose, branches }: ExportWizardProps) {
     const result = await exportBranchProductsPdf({
       branchId,
       selectedProductIds: selectedIds,
-      sortBy: sortMode,
+      sortBy: "code",
     });
     if (result.success && result.data) {
       downloadPdf(result.data.pdfBase64, result.data.filename);
@@ -250,10 +247,6 @@ export function ExportWizard({ open, onClose, branches }: ExportWizardProps) {
 
             <div className="md:grid md:grid-cols-2 md:gap-5 md:items-start">
               <div className="min-w-0">
-                <div className="mb-3 flex justify-center">
-                  <ProductSortToggle value={sortMode} onChange={setSortMode} />
-                </div>
-
                 {!productsLoading &&
                   !productsError &&
                   availableProducts.length > 0 && (
