@@ -62,7 +62,16 @@ Rama: `feat/control-stock` (desde `main` = `b55a7c2`). Entrega: commits locales 
 
 - **L16 — Cierre de T7 con la prueba del usuario (2026-10-22), verbatim**: «Bien, todo anda bien, podemos cerrar ya esta parte, cuando tengas todo, hay nuevas cosas para hacer, podes leer lo que se pide en /docs/Nuevas cosas.md». Se levantó el localhost con la base local (`127.0.0.1:54322`, descartable) y el Auth del `.env`; `/login` respondió 200 y `/inventario/control` sin sesión redirigió a `/login` (307), que es la frontera que se quería ver. La prueba del usuario cubrió: lista grande de sucursal en el paso 1, conteo con diferencias, decisión por producto, motivo que vuelve al retomar el borrador, cierre con PDF del ajuste en Poppins, selector de rango en los movimientos del producto y la sección nueva del catálogo público. Con esto la unidad queda cerrada: quedan pendientes, por decisión del usuario, el PR de la rama y el SQL de producción.
 
-## Migración a producción (del usuario, no del agente)
+## Migración a producción (aplicada el 2026-10-22)
+
+> **Aplicada en producción el 2026-10-22**, autorizada por el usuario, en una transacción
+> (`BEGIN … COMMIT`, `ON_ERROR_STOP=1`) contra el proyecto de Supabase de producción (PostgreSQL 17.6).
+> Salida: 2 `CREATE TYPE`, 2 `CREATE TABLE`, 4 `CREATE INDEX`, 3 `ALTER TABLE`, `COMMIT`. Verificado
+> después: ambas tablas, los dos enums, 6 índices (4 + las dos claves primarias) y 3 claves foráneas,
+> con 0 filas. Respaldo del esquema público tomado antes, en `%TEMP%/schema-publico-antes-20261022-1512.sql`.
+> Sin pérdida de datos: la migración sólo agrega objetos.
+
+## Migración a producción (SQL ejecutado)
 
 Generado con `npx prisma migrate diff` entre el esquema de `main` y el de esta rama. **Se corre una sola vez**, en el editor SQL del proyecto Supabase de producción; Prisma no agrega `IF NOT EXISTS`, así que volver a correrlo avisa que el objeto ya existe (no rompe nada). Antes: backup del proyecto y una ventana sin uso. El agente **no** ejecuta esto.
 
