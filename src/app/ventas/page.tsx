@@ -6,10 +6,10 @@ import { getSales } from '../actions/sale';
 import { getBranchOptions } from '../actions/branch';
 import { SalesList } from './components/SalesList';
 import { AddSaleButton } from './components/AddSaleButton';
-import { CashMenuModal } from './components/CashMenuModal';
 import { CashMovementsModal } from './components/CashMovementsModal';
 import { CashCloseModal } from './components/CashCloseModal';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { OptionsMenuModal, type MenuOption } from '@/components/ui/OptionsMenuModal';
 import { ActionCard } from '@/components/ui/ActionCard';
 import { Spinner } from '@/components/ui/Spinner';
 import { CardSkeleton, Skeleton } from '@/components/ui/Skeleton';
@@ -20,6 +20,12 @@ import { motion, useReducedMotion, useScroll, useTransform } from 'motion/react'
 
 /** Paso del acceso único a la caja (S4): el menú o ya una de sus acciones. */
 type CashStep = 'menu' | 'movimientos' | 'cierre';
+
+/** Opciones del paso 1; los ids son los pasos que abren los modales de abajo. */
+const OPCIONES_CAJA: MenuOption[] = [
+  { id: 'movimientos', label: 'Movimientos de caja', hint: 'Ingresos y egresos de una sucursal' },
+  { id: 'cierre', label: 'Cerrar caja', hint: 'Corte del turno por sucursal' },
+];
 
 const PAGE_SIZE = 20;
 const DEBOUNCE_MS = 300;
@@ -256,10 +262,12 @@ export default function VentasPage() {
         </div>
       </main>
       <AddSaleButton products={products} onSuccess={bump} />
-      <CashMenuModal
+      <OptionsMenuModal
         open={cashStep === 'menu'}
+        title="Caja"
+        options={OPCIONES_CAJA}
         onClose={() => setCashStep(null)}
-        onPick={(step) => setCashStep(step)}
+        onPick={(step) => setCashStep(step as CashStep)}
       />
       <CashMovementsModal
         open={cashStep === 'movimientos'}

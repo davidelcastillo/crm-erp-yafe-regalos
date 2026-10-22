@@ -35,13 +35,7 @@ export interface PageHeaderProps {
 
 export const PageHeader = ({ title, actions, right, menuItems = [] }: PageHeaderProps) => {
   const [isOpen, setIsOpen] = useState(false);
-  // El menú se monta en el body, no acá: ver el comentario del portal más abajo.
-  const [mounted, setMounted] = useState(false);
   const router = useRouter();
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   // Escape cierra el menú, igual que los modales.
   useEffect(() => {
@@ -106,7 +100,7 @@ export const PageHeader = ({ title, actions, right, menuItems = [] }: PageHeader
           `isolation` (el parallax del encabezado, la banda `isolate` de /ventas) lo
           encierra en su contexto de apilado y su `z-50` deja de valer frente a las
           cards del listado, que están más abajo en el documento. */}
-      {isOpen && mounted && createPortal(
+      {isOpen && typeof document !== "undefined" && createPortal(
         <div
           className="fixed inset-0 z-50 flex md:hidden"
           role="dialog"
