@@ -101,7 +101,7 @@ describe("LabelSelector — paso 1: sucursal", () => {
 });
 
 describe("LabelSelector — paso 2: productos y cantidades", () => {
-  it("«Todos» marca una etiqueta por producto y actualiza el resumen", async () => {
+  it("«Todos» toma la cantidad del stock de cada producto", async () => {
     await irAlPaso2();
 
     expect(screen.getByText(/0 etiquetas en 0 hojas A4/i)).toBeInTheDocument();
@@ -112,7 +112,29 @@ describe("LabelSelector — paso 2: productos y cantidades", () => {
       expect(checkbox).toBeChecked();
     }
     expect(screen.getByRole("checkbox", { name: "Todos" })).toBeChecked();
-    expect(screen.getByText(/2 etiquetas en 1 hoja A4/i)).toBeInTheDocument();
+    // El stock manda: 5 + 2 = 7 etiquetas, no una por producto.
+    expect(screen.getByLabelText("Cantidad Jabón de Avena")).toHaveValue(5);
+    expect(screen.getByLabelText("Cantidad Shampoo Solido")).toHaveValue(2);
+    expect(screen.getByText(/7 etiquetas en 1 hoja A4/i)).toBeInTheDocument();
+  });
+
+  it("al tildar un producto la cantidad arranca en su stock y se puede corregir", async () => {
+    await irAlPaso2();
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Seleccionar Jabón de Avena" }));
+    expect(screen.getByLabelText("Cantidad Jabón de Avena")).toHaveValue(5);
+    expect(screen.getByText(/5 etiquetas en 1 hoja A4/i)).toBeInTheDocument();
+
+    // Lo que escribe el usuario manda sobre el stock.
+    fireEvent.change(screen.getByLabelText("Cantidad Jabón de Avena"), {
+      target: { value: "3" },
+    });
+    expect(screen.getByText(/3 etiquetas en 1 hoja A4/i)).toBeInTheDocument();
+
+    // Destildar y volver a tildar no pierde lo escrito.
+    fireEvent.click(screen.getByRole("checkbox", { name: "Seleccionar Jabón de Avena" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Seleccionar Jabón de Avena" }));
+    expect(screen.getByLabelText("Cantidad Jabón de Avena")).toHaveValue(3);
   });
 
   it("suma la cantidad por producto y recalcula las hojas", async () => {
@@ -167,8 +189,9 @@ describe("LabelSelector — paso 2: productos y cantidades", () => {
       expect(mockGenerateProductLabels).toHaveBeenCalledWith({
         branchId: 1,
         selections: [
+          // Lo escrito a mano (3) manda; el otro va con su stock (2).
           { productId: 11, quantity: 3 },
-          { productId: 12, quantity: 1 },
+          { productId: 12, quantity: 2 },
         ],
       });
     });

@@ -4,10 +4,15 @@
  * usuario (`docs/PDF Precios/precios.png`, §S3 del documento ODD).
  *
  * Hoja **A4 horizontal** (297 × 210 mm) con grilla de **9 columnas × 8 filas =
- * 72 etiquetas** de 33,00 × 26,25 mm. La grilla entra exacta (9 × 33 = 297 y
- * 8 × 26,25 = 210), así que las líneas de corte caen en el borde de la hoja y no
- * hay márgenes. Las etiquetas se llenan **columna por columna**: de arriba abajo
- * y después la columna siguiente.
+ * 72 etiquetas**. La grilla entra exacta (9 × 33 = 297 y 8 × 26,25 = 210), así
+ * que el canal de corte sale de **achicar la etiqueta dentro de su celda**: la
+ * celda es el paso de la grilla (33 × 26,25 mm) y la etiqueta dibujada mide
+ * 30 × 23,5 mm, con 3 mm de canal horizontal y 2,75 mm vertical.
+ *
+ * Las etiquetas se llenan **columna por columna**: de arriba abajo y después la
+ * columna siguiente. Cada esquina lleva su **marca de corte** (un tick corto en
+ * el canal), porque cortar a mano necesita una referencia y no un borde pegado
+ * al de al lado.
  *
  * Este módulo es puro (sin pdf-lib): devuelve posiciones en mm desde la esquina
  * superior izquierda y las medidas que el dibujo necesita.
@@ -24,9 +29,28 @@ export const SHEET_HEIGHT_MM = 210;
 export const COLS_PER_SHEET = 9;
 export const ROWS_PER_SHEET = 8;
 export const LABELS_PER_SHEET = COLS_PER_SHEET * ROWS_PER_SHEET; // 72
-export const LABEL_WIDTH_MM = 33;
-export const LABEL_HEIGHT_MM = 26.25;
-export const CUT_LINE_WIDTH_MM = 0.6;
+/** Paso de la grilla: lo que ocupa cada etiqueta, incluido su canal. */
+export const CELL_WIDTH_MM = 33;
+export const CELL_HEIGHT_MM = 26.25;
+
+// --- Etiqueta y canal de corte --------------------------------------------
+/** Lo que se dibuja: más chico que la celda para que quede canal. */
+export const LABEL_WIDTH_MM = 30;
+export const LABEL_HEIGHT_MM = 23.5;
+/** Canal entre etiquetas: el resto de la celda, mitad de cada lado. */
+export const GUTTER_X_MM = CELL_WIDTH_MM - LABEL_WIDTH_MM; // 3
+/** El canal vertical es más chico porque la etiqueta ya tenía aire abajo. */
+export const GUTTER_Y_MM = CELL_HEIGHT_MM - LABEL_HEIGHT_MM; // 2,75
+export const LABEL_INSET_X_MM = GUTTER_X_MM / 2; // 1,5
+export const LABEL_INSET_Y_MM = GUTTER_Y_MM / 2; // 1,375
+
+// --- Marcas de corte ------------------------------------------------------
+/** Largo del tick, en mm. Más corto que medio canal para no tocar al vecino. */
+export const CUT_MARK_LENGTH_MM = 1.1;
+/** Separación entre el borde de la etiqueta y el tick, en mm. */
+export const CUT_MARK_OFFSET_MM = 0.15;
+export const CUT_MARK_WIDTH_MM = 0.2;
+export const CUT_MARK_COLOR = '#000000';
 
 // --- Colores medidos ------------------------------------------------------
 /** Fondo de la etiqueta. */
@@ -39,8 +63,6 @@ export const TEXT_COLOR = '#6b2b43';
 export const CODE_TEXT_COLOR = '#222222';
 /** Importe: negro pleno (L12). */
 export const PRICE_TEXT_COLOR = '#000000';
-/** Líneas de corte. */
-export const CUT_LINE_COLOR = '#000000';
 
 // --- Caja del código (81 % del ancho, centrada) ---------------------------
 export const BOX_WIDTH_MM = 26.7;
@@ -92,6 +114,14 @@ export interface LabelSlot {
   y: number;
 }
 
+/** Segmento de marca de corte, en mm desde la esquina superior izquierda. */
+export interface CutMark {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+}
+
 /** Cantidad de hojas necesarias para `totalLabels` etiquetas. */
 export function calculateSheetCount(totalLabels: number): number {
   if (totalLabels <= 0) return 0;
@@ -115,12 +145,40 @@ export function calculateLabelSlots(totalLabels: number): LabelSlot[] {
       page: Math.floor(index / LABELS_PER_SHEET),
       column,
       row,
-      x: column * LABEL_WIDTH_MM,
-      y: row * LABEL_HEIGHT_MM,
+      x: column * CELL_WIDTH_MM + LABEL_INSET_X_MM,
+      y: row * CELL_HEIGHT_MM + LABEL_INSET_Y_MM,
     });
   }
 
   return slots;
+}
+
+/**
+ * Marcas de corte de una etiqueta: dos ticks por esquina (uno horizontal y uno
+ * vertical), separados del borde para que el corte se guíe por afuera de la
+ * etiqueta. Con la grilla de 9 × 8 todos los ticks caen dentro de la hoja.
+ */
+export function cutMarksForSlot(slot: LabelSlot): CutMark[] {
+  const { x, y } = slot;
+  const right = x + LABEL_WIDTH_MM;
+  const bottom = y + LABEL_HEIGHT_MM;
+  const gap = CUT_MARK_OFFSET_MM;
+  const largo = CUT_MARK_LENGTH_MM;
+
+  return [
+    // Esquina superior izquierda.
+    { x1: x - gap - largo, y1: y, x2: x - gap, y2: y },
+    { x1: x, y1: y - gap - largo, x2: x, y2: y - gap },
+    // Superior derecha.
+    { x1: right + gap, y1: y, x2: right + gap + largo, y2: y },
+    { x1: right, y1: y - gap - largo, x2: right, y2: y - gap },
+    // Inferior izquierda.
+    { x1: x - gap - largo, y1: bottom, x2: x - gap, y2: bottom },
+    { x1: x, y1: bottom + gap, x2: x, y2: bottom + gap + largo },
+    // Inferior derecha.
+    { x1: right + gap, y1: bottom, x2: right + gap + largo, y2: bottom },
+    { x1: right, y1: bottom + gap, x2: right, y2: bottom + gap + largo },
+  ];
 }
 
 /** Importe en el estilo de la casa, sin símbolo: 1.250,00. */

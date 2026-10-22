@@ -18,7 +18,9 @@ Pedido original en L1 (verbatim). Las respuestas de producto dadas por el usuari
 
 La imagen es un A4 horizontal (2000 × 1414 px @ 171 dpi). Medido píxel a píxel: grilla de 9 columnas × 8 filas, celda 217,25 × 166,4 px, líneas de corte negras de 4 px. Todo lo de abajo está expresado en mm para la celda de **33,00 × 26,25 mm** (S6) y en porcentaje de la celda para que escale.
 
-Colores: fondo de etiqueta `#fcd2d3`; cajas `#ffeff3`; `$` y `@feria_conexx` en el tono de marca `#6b2b43`; **código** `#222222` en negrita e **importe** `#000000` (L12: el usuario pidió el código más oscuro y el precio en negro); líneas de corte `#000000`.
+Colores: fondo de etiqueta `#fcd2d3`; cajas `#ffeff3`; `$` y `@feria_conexx` en el tono de marca `#6b2b43`; **código** `#222222` en negrita e **importe** `#000000` (L12: el usuario pidió el código más oscuro y el precio en negro); marcas de corte `#000000`.
+
+> **Nota (2026-10-21)**: la tabla de abajo mide la plantilla original, con la etiqueta ocupando toda la celda de 33 × 26,25 mm y sin canal. Desde `odd/tasks/etiquetas-corte.md` la **celda sigue siendo el paso de la grilla** (9 × 8 = 72 por hoja) pero la **etiqueta dibujada mide 30 × 23,5 mm**, para dejar 3 mm de canal horizontal y 2,75 mm vertical con marcas de corte en las esquinas. Las medidas internas (cajas, textos, radios) no cambiaron y siguen entrando en el alto nuevo.
 
 | Pieza | Medida en la plantilla | En mm (celda 33 × 26,25) |
 | --- | --- | --- |

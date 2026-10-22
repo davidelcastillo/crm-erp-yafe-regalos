@@ -20,8 +20,10 @@ export interface LabelSelectorProps {
  * Wizard de etiquetas de precio (S3/S6):
  *   1. Elegir la sucursal (botón deshabilitado hasta elegir).
  *   2. Elegir los productos **activos con stock > 0** de esa sucursal, con
- *      cantidad por producto y «Todos» (una etiqueta por producto), y descargar
- *      el PDF. El resumen muestra en vivo cuántas etiquetas y hojas A4 salen.
+ *      cantidad por producto y «Todos». La cantidad arranca en el **stock de esa
+ *      sucursal** (es lo que se va a etiquetar) y el usuario la puede corregir;
+ *      lo escrito a mano manda sobre el stock. El resumen muestra en vivo
+ *      cuántas etiquetas y hojas A4 salen.
  */
 export function LabelSelector({ isOpen, onClose, branches }: LabelSelectorProps) {
   const [step, setStep] = useState<Step>(1);
@@ -85,8 +87,22 @@ export function LabelSelector({ isOpen, onClose, branches }: LabelSelectorProps)
 
   const allSelected = rows.length > 0 && selectedIds.length === rows.length;
 
+  /**
+   * Cantidad que propone el wizard: el stock de esa sucursal, acotado al rango
+   * que valida el servidor (1..999). El campo arranca con este valor, así
+   * «Todos» imprime tantas etiquetas como unidades hay y no una sola.
+   */
+  const cantidadSugerida = (row: ExportProductRow) =>
+    Math.min(Math.max(row.stock, 1), 999);
+
+  /** Lo que el usuario escribió si escribió algo; si no, el stock. */
   const cantidadDe = (id: number) => {
-    const cantidad = parseInt(quantities[id] ?? "1", 10);
+    const row = rows.find((fila) => fila.id === id);
+    const escrito = quantities[id];
+    const cantidad =
+      escrito === undefined
+        ? cantidadSugerida(row ?? ({ stock: 1 } as ExportProductRow))
+        : parseInt(escrito, 10);
     return Number.isInteger(cantidad) && cantidad > 0 ? cantidad : 0;
   };
 
@@ -94,26 +110,16 @@ export function LabelSelector({ isOpen, onClose, branches }: LabelSelectorProps)
   const totalLabels = selectedIds.reduce((total, id) => total + cantidadDe(id), 0);
   const totalSheets = calculateSheetCount(totalLabels);
 
+  // Tildar no escribe cantidades: el campo muestra el stock y `quantities` sólo
+  // guarda lo que el usuario corrigió, así destildar y volver a tildar no lo pierde.
   const toggleSelection = (id: number) => {
-    const yaElegido = selectedIds.includes(id);
     setSelectedIds((prev) =>
       prev.includes(id) ? prev.filter((selected) => selected !== id) : [...prev, id]
     );
-    if (!yaElegido) setQuantities((actual) => ({ ...actual, [id]: actual[id] ?? "1" }));
   };
 
   const toggleAll = () => {
-    if (allSelected) {
-      setSelectedIds([]);
-      return;
-    }
-    setSelectedIds(rows.map((row) => row.id));
-    setQuantities(
-      rows.reduce<Record<number, string>>(
-        (actual, row) => ({ ...actual, [row.id]: actual[row.id] ?? "1" }),
-        {}
-      )
-    );
+    setSelectedIds(allSelected ? [] : rows.map((row) => row.id));
   };
 
   const downloadPdf = (pdfBase64: string, filename: string) => {
@@ -284,7 +290,7 @@ export function LabelSelector({ isOpen, onClose, branches }: LabelSelectorProps)
                         type="number"
                         min={1}
                         max={999}
-                        value={quantities[row.id] ?? "1"}
+                        value={quantities[row.id] ?? String(cantidadSugerida(row))}
                         onChange={(e) =>
                           setQuantities((prev) => ({ ...prev, [row.id]: e.target.value }))
                         }

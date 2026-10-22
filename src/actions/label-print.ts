@@ -25,10 +25,10 @@ import {
   CODE_BOX_TOP_MM,
   CODE_FONT_SIZE_PT,
   CODE_MAX_WIDTH_RATIO,
-  COLS_PER_SHEET,
   CURRENCY_SYMBOL,
-  CUT_LINE_COLOR,
-  CUT_LINE_WIDTH_MM,
+  CUT_MARK_COLOR,
+  CUT_MARK_WIDTH_MM,
+  cutMarksForSlot,
   DOLLAR_FONT_SIZE_PT,
   DOLLAR_INSET_MM,
   HANDLE_MAX_WIDTH_RATIO,
@@ -43,7 +43,6 @@ import {
   PRICE_BOX_TOP_MM,
   PRICE_FONT_SIZE_PT,
   PRICE_GAP_MM,
-  ROWS_PER_SHEET,
   SHEET_HEIGHT_MM,
   SHEET_WIDTH_MM,
   CODE_TEXT_COLOR,
@@ -146,19 +145,23 @@ const drawRoundedRect = (
   }
 };
 
-/** Grilla de corte de la hoja: 9 × 8 celdas de 33 × 26,25 mm. */
-const drawCutGrid = (page: PDFPage) => {
-  const stroke = { color: color(CUT_LINE_COLOR), width: mm(CUT_LINE_WIDTH_MM) };
+/**
+ * Marcas de corte: dos ticks por esquina de cada etiqueta, dentro del canal.
+ *
+ * Antes esto era un rectángulo de borde por celda de 33 × 26,25 mm, o sea
+ * etiquetas pegadas una al lado de la otra: sin canal, el corte a mano no tenía
+ * por dónde entrar (S2). La geometría de los ticks vive en `label-layout`.
+ */
+const drawCutMarks = (page: PDFPage, slots: LabelSlot[]) => {
+  const stroke = { color: color(CUT_MARK_COLOR), width: mm(CUT_MARK_WIDTH_MM) };
 
-  for (let row = 0; row < ROWS_PER_SHEET; row++) {
-    for (let col = 0; col < COLS_PER_SHEET; col++) {
-      page.drawRectangle({
-        x: mm(col * LABEL_WIDTH_MM),
-        y: yFromTop(row * LABEL_HEIGHT_MM, LABEL_HEIGHT_MM),
-        width: mm(LABEL_WIDTH_MM),
-        height: mm(LABEL_HEIGHT_MM),
-        borderColor: stroke.color,
-        borderWidth: stroke.width,
+  for (const slot of slots) {
+    for (const mark of cutMarksForSlot(slot)) {
+      page.drawLine({
+        start: { x: mm(mark.x1), y: yFromTop(mark.y1, 0) },
+        end: { x: mm(mark.x2), y: yFromTop(mark.y2, 0) },
+        color: stroke.color,
+        thickness: stroke.width,
       });
     }
   }
@@ -345,8 +348,9 @@ export async function generateProductLabels(data: unknown): Promise<GenerateLabe
     const pages = Array.from({ length: calculateSheetCount(labels.length) }, () =>
       pdfDoc.addPage([mm(SHEET_WIDTH_MM), mm(SHEET_HEIGHT_MM)])
     );
-    for (const page of pages) drawCutGrid(page);
-    for (const slot of calculateLabelSlots(labels.length)) {
+    const slots = calculateLabelSlots(labels.length);
+    for (const slot of slots) {
+      drawCutMarks(pages[slot.page], [slot]);
       drawLabel(pages[slot.page], slot, labels[slot.index], fonts);
     }
 
