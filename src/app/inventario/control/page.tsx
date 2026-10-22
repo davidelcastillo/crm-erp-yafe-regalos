@@ -9,7 +9,8 @@ import {
   saveStockControlCounts,
   startStockControl,
 } from "@/app/actions/stockControl";
-import { BranchFilterDropdown } from "@/components/ui/BranchFilterDropdown";
+import { getBranchOptions } from "@/app/actions/branch";
+import { BranchPicker } from "@/components/ui/BranchPicker";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Spinner } from "@/components/ui/Spinner";
 import type {
@@ -63,6 +64,7 @@ const formatDay = (iso: string | null) =>
 
 export default function ControlStockPage() {
   const [branchId, setBranchId] = useState<number | null>(null);
+  const [branches, setBranches] = useState<Array<{ id: number; name: string }>>([]);
   const [ultimo, setUltimo] = useState<UltimoControl | null>(null);
   const [control, setControl] = useState<Control | null>(null);
   const [reusado, setReusado] = useState(false);
@@ -73,6 +75,20 @@ export default function ControlStockPage() {
   const [cerrando, setCerrando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cierre, setCierre] = useState<StockControlReceipt | null>(null);
+
+  // Las sucursales se eligen en una lista grande (paso 1), no en un desplegable
+  // del encabezado: en el celular el desplegable quedaba fuera de la vista.
+  useEffect(() => {
+    let vivo = true;
+    getBranchOptions()
+      .then((resultado) => {
+        if (vivo && resultado.success) setBranches(resultado.data ?? []);
+      })
+      .catch(() => undefined);
+    return () => {
+      vivo = false;
+    };
+  }, []);
 
   // Al cambiar de sucursal se descarta el control en pantalla: el conteo de una
   // sucursal no se mezcla con el de otra.
@@ -258,13 +274,6 @@ export default function ControlStockPage() {
         <div className="pb-16 brand-gradient">
           <PageHeader
             title="Control de stock"
-            right={
-              <BranchFilterDropdown
-                selectedId={branchId}
-                onValueChange={setBranchId}
-                label="Sucursal del control"
-              />
-            }
             menuItems={[{ label: "Volver al inventario", href: "/inventario" }]}
           />
         </div>
@@ -276,16 +285,31 @@ export default function ControlStockPage() {
             </p>
           )}
 
-          {branchId === null && (
-            <p className="text-sm text-[#6a6a6a]">
-              Elegí una sucursal para contar su mercadería y ver las diferencias contra el stock del sistema.
-            </p>
+          <p className="mb-4 text-xs font-medium uppercase tracking-wide text-[#6a6a6a]">
+            {control ? "Paso 2 de 2 · Contar y decidir" : "Paso 1 de 2 · Elegí la sucursal"}
+          </p>
+
+          {!control && (
+            <section aria-label="Sucursal del control">
+              <BranchPicker
+                branches={branches}
+                value={branchId}
+                onChange={setBranchId}
+                columns={2}
+                label="Sucursal del control"
+              />
+              {branchId === null && (
+                <p className="mt-2 text-sm text-[#6a6a6a]">
+                  Elegí una sucursal para contar su mercadería y ver las diferencias contra el stock del sistema.
+                </p>
+              )}
+            </section>
           )}
 
           {branchId !== null && loading && <Spinner label="Cargando el último control" />}
 
           {branchId !== null && !loading && !control && (
-            <section className="rounded-2xl border border-black/10 bg-[#f7f7f7] p-4">
+            <section className="mt-4 rounded-2xl border border-black/10 bg-[#f7f7f7] p-4">
               <h2 className="text-base font-semibold text-[#222222]">Contar la mercadería</h2>
               <p className="mt-1 text-sm text-[#6a6a6a]">
                 {ultimo

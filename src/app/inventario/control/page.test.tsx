@@ -20,12 +20,26 @@ jest.mock("@/app/actions/stockControl", () => ({
   getLastClosedStockControl: jest.fn(),
 }));
 
-jest.mock("@/components/ui/BranchFilterDropdown", () => ({
-  BranchFilterDropdown: ({ onValueChange }: { onValueChange?: (id: number | null) => void }) => (
-    <button type="button" onClick={() => onValueChange?.(1)}>
-      Elegir sucursal
-    </button>
+jest.mock("@/components/ui/BranchPicker", () => ({
+  BranchPicker: ({
+    branches,
+    onChange,
+  }: {
+    branches: Array<{ id: number; name: string }>;
+    onChange: (id: number) => void;
+  }) => (
+    <div>
+      {branches.map((branch) => (
+        <button key={branch.id} type="button" onClick={() => onChange(branch.id)}>
+          {branch.name}
+        </button>
+      ))}
+    </div>
   ),
+}));
+
+jest.mock("@/app/actions/branch", () => ({
+  getBranchOptions: jest.fn(async () => ({ success: true, data: [{ id: 1, name: "Centro" }] })),
 }));
 
 jest.mock("@/lib/utils/stock-control-pdf", () => ({
@@ -79,7 +93,7 @@ beforeEach(() => {
 
 const abrirControl = async () => {
   render(<ControlStockPage />);
-  fireEvent.click(screen.getByRole("button", { name: "Elegir sucursal" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Centro" }));
   await screen.findByText("Último control cerrado: 11/01/2026.");
   fireEvent.click(screen.getByRole("button", { name: "Iniciar control" }));
   await screen.findByText("Centro · control #9");
@@ -88,9 +102,12 @@ const abrirControl = async () => {
 const fila = (code: string) => screen.getByText(new RegExp(`^${code} ·`)).closest("li") as HTMLElement;
 
 describe("Control de stock por sucursal", () => {
-  it("sin sucursal pide elegir una y no abre ningún control", () => {
+  it("sin sucursal pide elegir una y no abre ningún control", async () => {
     render(<ControlStockPage />);
 
+    expect(screen.getByText(/Paso 1 de 2 · Elegí la sucursal/)).toBeInTheDocument();
+    // La sucursal se elige en la lista del paso 1, no en un desplegable del encabezado.
+    expect(await screen.findByRole("button", { name: "Centro" })).toBeInTheDocument();
     expect(
       screen.getByText(/Elegí una sucursal para contar su mercadería/)
     ).toBeInTheDocument();
