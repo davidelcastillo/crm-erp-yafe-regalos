@@ -34,6 +34,9 @@ export default function RootLayout({
   return (
     <html
       lang="es"
+      /* El script de arranque escribe `data-theme` antes de que React hidrate:
+         sin esto, React avisa que el atributo del servidor no coincide. */
+      suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       {/* El tema se aplica antes del primer pintado: leerlo desde un efecto de React
