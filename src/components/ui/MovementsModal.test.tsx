@@ -146,3 +146,99 @@ describe('MovementsModal — layout de escritorio', () => {
     expect(await screen.findByText('3 uds')).toHaveClass('tabular-nums', 'md:text-right');
   });
 });
+
+/**
+ * S4: el modal tiene el selector del rango y arranca en «desde el último
+ * control» cuando la página sabe de qué sucursal habla; sin sucursal no hay
+ * control contra el cual cortar, así que la opción queda deshabilitada y se
+ * explica por qué.
+ */
+describe('MovementsModal — rango del historial', () => {
+  const metaCreado = {
+    range: 'created' as const,
+    requestedRange: 'created' as const,
+    since: '2026-01-10T12:00:00.000Z',
+    controlClosedAt: null,
+    branchId: null,
+  };
+
+  it('pide el rango «desde la creación» y deshabilita el control cuando no hay sucursal', async () => {
+    mockGetProductMovements.mockResolvedValue({
+      success: true,
+      data: [],
+      meta: metaCreado,
+    } as never);
+
+    renderModal();
+
+    await waitFor(() =>
+      expect(mockGetProductMovements).toHaveBeenCalledWith(1, { range: 'created', branchId: null })
+    );
+
+    const control = screen.getByRole('button', { name: 'Desde el último control' });
+    expect(control).toBeDisabled();
+    expect(control).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('button', { name: 'Desde la creación' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+    expect(
+      screen.getByText('Elegí una sucursal en la página para ver desde su último control de stock.')
+    ).toBeInTheDocument();
+  })
+
+  it('con sucursal pide «desde el último control» y muestra la fecha del control', async () => {
+    mockGetProductMovements.mockResolvedValue({
+      success: true,
+      data: [],
+      meta: {
+        range: 'last-control',
+        requestedRange: 'last-control',
+        since: '2026-01-11T12:00:00.000Z',
+        controlClosedAt: '2026-01-11T12:00:00.000Z',
+        branchId: 7,
+      },
+    } as never);
+
+    render(<MovementsModal product={producto} isOpen onClose={jest.fn()} branchId={7} />);
+
+    await waitFor(() =>
+      expect(mockGetProductMovements).toHaveBeenCalledWith(1, { range: 'last-control', branchId: 7 })
+    );
+
+    expect(screen.getByRole('button', { name: 'Desde el último control' })).toBeEnabled();
+    expect(screen.getByText('Movimientos desde el control del 11/01/2026.')).toBeInTheDocument();
+  })
+
+  it('al cambiar de rango vuelve a pedir el historial con el otro corte', async () => {
+    mockGetProductMovements.mockResolvedValue({
+      success: true,
+      data: [],
+      meta: {
+        range: 'created',
+        requestedRange: 'last-control',
+        since: '2026-01-10T12:00:00.000Z',
+        controlClosedAt: null,
+        branchId: 7,
+      },
+    } as never);
+
+    render(<MovementsModal product={producto} isOpen onClose={jest.fn()} branchId={7} />);
+    await waitFor(() =>
+      expect(mockGetProductMovements).toHaveBeenCalledWith(1, { range: 'last-control', branchId: 7 })
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Desde la creación' }));
+
+    await waitFor(() =>
+      expect(mockGetProductMovements).toHaveBeenLastCalledWith(1, { range: 'created', branchId: 7 })
+    );
+
+    // Si la sucursal nunca tuvo control, el respaldo se avisa en vez de quedar mudo.
+    await waitFor(() =>
+      expect(
+        screen.getByText('Movimientos desde la creación del producto (10/01/2026).')
+      ).toBeInTheDocument()
+    );
+  })
+})

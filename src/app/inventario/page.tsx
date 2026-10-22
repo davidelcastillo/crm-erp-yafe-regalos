@@ -367,6 +367,7 @@ export default function InventarioPage() {
         {selectedProductForMovements && (
           <MovementsModal
             product={selectedProductForMovements}
+            branchId={branchId}
             isOpen={movementsModalOpen}
             onClose={() => {
               setMovementsModalOpen(false);

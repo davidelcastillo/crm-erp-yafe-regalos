@@ -285,14 +285,49 @@ export async function searchProducts(data: unknown) {
  * @param productId The product ID
  * @returns Promise resolving to an array of movement objects
  */
-export async function getProductMovements(productId: number) {
+/** Rango del historial: desde el último control de stock o desde la creación (S4). */
+const productMovementsOptionsSchema = z.object({
+  range: z.enum(["created", "last-control"]).default("created"),
+  branchId: z.number().int().positive().nullable().default(null),
+});
+
+/**
+ * Historial de movimientos del producto. El rango «desde el último control» es
+ * por sucursal: sin sucursal —o si esa sucursal nunca tuvo un control cerrado—
+ * cae a «desde la creación», y el `meta` lo dice para que la UI lo aclare en
+ * lugar de mostrar una lista vacía sin explicación.
+ */
+export async function getProductMovements(
+  productId: number,
+  options?: { range?: "created" | "last-control"; branchId?: number | null }
+) {
   try {
     const auth = await requireAdmin();
     if (!auth.ok) return { success: false as const, error: auth.error };
 
+    const { range, branchId } = productMovementsOptionsSchema.parse(options ?? {});
+
+    const product = await prisma.product.findUnique({
+      where: { id: productId },
+      select: { createdAt: true },
+    });
+    if (!product) return { success: false as const, error: "Producto no encontrado" };
+
+    const control =
+      range === "last-control" && branchId !== null
+        ? await prisma.stockControl.findFirst({
+            where: { branchId, status: "CLOSED", closedAt: { not: null } },
+            orderBy: { closedAt: "desc" },
+            select: { closedAt: true },
+          })
+        : null;
+    const controlClosedAt = control?.closedAt ?? null;
+    const desde = controlClosedAt ?? product.createdAt;
+    const branchFilter = branchId !== null ? { branchId } : {};
+
     // Fetch purchases with related purchase data
     const purchaseItems = await prisma.purchaseItem.findMany({
-      where: { productId },
+      where: { productId, purchase: { date: { gte: desde }, ...branchFilter } },
       include: {
         purchase: {
           select: {
@@ -311,7 +346,7 @@ export async function getProductMovements(productId: number) {
 
     // Fetch sales with related sale data
     const saleItems = await prisma.saleItem.findMany({
-      where: { productId },
+      where: { productId, sale: { date: { gte: desde }, ...branchFilter } },
       include: {
         sale: {
           select: {
@@ -334,6 +369,8 @@ export async function getProductMovements(productId: number) {
     const branchMovements = await prisma.branchMovement.findMany({
       where: {
         productId,
+        createdAt: { gte: desde },
+        ...branchFilter,
         NOT: [
           { movementType: 'ENTRY', reference: { startsWith: 'PURCHASE-' } },
           { movementType: 'EXIT', reference: { startsWith: 'SALE-' } },
@@ -380,7 +417,18 @@ export async function getProductMovements(productId: number) {
       new Date(b.date).getTime() - new Date(a.date).getTime()
     );
 
-    return { success: true, data: parseArray(allMovements) };
+    return {
+      success: true,
+      data: parseArray(allMovements),
+      // La UI necesita saber qué rango se aplicó de verdad y desde cuándo.
+      meta: {
+        range: controlClosedAt ? ("last-control" as const) : ("created" as const),
+        requestedRange: range,
+        since: desde.toISOString(),
+        controlClosedAt: controlClosedAt?.toISOString() ?? null,
+        branchId,
+      },
+    };
   } catch (error) {
     console.error("Error fetching product movements:", error);
     return { success: false, error: "Error al obtener los movimientos del producto" };

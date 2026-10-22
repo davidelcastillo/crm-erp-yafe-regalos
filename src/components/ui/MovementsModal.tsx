@@ -32,26 +32,45 @@ interface MovementsModalProps {
   };
   isOpen: boolean;
   onClose: () => void;
+  /** Sucursal elegida en la página: define contra qué control se corta (S4). */
+  branchId?: number | null;
 }
 
-export function MovementsModal({ product, isOpen, onClose }: MovementsModalProps) {
+type MovementRange = 'created' | 'last-control';
+
+type MovementsMeta = {
+  range: MovementRange;
+  since: string;
+  controlClosedAt: string | null;
+};
+
+export function MovementsModal({ product, isOpen, onClose, branchId = null }: MovementsModalProps) {
   const [movements, setMovements] = useState<ProductMovement[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [range, setRange] = useState<MovementRange>(branchId !== null ? 'last-control' : 'created');
+  const [meta, setMeta] = useState<MovementsMeta | null>(null);
+
+  // Al abrir (o al cambiar de producto o de sucursal) el rango vuelve al default:
+  // «desde el último control» si hay sucursal, si no «desde la creación».
+  useEffect(() => {
+    if (isOpen) setRange(branchId !== null ? 'last-control' : 'created');
+  }, [isOpen, branchId, product.id]);
 
   useEffect(() => {
     if (isOpen) {
-      loadMovements();
+      loadMovements(range);
     }
-  }, [isOpen, product.id]);
+  }, [isOpen, product.id, branchId, range]);
 
-  const loadMovements = async () => {
+  const loadMovements = async (rango: MovementRange) => {
     setLoading(true);
     setError(null);
     try {
-      const result = await getProductMovements(product.id);
+      const result = await getProductMovements(product.id, { range: rango, branchId });
       if (result.success && result.data) {
         setMovements(result.data as ProductMovement[]);
+        setMeta(result.meta ?? null);
       } else {
         setError(result.error ?? 'Error al cargar movimientos');
       }
@@ -61,6 +80,13 @@ export function MovementsModal({ product, isOpen, onClose }: MovementsModalProps
       setLoading(false);
     }
   };
+
+  const formatDay = (dateString: string): string =>
+    new Date(dateString).toLocaleDateString('es-AR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    });
 
   const formatDate = (dateString: string): string => {
     const options: Intl.DateTimeFormatOptions = {
@@ -111,6 +137,39 @@ export function MovementsModal({ product, isOpen, onClose }: MovementsModalProps
             <span className="text-sm font-medium text-[#222222]">Código:</span>
             <span className="font-mono text-[#6a6a6a]">{product.code}</span>
           </div>
+        </div>
+
+        {/* S4: rango del historial. «Desde el último control» necesita una
+            sucursal: sin ella no hay control contra el cual cortar. */}
+        <div role="group" aria-label="Rango del historial" className="mb-4">
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setRange('last-control')}
+              aria-pressed={range === 'last-control'}
+              disabled={branchId === null}
+              className={`btn ${range === 'last-control' ? 'btn-active' : 'btn-secondary'} flex-1 whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed`}
+            >
+              Desde el último control
+            </button>
+            <button
+              type="button"
+              onClick={() => setRange('created')}
+              aria-pressed={range === 'created'}
+              className={`btn ${range === 'created' ? 'btn-active' : 'btn-secondary'} flex-1 whitespace-nowrap`}
+            >
+              Desde la creación
+            </button>
+          </div>
+          <p className="mt-2 text-xs text-[#6a6a6a]">
+            {branchId === null
+              ? 'Elegí una sucursal en la página para ver desde su último control de stock.'
+              : meta?.range === 'last-control' && meta.controlClosedAt
+                ? `Movimientos desde el control del ${formatDay(meta.controlClosedAt)}.`
+                : meta
+                  ? `Movimientos desde la creación del producto (${formatDay(meta.since)}).`
+                  : ''}
+          </p>
         </div>
 
         {loading && (

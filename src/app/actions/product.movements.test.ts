@@ -213,3 +213,175 @@ describe('getProductMovements con movimientos de sucursal (integración, base lo
     expect(porTipo(datos, 'EXIT')).toHaveLength(0)
   })
 })
+
+/**
+ * S4: el historial se puede cortar en el **último control de stock** de la
+ * sucursal, no solo en la creación del producto. El corte es por sucursal: el
+ * control de una sucursal no recorta lo que pasó en otra, y un control en
+ * borrador no cuenta (solo los cerrados dejan corte).
+ */
+describe('getProductMovements con rango desde el último control (integración, base local)', () => {
+  const base = new Date('2026-01-10T12:00:00.000Z')
+  const despuesDelControl = new Date('2026-01-12T12:00:00.000Z')
+  const cierre = new Date('2026-01-11T12:00:00.000Z')
+
+  let branchConControlId = 0
+  let branchSinControlId = 0
+  let productRangoId = 0
+  let controlCerradoId = 0
+  let controlBorradorId = 0
+  const movimientosCreados: number[] = []
+  const comprasCreadas: number[] = []
+
+  const rango = async (opciones?: { range?: 'created' | 'last-control'; branchId?: number | null }) => {
+    const resultado = await getProductMovements(productRangoId, opciones)
+    expect(resultado.success).toBe(true)
+    return {
+      datos: resultado.data as Movimiento[],
+      meta: (resultado as { meta?: { range: string; since: string; controlClosedAt: string | null } }).meta,
+    }
+  }
+
+  beforeAll(async () => {
+    const [conControl, sinControl] = await Promise.all([
+      prisma.branch.create({
+        data: { name: `QA rango A ${sufijo}`, code: `RA${sufijo}`, authUserId: `qa-rango-a-${sufijo}` },
+      }),
+      prisma.branch.create({
+        data: { name: `QA rango B ${sufijo}`, code: `RB${sufijo}`, authUserId: `qa-rango-b-${sufijo}` },
+      }),
+    ])
+    branchConControlId = conControl.id
+    branchSinControlId = sinControl.id
+
+    const producto = await prisma.product.create({
+      data: { name: `QA rango ${sufijo}`, code: `QR${sufijo}`, price: 10, createdAt: base },
+    })
+    productRangoId = producto.id
+
+    // Un control cerrado anterior al «después» y un borrador más nuevo: el
+    // borrador no debe mover el corte.
+    const cerrado = await prisma.stockControl.create({
+      data: {
+        branchId: branchConControlId,
+        status: 'CLOSED',
+        startedAt: base,
+        closedAt: cierre,
+        closedBy: 'qa',
+        reason: 'control de prueba',
+      },
+    })
+    controlCerradoId = cerrado.id
+
+    const borrador = await prisma.stockControl.create({
+      data: { branchId: branchConControlId, status: 'DRAFT', startedAt: despuesDelControl },
+    })
+    controlBorradorId = borrador.id
+
+    const [antes, despues, enOtraSucursal] = await Promise.all([
+      prisma.branchMovement.create({
+        data: {
+          productId: productRangoId,
+          branchId: branchConControlId,
+          movementType: 'ADJUSTMENT',
+          quantity: 1,
+          reference: 'ADJUSTMENT',
+          performedBy: 'qa',
+          createdAt: base,
+        },
+      }),
+      prisma.branchMovement.create({
+        data: {
+          productId: productRangoId,
+          branchId: branchConControlId,
+          movementType: 'ADJUSTMENT',
+          quantity: 2,
+          reference: 'ADJUSTMENT',
+          performedBy: 'qa',
+          createdAt: despuesDelControl,
+        },
+      }),
+      prisma.branchMovement.create({
+        data: {
+          productId: productRangoId,
+          branchId: branchSinControlId,
+          movementType: 'ADJUSTMENT',
+          quantity: 3,
+          reference: 'ADJUSTMENT',
+          performedBy: 'qa',
+          createdAt: despuesDelControl,
+        },
+      }),
+    ])
+    movimientosCreados.push(antes.id, despues.id, enOtraSucursal.id)
+
+    // Compras a los dos lados del corte: el filtro también aplica a `Purchase.date`.
+    const [compraAntes, compraDespues] = await Promise.all([
+      prisma.purchase.create({
+        data: { branchId: branchConControlId, totalAmount: 10, date: base },
+      }),
+      prisma.purchase.create({
+        data: { branchId: branchConControlId, totalAmount: 20, date: despuesDelControl },
+      }),
+    ])
+    comprasCreadas.push(compraAntes.id, compraDespues.id)
+    await Promise.all([
+      prisma.purchaseItem.create({
+        data: { purchaseId: compraAntes.id, productId: productRangoId, price: 10, quantity: 1, subtotal: 10 },
+      }),
+      prisma.purchaseItem.create({
+        data: { purchaseId: compraDespues.id, productId: productRangoId, price: 10, quantity: 2, subtotal: 20 },
+      }),
+    ])
+  })
+
+  afterAll(async () => {
+    await prisma.branchMovement.deleteMany({ where: { id: { in: movimientosCreados } } })
+    await prisma.purchaseItem.deleteMany({ where: { purchaseId: { in: comprasCreadas } } })
+    await prisma.purchase.deleteMany({ where: { id: { in: comprasCreadas } } })
+    await prisma.stockControl.deleteMany({ where: { id: { in: [controlCerradoId, controlBorradorId] } } })
+    await prisma.product.deleteMany({ where: { id: productRangoId } })
+    await prisma.branch.deleteMany({ where: { id: { in: [branchConControlId, branchSinControlId] } } })
+  })
+
+  it('desde el último control deja solo lo posterior al cierre, con su fecha en el meta', async () => {
+    const { datos, meta } = await rango({ range: 'last-control', branchId: branchConControlId })
+
+    expect(meta?.range).toBe('last-control')
+    expect(meta?.controlClosedAt).toBe(cierre.toISOString())
+    expect(meta?.since).toBe(cierre.toISOString())
+
+    const ajustes = porTipo(datos, 'ADJUSTMENT')
+    expect(ajustes).toHaveLength(1)
+    expect(ajustes[0]).toMatchObject({ quantity: 2, branchName: `QA rango A ${sufijo}` })
+
+    const compras = porTipo(datos, 'PURCHASE')
+    expect(compras).toHaveLength(1)
+    expect(compras[0]).toMatchObject({ quantity: 2, referenceId: comprasCreadas[1] })
+  })
+
+  it('sin control cerrado en la sucursal cae a «desde la creación» y lo informa', async () => {
+    const { datos, meta } = await rango({ range: 'last-control', branchId: branchSinControlId })
+
+    expect(meta?.range).toBe('created')
+    expect(meta?.controlClosedAt).toBeNull()
+    expect(meta?.since).toBe(base.toISOString())
+
+    // Toda la vida del producto en esa sucursal, y ninguna fila de la otra.
+    const ajustes = porTipo(datos, 'ADJUSTMENT')
+    expect(ajustes).toHaveLength(1)
+    expect(ajustes[0]).toMatchObject({ quantity: 3, branchName: `QA rango B ${sufijo}` })
+    expect(porTipo(datos, 'PURCHASE')).toHaveLength(0)
+  })
+
+  it('sin opciones mantiene el comportamiento previo: desde la creación y todas las sucursales', async () => {
+    const { datos, meta } = await rango()
+
+    expect(meta?.range).toBe('created')
+    expect(meta?.since).toBe(base.toISOString())
+
+    const ajustes = porTipo(datos, 'ADJUSTMENT')
+    expect(ajustes.map((a) => a.quantity).sort()).toEqual([1, 2, 3])
+    expect(porTipo(datos, 'PURCHASE')).toHaveLength(2)
+  })
+})
