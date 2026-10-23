@@ -217,24 +217,28 @@ export async function saveStockControlCounts(data: unknown) {
     if (!control) return controlNotFound;
     if (control.status === "CLOSED") return alreadyClosed;
 
-    const saved = await prisma.$transaction(async (tx) => {
-      // El motivo viaja con el borrador: retomarlo tiene que devolver el texto ya
-      // escrito, no un campo vacío (S10).
-      const texto = reason?.trim() ?? "";
-      if (texto) {
-        await tx.stockControl.update({ where: { id: controlId }, data: { reason: texto } });
-      }
-
-      let count = 0;
-      for (const item of items) {
-        const result = await tx.stockControlItem.updateMany({
+    // Un control real tiene cientos de productos. Cada ítem es un UPDATE: si la
+    // transacción es interactiva hace un viaje por ítem y Prisma la corta a los
+    // 5 s por defecto (P2028), que es exactamente lo que pasaba en producción con
+    // 136 productos. En lote todas las escrituras viajan juntas y siguen siendo
+    // atómicas: o se guarda el conteo completo o no se guarda nada.
+    const motivo = reason?.trim() ?? "";
+    const escrituras = [
+      ...(motivo
+        ? [prisma.stockControl.update({ where: { id: controlId }, data: { reason: motivo } })]
+        : []),
+      ...items.map((item) =>
+        prisma.stockControlItem.updateMany({
           where: { controlId, productId: item.productId },
           data: { countedStock: item.countedStock, decision: item.decision },
-        });
-        count += result.count;
-      }
-      return count;
-    });
+        })
+      ),
+    ];
+
+    const resultados = await prisma.$transaction(escrituras);
+    const saved = resultados
+      .slice(motivo ? 1 : 0)
+      .reduce((total, resultado) => total + ("count" in resultado ? resultado.count : 0), 0);
 
     revalidateStockViews();
 
@@ -359,7 +363,10 @@ export async function closeStockControl(data: unknown) {
           },
         });
       }
-    });
+      // El cierre ajusta de a un producto aceptado: con un control grande y la
+      // base remota, el default de 5 s no alcanza. Los límites son explícitos
+      // para que el fallo no vuelva a ser un "Error al cerrar" genérico.
+    }, { timeout: 30_000, maxWait: 10_000 });
 
     revalidateStockViews();
 

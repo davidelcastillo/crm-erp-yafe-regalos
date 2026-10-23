@@ -28,7 +28,10 @@ const mockStockControlUpdateMany = jest.fn();
 const mockStockControlUpdate = jest.fn();
 const mockStockControlItemUpdateMany = jest.fn();
 const mockTransaction = jest.fn(
-  async (callback: (tx: unknown) => Promise<unknown>) => {
+  async (arg: unknown, opciones?: unknown) => {
+    if (typeof arg !== "function") return Promise.all(arg as unknown[]);
+    void opciones;
+    const callback = arg as (tx: unknown) => Promise<unknown>;
     const tx = {
       branchInventory: { upsert: (...args: unknown[]) => mockBranchInventoryUpsert(...args) },
       branchMovement: { create: (...args: unknown[]) => mockBranchMovementCreate(...args) },
@@ -280,6 +283,27 @@ describe("saveStockControlCounts", () => {
       where: { controlId: 7, productId: 12 },
       data: { countedStock: 1, decision: "PENDING" },
     });
+  });
+
+  it("guarda un control grande en una sola transacción en lote, no una consulta por ítem", async () => {
+    mockStockControlFindUnique.mockResolvedValue({ id: 7, status: "DRAFT" });
+
+    // Un control real de producción tiene cientos de productos. Si cada ítem es
+    // un viaje a la base dentro de una transacción interactiva, la red suma
+    // minutos y Prisma la corta a los 5 s (P2028): el guardado falla entero.
+    const items = Array.from({ length: 136 }, (_, index) => ({
+      productId: 1000 + index,
+      countedStock: index,
+      decision: "PENDING" as const,
+    }));
+
+    const result = await saveStockControlCounts({ controlId: 7, items });
+
+    expect(result).toEqual({ success: true, data: { saved: 136 } });
+    expect(mockTransaction).toHaveBeenCalledTimes(1);
+    expect(Array.isArray(mockTransaction.mock.calls[0][0])).toBe(true);
+    expect(mockTransaction.mock.calls[0][0]).toHaveLength(136);
+    expect(mockStockControlItemUpdateMany).toHaveBeenCalledTimes(136);
   });
 
   it("guarda el motivo del ajuste junto con el borrador (S10)", async () => {
