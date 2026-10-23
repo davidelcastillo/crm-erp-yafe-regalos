@@ -115,8 +115,6 @@ export function AddPurchaseButton({ products: initialProducts, onSuccess }: AddP
         icon: "success",
         confirmButtonColor: "#6d28d9",
         confirmButtonText: "Aceptar",
-        background: "#ffffff",
-        color: "#222222",
       });
       router.refresh();
       onSuccess?.();
@@ -128,8 +126,6 @@ export function AddPurchaseButton({ products: initialProducts, onSuccess }: AddP
         text: result.error || "Error al registrar la compra",
         icon: "error",
         confirmButtonColor: "#dc2626",
-        background: "#ffffff",
-        color: "#222222",
       });
     }
     setLoading(false);

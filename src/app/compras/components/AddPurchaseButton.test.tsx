@@ -204,8 +204,6 @@ it("closes purchase modal when clicking outside", async () => {
         cancelButtonColor: '#6a6a6a',
         confirmButtonText: 'Sí, eliminar',
         cancelButtonText: 'Cancelar',
-        background: '#ffffff',
-        color: '#222222',
       })
     );
     
@@ -251,8 +249,6 @@ it("closes purchase modal when clicking outside", async () => {
         cancelButtonColor: '#6a6a6a',
         confirmButtonText: 'Sí, eliminar',
         cancelButtonText: 'Cancelar',
-        background: '#ffffff',
-        color: '#222222',
       })
     );
     
@@ -387,8 +383,6 @@ it("closes purchase modal when clicking outside", async () => {
           icon: 'success',
           confirmButtonColor: "#6d28d9",
           confirmButtonText: 'Aceptar',
-          background: '#ffffff',
-          color: '#222222',
         })
       );
     });

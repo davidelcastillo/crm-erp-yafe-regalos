@@ -556,8 +556,28 @@
 }
 
 /* SweetAlert dibuja su propio DOM desde JS: no se le pueden poner clases desde
-   el componente, así que el tema se resuelve acá. Los colores del `Swal.fire`
-   no se tocan: son la marca y no dependen del tema. */
+   el componente, así que el tema se resuelve acá y las llamadas no pasan
+   `background`/`color` (los aplicaba como estilo inline y ganaba sobre este
+   bloque). Lo único que sigue inline es el color semántico por llamada —rojo
+   destructivo, verde de éxito—, que no depende del tema. */
+:root .swal2-popup {
+  background-color: var(--surface);
+  color: var(--ink);
+}
+
+/* `.swal2-styled` sólo la tienen los botones que pinta SweetAlert: con
+   `buttonsStyling: false` la clase se quita y el botón lo pinta `btn-primary` o
+   `btn-danger` (los diálogos con `customClass`). */
+:root .swal2-actions .swal2-confirm.swal2-styled {
+  background-color: var(--palette-brand-action);
+  color: #ffffff;
+}
+
+:root .swal2-actions .swal2-cancel.swal2-styled {
+  background-color: var(--palette-secondary-gray);
+  color: #ffffff;
+}
+
 [data-theme="dark"] .swal2-popup {
   background-color: var(--surface);
   color: var(--ink);
@@ -574,12 +594,12 @@
 
 /* Después de la regla de arriba y con más especificidad (0,3,0 contra 0,2,1):
    si no, el confirm se queda con el `color: var(--ink)` de los botones. */
-[data-theme="dark"] .swal2-actions .swal2-confirm {
+[data-theme="dark"] .swal2-actions .swal2-confirm.swal2-styled {
   background-color: var(--palette-brand-action);
   color: #ffffff;
 }
 
-[data-theme="dark"] .swal2-actions .swal2-cancel {
+[data-theme="dark"] .swal2-actions .swal2-cancel.swal2-styled {
   background-color: var(--surface-strong);
   color: var(--ink);
 }
@@ -595,6 +615,29 @@
 [data-theme="dark"] .swal2-validation-message {
   background-color: var(--error-surface);
   color: var(--error-ink);
+}
+
+/* El velo al 40 % no separa el popup del contenido de abajo en tema oscuro. */
+[data-theme="dark"] .swal2-container.swal2-backdrop-show {
+  background-color: var(--scrim);
+}
+
+/* La X de cierre y el pie traen gris y borde claros escritos a mano. */
+[data-theme="dark"] .swal2-close {
+  color: var(--ink-muted);
+}
+
+[data-theme="dark"] .swal2-footer {
+  border-color: var(--hairline);
+}
+
+[data-theme="dark"] .swal2-loader {
+  border-color: var(--accent) transparent;
+}
+
+/* La barra del temporizador es negra al 30 %: sobre `--surface` no se ve. */
+[data-theme="dark"] .swal2-timer-progress-bar {
+  background-color: var(--ink-soft);
 }
 
 [data-theme="dark"] .btn-secondary {

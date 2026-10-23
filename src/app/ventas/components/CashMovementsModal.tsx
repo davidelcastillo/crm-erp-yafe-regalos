@@ -128,8 +128,6 @@ export const CashMovementsModal = ({
         text: `${plata(monto)} en la caja de la sucursal`,
         icon: "success",
         confirmButtonColor: "#6d28d9",
-        background: "#ffffff",
-        color: "#222222",
       });
       setAmount("");
       setDetalle("");

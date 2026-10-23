@@ -70,8 +70,6 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
         cancelButtonColor: "#6a6a6a",
         confirmButtonText: "Sí, desactivar",
         cancelButtonText: "Cancelar",
-        background: "#ffffff",
-        color: "#222222",
       });
       if (!confirmation.isConfirmed) return; // leave the toggle unchanged
     }
@@ -115,8 +113,6 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
         icon: "success",
         confirmButtonColor: "#6d28d9",
         confirmButtonText: "Aceptar",
-        background: "#ffffff",
-        color: "#222222",
         customClass: { confirmButton: "rounded-xl px-6 py-3 font-medium" },
       });
 
@@ -136,8 +132,6 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
         icon: "error",
         confirmButtonColor: "#dc2626",
         confirmButtonText: "Aceptar",
-        background: "#ffffff",
-        color: "#222222",
       });
     }
     setLoading(false);

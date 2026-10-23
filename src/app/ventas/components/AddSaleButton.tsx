@@ -234,8 +234,6 @@ export function AddSaleButton({ products, onSuccess }: AddSaleButtonProps) {
          icon: "success",
          confirmButtonColor: "#6d28d9",
          confirmButtonText: "Aceptar",
-         background: "#ffffff",
-         color: "#222222",
        });
         router.refresh();
         onSuccess?.();
@@ -250,8 +248,6 @@ export function AddSaleButton({ products, onSuccess }: AddSaleButtonProps) {
          text: result.error || "Error al registrar la venta",
          icon: "error",
          confirmButtonColor: "#dc2626",
-         background: "#ffffff",
-         color: "#222222",
        });
      }
      setLoading(false);

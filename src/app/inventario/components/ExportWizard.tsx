@@ -130,8 +130,6 @@ export function ExportWizard({ open, onClose, branches }: ExportWizardProps) {
         text: "El inventario se exportó correctamente",
         icon: "success",
         confirmButtonColor: "#6d28d9",
-        background: "#ffffff",
-        color: "#222222",
       });
     } else {
       await Swal.fire({
@@ -139,7 +137,6 @@ export function ExportWizard({ open, onClose, branches }: ExportWizardProps) {
         text: result.error || "Error al generar el PDF",
         icon: "error",
         confirmButtonColor: "#dc2626",
-        color: "#222222",
       });
     }
     setGenerating(false);

@@ -146,8 +146,6 @@ export function BranchManager({ branches }: { branches: Branch[] }) {
           `,
           icon: "success",
           confirmButtonColor: "#6d28d9",
-          background: "#ffffff",
-          color: "#222222",
           confirmButtonText: "Entendido",
         });
         const refreshed = await getBranches();

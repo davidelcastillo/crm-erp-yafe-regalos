@@ -199,8 +199,6 @@ export default function InventarioPage() {
       cancelButtonText: "Cancelar",
       confirmButtonColor: "#6d28d9",
       cancelButtonColor: "#6a6a6a",
-      background: "#ffffff",
-      color: "#222222",
       inputValidator: (value) => {
         if (!value || !value.trim()) return "El nombre es requerido";
         if (value.length > 100) return "Máximo 100 caracteres";
@@ -222,8 +220,6 @@ export default function InventarioPage() {
         icon: "success",
         confirmButtonColor: "#6d28d9",
         confirmButtonText: "Aceptar",
-        background: "#ffffff",
-        color: "#222222",
       });
     } else {
       await Swal.fire({
@@ -232,8 +228,6 @@ export default function InventarioPage() {
         icon: "error",
         confirmButtonColor: "#dc2626",
         confirmButtonText: "Aceptar",
-        background: "#ffffff",
-        color: "#222222",
       });
     }
   };
