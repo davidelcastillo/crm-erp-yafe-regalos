@@ -15,7 +15,9 @@ export const fechaCalendarioSchema = z
 export const registerCashMovementSchema = z.object({
   branchId: z.coerce.number().int().positive("Sucursal inválida"),
   type: z.enum(["INGRESO", "EGRESO"], { message: "El tipo debe ser INGRESO o EGRESO" }),
-  method: z.enum(["EFECTIVO", "TRANSFERENCIA"]).default("EFECTIVO"),
+  // `MIXTO` es un medio del corte (su propia columna) y del libro; el formulario
+  // todavía no lo ofrece, pero aceptarlo deja listo el alta sin tocar la UI.
+  method: z.enum(["EFECTIVO", "TRANSFERENCIA", "MIXTO"]).default("EFECTIVO"),
   amount: z.number().positive("El monto debe ser mayor a 0"),
   // Fecha propia, elegible al cargar (S18); sin ella, el momento de la carga.
   date: fechaCalendarioSchema.optional(),

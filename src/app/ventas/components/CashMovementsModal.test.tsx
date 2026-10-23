@@ -92,6 +92,29 @@ describe("CashMovementsModal", () => {
     expect(screen.getByText("$60.00")).toBeInTheDocument();
   });
 
+  it("rotula el medio mixto del libro y no lo ofrece en el formulario", async () => {
+    // `MIXTO` ya es un medio del libro y del corte, pero el formulario todavía no
+    // lo ofrece: no tiene que mostrarse como si fuera una transferencia.
+    mockListar.mockResolvedValue({
+      success: true,
+      data: {
+        items: [{ ...libro.items[0], id: 11, method: "MIXTO", amount: 50 }],
+        totals: libro.totals,
+      },
+    } as never);
+
+    renderModal();
+    await elegirSucursal();
+
+    expect(screen.getByText(/Mixto/)).toBeInTheDocument();
+
+    const medio = screen.getByLabelText("Medio") as HTMLSelectElement;
+    expect(Array.from(medio.options).map((opcion) => opcion.value)).toEqual([
+      "EFECTIVO",
+      "TRANSFERENCIA",
+    ]);
+  });
+
   it("registra el ingreso con la fecha propia, el detalle y el actor", async () => {
     renderModal();
     await elegirSucursal();

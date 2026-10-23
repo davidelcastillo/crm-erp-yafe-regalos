@@ -187,6 +187,24 @@ describe('plata de caja (integración, base local)', () => {
     expect(despues.data!.totalIncome - antes.data!.totalIncome).toBeCloseTo(200)
     expect(despues.data!.totalExpense - antes.data!.totalExpense).toBeCloseTo(50)
   })
+
+  // Va al final: un movimiento MIXTO cambia los totales del libro, y los tests de
+  // arriba afirman totales exactos.
+  it('acepta el medio MIXTO aunque el formulario todavía no lo ofrezca', async () => {
+    const resultado = await guardar({
+      branchId,
+      type: 'INGRESO',
+      method: 'MIXTO',
+      amount: 600,
+      performedBy: ACTOR,
+    })
+
+    expect(resultado.success).toBe(true)
+    const fila = await prisma.cashMovement.findUniqueOrThrow({
+      where: { id: resultado.data!.id },
+    })
+    expect(fila.method).toBe('MIXTO')
+  })
 })
 
 // AGENTS.md §0.2: la acción exige sesión + rol admin antes de validar nada.

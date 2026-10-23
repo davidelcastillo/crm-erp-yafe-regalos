@@ -6,6 +6,7 @@ Dos cosas distintas, y conviene no mezclarlas: la **plata que entra o sale sin s
 
 - Dónde: `/ventas`, botón **Caja**.
 - Qué registra: ingresos y egresos de plata de **una** sucursal (correcciones de conteo, cambio, gastos pagados de la caja), en efectivo o por transferencia.
+- El medio **mixto** también es válido para un movimiento y el corte lo suma en su propia línea, pero el formulario todavía no lo ofrece: por ahora sólo puede llegar desde fuera de la pantalla. Cuando se habilite, no hace falta tocar el corte.
 - Cada movimiento lleva **fecha propia**, elegible al cargar: un ajuste de un día anterior se registra con ese día.
 - El saldo de la sucursal sale de sus movimientos (ingresos − egresos), y el libro muestra los últimos movimientos con esos totales.
 - Entra en el **balance del dashboard**: los ingresos suman a los ingresos del tablero y los egresos a los egresos, dentro del período elegido.

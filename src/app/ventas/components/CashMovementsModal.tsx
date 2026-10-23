@@ -40,6 +40,14 @@ const METODOS = [
   { value: "TRANSFERENCIA", label: "Transferencia" },
 ];
 
+// Rótulo del libro: `MIXTO` puede venir de la base aunque el formulario todavía
+// no lo ofrezca; sin esto se mostraba como «Transferencia».
+const ETIQUETA_METODO: Record<string, string> = {
+  EFECTIVO: "Efectivo",
+  TRANSFERENCIA: "Transferencia",
+  MIXTO: "Mixto",
+};
+
 const TIPOS: Array<{ value: Tipo; label: string; ayuda: string }> = [
   { value: "INGRESO", label: "Ingreso", ayuda: "Entra plata a la caja" },
   { value: "EGRESO", label: "Egreso", ayuda: "Sale plata de la caja" },
@@ -346,7 +354,7 @@ export const CashMovementsModal = ({
                     <div className="min-w-0">
                       <p className="text-sm text-ink">
                         {m.date.slice(0, 10).split("-").reverse().join("/")} ·{" "}
-                        {m.method === "EFECTIVO" ? "Efectivo" : "Transferencia"}
+                        {ETIQUETA_METODO[m.method] ?? m.method}
                       </p>
                       {m.description && (
                         <p className="text-xs text-ink-muted truncate">{m.description}</p>
