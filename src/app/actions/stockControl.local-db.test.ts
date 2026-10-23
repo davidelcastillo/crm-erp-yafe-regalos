@@ -142,7 +142,6 @@ describe("control de stock (integración, base local)", () => {
     const receipt = resultado.data.receipt as {
       adjustedCount: number;
       pendingCount: number;
-      items: { productId: number; difference: number }[];
     };
     expect(receipt.adjustedCount).toBe(2);
     expect(receipt.pendingCount).toBe(1);
@@ -203,3 +202,7 @@ describe("control de stock (integración, base local)", () => {
     expect(item?.countedStock).toBe(7);
   });
 });
+
+// Sin esto el archivo es un script global y sus tipos chocan con los de otros
+// tests de integración que usan el mismo patrón de carga diferida.
+export {};
