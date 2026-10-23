@@ -12,26 +12,39 @@ export async function ultimosCierres(branchId?: number) {
 }
 
 /**
- * Piso del cierre de caja: una venta o un movimiento de plata anterior al
- * **último cierre de su sucursal** pertenece a la caja cerrada. Se aplica solo
- * en el período «desde el último cierre»: 7/30/90/personalizado muestran todo lo
- * que cae en el rango (pedido del usuario).
+ * Pisos del cierre de caja, con **una sola** lectura de los últimos cierres.
  *
- * Se devuelve como filtro para poder combinarlo con la sucursal elegida (`AND` de
- * Prisma). Sin sucursal, el piso se arma con el último cierre de **cada**
- * sucursal; las que nunca cerraron caja no tienen piso.
+ * Las ventas y las compras guardan el instante en `date`, así que se comparan
+ * contra `closedAt` directo. La plata de caja no: su `date` es un **día
+ * declarado** (medianoche), que no se puede comparar contra un instante. El corte
+ * mide cuándo entró la plata a la caja, o sea `createdAt` (bug de producción del
+ * 2026-10-23: un egreso cargado después del cierre con la fecha del día anterior
+ * quedaba fuera del corte y del tablero).
+ *
+ * Se aplica solo en el período «desde el último cierre»: 7/30/90/personalizado
+ * muestran todo lo que cae en el rango (pedido del usuario).
  */
-export async function pisoDeCaja(branchId?: number) {
+export async function pisosDeCaja(branchId?: number) {
   const cierres = await ultimosCierres(branchId);
 
-  if (cierres.length === 0) return {};
+  if (cierres.length === 0) return { porFecha: {}, porCarga: {} };
 
   const conCierre = cierres.map((c) => c.branchId);
+  const sinCierre = { branchId: { notIn: conCierre } };
+
   return {
-    OR: [
-      ...cierres.map((c) => ({ branchId: c.branchId, date: { gt: c.closedAt } })),
-      { branchId: { notIn: conCierre } },
-    ],
+    porFecha: {
+      OR: [
+        ...cierres.map((c) => ({ branchId: c.branchId, date: { gt: c.closedAt } })),
+        sinCierre,
+      ],
+    },
+    porCarga: {
+      OR: [
+        ...cierres.map((c) => ({ branchId: c.branchId, createdAt: { gt: c.closedAt } })),
+        sinCierre,
+      ],
+    },
   };
 }
 

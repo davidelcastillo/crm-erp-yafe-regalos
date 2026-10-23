@@ -186,6 +186,8 @@ describe('cierre de caja (integración, base local)', () => {
         method: 'EFECTIVO',
         amount: INGRESO_ANTERIOR,
         date: new Date(closedAt.getTime() - 60_000),
+        // Cargado antes del corte: es plata de la caja ya cerrada.
+        createdAt: new Date(closedAt.getTime() - 60_000),
         performedBy: ACTOR,
       },
     })
@@ -294,7 +296,8 @@ describe('cierre de caja con movimientos (integración, base local)', () => {
     type: 'INGRESO' | 'EGRESO',
     method: 'EFECTIVO' | 'TRANSFERENCIA' | 'MIXTO',
     amount: number,
-    date?: Date
+    date?: Date,
+    createdAt?: Date
   ) =>
     prisma.cashMovement.create({
       data: {
@@ -304,6 +307,7 @@ describe('cierre de caja con movimientos (integración, base local)', () => {
         amount,
         performedBy: ACTOR_MOV,
         ...(date ? { date } : {}),
+        ...(createdAt ? { createdAt } : {}),
       },
     })
 
@@ -439,25 +443,27 @@ describe('cierre de caja con movimientos (integración, base local)', () => {
     )
   })
 
-  it('(e) la ventana es la de las ventas: el movimiento anterior al cierre no cuenta', async () => {
+  it('(e) la ventana mide cuándo entró la plata: lo cargado antes del corte no cuenta', async () => {
     const corte = await prisma.cashClose.findFirstOrThrow({
       where: { branchId: branchMovId },
       orderBy: { closedAt: 'desc' },
     })
 
-    // Anterior al corte: ya se firmó en el cierre anterior, no vuelve a entrar.
+    // Cargado antes del corte: ya se firmó en el cierre anterior, no vuelve a entrar.
     await crearMovimiento(
       'INGRESO',
       'EFECTIVO',
       999,
+      new Date(corte.closedAt.getTime() - 60_000),
       new Date(corte.closedAt.getTime() - 60_000)
     )
-    // Posterior: entra una sola vez; el próximo cierre mueve el piso.
+    // Cargado después del corte con la fecha del día anterior (el caso de
+    // producción): la plata entró a la caja después del cierre, así que cuenta.
     await crearMovimiento(
       'INGRESO',
       'EFECTIVO',
       30,
-      new Date(corte.closedAt.getTime() + 60_000)
+      new Date(corte.closedAt.getTime() - 86_400_000)
     )
 
     const resultado = await getCashClosePreview({ branchId: branchMovId })
@@ -474,5 +480,28 @@ describe('cierre de caja con movimientos (integración, base local)', () => {
         efectivo: { ventas: 0, ingresos: 30, egresos: 0, total: 30 },
       },
     })
+  })
+
+  it('(f) el tablero cuenta el movimiento con fecha anterior cargado después del cierre', async () => {
+    const tarjetasAntes = await getStats({ type: 'cierre', branchId: branchMovId })
+    if (!tarjetasAntes.success) throw new Error(tarjetasAntes.error)
+    const graficoAntes = await getPerformanceData({ type: 'cierre', branchId: branchMovId })
+    if (!graficoAntes.success) throw new Error(graficoAntes.error)
+
+    const sumaEgresos = (dias: { expense: number }[]) =>
+      dias.reduce((acc, dia) => acc + dia.expense, 0)
+
+    // Mismo caso que el corte: fecha declarada de días atrás, carga de ahora.
+    await crearMovimiento('EGRESO', 'EFECTIVO', 12, new Date(Date.now() - 3 * 86_400_000))
+
+    const tarjetasDespues = await getStats({ type: 'cierre', branchId: branchMovId })
+    if (!tarjetasDespues.success) throw new Error(tarjetasDespues.error)
+    expect(tarjetasDespues.data!.totalExpense - tarjetasAntes.data!.totalExpense).toBe(12)
+
+    // El gráfico sigue el mismo criterio que las tarjetas (S18): la plata se
+    // ubica el día en que se cargó, que es el que muestra el eje del cierre.
+    const graficoDespues = await getPerformanceData({ type: 'cierre', branchId: branchMovId })
+    if (!graficoDespues.success) throw new Error(graficoDespues.error)
+    expect(sumaEgresos(graficoDespues.data!) - sumaEgresos(graficoAntes.data!)).toBe(12)
   })
 })

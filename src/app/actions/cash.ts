@@ -153,7 +153,9 @@ const totalesDeCaja = async (db: Prisma.TransactionClient, branchId: number) => 
       by: ["type", "method"],
       where: {
         branchId,
-        ...(ultimoCierre ? { date: { gt: ultimoCierre.closedAt } } : {}),
+        // `date` es el día declarado del movimiento, no un instante: la ventana
+        // del corte mide cuándo entró la plata a la caja.
+        ...(ultimoCierre ? { createdAt: { gt: ultimoCierre.closedAt } } : {}),
       },
       _sum: { amount: true },
     }),
