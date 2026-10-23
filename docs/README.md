@@ -11,6 +11,7 @@ El trabajo nuevo usa **ODD**, con preguntas de alcance por bug antes de implemen
    - [Catálogo público de sucursal](portal-externo-sucursal.md).
    - [Exportar inventario a PDF](exportar-inventario-pdf.md).
    - [Caja y cierre de caja](caja-y-cierre.md).
+   - [Plan del producto base reutilizable](base-reutilizable.md) (preparación, repositorios y piloto VPS; no implementado).
 4. [Estilo visual](../STYLE.md) para UI/CSS.
 
 ## Actual frente a histórico
