@@ -209,12 +209,14 @@ describe('cierre de caja (integración, base local)', () => {
 
     const preview = await getCashClosePreview({ branchId })
     if (!preview.success) throw new Error(preview.error)
+    // El ingreso posterior al cierre también entra al corte nuevo (S1/S2): el
+    // movimiento viejo queda afuera, el nuevo suma en su medio.
     expect(preview.data).toMatchObject({
       since: closedAt.toISOString(),
-      cashTotal: VENTA_NUEVA,
+      cashTotal: VENTA_NUEVA + INGRESO_POSTERIOR,
       transferTotal: 0,
       mixedTotal: 0,
-      total: VENTA_NUEVA,
+      total: VENTA_NUEVA + INGRESO_POSTERIOR,
       salesCount: 1,
     })
 
@@ -249,5 +251,228 @@ describe('cierre de caja (integración, base local)', () => {
     expect(
       await prisma.cashClose.count({ where: { branchId: branchInactivaId } })
     ).toBe(0)
+  })
+})
+
+/**
+ * Los movimientos de caja entran al corte (S1/S2): cada uno suma o resta en su
+ * medio, dentro de la misma ventana que las ventas (S4), sin recortar los
+ * negativos (S5) y plegados en las columnas que ya existen (S6).
+ */
+describe('cierre de caja con movimientos (integración, base local)', () => {
+  const sufijoMov = Math.floor(1000 + Math.random() * 9000)
+  const NOMBRE_MOV = `QA movimientos ${sufijoMov}`
+  const ACTOR_MOV = `qa-movimientos-${sufijoMov}@local`
+
+  let branchMovId = 0
+  let productoMovId = 0
+  const ventasMovIds: number[] = []
+
+  const crearVentaMov = (
+    totalAmount: number,
+    paymentMethod: 'EFECTIVO' | 'TRANSFERENCIA' | 'MIXTO'
+  ) =>
+    prisma.sale.create({
+      data: {
+        branchId: branchMovId,
+        totalAmount,
+        paymentMethod,
+        items: {
+          create: [
+            {
+              productId: productoMovId,
+              price: totalAmount,
+              quantity: 1,
+              subtotal: totalAmount,
+            },
+          ],
+        },
+      },
+    })
+
+  const crearMovimiento = (
+    type: 'INGRESO' | 'EGRESO',
+    method: 'EFECTIVO' | 'TRANSFERENCIA' | 'MIXTO',
+    amount: number,
+    date?: Date
+  ) =>
+    prisma.cashMovement.create({
+      data: {
+        branchId: branchMovId,
+        type,
+        method,
+        amount,
+        performedBy: ACTOR_MOV,
+        ...(date ? { date } : {}),
+      },
+    })
+
+  beforeAll(async () => {
+    const branch = await prisma.branch.create({
+      data: {
+        name: NOMBRE_MOV,
+        code: `QM${sufijoMov}`,
+        authUserId: `qa-movimientos-${sufijoMov}`,
+      },
+    })
+    branchMovId = branch.id
+
+    const producto = await prisma.product.create({
+      data: {
+        name: `QA movimientos producto ${sufijoMov}`,
+        code: `QM${sufijoMov}-1`,
+        price: 1,
+      },
+    })
+    productoMovId = producto.id
+
+    const ventas = await Promise.all([
+      crearVentaMov(EFECTIVO, 'EFECTIVO'),
+      crearVentaMov(TRANSFERENCIA, 'TRANSFERENCIA'),
+      crearVentaMov(MIXTO, 'MIXTO'),
+    ])
+    ventasMovIds.push(...ventas.map((v) => v.id))
+  })
+
+  afterAll(async () => {
+    await prisma.cashClose.deleteMany({ where: { branchId: branchMovId } })
+    await prisma.cashMovement.deleteMany({ where: { branchId: branchMovId } })
+    await prisma.saleItem.deleteMany({ where: { saleId: { in: ventasMovIds } } })
+    await prisma.sale.deleteMany({ where: { branchId: branchMovId } })
+    await prisma.product.deleteMany({ where: { id: productoMovId } })
+    await prisma.branch.deleteMany({ where: { id: branchMovId } })
+  })
+
+  it('(a) sin movimientos el corte queda igual que antes: solo ventas', async () => {
+    const resultado = await getCashClosePreview({ branchId: branchMovId })
+    if (!resultado.success) throw new Error(resultado.error)
+
+    expect(resultado.data).toMatchObject({
+      since: null,
+      cashTotal: EFECTIVO,
+      transferTotal: TRANSFERENCIA,
+      mixedTotal: MIXTO,
+      total: EFECTIVO + TRANSFERENCIA + MIXTO,
+      salesCount: 3,
+      desglose: {
+        efectivo: { ventas: EFECTIVO, ingresos: 0, egresos: 0, total: EFECTIVO },
+        transferencia: {
+          ventas: TRANSFERENCIA,
+          ingresos: 0,
+          egresos: 0,
+          total: TRANSFERENCIA,
+        },
+        mixto: { ventas: MIXTO, ingresos: 0, egresos: 0, total: MIXTO },
+      },
+    })
+  })
+
+  it('(b) un ingreso suma y un egreso resta en su propio medio', async () => {
+    await crearMovimiento('INGRESO', 'EFECTIVO', 40)
+    await crearMovimiento('EGRESO', 'EFECTIVO', 15)
+
+    const resultado = await getCashClosePreview({ branchId: branchMovId })
+    if (!resultado.success) throw new Error(resultado.error)
+
+    // El efectivo mezcla los dos movimientos; los otros medios no se mueven.
+    expect(resultado.data).toMatchObject({
+      cashTotal: EFECTIVO + 40 - 15,
+      transferTotal: TRANSFERENCIA,
+      mixedTotal: MIXTO,
+      total: EFECTIVO + 40 - 15 + TRANSFERENCIA + MIXTO,
+      salesCount: 3,
+      desglose: {
+        efectivo: { ventas: EFECTIVO, ingresos: 40, egresos: 15, total: EFECTIVO + 40 - 15 },
+      },
+    })
+  })
+
+  it('(c) un ingreso por transferencia sube la transferencia a verificar', async () => {
+    await crearMovimiento('INGRESO', 'TRANSFERENCIA', 20)
+
+    const resultado = await getCashClosePreview({ branchId: branchMovId })
+    if (!resultado.success) throw new Error(resultado.error)
+
+    expect(resultado.data).toMatchObject({
+      cashTotal: EFECTIVO + 40 - 15,
+      transferTotal: TRANSFERENCIA + 20,
+      mixedTotal: MIXTO,
+      desglose: {
+        transferencia: {
+          ventas: TRANSFERENCIA,
+          ingresos: 20,
+          egresos: 0,
+          total: TRANSFERENCIA + 20,
+        },
+      },
+    })
+  })
+
+  it('(d) un egreso puede dejar el medio en negativo y el corte lo persiste plegado', async () => {
+    await crearMovimiento('EGRESO', 'EFECTIVO', 200)
+    // El tercer medio también tiene su línea: se pliega en `mixedTotal`.
+    await crearMovimiento('INGRESO', 'MIXTO', 5)
+
+    const preview = await getCashClosePreview({ branchId: branchMovId })
+    if (!preview.success) throw new Error(preview.error)
+
+    // S5: la caja quedó corta y el número lo dice; no se recorta a 0.
+    expect(preview.data).toMatchObject({
+      cashTotal: EFECTIVO + 40 - 15 - 200,
+      mixedTotal: MIXTO + 5,
+      total: EFECTIVO + 40 - 15 - 200 + TRANSFERENCIA + 20 + MIXTO + 5,
+    })
+    expect(preview.data!.cashTotal).toBeLessThan(0)
+
+    // S6: sin migración, los movimientos se pliegan en las columnas del corte.
+    const cierre = await closeCash({ branchId: branchMovId, performedBy: ACTOR_MOV })
+    if (!cierre.success) throw new Error(cierre.error)
+
+    const fila = await prisma.cashClose.findUniqueOrThrow({
+      where: { id: cierre.data!.id },
+    })
+    expect(Number(fila.cashTotal)).toBe(EFECTIVO + 40 - 15 - 200)
+    expect(Number(fila.transferTotal)).toBe(TRANSFERENCIA + 20)
+    expect(Number(fila.mixedTotal)).toBe(MIXTO + 5)
+    expect(Number(fila.total)).toBe(
+      EFECTIVO + 40 - 15 - 200 + TRANSFERENCIA + 20 + MIXTO + 5
+    )
+  })
+
+  it('(e) la ventana es la de las ventas: el movimiento anterior al cierre no cuenta', async () => {
+    const corte = await prisma.cashClose.findFirstOrThrow({
+      where: { branchId: branchMovId },
+      orderBy: { closedAt: 'desc' },
+    })
+
+    // Anterior al corte: ya se firmó en el cierre anterior, no vuelve a entrar.
+    await crearMovimiento(
+      'INGRESO',
+      'EFECTIVO',
+      999,
+      new Date(corte.closedAt.getTime() - 60_000)
+    )
+    // Posterior: entra una sola vez; el próximo cierre mueve el piso.
+    await crearMovimiento(
+      'INGRESO',
+      'EFECTIVO',
+      30,
+      new Date(corte.closedAt.getTime() + 60_000)
+    )
+
+    const resultado = await getCashClosePreview({ branchId: branchMovId })
+    if (!resultado.success) throw new Error(resultado.error)
+
+    expect(resultado.data).toMatchObject({
+      since: corte.closedAt.toISOString(),
+      cashTotal: 30,
+      transferTotal: 0,
+      mixedTotal: 0,
+      total: 30,
+      salesCount: 0,
+      desglose: {
+        efectivo: { ventas: 0, ingresos: 30, egresos: 0, total: 30 },
+      },
+    })
   })
 })

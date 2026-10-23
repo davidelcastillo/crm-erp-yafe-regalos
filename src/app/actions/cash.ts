@@ -122,9 +122,15 @@ export async function getCashMovements(filters?: unknown) {
 }
 
 /**
- * Totales de la **caja abierta** de una sucursal: las ventas posteriores a su
- * último cierre, separadas por método de pago. `MIXTO` va en su propia línea
- * porque la venta no guarda cuánto fue efectivo y cuánto transferencia.
+ * Totales de la **caja abierta** de una sucursal: las ventas **y los
+ * movimientos de caja** posteriores a su último cierre, separados por método de
+ * pago. `MIXTO` va en su propia línea porque la venta no guarda cuánto fue
+ * efectivo y cuánto transferencia.
+ *
+ * Los movimientos entran en su propio medio y pueden restar (S1/S2): así se
+ * corrige un error de carga de una venta sin tocar la venta. La ventana es la
+ * misma que la de las ventas (S4), y el total de un medio no se recorta a 0 si
+ * un egreso lo deja corto (S5): la caja corta tiene que verse.
  */
 const totalesDeCaja = async (db: Prisma.TransactionClient, branchId: number) => {
   const ultimoCierre = await db.cashClose.findFirst({
@@ -132,30 +138,61 @@ const totalesDeCaja = async (db: Prisma.TransactionClient, branchId: number) => 
     orderBy: { closedAt: "desc" },
   });
 
-  const ventas = await db.sale.groupBy({
-    by: ["paymentMethod"],
-    where: {
-      branchId,
-      ...(ultimoCierre ? { date: { gt: ultimoCierre.closedAt } } : {}),
-    },
-    _sum: { totalAmount: true },
-    _count: true,
-  });
+  // Ventas y movimientos no dependen entre sí: se leen en paralelo.
+  const [ventas, movimientos] = await Promise.all([
+    db.sale.groupBy({
+      by: ["paymentMethod"],
+      where: {
+        branchId,
+        ...(ultimoCierre ? { date: { gt: ultimoCierre.closedAt } } : {}),
+      },
+      _sum: { totalAmount: true },
+      _count: true,
+    }),
+    db.cashMovement.groupBy({
+      by: ["type", "method"],
+      where: {
+        branchId,
+        ...(ultimoCierre ? { date: { gt: ultimoCierre.closedAt } } : {}),
+      },
+      _sum: { amount: true },
+    }),
+  ]);
 
-  const porMetodo = (metodo: "EFECTIVO" | "TRANSFERENCIA" | "MIXTO") =>
-    Number(ventas.find((v) => v.paymentMethod === metodo)?._sum.totalAmount ?? 0);
+  // Cada medio muestra de dónde sale su total: ventas + ingresos − egresos (S3).
+  const porMetodo = (metodo: "EFECTIVO" | "TRANSFERENCIA" | "MIXTO") => {
+    const ventasDelMetodo = Number(
+      ventas.find((v) => v.paymentMethod === metodo)?._sum.totalAmount ?? 0
+    );
+    const sumarMovimientos = (tipo: "INGRESO" | "EGRESO") =>
+      Number(
+        movimientos.find((m) => m.method === metodo && m.type === tipo)?._sum
+          .amount ?? 0
+      );
 
-  const cashTotal = porMetodo("EFECTIVO");
-  const transferTotal = porMetodo("TRANSFERENCIA");
-  const mixedTotal = porMetodo("MIXTO");
+    const ingresos = sumarMovimientos("INGRESO");
+    const egresos = sumarMovimientos("EGRESO");
+
+    return {
+      ventas: ventasDelMetodo,
+      ingresos,
+      egresos,
+      total: ventasDelMetodo + ingresos - egresos,
+    };
+  };
+
+  const efectivo = porMetodo("EFECTIVO");
+  const transferencia = porMetodo("TRANSFERENCIA");
+  const mixto = porMetodo("MIXTO");
 
   return {
     since: ultimoCierre?.closedAt ?? null,
-    cashTotal,
-    transferTotal,
-    mixedTotal,
-    total: cashTotal + transferTotal + mixedTotal,
+    cashTotal: efectivo.total,
+    transferTotal: transferencia.total,
+    mixedTotal: mixto.total,
+    total: efectivo.total + transferencia.total + mixto.total,
     salesCount: ventas.reduce((acc, v) => acc + v._count, 0),
+    desglose: { efectivo, transferencia, mixto },
   };
 };
 
@@ -187,6 +224,7 @@ export async function getCashClosePreview(data: unknown) {
         mixedTotal: totales.mixedTotal,
         total: totales.total,
         salesCount: totales.salesCount,
+        desglose: totales.desglose,
       },
     };
   } catch (error) {
@@ -230,6 +268,8 @@ export async function closeCash(data: unknown) {
         data: {
           branchId: validado.branchId,
           closedBy: validado.performedBy,
+          // Los movimientos se pliegan en estas columnas: el corte firmado
+          // guarda el número final, sin migración ni recálculo (S6).
           cashTotal: totales.cashTotal,
           transferTotal: totales.transferTotal,
           mixedTotal: totales.mixedTotal,

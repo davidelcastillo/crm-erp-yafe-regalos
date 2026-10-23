@@ -7,6 +7,10 @@
  * resumen de la caja abierta —efectivo a retirar, transferencia a verificar y el
  * mixto con su aclaración— y confirma el corte con el actor de la sesión.
  * Los métodos con total 0 no se muestran (S9).
+ *
+ * Cada medio trae su desglose «ventas + ingresos − egresos» (S3): el corte suma
+ * y resta los movimientos de caja, y un egreso puede dejar el medio en negativo
+ * (S5).
  */
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { CashCloseModal } from "./CashCloseModal";
@@ -44,6 +48,11 @@ const resumen = {
   mixedTotal: 0,
   total: 1550,
   salesCount: 7,
+  desglose: {
+    efectivo: { ventas: 1000, ingresos: 250, egresos: 50, total: 1200 },
+    transferencia: { ventas: 400, ingresos: 0, egresos: 50, total: 350 },
+    mixto: { ventas: 0, ingresos: 0, egresos: 0, total: 0 },
+  },
 };
 
 const onConfirm = jest.fn();
@@ -89,6 +98,52 @@ describe("CashCloseModal", () => {
     expect(screen.getAllByText("$350.00")).toHaveLength(2);
     expect(screen.getByText("$1550.00")).toBeInTheDocument();
     expect(screen.queryByText(/Mixto/)).not.toBeInTheDocument();
+  });
+
+  it("cada medio muestra de dónde sale su total: ventas + ingresos − egresos", async () => {
+    renderModal();
+
+    fireEvent.click(screen.getByRole("button", { name: "Principal" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
+
+    expect(
+      await screen.findByText("Ventas $1000.00 + ingresos $250.00 − egresos $50.00")
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Ventas $400.00 + ingresos $0.00 − egresos $50.00")
+    ).toBeInTheDocument();
+    // El total del corte ya no es solo de ventas: incluye los movimientos.
+    expect(screen.getByText("Total del corte")).toBeInTheDocument();
+  });
+
+  it("no esconde un medio en negativo: la caja corta se ve", async () => {
+    mockPreview.mockResolvedValue({
+      success: true,
+      data: {
+        ...resumen,
+        cashTotal: -75,
+        transferTotal: 0,
+        mixedTotal: 0,
+        total: -75,
+        desglose: {
+          efectivo: { ventas: 100, ingresos: 40, egresos: 215, total: -75 },
+          transferencia: { ventas: 0, ingresos: 0, egresos: 0, total: 0 },
+          mixto: { ventas: 0, ingresos: 0, egresos: 0, total: 0 },
+        },
+      },
+    } as never);
+
+    renderModal();
+
+    fireEvent.click(screen.getByRole("button", { name: "Principal" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
+
+    expect(
+      await screen.findByText("Ventas $100.00 + ingresos $40.00 − egresos $215.00")
+    ).toBeInTheDocument();
+    // El menos va adelante del símbolo, y el negativo no se recorta a 0: aparece
+    // en el detalle, en el total del corte y en el número grande de «A retirar».
+    expect(screen.getAllByText("-$75.00")).toHaveLength(3);
   });
 
   it("cierra la caja con la sucursal y el email del usuario, y avisa al listado", async () => {

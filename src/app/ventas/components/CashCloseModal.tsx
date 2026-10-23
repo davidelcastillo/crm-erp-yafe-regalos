@@ -12,6 +12,10 @@ import { BranchPicker } from "@/components/ui/BranchPicker";
  * guarda el corte. Los métodos con total 0 no se muestran, porque no hay nada
  * que retirar ni verificar (S9). No toca stock: ordena la plata.
  *
+ * Cada medio muestra su desglose «ventas + ingresos − egresos» (S3), porque el
+ * corte suma y resta los movimientos de caja del período. Un egreso puede dejar
+ * el medio en negativo y se muestra así: la caja quedó corta (S5).
+ *
  * Es hermana de `CashMovementsModal` (el libro de plata de la misma sucursal).
  */
 export interface CashCloseModalProps {
@@ -21,6 +25,13 @@ export interface CashCloseModalProps {
   onConfirm: () => void;
 }
 
+type Desglose = {
+  ventas: number;
+  ingresos: number;
+  egresos: number;
+  total: number;
+};
+
 type Resumen = {
   branchName: string;
   since: string | null;
@@ -29,9 +40,16 @@ type Resumen = {
   mixedTotal: number;
   total: number;
   salesCount: number;
+  desglose: { efectivo: Desglose; transferencia: Desglose; mixto: Desglose };
 };
 
-const plata = (monto: number) => `$${monto.toFixed(2)}`;
+// El menos va adelante del símbolo: `-$75.00`, no `$-75.00`.
+const plata = (monto: number) =>
+  `${monto < 0 ? "-" : ""}$${Math.abs(monto).toFixed(2)}`;
+
+/** De dónde sale el total del medio: es lo que cierra contra el listado (S3). */
+const desgloseTexto = (d: Desglose) =>
+  `Ventas ${plata(d.ventas)} + ingresos ${plata(d.ingresos)} − egresos ${plata(d.egresos)}`;
 
 const fechaCierre = (iso: string) => {
   const [fecha, hora] = iso.split("T");
@@ -96,8 +114,6 @@ export const CashCloseModal = ({
         text: `Se guardó el corte de ${resumen?.branchName ?? "la sucursal"} por ${plata(resumen?.total ?? 0)}`,
         icon: "success",
         confirmButtonColor: "#6d28d9",
-        background: "#ffffff",
-        color: "#222222",
       });
       reset();
       onConfirm();
@@ -200,28 +216,43 @@ export const CashCloseModal = ({
                 </h3>
 
                 <dl className="mt-3 space-y-2">
-                  {resumen.cashTotal > 0 && (
+                  {/* 0 = no hay nada que retirar ni verificar; un negativo sí se
+                      muestra (S5). */}
+                  {resumen.cashTotal !== 0 && (
                     <div className="flex items-baseline justify-between gap-4">
-                      <dt className="text-sm text-ink-body">Efectivo</dt>
+                      <dt className="text-sm text-ink-body">
+                        Efectivo
+                        <span className="block text-xs text-ink-muted">
+                          {desgloseTexto(resumen.desglose.efectivo)}
+                        </span>
+                      </dt>
                       <dd className="text-sm font-semibold text-ink tabular-nums">
                         {plata(resumen.cashTotal)}
                       </dd>
                     </div>
                   )}
 
-                  {resumen.transferTotal > 0 && (
+                  {resumen.transferTotal !== 0 && (
                     <div className="flex items-baseline justify-between gap-4">
-                      <dt className="text-sm text-ink-body">Transferencia</dt>
+                      <dt className="text-sm text-ink-body">
+                        Transferencia
+                        <span className="block text-xs text-ink-muted">
+                          {desgloseTexto(resumen.desglose.transferencia)}
+                        </span>
+                      </dt>
                       <dd className="text-sm font-semibold text-ink tabular-nums">
                         {plata(resumen.transferTotal)}
                       </dd>
                     </div>
                   )}
 
-                  {resumen.mixedTotal > 0 && (
+                  {resumen.mixedTotal !== 0 && (
                     <div className="flex items-baseline justify-between gap-4">
                       <dt className="text-sm text-ink-body">
                         Mixto
+                        <span className="block text-xs text-ink-muted">
+                          {desgloseTexto(resumen.desglose.mixto)}
+                        </span>
                         <span className="block text-xs text-ink-muted">
                           La venta no guarda cuánto fue de cada medio: verificá ese total aparte.
                         </span>
@@ -234,7 +265,7 @@ export const CashCloseModal = ({
                 </dl>
 
                 <div className="mt-3 flex items-baseline justify-between gap-4 border-t border-hairline pt-3">
-                  <span className="text-sm font-medium text-ink">Total de ventas</span>
+                  <span className="text-sm font-medium text-ink">Total del corte</span>
                   <span className="text-base font-semibold text-ink tabular-nums">
                     {plata(resumen.total)}
                   </span>

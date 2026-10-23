@@ -14,12 +14,14 @@ Dos cosas distintas, y conviene no mezclarlas: la **plata que entra o sale sin s
 ## Cierre de caja
 
 - Dónde: `/ventas`, botón **Cerrar caja**. Pide primero la sucursal y después calcula el corte de esa sucursal desde su último cierre.
-- Qué muestra: el total en **efectivo** (lo que se retira), el total en **transferencia** (lo que se verifica) y el total en **mixto** aparte — una venta mixta no guarda cuánto fue de cada medio. Los métodos sin ventas no se muestran.
-- Qué hace al confirmar: guarda el corte. Desde ahí:
+- Qué muestra: el total en **efectivo** (lo que se retira), el total en **transferencia** (lo que se verifica) y el total en **mixto** aparte — una venta mixta no guarda cuánto fue de cada medio. Cada línea abre su desglose «ventas X + ingresos Y − egresos Z», para que el número cierre contra el listado. Los medios con total 0 no se muestran; uno en **negativo** sí, porque la caja quedó corta y el número tiene que decirlo.
+- Qué suma: las **ventas** y los **movimientos de caja** de la sucursal posteriores a su último cierre, **cada uno en su medio** (un ingreso suma al efectivo, a la transferencia o al mixto; un egreso resta). Sirve como corrección cuando una venta se cargó mal, sin tocar la venta.
+- La **ventana** es la misma que la de las ventas: un movimiento con fecha anterior al último cierre no entra, y uno posterior entra una sola vez (el siguiente cierre mueve el piso).
+- Qué hace al confirmar: guarda el corte, con los movimientos ya sumados y restados en sus columnas. Los cortes ya guardados **no se recalculan**: quedan como se firmaron. Desde ahí:
   - los **indicadores** del dashboard arrancan de cero: las ventas y la plata anteriores a ese cierre dejan de contar;
   - en el **listado de ventas**, las ventas de la caja anterior se ven con el fondo oscurecido y el rótulo «Caja anterior», y las nuevas quedan en blanco;
   - **nada se borra**: el histórico sigue completo y la caja anterior se reconstruye sumando lo anterior al corte.
-- Qué **no** hace: no toca stock, no cierra la caja de las otras sucursales, no bloquea ventas nuevas y **no** suma los movimientos de caja al total del corte (el corte son ventas por método de pago).
+- Qué **no** hace: no toca stock, no cierra la caja de las otras sucursales, no bloquea ventas nuevas y no abre columnas nuevas: los movimientos de caja quedan plegados en los totales del corte.
 - Las **compras** no son la caja: siguen el período elegido y no se resetean con el cierre.
 
 ## Dónde vive
