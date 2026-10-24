@@ -157,7 +157,7 @@ export async function getStockControl(data: unknown) {
             systemStock: true,
             countedStock: true,
             decision: true,
-            product: { select: { code: true, name: true, price: true } },
+            product: { select: { code: true, name: true, price: true, updatedAt: true } },
           },
         },
       },
@@ -174,6 +174,10 @@ export async function getStockControl(data: unknown) {
         systemStock: item.systemStock,
         countedStock: item.countedStock,
         decision: item.decision,
+        // La lista puede ordenarse por última modificación, como el resto.
+        updatedAt: item.product.updatedAt
+          ? new Date(item.product.updatedAt).toISOString()
+          : null,
       }))
     );
 

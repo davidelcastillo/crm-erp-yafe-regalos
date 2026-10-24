@@ -50,6 +50,8 @@ beforeAll(() => {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  // El orden elegido se recuerda en el navegador: cada caso arranca limpio.
+  window.localStorage.clear();
   descarga = null;
   mockGetBranchProductsForExport.mockResolvedValue({
     success: true,
@@ -198,6 +200,35 @@ describe("LabelSelector — paso 2: productos y cantidades", () => {
     await waitFor(() => {
       expect(descarga).toBe("etiquetas-PR001-20260101.pdf");
     });
+  });
+
+  it("ordena por código y cambia a última modificación desde el control de orden", async () => {
+    mockGetBranchProductsForExport.mockResolvedValue({
+      success: true,
+      data: [
+        { id: 21, code: "AAA001", name: "Viejo", stock: 1, price: 10, updatedAt: "2026-01-01T00:00:00.000Z" },
+        { id: 22, code: "ZZZ999", name: "Nuevo", stock: 1, price: 10, updatedAt: "2026-05-01T00:00:00.000Z" },
+      ],
+    } as never);
+
+    renderWizard();
+    fireEvent.click(screen.getByRole("button", { name: "Principal" }));
+    fireEvent.click(screen.getByRole("button", { name: "Siguiente" }));
+    await screen.findByRole("checkbox", { name: "Seleccionar Viejo" });
+
+    const nombres = () =>
+      screen
+        .getAllByRole("checkbox", { name: /^Seleccionar / })
+        .map((checkbox) => checkbox.getAttribute("aria-label"));
+
+    // Arranca por código: AAA001 antes que ZZZ999.
+    expect(nombres()).toEqual(["Seleccionar Viejo", "Seleccionar Nuevo"]);
+    expect(screen.getByRole("group", { name: "Ordenar por" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Última modificación" }));
+
+    // La modificación más nueva primero.
+    expect(nombres()).toEqual(["Seleccionar Nuevo", "Seleccionar Viejo"]);
   });
 
   it("muestra el error de la acción sin perder la selección", async () => {

@@ -12,6 +12,9 @@ import {
 import { getBranchOptions } from "@/app/actions/branch";
 import { BranchPicker } from "@/components/ui/BranchPicker";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { ProductSortToggle } from "@/components/ui/ProductSortToggle";
+import { useProductSortMode } from "@/lib/hooks/useProductSortMode";
+import { sortProducts } from "@/lib/product-order";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { Spinner } from "@/components/ui/Spinner";
 import { ValueChange } from "@/components/ui/ValueChange";
@@ -39,6 +42,7 @@ type ControlItem = {
   systemStock: number;
   countedStock: number;
   decision: StockControlDecision;
+  updatedAt?: string | null;
 };
 
 type Control = {
@@ -81,6 +85,13 @@ export default function ControlStockPage() {
   const [cerrando, setCerrando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cierre, setCierre] = useState<StockControlReceipt | null>(null);
+  // Mismo control y misma memoria que el resto de las listas de productos.
+  const [sortMode, setSortMode] = useProductSortMode();
+
+  const itemsOrdenados = useMemo(
+    () => sortProducts(control?.items ?? [], sortMode),
+    [control, sortMode]
+  );
 
   // El encabezado se mueve solo y el degradé de marca se retira al hacer scroll
   // (S10, S11). Con movimiento reducido queda quieto.
@@ -439,8 +450,12 @@ export default function ControlStockPage() {
                 </section>
               )}
 
+              <div className="mt-4 flex justify-center">
+                <ProductSortToggle value={sortMode} onChange={setSortMode} />
+              </div>
+
               <ul className="mt-4 space-y-2">
-                {control.items.map((item) => {
+                {itemsOrdenados.map((item) => {
                   const diferencia = item.countedStock - item.systemStock;
                   return (
                     <li key={item.productId} className="rounded-2xl border border-hairline bg-surface p-3">

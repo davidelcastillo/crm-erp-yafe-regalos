@@ -5,7 +5,10 @@ import { getBranchProductsForExport, type ExportProductRow } from "@/app/actions
 import { generateProductLabels } from "@/actions/label-print";
 import { calculateSheetCount } from "@/lib/label-layout";
 import { BranchPicker } from "@/components/ui/BranchPicker";
+import { ProductSortToggle } from "@/components/ui/ProductSortToggle";
 import { Spinner } from "@/components/ui/Spinner";
+import { useProductSortMode } from "@/lib/hooks/useProductSortMode";
+import { sortProducts } from "@/lib/product-order";
 
 type BranchOption = { id: number; name: string };
 type Step = 1 | 2;
@@ -36,6 +39,8 @@ export function LabelSelector({ isOpen, onClose, branches }: LabelSelectorProps)
   const [quantities, setQuantities] = useState<Record<number, string>>({});
   const [generating, setGenerating] = useState(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
+  // Mismo control y misma memoria que el resto de las listas de productos.
+  const [sortMode, setSortMode] = useProductSortMode();
 
   const cargarProductos = async (branch: number) => {
     setLoading(true);
@@ -77,13 +82,15 @@ export function LabelSelector({ isOpen, onClose, branches }: LabelSelectorProps)
 
   const visibles = useMemo(() => {
     const texto = search.trim().toLowerCase();
-    if (!texto) return rows;
-    return rows.filter(
-      (row) =>
-        row.name.toLowerCase().includes(texto) ||
-        row.code.toLowerCase().includes(texto)
-    );
-  }, [rows, search]);
+    const filtradas = texto
+      ? rows.filter(
+          (row) =>
+            row.name.toLowerCase().includes(texto) ||
+            row.code.toLowerCase().includes(texto)
+        )
+      : rows;
+    return sortProducts(filtradas, sortMode);
+  }, [rows, search, sortMode]);
 
   const allSelected = rows.length > 0 && selectedIds.length === rows.length;
 
@@ -231,6 +238,10 @@ export function LabelSelector({ isOpen, onClose, branches }: LabelSelectorProps)
                 aria-label="Buscar producto"
                 className="w-full px-3 py-3 mb-3 min-h-[48px] rounded-xl border border-hairline focus:border-accent focus:ring-2 focus:ring-accent/30 outline-none transition-all text-sm touch-manipulation"
               />
+
+              <div className="flex justify-center mb-3">
+                <ProductSortToggle value={sortMode} onChange={setSortMode} />
+              </div>
 
               {loading && <Spinner label="Cargando productos..." />}
 

@@ -201,14 +201,24 @@ describe("getStockControl", () => {
           systemStock: 3,
           countedStock: 1,
           decision: "PENDING",
-          product: { code: "AAA002", name: "Fideos", price: "10.5" },
+          product: {
+            code: "AAA002",
+            name: "Fideos",
+            price: "10.5",
+            updatedAt: new Date("2026-03-02T00:00:00.000Z"),
+          },
         },
         {
           productId: 11,
           systemStock: 4,
           countedStock: 4,
           decision: "ACCEPTED",
-          product: { code: "AAA001", name: "Arroz", price: "7" },
+          product: {
+            code: "AAA001",
+            name: "Arroz",
+            price: "7",
+            updatedAt: new Date("2026-03-01T00:00:00.000Z"),
+          },
         },
       ],
     });
@@ -236,6 +246,8 @@ describe("getStockControl", () => {
           systemStock: 4,
           countedStock: 4,
           decision: "ACCEPTED",
+          // La lista también se puede ordenar por última modificación.
+          updatedAt: "2026-03-01T00:00:00.000Z",
         },
         {
           productId: 12,
@@ -245,6 +257,7 @@ describe("getStockControl", () => {
           systemStock: 3,
           countedStock: 1,
           decision: "PENDING",
+          updatedAt: "2026-03-02T00:00:00.000Z",
         },
       ],
     });

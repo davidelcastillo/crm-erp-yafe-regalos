@@ -72,6 +72,7 @@ export async function getBranchInventory(data: unknown) {
         name: true,
         code: true,
         active: true,
+        updatedAt: true,
         inventory: {
           where: {
             branchId,
@@ -92,6 +93,7 @@ export async function getBranchInventory(data: unknown) {
         code: p.code,
         stock: p.inventory[0]?.stock ?? 0,
         active: p.active,
+        updatedAt: p.updatedAt.toISOString(),
       }))
     );
     return { success: true, data: parseArray(result) };
