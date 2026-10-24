@@ -10,31 +10,52 @@ export function StockMovementReceiptPanel({
   const [error, setError] = useState<string | null>(null);
   const label = { ENTRY: "Ingreso", EXIT: "Egreso", TRANSFER: "Movimiento de sucursal" }[receipt.movementType];
   const isTransfer = receipt.movementType === "TRANSFER";
+  const isEntry = receipt.movementType === "ENTRY";
+  const downloadError = "El movimiento ya se registró, pero no se pudo generar el PDF. Reintentá la descarga sin repetir la operación.";
+
+  /** Único lugar que crea el Blob y el enlace de descarga. */
+  const savePdf = (bytes: Uint8Array, filename: string) => {
+    const url = URL.createObjectURL(new Blob([new Uint8Array(bytes)], { type: "application/pdf" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  };
 
   const download = async (side: StockMovementSide) => {
     setGenerating(true);
     setError(null);
-    let url: string | undefined;
-    let link: HTMLAnchorElement | undefined;
     try {
       const { generateStockMovementPdf } = await import("@/lib/utils/stock-movement-pdf");
-      const bytes = await generateStockMovementPdf(receipt, side);
-      url = URL.createObjectURL(new Blob([new Uint8Array(bytes)], { type: "application/pdf" }));
-      link = document.createElement("a");
-      link.href = url;
       const sanitize = (value: string) => value.replace(/[^a-z0-9_-]/gi, "_");
       const stamp = receipt.date.replace(/[^0-9TZ]/g, "");
       const kind = isTransfer
         ? `traslado-${side === "SOURCE" ? "origen" : "destino"}-${sanitize(side === "SOURCE" ? receipt.sourceBranchCode ?? "" : receipt.branchCode)}`
-        : `${receipt.movementType === "ENTRY" ? "ingreso" : "egreso"}-${sanitize(receipt.branchCode)}`;
-      link.download = `comprobante-${kind}-${stamp}.pdf`;
-      document.body.appendChild(link);
-      link.click();
+        : `${isEntry ? "ingreso" : "egreso"}-${sanitize(receipt.branchCode)}`;
+      savePdf(await generateStockMovementPdf(receipt, side), `comprobante-${kind}-${stamp}.pdf`);
     } catch {
-      setError("El movimiento ya se registró, pero no se pudo generar el PDF. Reintentá la descarga sin repetir la operación.");
+      setError(downloadError);
     } finally {
-      link?.remove();
-      if (url) URL.revokeObjectURL(url);
+      setGenerating(false);
+    }
+  };
+
+  /** S2: el comprobante y las etiquetas de lo ingresado salen en un solo PDF. */
+  const downloadWithLabels = async () => {
+    setGenerating(true);
+    setError(null);
+    try {
+      const { generateEntryReceiptWithLabels } = await import("@/actions/label-print");
+      const result = await generateEntryReceiptWithLabels(receipt);
+      if (!result.success) throw new Error(result.error);
+      const bytes = Uint8Array.from(atob(result.data.pdfBase64), (char) => char.charCodeAt(0));
+      savePdf(bytes, result.data.filename);
+    } catch {
+      setError(downloadError);
+    } finally {
       setGenerating(false);
     }
   };
@@ -62,7 +83,8 @@ export function StockMovementReceiptPanel({
           {isTransfer ? `${receipt.sourceBranchName} → ${receipt.branchName}` : receipt.branchName}
         </p>
         <p className="mt-2 text-sm text-ink-muted">
-          El stock ya se actualizó. Podés descargar el comprobante antes de cerrar.
+          El stock ya se actualizó. Podés descargar el comprobante
+          {isEntry ? ", con o sin las etiquetas de lo ingresado, " : " "}antes de cerrar.
           Descargarlo no vuelve a registrar el movimiento.
         </p>
         {error && <p role="alert" className="mt-4 text-sm text-error">{error}</p>}
@@ -80,10 +102,18 @@ export function StockMovementReceiptPanel({
             </>
           )}
           {!isTransfer && (
-            <button type="button" className="btn btn-primary min-h-12" autoFocus
-              onClick={() => download("DESTINATION")} disabled={generating}>
-              {generating ? "Generando PDF…" : "Descargar comprobante"}
-            </button>
+            <>
+              <button type="button" className="btn btn-primary min-h-12" autoFocus
+                onClick={() => download("DESTINATION")} disabled={generating}>
+                {generating ? "Generando PDF…" : "Descargar comprobante"}
+              </button>
+              {isEntry && (
+                <button type="button" className="btn btn-secondary min-h-12"
+                  onClick={downloadWithLabels} disabled={generating}>
+                  {generating ? "Generando PDF…" : "Comprobante + etiquetas"}
+                </button>
+              )}
+            </>
           )}
           <button type="button" className="btn btn-secondary min-h-12" onClick={onClose} disabled={generating}>
             Cerrar comprobante

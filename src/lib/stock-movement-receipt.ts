@@ -1,6 +1,8 @@
 /** Snapshot de la operación confirmada; descargarlo no vuelve a escribir stock. */
 export interface StockMovementReceipt {
   movementType: "ENTRY" | "EXIT" | "TRANSFER";
+  /** Sucursal del comprobante: con ella se piden las etiquetas de lo ingresado (S1). */
+  branchId: number;
   date: string;
   branchName: string;
   branchCode: string;
@@ -8,6 +10,8 @@ export interface StockMovementReceipt {
   sourceBranchCode?: string;
   reference: string;
   rows: Array<{
+    /** Producto de la fila: las etiquetas se piden por id (S5). */
+    productId: number;
     code: string;
     name: string;
     quantity: number;
