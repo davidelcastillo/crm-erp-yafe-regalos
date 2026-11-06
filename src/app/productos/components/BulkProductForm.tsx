@@ -323,6 +323,7 @@ export function BulkProductForm({ onClose, onSuccess }: BulkProductFormProps) {
                       <button
                         type="button"
                         onClick={() => quitarFila(fila)}
+                        disabled={loading}
                         className="btn btn-icon text-ink-muted hover:bg-surface-strong"
                         aria-label={`Quitar producto ${index + 1}`}
                       >
@@ -439,7 +440,7 @@ export function BulkProductForm({ onClose, onSuccess }: BulkProductFormProps) {
               <button
                 type="button"
                 onClick={agregarFila}
-                disabled={filas.length >= MAX_FILAS}
+                disabled={filas.length >= MAX_FILAS || loading}
                 className="btn btn-secondary w-full"
               >
                 {filas.length >= MAX_FILAS ? "Máximo 50" : "+ Agregar producto"}

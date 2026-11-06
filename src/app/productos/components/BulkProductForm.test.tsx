@@ -6,7 +6,7 @@
  * se quitan, el tope de 50, Enter que no envía, el error por fila con su
  * resumen, y el resultado del envío.
  */
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { BulkProductForm } from "../components/BulkProductForm";
 
 jest.mock("../../actions/product", () => ({
@@ -150,6 +150,33 @@ describe("BulkProductForm", () => {
     fireEvent.keyDown(precios()[0], { key: "Enter" });
     expect(nombres()).toHaveLength(2);
     expect(mockCreateProductsBatch).not.toHaveBeenCalled();
+  });
+
+  it("mientras se envía no se puede agregar ni quitar filas", async () => {
+    renderForm();
+    fireEvent.click(screen.getByRole("button", { name: /agregar producto/i }));
+    llenarFila(0, "Producto uno");
+    llenarFila(1, "Producto dos");
+
+    // Envío en vuelo: la promesa queda pendiente a propósito.
+    let resolver: (valor: unknown) => void = () => {};
+    mockCreateProductsBatch.mockImplementation(
+      () =>
+        new Promise((r) => {
+          resolver = r as (valor: unknown) => void;
+        }) as never,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /crear 2 productos/i }));
+
+    await waitFor(() => expect(screen.getByRole("button", { name: /creando/i })).toBeDisabled());
+    // Quitar una fila en vuelo perdería el error que vuelve del servidor.
+    expect(screen.getByRole("button", { name: /agregar producto/i })).toBeDisabled();
+    expect(screen.getByLabelText("Quitar producto 2")).toBeDisabled();
+
+    await act(async () => {
+      resolver({ success: true, data: { products: [] } });
+    });
   });
 
   it("el error por fila se ve, queda asociado al campo y el resumen lo enfoca", async () => {
