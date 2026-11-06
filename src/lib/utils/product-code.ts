@@ -1,4 +1,12 @@
 /**
+ * Clave del advisory lock por prefijo. `createProduct` y el alta masiva tienen
+ * que usar la misma para serializarse entre sí.
+ */
+export function prefixLockKey(prefix: string): number {
+  return Math.abs(prefix.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0));
+}
+
+/**
  * Pure function to generate next sequential product code for a productCode
  * Format: PREFIX + 3 digits (e.g., AA001, PROD000, XYZ999)
  * No side effects - 100% testable in isolation

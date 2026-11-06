@@ -8,17 +8,8 @@ import { readProductMovements, type ProductMovementRow } from "@/lib/product-mov
 import { sortProducts } from "@/lib/product-order";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { getNextCode } from "@/lib/utils/product-code";
-import { updateProductExtendedSchema } from "@/lib/validations/product";
-
-// Schema de validación para crear producto
-// Note: stock is no longer on Product; it lives in BranchInventory per branch.
-const createProductSchema = z.object({
-  name: z.string().min(1, "El nombre es requerido").max(255, "El nombre es muy largo"),
-  description: z.string().max(500, "La descripción es muy larga").optional(),
-  prefix: z.string().regex(/^[A-Za-z]{2,4}$/, "Prefijo: 2-4 letras (A-Z)").transform(v => v.toUpperCase()),
-  price: z.number().min(0, "El precio no puede ser negativo"),
-});
+import { getNextCode, prefixLockKey } from "@/lib/utils/product-code";
+import { createProductSchema, updateProductExtendedSchema } from "@/lib/validations/product";
 
 // Schema for searchProducts action
 const searchProductsSchema = z.object({
@@ -69,7 +60,7 @@ export async function createProduct(data: unknown) {
       try {
         const product = await prisma.$transaction(async (tx) => {
           // Advisory lock on prefix hash to prevent concurrent code generation for same prefix
-          const lockKey = Math.abs(validatedData.prefix.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0));
+          const lockKey = prefixLockKey(validatedData.prefix);
           await tx.$executeRawUnsafe(`SELECT pg_advisory_xact_lock(${lockKey})`);
 
           // Fetch existing codes for this prefix within transaction
