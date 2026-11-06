@@ -263,7 +263,7 @@ export const MoveStockModal = ({
               emptyLabel="No hay sucursales activas"
               columns={2}
             />
-            <div className="md:flex md:justify-end">
+            <div className="md:flex md:justify-center">
               <button
                 type="button"
                 onClick={() => setStep(2)}

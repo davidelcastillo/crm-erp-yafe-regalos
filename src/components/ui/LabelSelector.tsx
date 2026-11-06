@@ -210,7 +210,7 @@ export function LabelSelector({ isOpen, onClose, branches }: LabelSelectorProps)
               columns={2}
               label="Sucursal"
             />
-            <div className="md:flex md:justify-end">
+            <div className="md:flex md:justify-center">
               <button
                 type="button"
                 onClick={handleContinue}

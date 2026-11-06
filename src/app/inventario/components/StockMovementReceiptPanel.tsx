@@ -88,7 +88,7 @@ export function StockMovementReceiptPanel({
           Descargarlo no vuelve a registrar el movimiento.
         </p>
         {error && <p role="alert" className="mt-4 text-sm text-error">{error}</p>}
-        <div className="mt-6 flex flex-col gap-3 md:flex-row md:justify-end md:flex-wrap">
+        <div className="mt-6 flex flex-col gap-3 md:flex-row md:justify-center md:flex-wrap">
           {isTransfer && (
             <>
               <button type="button" className="btn btn-primary min-h-12" autoFocus
