@@ -305,4 +305,14 @@ describe("BulkProductForm", () => {
     expect(categorias()).toHaveLength(3);
     expect(mockGetCategoryOptions).toHaveBeenCalledTimes(1);
   });
+
+  it("avisa cuando no se pudieron cargar las categorías", async () => {
+    mockGetCategoryOptions.mockResolvedValue({ success: false, error: "sin permisos" } as never);
+
+    await renderForm();
+
+    expect(
+      await screen.findByText(/no se pudieron cargar las categorías/i),
+    ).toBeInTheDocument();
+  });
 });

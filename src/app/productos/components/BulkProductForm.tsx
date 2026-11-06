@@ -61,6 +61,7 @@ export function BulkProductForm({ onClose, onSuccess }: BulkProductFormProps) {
   ]);
   const [categorias, setCategorias] = useState<{ id: number; name: string }[]>([]);
   const [cargandoCategorias, setCargandoCategorias] = useState(true);
+  const [errorCategorias, setErrorCategorias] = useState(false);
   const [errores, setErrores] = useState<Record<string, FilaError[]>>({});
   const [loading, setLoading] = useState(false);
 
@@ -76,9 +77,12 @@ export function BulkProductForm({ onClose, onSuccess }: BulkProductFormProps) {
     (async () => {
       try {
         const resultado = await getCategoryOptions();
-        if (!cancelado && resultado.success && resultado.data) setCategorias(resultado.data);
+        if (cancelado) return;
+        if (resultado.success && resultado.data) setCategorias(resultado.data);
+        else setErrorCategorias(true);
       } catch (error) {
         console.error("Error loading category options:", error);
+        if (!cancelado) setErrorCategorias(true);
       } finally {
         if (!cancelado) setCargandoCategorias(false);
       }
@@ -306,6 +310,13 @@ export function BulkProductForm({ onClose, onSuccess }: BulkProductFormProps) {
             ref={cuerpoRef}
             className="order-1 min-h-0 flex-1 space-y-4 overflow-y-auto px-6 pb-4 md:order-none md:col-start-1 md:row-start-1 md:overflow-visible md:px-0 md:pb-0"
           >
+            {errorCategorias && (
+              <p role="status" className="rounded-xl border border-hairline bg-surface-soft p-3 text-sm text-ink-muted">
+                No se pudieron cargar las categorías. Los productos se van a guardar sin
+                categoría; podés asignarla después desde el inventario.
+              </p>
+            )}
+
             {filasConError.length > 0 && (
               <div
                 ref={resumenRef}
