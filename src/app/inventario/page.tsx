@@ -19,6 +19,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import { CardSkeleton, Skeleton } from "@/components/ui/Skeleton";
 import { AddProductButton } from "../productos/components/AddProductButton";
 import { ProductForm } from "../productos/components/ProductForm";
+import { BulkProductForm } from "../productos/components/BulkProductForm";
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, useCallback } from 'react';
@@ -41,6 +42,15 @@ const OPCIONES_STOCK: MenuOption[] = [
   { id: 'mover', label: 'Mover stock', hint: 'Entre dos sucursales' },
   { id: 'ajuste', label: 'Entrada / Salida', hint: 'Corregir el stock por lote' },
   { id: 'control', label: 'Control de stock', hint: 'Contar y ajustar contra el sistema' },
+];
+
+/** Paso previo del alta (S5): un producto o varios en un mismo modal. */
+type AltaStep = 'menu' | 'unico' | 'masivo';
+
+/** Opciones del paso 1 del alta; los ids son los modales de abajo. */
+const OPCIONES_ALTA: MenuOption[] = [
+  { id: 'unico', label: 'Un producto', hint: 'Alta de a uno, con descripción' },
+  { id: 'masivo', label: 'Varios productos', hint: 'Hasta 50 en una sola carga' },
 ];
 
 /** Opciones del paso 1 de impresión; los ids son los modales de abajo. */
@@ -94,7 +104,8 @@ export default function InventarioPage() {
   // Un solo acceso por tema (S4): el menú de pasos y, adentro, el modal de siempre.
   const [stockStep, setStockStep] = useState<StockStep | null>(null);
   const [printStep, setPrintStep] = useState<PrintStep | null>(null);
-  const [productFormOpen, setProductFormOpen] = useState(false);
+  // Un solo acceso al alta (S5): el paso previo elige un producto o varios.
+  const [altaStep, setAltaStep] = useState<AltaStep | null>(null);
 
   const router = useRouter();
 
@@ -173,7 +184,7 @@ export default function InventarioPage() {
   // activos (sucursal + categoría + búsqueda) SIN resetearlos (spec
   // inventory-ui). Si el producto nuevo no matchea los filtros, no aparece
   // en la lista — comportamiento correcto del AND.
-  const handleProductCreated = async (_created: Product) => {
+  const handleProductCreated = async (_created?: Product) => {
     try {
       const data = await fetchProducts(branchId, selectedCategoryId, debouncedSearch);
       setProducts(data);
@@ -489,19 +500,33 @@ export default function InventarioPage() {
           />
         )}
 
-        {/* FAB crear producto + ProductForm directo (Fase 1 unificar
-            productos): scrim propio z-[60] de ProductForm, SIN wrapper z-[70].
-            El FAB (z-40) queda cubierto por el scrim del modal. */}
+        {/* FAB crear producto (Fase 1 unificar productos): scrim propio z-[60]
+            de cada modal, SIN wrapper z-[70]. El FAB (z-40) queda cubierto por
+            el scrim. El paso previo elige un producto o varios (S5). */}
         <AddProductButton
-          open={productFormOpen}
-          onOpenChange={setProductFormOpen}
+          open={altaStep !== null}
+          onOpenChange={(abierto) => setAltaStep(abierto ? 'menu' : null)}
           onSuccess={handleProductCreated}
         />
-        {productFormOpen && (
+        <OptionsMenuModal
+          open={altaStep === 'menu'}
+          title="Nuevo producto"
+          subtitle="¿Cuántos productos vas a cargar?"
+          options={OPCIONES_ALTA}
+          onClose={() => setAltaStep(null)}
+          onPick={(id) => setAltaStep(id as AltaStep)}
+        />
+        {altaStep === 'unico' && (
           <ProductForm
             product={null}
             onSuccess={handleProductCreated}
-            onClose={() => setProductFormOpen(false)}
+            onClose={() => setAltaStep(null)}
+          />
+        )}
+        {altaStep === 'masivo' && (
+          <BulkProductForm
+            onSuccess={handleProductCreated}
+            onClose={() => setAltaStep(null)}
           />
         )}
       </main>
