@@ -552,4 +552,24 @@ describe("BulkProductForm", () => {
     fireEvent.click(screen.getByRole("button", { name: /ir a la primera/i }));
     expect(stocks()[0]).toHaveFocus();
   });
+
+  it("quitar la sucursal borra el error de stock, que ya no tiene campo", async () => {
+    await renderForm();
+    await elegirSucursal();
+    llenarFila(0, "Producto con error");
+    mockCreateProductsBatch.mockResolvedValue({
+      success: false,
+      error: "El stock no puede ser negativo",
+      rowErrors: [{ row: 0, field: "initialStock", message: "El stock no puede ser negativo" }],
+    } as Falla as never);
+
+    fireEvent.click(screen.getByRole("button", { name: /crear 1 producto/i }));
+    expect(await screen.findByText("El stock no puede ser negativo")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /no cargar stock/i }));
+
+    await waitFor(() =>
+      expect(screen.queryByText("El stock no puede ser negativo")).not.toBeInTheDocument(),
+    );
+  });
 });

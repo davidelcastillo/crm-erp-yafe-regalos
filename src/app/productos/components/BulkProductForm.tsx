@@ -88,6 +88,18 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
   const [cargandoCategorias, setCargandoCategorias] = useState(true);
   const [errorCategorias, setErrorCategorias] = useState(false);
   const [errores, setErrores] = useState<Record<string, FilaError[]>>({});
+
+  // Sin sucursal no existen los campos de stock: limpiar sus errores evita que
+  // el resumen intente enfocar un campo que ya no está en pantalla.
+  useEffect(() => {
+    if (branchId !== null) return;
+    setErrores((prev) => {
+      const limpio = Object.entries(prev)
+        .map(([id, lista]) => [id, lista.filter((e) => e.field !== "initialStock")] as const)
+        .filter(([, lista]) => lista.length > 0);
+      return Object.fromEntries(limpio);
+    });
+  }, [branchId]);
   const [loading, setLoading] = useState(false);
 
   const nextId = useRef(1);
