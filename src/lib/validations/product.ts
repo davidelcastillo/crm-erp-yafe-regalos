@@ -14,6 +14,38 @@ export const createProductSchema = z.object({
 });
 
 /**
+ * Schema de alta masiva. La categoría es una sola para todo el lote (S4) y
+ * cada fila usa la misma regla que el alta individual. El nombre repetido
+ * dentro del lote se marca en la fila repetida; el choque con un nombre que ya
+ * existe se valida en el servidor, contra los productos activos (S3).
+ */
+export const createProductsBatchSchema = z
+  .object({
+    categoryId: z.number().int().positive("Categoría inválida").nullable().optional(),
+    rows: z
+      .array(createProductSchema)
+      .min(1, "Agregá al menos un producto")
+      .max(50, "Máximo 50 productos por carga"),
+  })
+  .superRefine((data, ctx) => {
+    const vistos = new Set<string>();
+    data.rows.forEach((row, rowIndex) => {
+      const clave = row.name.trim().toLowerCase();
+      if (vistos.has(clave)) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Nombre repetido en el lote",
+          path: ["rows", rowIndex, "name"],
+        });
+        return;
+      }
+      vistos.add(clave);
+    });
+  });
+
+export type CreateProductsBatchValues = z.infer<typeof createProductsBatchSchema>;
+
+/**
  * Schema extendido para actualización de producto.
  *
  * NO reemplaza el `updateProductSchema` inline en `src/app/actions/product.ts`

@@ -9,7 +9,7 @@ import { sortProducts } from "@/lib/product-order";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getNextCode, prefixLockKey } from "@/lib/utils/product-code";
-import { createProductSchema, updateProductExtendedSchema } from "@/lib/validations/product";
+import { createProductSchema, createProductsBatchSchema, updateProductExtendedSchema } from "@/lib/validations/product";
 
 // Schema for searchProducts action
 const searchProductsSchema = z.object({
@@ -110,6 +110,175 @@ export async function createProduct(data: unknown) {
     }
     console.error("Error creating product:", error);
     return { success: false, error: "Error al crear el producto" };
+  }
+}
+
+type BatchRowError = { row: number; field?: string; message: string };
+
+/** Errores de Zod por fila: el `path` del issue es ["rows", índice, campo]. */
+function rowErrorsFromZodError(error: z.ZodError): BatchRowError[] {
+  return error.issues.flatMap((issue) => {
+    const [raiz, row, field] = issue.path;
+    if (raiz !== "rows" || typeof row !== "number") return [];
+    return [{ row, ...(typeof field === "string" ? { field } : {}), message: issue.message }];
+  });
+}
+
+function batchFailure(error: string, rowErrors: BatchRowError[] = []) {
+  return { success: false as const, error, ...(rowErrors.length > 0 ? { rowErrors } : {}) };
+}
+
+/**
+ * Alta masiva de productos. Todo o nada (S7): cualquier falla revierte todas
+ * las filas. Solo crea productos; el stock inicial y su movimiento son otra unidad.
+ */
+export async function createProductsBatch(data: unknown) {
+  // Se llena después de validar; el catch la usa para marcar el prefijo agotado.
+  let filas: { prefix: string }[] = [];
+
+  try {
+    const auth = await requireAdmin();
+    if (!auth.ok) return { success: false as const, error: auth.error };
+
+    const parsed = createProductsBatchSchema.safeParse(data);
+    if (!parsed.success) {
+      return batchFailure(
+        parsed.error.issues.map((e) => e.message).join(", "),
+        rowErrorsFromZodError(parsed.error)
+      );
+    }
+    const { categoryId = null, rows } = parsed.data;
+    filas = rows;
+
+    // Categoría compartida (S4): si viene, tiene que existir antes de escribir.
+    if (categoryId !== null) {
+      const categoria = await prisma.category.findUnique({
+        where: { id: categoryId },
+        select: { id: true },
+      });
+      if (!categoria) return batchFailure("La categoría seleccionada no existe");
+    }
+
+    // Solo bloquean los nombres de productos ACTIVOS, sin distinguir mayúsculas (S3).
+    const existentes = await prisma.product.findMany({
+      where: {
+        active: true,
+        OR: rows.map((row) => ({ name: { equals: row.name.trim(), mode: "insensitive" } })),
+      },
+      select: { name: true },
+    });
+    if (existentes.length > 0) {
+      const bloqueados = new Set(existentes.map((p) => p.name.trim().toLowerCase()));
+      return batchFailure(
+        "Ya existe un producto con ese nombre",
+        rows.flatMap((row, rowIndex) =>
+          bloqueados.has(row.name.trim().toLowerCase())
+            ? [{ row: rowIndex, field: "name", message: "Ya existe un producto con ese nombre" }]
+            : []
+        )
+      );
+    }
+
+    const maxRetries = 3;
+    const baseDelay = 50;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const products = await prisma.$transaction(
+          async (tx) => {
+            // Un lock por prefijo, ordenados y sin repetir: la misma clave que
+            // `createProduct`, así el alta individual y el lote se serializan.
+            const prefijos = [...new Set(rows.map((row) => row.prefix))].sort();
+            for (const prefijo of prefijos) {
+              await tx.$executeRawUnsafe(`SELECT pg_advisory_xact_lock(${prefixLockKey(prefijo)})`);
+            }
+
+            const existentesCodigos = await tx.product.findMany({
+              where: { codePrefix: { in: prefijos } },
+              select: { code: true, codePrefix: true },
+            });
+            const codigosPorPrefijo = new Map<string, string[]>(prefijos.map((p) => [p, []]));
+            for (const existente of existentesCodigos) {
+              if (existente.code && existente.codePrefix) {
+                codigosPorPrefijo.get(existente.codePrefix)?.push(existente.code);
+              }
+            }
+
+            // Códigos en memoria: cada código generado suma a su prefijo, así el
+            // mismo prefijo sigue contando y el tope de 999 se respeta.
+            const codigos = rows.map((row) => {
+              const delPrefijo = codigosPorPrefijo.get(row.prefix) ?? [];
+              const code = getNextCode(row.prefix, delPrefijo);
+              delPrefijo.push(code);
+              codigosPorPrefijo.set(row.prefix, delPrefijo);
+              return code;
+            });
+
+            const creados = await tx.product.createManyAndReturn({
+              data: rows.map((row, i) => ({
+                name: row.name,
+                description: row.description || "-",
+                price: row.price,
+                code: codigos[i],
+                codePrefix: row.prefix,
+                categoryId,
+              })),
+              select: { id: true, code: true, name: true },
+            });
+
+            // `createManyAndReturn` no promete orden: se cruza por código.
+            const porCodigo = new Map(creados.map((p) => [p.code, p]));
+            return rows.map((row, i) => {
+              const creado = porCodigo.get(codigos[i]);
+              if (!creado) throw new Error("No se pudo leer uno de los productos creados");
+              return { id: creado.id, code: creado.code, name: creado.name };
+            });
+          },
+          { timeout: 20_000 }
+        );
+
+        revalidatePath("/inventario");
+        revalidatePath("/productos");
+        return { success: true as const, data: { products } };
+      } catch (txError) {
+        if (attempt < maxRetries && isUniqueConstraintError(txError)) {
+          await sleep(baseDelay * attempt);
+          continue;
+        }
+        throw txError;
+      }
+    }
+
+    throw new Error("Max retries exceeded for code generation");
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return batchFailure(
+        error.issues.map((e) => e.message).join(", "),
+        rowErrorsFromZodError(error)
+      );
+    }
+    if (error instanceof Error && error.message.includes("agotado")) {
+      // `getNextCode` nombra el prefijo agotado: esas filas son las que fallan.
+      const prefijo = /Prefijo\s+([A-Za-z]{2,4})\s+agotado/.exec(error.message)?.[1]?.toUpperCase();
+      return batchFailure(
+        error.message,
+        prefijo
+          ? filas.flatMap((fila, row) =>
+              fila.prefix === prefijo ? [{ row, message: error.message }] : []
+            )
+          : []
+      );
+    }
+    if (
+      error &&
+      typeof error === "object" &&
+      "code" in error &&
+      (error as { code: unknown }).code === "P2003"
+    ) {
+      return batchFailure("La categoría seleccionada no existe");
+    }
+    console.error("Error creating products batch:", error);
+    return batchFailure("Error al crear los productos");
   }
 }
 

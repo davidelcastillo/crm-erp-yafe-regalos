@@ -1,18 +1,22 @@
 /**
  * Integration test for createProduct Server Action
  */
-import { createProduct, getProducts, searchProducts } from "../actions/product";
+import { createProduct, createProductsBatch, getProducts, searchProducts } from "../actions/product";
+import { createProductsBatchSchema } from "@/lib/validations/product";
 
 // Mock the entire prisma module with inline factory
 jest.mock("@/lib/prisma", () => {
   const mockFindMany = jest.fn();
   const mockProductCreate = jest.fn();
+  const mockCreateManyAndReturn = jest.fn();
+  const mockCategoryFindUnique = jest.fn();
   const mockExecuteRawUnsafe = jest.fn().mockResolvedValue(undefined);
   const mockTransaction = jest.fn(async (callback: (tx: unknown) => Promise<unknown>) => {
     const tx = {
       product: {
         findMany: mockFindMany,
         create: mockProductCreate,
+        createManyAndReturn: mockCreateManyAndReturn,
       },
       $executeRawUnsafe: mockExecuteRawUnsafe,
     };
@@ -29,6 +33,10 @@ jest.mock("@/lib/prisma", () => {
         findUnique: jest.fn(),
         update: jest.fn(),
         delete: jest.fn(),
+        createManyAndReturn: mockCreateManyAndReturn,
+      },
+      category: {
+        findUnique: mockCategoryFindUnique,
       },
     },
   };
@@ -350,5 +358,104 @@ describe("productos: autorización admin", () => {
     expect(result).toEqual({ success: false, error: "No autorizado" });
     expect(prisma.product.findMany).not.toHaveBeenCalled();
     expect(prisma.product.create).not.toHaveBeenCalled();
+  });
+});
+
+// Alta masiva (ODD `productos-alta-masiva`, T2): contrato del lote y autorización.
+describe("createProductsBatch", () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  const fila = (n: number) => ({ name: `Producto ${n}`, prefix: "ZZ", price: 10 });
+
+  it("el esquema acepta 1 y 50 filas y rechaza 0 y 51", () => {
+    expect(createProductsBatchSchema.safeParse({ rows: [fila(1)] }).success).toBe(true);
+    expect(
+      createProductsBatchSchema.safeParse({ rows: Array.from({ length: 50 }, (_, i) => fila(i)) }).success
+    ).toBe(true);
+
+    const vacio = createProductsBatchSchema.safeParse({ rows: [] });
+    expect(vacio.success).toBe(false);
+    expect(vacio.success === false && vacio.error.issues[0]?.message).toBe("Agregá al menos un producto");
+
+    const lleno = createProductsBatchSchema.safeParse({ rows: Array.from({ length: 51 }, (_, i) => fila(i)) });
+    expect(lleno.success).toBe(false);
+    expect(lleno.success === false && lleno.error.issues[0]?.message).toBe("Máximo 50 productos por carga");
+  });
+
+  it("el error de una fila lleva su índice en el path", () => {
+    const parsed = createProductsBatchSchema.safeParse({
+      rows: [fila(1), { name: "", prefix: "ZZ", price: 10 }],
+    });
+
+    expect(parsed.success).toBe(false);
+    if (parsed.success) return;
+    expect(parsed.error.issues.map((i) => i.path)).toContainEqual(["rows", 1, "name"]);
+  });
+
+  it("el nombre repetido dentro del lote se marca en la fila repetida", () => {
+    const parsed = createProductsBatchSchema.safeParse({
+      rows: [
+        { name: "Jabón de Avena", prefix: "ZZ", price: 10 },
+        { name: "jabón de avena", prefix: "ZZ", price: 20 },
+      ],
+    });
+
+    expect(parsed.success).toBe(false);
+    if (parsed.success) return;
+    expect(parsed.error.issues[0]?.path).toEqual(["rows", 1, "name"]);
+  });
+
+  it("rechaza sin sesión admin y no toca Prisma", async () => {
+    const { requireAdmin } = jest.requireMock<{ requireAdmin: jest.Mock }>("@/lib/auth-guard");
+    requireAdmin.mockResolvedValueOnce({ ok: false, error: "No autorizado" });
+
+    // Fila inválida a propósito: si el guardián no fuera primero, el error sería de Zod.
+    const result = await createProductsBatch({ rows: [{ name: "", prefix: "Z", price: -1 }] });
+
+    expect(result).toEqual({ success: false, error: "No autorizado" });
+    expect(prisma.product.findMany).not.toHaveBeenCalled();
+    expect(prisma.product.createManyAndReturn).not.toHaveBeenCalled();
+  });
+
+  it("un error de Zod devuelve rowErrors de todas las filas inválidas y no toca Prisma", async () => {
+    const result = await createProductsBatch({
+      rows: [
+        { name: "", prefix: "ZZ", price: 10 },
+        { name: "Producto bueno", prefix: "ZZ", price: 10 },
+        { name: "Producto malo", prefix: "1", price: -5 },
+      ],
+    });
+
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    const filas = Array.from(new Set((result.rowErrors ?? []).map((e) => e.row)));
+    expect(filas).toEqual([0, 2]);
+    expect((result.rowErrors ?? []).every((e) => typeof e.field === "string")).toBe(true);
+    expect(prisma.product.findMany).not.toHaveBeenCalled();
+  });
+
+  it("devuelve los productos en el orden de las filas, cruzando por código", async () => {
+    (prisma.category.findUnique as jest.Mock).mockResolvedValue({ id: 5 });
+    (prisma.product.findMany as jest.Mock).mockResolvedValue([]);
+    // `createManyAndReturn` no promete orden: la respuesta se arma cruzando por código.
+    (prisma.product.createManyAndReturn as jest.Mock).mockResolvedValue([
+      { id: 3, code: "ZZ001", name: "Producto C" },
+      { id: 1, code: "ZZ000", name: "Producto A" },
+    ]);
+
+    const result = await createProductsBatch({
+      categoryId: 5,
+      rows: [
+        { name: "Producto A", prefix: "ZZ", price: 10 },
+        { name: "Producto C", prefix: "ZZ", price: 20 },
+      ],
+    });
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.products).toEqual([
+      { id: 1, code: "ZZ000", name: "Producto A" },
+      { id: 3, code: "ZZ001", name: "Producto C" },
+    ]);
   });
 });
