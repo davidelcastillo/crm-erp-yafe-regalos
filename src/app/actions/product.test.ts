@@ -121,6 +121,41 @@ describe("createProduct Server Action - Integration", () => {
     expect(result.data?.price).toBe(100);
   });
 
+  it("persists the chosen category when creating a product (H2)", async () => {
+    const { product } = prisma;
+    (product.findMany as jest.Mock).mockResolvedValue([]);
+    (product.create as jest.Mock).mockResolvedValue({ id: 3, name: "Con categoría", code: "CC000" });
+
+    const result = await createProduct({
+      name: "Con categoría",
+      prefix: "CC",
+      price: 100,
+      categoryId: 7,
+    });
+
+    expect(result.success).toBe(true);
+    expect(product.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ categoryId: 7 }) })
+    );
+  });
+
+  it("persists a null category when none is chosen", async () => {
+    const { product } = prisma;
+    (product.findMany as jest.Mock).mockResolvedValue([]);
+    (product.create as jest.Mock).mockResolvedValue({ id: 4, name: "Sin categoría", code: "SC000" });
+
+    const result = await createProduct({
+      name: "Sin categoría",
+      prefix: "SC",
+      price: 100,
+    });
+
+    expect(result.success).toBe(true);
+    expect(product.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ categoryId: null }) })
+    );
+  });
+
   it("should return error when name is empty", async () => {
     const result = await createProduct({
       name: "",

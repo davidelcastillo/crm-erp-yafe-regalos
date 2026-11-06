@@ -17,12 +17,15 @@ const sufijo = Math.floor(1000 + Math.random() * 9000);
 const letra = (n: number) => String.fromCharCode(65 + (n % 26));
 const PREFIJO_NUEVO = `${letra(sufijo)}${letra(Math.floor(sufijo / 26))}N`;
 const PREFIJO_AGOTADO = `${letra(sufijo)}${letra(Math.floor(sufijo / 26))}X`;
+const PREFIJO_CATEGORIA = `${letra(sufijo)}${letra(Math.floor(sufijo / 26))}C`;
+const NOMBRE_CATEGORIA = `QA categoría individual ${sufijo}`;
 
 type Cliente = (typeof import("@/lib/prisma"))["prisma"];
 type Acciones = typeof import("@/app/actions/product");
 
 let prisma: Cliente;
 let acciones: Acciones;
+let categoryId = 0;
 
 describe("createProduct (integración, base local)", () => {
   beforeAll(async () => {
@@ -33,14 +36,18 @@ describe("createProduct (integración, base local)", () => {
     acciones = await import("@/app/actions/product");
 
     await prisma.product.deleteMany({
-      where: { codePrefix: { in: [PREFIJO_NUEVO, PREFIJO_AGOTADO] } },
+      where: { codePrefix: { in: [PREFIJO_NUEVO, PREFIJO_AGOTADO, PREFIJO_CATEGORIA] } },
     });
+
+    const categoria = await prisma.category.create({ data: { name: NOMBRE_CATEGORIA } });
+    categoryId = categoria.id;
   });
 
   afterAll(async () => {
     await prisma.product.deleteMany({
-      where: { codePrefix: { in: [PREFIJO_NUEVO, PREFIJO_AGOTADO] } },
+      where: { codePrefix: { in: [PREFIJO_NUEVO, PREFIJO_AGOTADO, PREFIJO_CATEGORIA] } },
     });
+    await prisma.category.deleteMany({ where: { name: NOMBRE_CATEGORIA } });
     await prisma.$disconnect();
   });
 
@@ -86,6 +93,22 @@ describe("createProduct (integración, base local)", () => {
     });
     const despues = await prisma.product.count({ where: { codePrefix: PREFIJO_AGOTADO } });
     expect(despues).toBe(antes);
+  });
+
+  it("guarda la categoría elegida al crear (H2)", async () => {
+    const resultado = await acciones.createProduct({
+      name: `QA alta individual ${sufijo} con categoría`,
+      prefix: PREFIJO_CATEGORIA,
+      price: 40,
+      categoryId,
+    });
+    expect(resultado.success).toBe(true);
+
+    const guardado = await prisma.product.findFirst({
+      where: { codePrefix: PREFIJO_CATEGORIA },
+      select: { categoryId: true },
+    });
+    expect(guardado).toEqual({ categoryId });
   });
 });
 

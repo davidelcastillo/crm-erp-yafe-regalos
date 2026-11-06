@@ -85,6 +85,7 @@ export async function createProduct(data: unknown) {
               price: validatedData.price,
               code,
               codePrefix: validatedData.prefix,
+              categoryId: validatedData.categoryId ?? null,
             },
           });
         });

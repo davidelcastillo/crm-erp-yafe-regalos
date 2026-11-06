@@ -4,6 +4,7 @@ import { z } from "zod";
 /**
  * Schema de creación de producto. Vive acá para que el alta masiva use la
  * misma regla por fila que el alta individual.
+ * `categoryId` es opcional y nullable (H2): sin categoría elegida queda en null.
  * Note: stock is no longer on Product; it lives in BranchInventory per branch.
  */
 export const createProductSchema = z.object({
@@ -11,15 +12,15 @@ export const createProductSchema = z.object({
   description: z.string().max(500, "La descripción es muy larga").optional(),
   prefix: z.string().regex(/^[A-Za-z]{2,4}$/, "Prefijo: 2-4 letras (A-Z)").transform(v => v.toUpperCase()),
   price: z.number().min(0, "El precio no puede ser negativo"),
+  categoryId: z.number().int().positive("Categoría inválida").nullable().optional(),
 });
 
 /**
- * Fila del alta masiva: la misma regla que el alta individual más la
- * categoría de esa fila, opcional (S4), y su stock inicial (S2/S11), que sin
+ * Fila del alta masiva: la misma regla que el alta individual (que ya trae la
+ * categoría de esa fila, opcional, S4) más su stock inicial (S2/S11), que sin
  * valor se trata como 0.
  */
 const createProductsBatchRowSchema = createProductSchema.extend({
-  categoryId: z.number().int().positive("Categoría inválida").nullable().optional(),
   initialStock: z.number().int().min(0, "El stock no puede ser negativo").optional(),
 });
 
