@@ -305,7 +305,8 @@ export async function createProductsBatch(data: unknown) {
                   reference: BATCH_ENTRY_REFERENCE,
                   // Calidad de auditoría, no un fix de la base: `performedBy` es
                   // TEXT NOT NULL y acepta "" igual, pero un ingreso sin responsable es ilegible.
-                  performedBy: auth.email || "admin",
+                  // Fallback explícito: `requireAdmin` puede devolver email vacío y `performedBy` es obligatorio.
+                  performedBy: auth.email || "sistema",
                 })),
               });
             }

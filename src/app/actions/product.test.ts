@@ -757,7 +757,7 @@ describe("createProductsBatch: stock inicial y comprobante", () => {
 
     expect(result.success).toBe(true);
     const movimientos = (prisma.branchMovement.createMany as jest.Mock).mock.calls[0][0].data;
-    expect(movimientos[0].performedBy).toBe("admin");
+    expect(movimientos[0].performedBy).toBe("sistema");
   });
 });
 
