@@ -15,21 +15,23 @@ Decisiones del humano, citadas textualmente. Las citas largas son transcripción
 - **S6.** Tope: «50 filas» por envío.
 - **S7.** Falla: «Todo o nada».
 - **S8.** Bug H2, la categoría que se descarta al crear: «Corregirlo en esta entrega».
-- **S9.** Sucursal: global para todo el lote (D8). Comprobante: el de ingreso actual, sin trabajo de PDF nuevo (D9). Etiquetas: unidad siguiente (T7), fuera de esta entrega. Sigue abierto: los campos de cada fila (D5) y qué pasa con las filas de stock 0.
+- **S9.** Sucursal: global para todo el lote (D8). Comprobante: el de ingreso actual, sin trabajo de PDF nuevo (D9). Etiquetas: unidad siguiente (T7), fuera de esta entrega. Stock 0: deja la fila de inventario en 0, sin movimiento ni comprobante. Sigue abierto solo los campos de cada fila (D5).
 
 ## Tasks
 
 | ID | Tarea | Specs | Ruta principal | Estado | Commit |
 |---|---|---|---|---|---|
 | T1 | Extraer el helper de la clave del lock y mover `createProductSchema` a `src/lib/validations/product.ts`, con la regresión del alta individual | S1 | `src/app/actions/product.ts`, `src/lib/validations/product.ts` | hecho | `704d765` |
-| T2 | `createProductsBatchSchema` y `createProductsBatch` solo productos (sin stock), nombres existentes activos, todo o nada | S1, S3, S4, S7 | `src/lib/validations/product.ts`, `src/app/actions/product.ts` | pendiente | — |
-| T3 | Tests del lote: unitarios con Prisma mockeado y casos 1 a 8 en base local | S1, S3, S7 | `src/app/actions/product.test.ts`, `src/app/actions/product.batch.local-db.test.ts` | pendiente | — |
+| T2 | `createProductsBatchSchema` y `createProductsBatch` solo productos (sin stock), nombres existentes activos, todo o nada | S1, S3, S4, S7 | `src/lib/validations/product.ts`, `src/app/actions/product.ts` | hecho | `171fb66` |
+| T3 | Tests del lote: unitarios con Prisma mockeado y casos 1 a 8 en base local | S1, S3, S7 | `src/app/actions/product.test.ts`, `src/app/actions/product.batch.local-db.test.ts` | absorbida por T2 | — |
 | T4 | `BulkProductForm` con el paso previo y la guía en `docs/` | S1, S5, S6 | `src/app/productos/components/BulkProductForm.tsx`, `src/app/inventario/page.tsx`, `docs/` | pendiente | — |
-| T5 | Stock inicial con sucursal global, movimiento ENTRY y comprobante sin etiquetas | S2 | `src/app/actions/product.ts`, `src/app/productos/components/BulkProductForm.tsx` | pendiente (D5 y stock 0) | — |
+| T5 | Stock inicial con sucursal global, movimiento ENTRY y comprobante sin etiquetas | S2 | `src/app/actions/product.ts`, `src/app/productos/components/BulkProductForm.tsx` | pendiente (D5) | — |
 | T7 | Etiquetas de lo recién creado, como unidad siguiente | S2 | `src/actions/label-print.ts`, `src/app/inventario/components/StockMovementReceiptPanel.tsx` | pendiente | — |
 | T6 | Corregir H2: la categoría elegida al crear se descarta | S8 | `src/app/productos/components/ProductForm.tsx`, `src/app/actions/product.ts` | pendiente | — |
 
-Orden de entrega: T1, T2, T3, T4, T6, T5 y después T7 (etiquetas).
+Orden de entrega: T1, T2 (con T3 adentro), T4, T6, T5 y después T7 (etiquetas).
+
+**T3 se absorbió en T2**: el escritor hizo los tests junto con la acción, con RED observado primero (6 unitarios y 9 casos de base local). No se hizo como unidad aparte para no comitear una acción sin su prueba.
 
 **Slice de entrega.** La rama `feat/productos-alta-masiva` está apoyada en `bfeae6c` (`feat/orden-listas-modales`), que aporta dos commits y unas 1.300 líneas ajenas a esta feature. Por eso el conteo contra `main` no mide este trabajo: el slice real es cada unidad de esta tabla, y el PR tiene que apuntar a `feat/orden-listas-modales`, no a `main`.
 Actualización: D1 redefinida por el humano (stock, movimiento y comprobante). Las citas marcadas **(hermano)** son del worktree `D:/SeguimientosCompras/seguimientos-compras`, rama `feat/orden-listas-modales`, commit `bfeae6c`.
@@ -410,10 +412,10 @@ Si se decide corregir H2 (la categoría que se descarta en el alta individual), 
 - (c) Una `ActionCard` o botón separado en `/inventario`. Es descubrible, pero suma una acción a la banda.
 - **Recomendación: (a).**
 
-**D5. ¿Qué campos lleva cada fila?**
+**D5. ¿Qué campos lleva cada fila? — DECIDIDA: (a) más el stock inicial.**
 - (a) Nombre, prefijo y precio. Es lo mínimo y rápido de tipear; la descripción queda en "-" y se edita después.
 - (b) Lo anterior más una descripción plegable. Es completo, pero agranda cada fila y el código del modal.
-- **Recomendación: (a).**
+- **Decidido: (a), con el stock inicial como cuarto campo** por D1. La descripción no va por fila: el alta usa "-", como el alta individual, y se edita después. Si el usuario quiere la descripción en el lote, se agrega en T4 antes de implementarlo.
 
 **D6. ¿Cuál es el máximo de filas por envío? — DECIDIDA: 50 (S6).**
 - 30: margen holgado de tiempo y de lista visible, pero puede quedar corto si cargan "decenas".
@@ -439,7 +441,7 @@ Si se decide corregir H2 (la categoría que se descarta en el alta individual), 
 - **Recomendación: (a), global.**
   - Cumple el invariante con un solo comprobante y reusa todo sin cambios.
   - Cargar decenas de productos "en un local" es el caso que motivó el pedido, y otra sucursal se resuelve con un segundo lote o con un traslado.
-- Supuesto **pendiente de respuesta**: las filas con stock 0 crean una fila `BranchInventory` en 0 en esa sucursal, para que el producto se vea en la vista por sucursal (H1, `src/app/actions/inventory.ts:247-254`). No generan movimiento ni van al comprobante, porque no hubo ingreso. El humano preguntó qué significa; falta su respuesta.
+- **Decidido por el humano:** las filas con stock 0 crean una fila `BranchInventory` en 0 en esa sucursal, para que el producto se vea en la vista por sucursal (H1, `src/app/actions/inventory.ts:247-254`). No generan movimiento ni van al comprobante, porque no hubo ingreso.
 
 **D9. ¿Qué comprobante emite el alta con stock? — DECIDIDA: (a), el comprobante de ingreso actual. Las etiquetas pasan a una unidad siguiente (T7).**
 - (a) **El comprobante de ingreso actual, sin cambios**: `StockMovementReceipt` ENTRY más `StockMovementReceiptPanel`.
@@ -468,3 +470,6 @@ Si se decide corregir H2 (la categoría que se descarta en el alta individual), 
 - **L9.** T1 verificado de forma independiente y commiteado en `704d765`. Dos correcciones del verificador: el archivo de test nuevo había roto `npx tsc --noEmit` con 6 errores (sin `import`/`export` de nivel superior, TypeScript lo trataba como script global y sus `sufijo`/`Cliente`/`prisma` chocaban con los de `purchase.scale.test.ts`), resuelto con `export {};` al final, igual que `stockControl.local-db.test.ts:208`; y el test no fijaba el conteo previo, que ahora arranca en 1.
 - **L10.** `npx tsc --noEmit` sigue en rojo por una causa **previa a esta rama**: `src/app/actions/purchase.scale.test.ts:20`, `:26` y `:43` chocan con otro archivo de test sin módulo. Se comprobó sacando el archivo nuevo del árbol: los tres errores siguen ahí. O sea que la puerta de cierre de `AGENTS.md` §3.4 ya fallaba antes de esta feature y necesita una decisión aparte (un `export {};` en el archivo culpable, o revisar cuál es el otro script global).
 - **L11.** Observación del entorno: `DATABASE_URL` del shell apunta a un pooler remoto de Supabase (`aws-1-us-west-2.pooler.supabase.com`). El guard de `src/lib/prisma.ts` corta antes de escribir, y por eso `AddPurchaseButton.test.tsx` falla de forma preexistente: mockea la acción con una ruta relativa equivocada (`../../actions/product`) y cae en el Prisma real.
+- **L12.** Decisión del humano: las filas con stock 0 dejan `BranchInventory` en 0, sin movimiento ni fila en el comprobante. Con esto D8 queda cerrada y T5 solo espera D5 (campos por fila).
+- **L13.** T2 implementado por el escritor delegado, con TDD observado: RED (6 fallos unitarios y 9 de base local por «createProductsBatch is not a function») y después GREEN de 22/22 unitarios y 9/9 de base local; `npm run lint` sin errores nuevos y `npx tsc --noEmit` sin errores nuevos (solo los tres previos de L10). El mock de `createManyAndReturn` devuelve las filas al revés a propósito para probar que la respuesta se cruza por `code`. T3 quedó absorbida: los tests se escribieron junto con la acción.
+- **L14.** D5 decidida por el coordinador y sujeta a veto del humano: nombre, prefijo, precio y stock inicial por fila; sin descripción por fila (queda en "-" y se edita después).
