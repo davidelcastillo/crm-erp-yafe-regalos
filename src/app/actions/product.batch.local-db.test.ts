@@ -48,6 +48,7 @@ type Acciones = typeof import("@/app/actions/product");
 let prisma: Cliente;
 let acciones: Acciones;
 let categoryId = 0;
+let categoryId2 = 0;
 
 const limpiar = async () => {
   await prisma.product.deleteMany({
@@ -70,6 +71,11 @@ describe("createProductsBatch (integración, base local)", () => {
     });
     categoryId = categoria.id;
 
+    const categoria2 = await prisma.category.create({
+      data: { name: `${marca} categoria dos` },
+    });
+    categoryId2 = categoria2.id;
+
     await prisma.product.create({
       data: { name: NOMBRE_EXISTENTE, code: `${base}EX`, price: 1 },
     });
@@ -80,7 +86,7 @@ describe("createProductsBatch (integración, base local)", () => {
 
   afterAll(async () => {
     await limpiar();
-    await prisma.category.deleteMany({ where: { id: categoryId } });
+    await prisma.category.deleteMany({ where: { id: { in: [categoryId, categoryId2] } } });
     await prisma.$disconnect();
   });
 
@@ -89,9 +95,10 @@ describe("createProductsBatch (integración, base local)", () => {
       name: `${marca} treinta ${i}`,
       prefix: PREFIJO_TREINTA,
       price: 10 + i,
+      categoryId,
     }));
 
-    const resultado = await acciones.createProductsBatch({ categoryId, rows });
+    const resultado = await acciones.createProductsBatch({ rows });
 
     expect(resultado.success).toBe(true);
     if (!resultado.success) return;
@@ -101,12 +108,48 @@ describe("createProductsBatch (integración, base local)", () => {
       Array.from({ length: 30 }, (_, i) => `${PREFIJO_TREINTA}${String(i).padStart(3, "0")}`)
     );
     expect(productos.map((p) => p.name)).toEqual(rows.map((r) => r.name));
-    // La categoría es una sola para todo el lote.
+    // Cada fila escribió la categoría que traía (S4: una por fila).
     const guardados = await prisma.product.findMany({
       where: { code: { in: productos.map((p) => p.code) } },
       select: { categoryId: true },
     });
     expect(guardados.every((p) => p.categoryId === categoryId)).toBe(true);
+  });
+
+  // S4: la categoría dejó de ser compartida; cada fila guarda la suya.
+  it("dos filas con categorías distintas guardan cada una la propia", async () => {
+    const resultado = await acciones.createProductsBatch({
+      rows: [
+        { name: `${marca} categorias a`, prefix: PREFIJO_CONFLICTO, price: 1, categoryId },
+        { name: `${marca} categorias b`, prefix: PREFIJO_CONFLICTO, price: 1, categoryId: categoryId2 },
+      ],
+    });
+
+    expect(resultado.success).toBe(true);
+    if (!resultado.success) return;
+
+    const guardados = await prisma.product.findMany({
+      where: { code: { in: resultado.data.products.map((p) => p.code) } },
+      select: { name: true, categoryId: true },
+    });
+    const porNombre = new Map(guardados.map((p) => [p.name, p.categoryId]));
+    expect(porNombre.get(`${marca} categorias a`)).toBe(categoryId);
+    expect(porNombre.get(`${marca} categorias b`)).toBe(categoryId2);
+  });
+
+  it("una fila sin categoría se crea igual y la guarda en null", async () => {
+    const resultado = await acciones.createProductsBatch({
+      rows: [{ name: `${marca} sin categoria`, prefix: PREFIJO_CONFLICTO, price: 1, categoryId: null }],
+    });
+
+    expect(resultado.success).toBe(true);
+    if (!resultado.success) return;
+
+    const guardado = await prisma.product.findUnique({
+      where: { code: resultado.data.products[0].code },
+      select: { categoryId: true },
+    });
+    expect(guardado).toEqual({ categoryId: null });
   });
 
   it("prefijos mezclados: sigue la secuencia del prefijo y el otro arranca en 000", async () => {
@@ -171,15 +214,22 @@ describe("createProductsBatch (integración, base local)", () => {
     expect(await prisma.product.count({ where: { codePrefix: PREFIJO_AGOTADO } })).toBe(antes);
   });
 
-  it("con una categoría inexistente falla y no escribe nada", async () => {
+  // La categoría es de cada fila: la que no existe falla el lote entero y se marca solo ahí.
+  it("con una categoría inexistente en una fila falla todo y no escribe nada", async () => {
     const antes = await prisma.product.count({ where: { codePrefix: PREFIJO_CONFLICTO } });
 
     const resultado = await acciones.createProductsBatch({
-      categoryId: CATEGORIA_INEXISTENTE,
-      rows: [{ name: `${marca} categoria mala`, prefix: PREFIJO_CONFLICTO, price: 1 }],
+      rows: [
+        { name: `${marca} categoria buena`, prefix: PREFIJO_CONFLICTO, price: 1, categoryId },
+        { name: `${marca} categoria mala`, prefix: PREFIJO_CONFLICTO, price: 1, categoryId: CATEGORIA_INEXISTENTE },
+      ],
     });
 
-    expect(resultado).toEqual({ success: false, error: "La categoría seleccionada no existe" });
+    expect(resultado).toEqual({
+      success: false,
+      error: "La categoría seleccionada no existe",
+      rowErrors: [{ row: 1, field: "categoryId", message: "La categoría seleccionada no existe" }],
+    });
     expect(await prisma.product.count({ where: { codePrefix: PREFIJO_CONFLICTO } })).toBe(antes);
   });
 

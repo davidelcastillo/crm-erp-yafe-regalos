@@ -147,16 +147,37 @@ export async function createProductsBatch(data: unknown) {
         rowErrorsFromZodError(parsed.error)
       );
     }
-    const { categoryId = null, rows } = parsed.data;
+    const { rows } = parsed.data;
     filas = rows;
 
-    // Categoría compartida (S4): si viene, tiene que existir antes de escribir.
-    if (categoryId !== null) {
-      const categoria = await prisma.category.findUnique({
-        where: { id: categoryId },
+    // Una categoría por fila (S4): las distintas se verifican en UNA consulta,
+    // nunca una por fila (H6).
+    const categoriasPedidas = [
+      ...new Set(rows.flatMap((row) => (row.categoryId == null ? [] : [row.categoryId]))),
+    ];
+    if (categoriasPedidas.length > 0) {
+      const categorias = await prisma.category.findMany({
+        where: { id: { in: categoriasPedidas } },
         select: { id: true },
       });
-      if (!categoria) return batchFailure("La categoría seleccionada no existe");
+      const existentesIds = new Set(categorias.map((categoria) => categoria.id));
+      const faltantes = new Set(categoriasPedidas.filter((id) => !existentesIds.has(id)));
+      if (faltantes.size > 0) {
+        return batchFailure(
+          "La categoría seleccionada no existe",
+          rows.flatMap((row, rowIndex) =>
+            row.categoryId != null && faltantes.has(row.categoryId)
+              ? [
+                  {
+                    row: rowIndex,
+                    field: "categoryId",
+                    message: "La categoría seleccionada no existe",
+                  },
+                ]
+              : []
+          )
+        );
+      }
     }
 
     // Solo bloquean los nombres de productos ACTIVOS, sin distinguir mayúsculas (S3).
@@ -221,7 +242,7 @@ export async function createProductsBatch(data: unknown) {
                 price: row.price,
                 code: codigos[i],
                 codePrefix: row.prefix,
-                categoryId,
+                categoryId: row.categoryId ?? null,
               })),
               select: { id: true, code: true, name: true },
             });

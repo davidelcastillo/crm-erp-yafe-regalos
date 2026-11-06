@@ -4,16 +4,16 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Swal from "sweetalert2";
-import { CategorySelector } from "@/components/ui/CategorySelector";
+import { getCategoryOptions } from "@/app/actions/category";
 import { createProductsBatch } from "@/app/actions/product";
 import { createProductsBatchSchema } from "@/lib/validations/product";
 
 /** Tope de filas por envío (S6). */
 const MAX_FILAS = 50;
 
-type Fila = { id: string; name: string; prefix: string; price: string };
+type Fila = { id: string; name: string; prefix: string; price: string; categoryId: number | null };
 /** `row` es un mensaje que no pertenece a un campo puntual: se muestra en la card. */
-type Campo = "name" | "prefix" | "price" | "row";
+type Campo = "name" | "prefix" | "price" | "categoryId" | "row";
 type FilaError = { field: Campo; message: string };
 
 export interface BulkProductFormProps {
@@ -31,7 +31,7 @@ function erroresPorFila(
     const fila = filas[item.row];
     if (!fila) continue;
     const field: Campo =
-      item.field === "name" || item.field === "prefix" || item.field === "price"
+      item.field === "name" || item.field === "prefix" || item.field === "price" || item.field === "categoryId"
         ? item.field
         : "row";
     (mapa[fila.id] ??= []).push({ field, message: item.message });
@@ -44,15 +44,23 @@ function erroresPorFila(
  *
  * Alta masiva de productos (S1): muchas filas en un mismo modal y un solo
  * envío «todo o nada» (S7). El stock inicial es otra unidad (T5), así que acá
- * solo van nombre, prefijo y precio por fila, más la categoría compartida (S4).
+ * solo van nombre, prefijo, precio y categoría por fila (S4).
+ *
+ * La lista de categorías se pide UNA vez para todo el modal: `CategorySelector`
+ * la carga en su mount, así que instanciarlo por fila serían N viajes. Por eso
+ * cada fila usa un `<select>` nativo sobre esa misma lista, como la sucursal por
+ * ítem de `AddPurchaseButton` (STYLE.md).
  *
  * Patrón: bottom-sheet montado en un portal al `body`, como `ProductForm`
  * (STYLE.md), con el cuerpo con scroll y el pie fijo. Enter nunca envía: pasa
  * al campo siguiente y en el último campo de la última fila agrega una fila.
  */
 export function BulkProductForm({ onClose, onSuccess }: BulkProductFormProps) {
-  const [filas, setFilas] = useState<Fila[]>([{ id: "1", name: "", prefix: "", price: "" }]);
-  const [categoryId, setCategoryId] = useState<number | null>(null);
+  const [filas, setFilas] = useState<Fila[]>([
+    { id: "1", name: "", prefix: "", price: "", categoryId: null },
+  ]);
+  const [categorias, setCategorias] = useState<{ id: number; name: string }[]>([]);
+  const [cargandoCategorias, setCargandoCategorias] = useState(true);
   const [errores, setErrores] = useState<Record<string, FilaError[]>>({});
   const [loading, setLoading] = useState(false);
 
@@ -61,6 +69,24 @@ export function BulkProductForm({ onClose, onSuccess }: BulkProductFormProps) {
   const resumenRef = useRef<HTMLDivElement>(null);
   const idParaEnfocar = useRef<string | null>(null);
   const enfocarResumen = useRef(false);
+
+  // Lista de categorías: un solo viaje para todo el modal, compartido por las filas.
+  useEffect(() => {
+    let cancelado = false;
+    (async () => {
+      try {
+        const resultado = await getCategoryOptions();
+        if (!cancelado && resultado.success && resultado.data) setCategorias(resultado.data);
+      } catch (error) {
+        console.error("Error loading category options:", error);
+      } finally {
+        if (!cancelado) setCargandoCategorias(false);
+      }
+    })();
+    return () => {
+      cancelado = true;
+    };
+  }, []);
 
   // Foco diferido: la fila nueva (o el resumen) todavía no existe cuando se pide.
   useEffect(() => {
@@ -86,6 +112,7 @@ export function BulkProductForm({ onClose, onSuccess }: BulkProductFormProps) {
       name: "",
       prefix: filas[filas.length - 1]?.prefix ?? "", // una fila nueva copia el prefijo anterior
       price: "",
+      categoryId: null,
     };
     idParaEnfocar.current = nueva.id;
     setFilas((prev) => [...prev, nueva]);
@@ -117,7 +144,7 @@ export function BulkProductForm({ onClose, onSuccess }: BulkProductFormProps) {
     });
   };
 
-  const actualizarFila = (id: string, campo: "name" | "prefix" | "price", valor: string) =>
+  const actualizarFila = <K extends keyof Omit<Fila, "id">>(id: string, campo: K, valor: Fila[K]) =>
     setFilas((prev) => prev.map((f) => (f.id === id ? { ...f, [campo]: valor } : f)));
 
   /** Enter pasa al campo siguiente; en el último campo de la última fila agrega una fila. */
@@ -171,8 +198,12 @@ export function BulkProductForm({ onClose, onSuccess }: BulkProductFormProps) {
 
     // Validación de cliente con el mismo esquema: el servidor sigue siendo la autoridad.
     const parsed = createProductsBatchSchema.safeParse({
-      categoryId,
-      rows: filas.map((f) => ({ name: f.name, prefix: f.prefix, price: Number(f.price) })),
+      rows: filas.map((f) => ({
+        name: f.name,
+        prefix: f.prefix,
+        price: Number(f.price),
+        categoryId: f.categoryId,
+      })),
     });
     if (!parsed.success) {
       const items = parsed.error.issues.flatMap((issue) => {
@@ -270,11 +301,10 @@ export function BulkProductForm({ onClose, onSuccess }: BulkProductFormProps) {
           onSubmit={enviar}
           className="flex min-h-0 flex-1 flex-col md:grid md:grid-cols-2 md:items-start md:gap-x-6 md:gap-y-4 md:overflow-y-auto md:px-6 md:pb-4"
         >
-          {/* Columna izquierda desde md: el resumen y las filas. En celular va después
-              del contexto (STYLE.md: primero el contexto, después la acción). */}
+          {/* Columna izquierda desde md: el resumen y las filas. En celular va primero. */}
           <div
             ref={cuerpoRef}
-            className="order-2 min-h-0 flex-1 space-y-4 overflow-y-auto px-6 pb-4 md:order-none md:col-start-1 md:row-start-1 md:overflow-visible md:px-0 md:pb-0"
+            className="order-1 min-h-0 flex-1 space-y-4 overflow-y-auto px-6 pb-4 md:order-none md:col-start-1 md:row-start-1 md:overflow-visible md:px-0 md:pb-0"
           >
             {filasConError.length > 0 && (
               <div
@@ -419,24 +449,45 @@ export function BulkProductForm({ onClose, onSuccess }: BulkProductFormProps) {
                       </p>
                     )}
                   </div>
+
+                  <div>
+                    <label htmlFor={`${base}-categoryId`} className={labelClass}>
+                      Categoría
+                    </label>
+                    <select
+                      id={`${base}-categoryId`}
+                      value={fila.categoryId ?? ""}
+                      onChange={(e) =>
+                        actualizarFila(fila.id, "categoryId", e.target.value ? Number(e.target.value) : null)
+                      }
+                      disabled={cargandoCategorias || loading}
+                      aria-invalid={mensajeDe("categoryId") ? "true" : undefined}
+                      aria-describedby={descritoPor("categoryId")}
+                      className={inputClass}
+                    >
+                      <option value="">{cargandoCategorias ? "Cargando…" : "Sin categoría"}</option>
+                      {categorias.map((categoria) => (
+                        <option key={categoria.id} value={categoria.id}>
+                          {categoria.name}
+                        </option>
+                      ))}
+                    </select>
+                    {mensajeDe("categoryId") && (
+                      <p id={`${base}-categoryId-error`} className="mt-1 text-sm text-error-ink">
+                        {mensajeDe("categoryId")}
+                      </p>
+                    )}
+                  </div>
                 </div>
               );
             })}
           </div>
 
-          {/* Columna derecha desde md: «Para todas» y la acción, pegajosas
-              (`md:sticky md:top-4`). En celular `contents` hace que sus dos bloques
-              se ordenen en la columna única —contexto arriba, pie al final— sin
-              duplicar markup. */}
+          {/* Columna derecha desde md: la acción, pegajosa (`md:sticky md:top-4`).
+              En celular `contents` deja el pie al final de la columna única. */}
           <div className="contents md:sticky md:top-4 md:col-start-2 md:row-start-1 md:block md:space-y-4">
-            {/* Contexto primero (STYLE.md): la categoría es una sola para el lote (S4). */}
-            <div className="order-1 mx-6 mb-4 rounded-2xl border border-hairline bg-surface-soft p-4 md:order-none md:mx-0 md:mb-0">
-              <span className={labelClass}>Categoría (para todas)</span>
-              <CategorySelector selectedId={categoryId} onValueChange={setCategoryId} label="" />
-            </div>
-
             {/* Pie fijo: agregar filas a la izquierda del envío, una sola acción primaria. */}
-            <div className="order-3 space-y-2 border-t border-hairline px-6 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4 md:order-none md:border-0 md:p-0">
+            <div className="order-2 space-y-2 border-t border-hairline px-6 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4 md:order-none md:border-0 md:p-0">
               <button
                 type="button"
                 onClick={agregarFila}

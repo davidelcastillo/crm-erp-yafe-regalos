@@ -14,16 +14,23 @@ export const createProductSchema = z.object({
 });
 
 /**
- * Schema de alta masiva. La categoría es una sola para todo el lote (S4) y
- * cada fila usa la misma regla que el alta individual. El nombre repetido
- * dentro del lote se marca en la fila repetida; el choque con un nombre que ya
- * existe se valida en el servidor, contra los productos activos (S3).
+ * Fila del alta masiva: la misma regla que el alta individual más la
+ * categoría de esa fila, opcional (S4).
+ */
+const createProductsBatchRowSchema = createProductSchema.extend({
+  categoryId: z.number().int().positive("Categoría inválida").nullable().optional(),
+});
+
+/**
+ * Schema de alta masiva. La categoría es de cada fila (S4), así que el lote no
+ * lleva ninguna. El nombre repetido dentro del lote se marca en la fila
+ * repetida; el choque con un nombre que ya existe se valida en el servidor,
+ * contra los productos activos (S3).
  */
 export const createProductsBatchSchema = z
   .object({
-    categoryId: z.number().int().positive("Categoría inválida").nullable().optional(),
     rows: z
-      .array(createProductSchema)
+      .array(createProductsBatchRowSchema)
       .min(1, "Agregá al menos un producto")
       .max(50, "Máximo 50 productos por carga"),
   })

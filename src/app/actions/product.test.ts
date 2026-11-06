@@ -12,6 +12,7 @@ jest.mock("@/lib/prisma", () => {
   const mockProductCreate = jest.fn();
   const mockCreateManyAndReturn = jest.fn();
   const mockCategoryFindUnique = jest.fn();
+  const mockCategoryFindMany = jest.fn();
   const mockExecuteRawUnsafe = jest.fn().mockResolvedValue(undefined);
   const mockTransaction = jest.fn(async (callback: (tx: unknown) => Promise<unknown>) => {
     const tx = {
@@ -39,6 +40,7 @@ jest.mock("@/lib/prisma", () => {
       },
       category: {
         findUnique: mockCategoryFindUnique,
+        findMany: mockCategoryFindMany,
       },
     },
   };
@@ -384,6 +386,29 @@ describe("createProductsBatch", () => {
     expect(lleno.success === false && lleno.error.issues[0]?.message).toBe("Máximo 50 productos por carga");
   });
 
+  // S4: la categoría es de cada fila, no del lote. Una fila sin categoría es válida.
+  it("la categoría va por fila y es opcional", () => {
+    const parsed = createProductsBatchSchema.safeParse({
+      rows: [
+        { name: "Producto A", prefix: "ZZ", price: 10, categoryId: 5 },
+        { name: "Producto B", prefix: "ZZ", price: 10 },
+        { name: "Producto C", prefix: "ZZ", price: 10, categoryId: null },
+      ],
+    });
+
+    expect(parsed.success).toBe(true);
+    if (!parsed.success) return;
+    expect(parsed.data.rows.map((row) => row.categoryId)).toEqual([5, undefined, null]);
+
+    const invalida = createProductsBatchSchema.safeParse({
+      rows: [{ name: "Producto A", prefix: "ZZ", price: 10, categoryId: 0 }],
+    });
+    expect(invalida.success).toBe(false);
+    if (invalida.success) return;
+    expect(invalida.error.issues[0]?.message).toBe("Categoría inválida");
+    expect(invalida.error.issues[0]?.path).toEqual(["rows", 0, "categoryId"]);
+  });
+
   it("el error de una fila lleva su índice en el path", () => {
     const parsed = createProductsBatchSchema.safeParse({
       rows: [fila(1), { name: "", prefix: "ZZ", price: 10 }],
@@ -437,7 +462,6 @@ describe("createProductsBatch", () => {
   });
 
   it("devuelve los productos en el orden de las filas, cruzando por código", async () => {
-    (prisma.category.findUnique as jest.Mock).mockResolvedValue({ id: 5 });
     (prisma.product.findMany as jest.Mock).mockResolvedValue([]);
     // `createManyAndReturn` no promete orden: la respuesta se arma cruzando por código.
     (prisma.product.createManyAndReturn as jest.Mock).mockResolvedValue([
@@ -446,7 +470,6 @@ describe("createProductsBatch", () => {
     ]);
 
     const result = await createProductsBatch({
-      categoryId: 5,
       rows: [
         { name: "Producto A", prefix: "ZZ", price: 10 },
         { name: "Producto C", prefix: "ZZ", price: 20 },
@@ -485,16 +508,63 @@ describe("createProductsBatch", () => {
 
   // Cubre el mapeo de la rama P2003, no la carrera de FK que la dispara en producción.
   it("un P2003 del insert vuelve como categoría inexistente", async () => {
-    (prisma.category.findUnique as jest.Mock).mockResolvedValue({ id: 5 });
+    (prisma.category.findMany as jest.Mock).mockResolvedValue([{ id: 5 }]);
     (prisma.product.findMany as jest.Mock).mockResolvedValue([]);
     (prisma.product.createManyAndReturn as jest.Mock).mockRejectedValueOnce({ code: "P2003" });
 
     const result = await createProductsBatch({
-      categoryId: 5,
-      rows: [{ name: "Producto A", prefix: "ZZ", price: 10 }],
+      rows: [{ name: "Producto A", prefix: "ZZ", price: 10, categoryId: 5 }],
     });
 
     expect(result).toEqual({ success: false, error: "La categoría seleccionada no existe" });
+  });
+
+  it("verifica las categorías distintas en una sola consulta y escribe la de cada fila", async () => {
+    (prisma.category.findMany as jest.Mock).mockResolvedValue([{ id: 5 }, { id: 7 }]);
+    (prisma.product.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.product.createManyAndReturn as jest.Mock).mockResolvedValue([
+      { id: 1, code: "ZZ000", name: "Producto A" },
+      { id: 2, code: "ZZ001", name: "Producto B" },
+      { id: 3, code: "ZZ002", name: "Producto C" },
+    ]);
+
+    const result = await createProductsBatch({
+      rows: [
+        { name: "Producto A", prefix: "ZZ", price: 10, categoryId: 5 },
+        { name: "Producto B", prefix: "ZZ", price: 10, categoryId: 7 },
+        { name: "Producto C", prefix: "ZZ", price: 10 },
+      ],
+    });
+
+    expect(result.success).toBe(true);
+    // Una sola consulta, con los ids distintos y sin repetir.
+    expect(prisma.category.findMany).toHaveBeenCalledTimes(1);
+    expect(prisma.category.findMany).toHaveBeenCalledWith({
+      where: { id: { in: [5, 7] } },
+      select: { id: true },
+    });
+    // Cada fila se inserta con la suya; la que no tiene queda en null.
+    const data = (prisma.product.createManyAndReturn as jest.Mock).mock.calls[0][0].data;
+    expect(data.map((row: { categoryId: number | null }) => row.categoryId)).toEqual([5, 7, null]);
+  });
+
+  it("una categoría inexistente falla el lote entero y marca solo sus filas", async () => {
+    (prisma.category.findMany as jest.Mock).mockResolvedValue([{ id: 5 }]);
+
+    const result = await createProductsBatch({
+      rows: [
+        { name: "Producto A", prefix: "ZZ", price: 10, categoryId: 5 },
+        { name: "Producto B", prefix: "ZZ", price: 10 },
+        { name: "Producto C", prefix: "ZZ", price: 10, categoryId: 999 },
+      ],
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error: "La categoría seleccionada no existe",
+      rowErrors: [{ row: 2, field: "categoryId", message: "La categoría seleccionada no existe" }],
+    });
+    expect(prisma.product.createManyAndReturn).not.toHaveBeenCalled();
   });
 });
 
