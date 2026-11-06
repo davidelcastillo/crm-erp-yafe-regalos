@@ -8,6 +8,10 @@
  * producto existente está activo, y todo o nada cuando una fila falla, el
  * prefijo se agota o la categoría no existe.
  *
+ * T5 suma el ingreso inicial (S2, S11): stock por fila en una sucursal global
+ * del lote, movimiento `ENTRY` y comprobante solo para las filas con stock, y
+ * la atomicidad multi-sentencia que recién acá se puede probar.
+ *
  * Los tests que escriben datos corren con `npm run test:local-db`.
  */
 
@@ -26,6 +30,9 @@ const PREFIJO_AGOTADO = `${base}E`;
 const PREFIJO_CONCURRENTE = `${base}F`;
 const PREFIJO_CONFLICTO = `${base}G`;
 const PREFIJO_ATOMICO = `${base}H`;
+const PREFIJO_STOCK = `${base}J`;
+const PREFIJO_SIN_SUCURSAL = `${base}K`;
+const PREFIJO_ATOMICO_STOCK = `${base}L`;
 
 const PREFIJOS = [
   PREFIJO_TREINTA,
@@ -36,7 +43,14 @@ const PREFIJOS = [
   PREFIJO_CONCURRENTE,
   PREFIJO_CONFLICTO,
   PREFIJO_ATOMICO,
+  PREFIJO_STOCK,
+  PREFIJO_SIN_SUCURSAL,
+  PREFIJO_ATOMICO_STOCK,
 ];
+
+const NOMBRE_SUCURSAL = `QA lote sucursal ${sufijo}`;
+const CODIGO_SUCURSAL = `QS${sufijo}`;
+const CODIGO_SUCURSAL_INACTIVA = `QT${sufijo}`;
 
 const NOMBRE_EXISTENTE = `${marca} nombre existente`;
 const NOMBRE_INACTIVO = `${marca} nombre inactivo`;
@@ -49,6 +63,8 @@ let prisma: Cliente;
 let acciones: Acciones;
 let categoryId = 0;
 let categoryId2 = 0;
+let branchId = 0;
+let branchInactivaId = 0;
 
 const limpiar = async () => {
   await prisma.product.deleteMany({
@@ -65,6 +81,19 @@ describe("createProductsBatch (integración, base local)", () => {
     acciones = await import("@/app/actions/product");
 
     await limpiar();
+
+    // `code` de sucursal es único: si una corrida anterior se cortó, se limpia antes.
+    await prisma.branch.deleteMany({ where: { code: { in: [CODIGO_SUCURSAL, CODIGO_SUCURSAL_INACTIVA] } } });
+    // `authUserId` no nulo: `branchAdminService.populateAuthUserIds` actualiza
+    // todas las sucursales sin authUserId y pisaría las fixtures.
+    const sucursal = await prisma.branch.create({
+      data: { name: NOMBRE_SUCURSAL, code: CODIGO_SUCURSAL, authUserId: `qa-lote-${sufijo}` },
+    });
+    branchId = sucursal.id;
+    const sucursalInactiva = await prisma.branch.create({
+      data: { name: `QA lote inactiva ${sufijo}`, code: CODIGO_SUCURSAL_INACTIVA, isActive: false },
+    });
+    branchInactivaId = sucursalInactiva.id;
 
     const categoria = await prisma.category.create({
       data: { name: `${marca} categoria` },
@@ -87,6 +116,7 @@ describe("createProductsBatch (integración, base local)", () => {
   afterAll(async () => {
     await limpiar();
     await prisma.category.deleteMany({ where: { id: { in: [categoryId, categoryId2] } } });
+    await prisma.branch.deleteMany({ where: { id: { in: [branchId, branchInactivaId] } } });
     await prisma.$disconnect();
   });
 
@@ -336,6 +366,190 @@ describe("createProductsBatch (integración, base local)", () => {
         select: { code: true, codePrefix: true, name: true },
       })
     ).toEqual({ code: codigoHeredado, codePrefix: null, name: `${marca} legado atomico` });
+  });
+  // C1 del documento (S2, S11): stock inicial, movimiento ENTRY y comprobante.
+  it("C1: deja inventario de las tres filas, movimiento ENTRY solo de las que tienen stock y su comprobante", async () => {
+    const resultado = await acciones.createProductsBatch({
+      branchId,
+      rows: [
+        { name: `${marca} c1 a`, prefix: PREFIJO_STOCK, price: 10, initialStock: 5 },
+        { name: `${marca} c1 b`, prefix: PREFIJO_STOCK, price: 20, initialStock: 0 },
+        { name: `${marca} c1 c`, prefix: PREFIJO_STOCK, price: 30, initialStock: 12 },
+      ],
+    });
+
+    expect(resultado.success).toBe(true);
+    if (!resultado.success) return;
+    const { products, receipt } = resultado.data;
+    expect(products.map((p) => p.code)).toEqual([
+      `${PREFIJO_STOCK}000`,
+      `${PREFIJO_STOCK}001`,
+      `${PREFIJO_STOCK}002`,
+    ]);
+    const [a, b, c] = products.map((p) => p.id);
+
+    // Inventario: las tres filas, incluida la de stock 0 (S11/H1).
+    const inventario = await prisma.branchInventory.findMany({
+      where: { branchId, productId: { in: [a, b, c] } },
+      select: { productId: true, stock: true },
+    });
+    expect(inventario).toHaveLength(3);
+    const stockPorProducto = new Map(inventario.map((i) => [i.productId, i.stock]));
+    expect(stockPorProducto.get(a)).toBe(5);
+    expect(stockPorProducto.get(b)).toBe(0);
+    expect(stockPorProducto.get(c)).toBe(12);
+
+    // Movimientos: exactamente dos, ENTRY, con el motivo y el admin de la sesión.
+    const movimientos = await prisma.branchMovement.findMany({
+      where: { branchId, productId: { in: [a, b, c] } },
+      select: {
+        productId: true,
+        movementType: true,
+        quantity: true,
+        reference: true,
+        performedBy: true,
+      },
+    });
+    expect(movimientos).toHaveLength(2);
+    expect(movimientos).toEqual(
+      expect.arrayContaining([
+        {
+          productId: a,
+          movementType: "ENTRY",
+          quantity: 5,
+          reference: "ALTA DE PRODUCTOS",
+          performedBy: "test@feria.test",
+        },
+        {
+          productId: c,
+          movementType: "ENTRY",
+          quantity: 12,
+          reference: "ALTA DE PRODUCTOS",
+          performedBy: "test@feria.test",
+        },
+      ])
+    );
+
+    // Cabecera del comprobante.
+    expect(receipt).not.toBeNull();
+    if (!receipt) return;
+    expect(receipt.movementType).toBe("ENTRY");
+    expect(receipt.branchId).toBe(branchId);
+    expect(receipt.branchName).toBe(NOMBRE_SUCURSAL);
+    expect(receipt.branchCode).toBe(CODIGO_SUCURSAL);
+    expect(receipt.reference).toBe("ALTA DE PRODUCTOS");
+    expect(Number.isNaN(Date.parse(receipt.date))).toBe(false);
+
+    // Filas: solo A y C, en el orden de las filas, con el saldo leído de la base.
+    expect(receipt.rows).toEqual([
+      {
+        productId: a,
+        code: products[0].code,
+        name: products[0].name,
+        price: 10,
+        quantity: 5,
+        stock: stockPorProducto.get(a),
+      },
+      {
+        productId: c,
+        code: products[2].code,
+        name: products[2].name,
+        price: 30,
+        quantity: 12,
+        stock: stockPorProducto.get(c),
+      },
+    ]);
+    // La fila con stock 0 no va al comprobante: las etiquetas exigen cantidad >= 1.
+    expect(receipt.rows.some((row) => row.productId === b)).toBe(false);
+
+    // Cruce: un movimiento por fila del comprobante y ninguno queda sin fila.
+    for (const row of receipt.rows) {
+      const propios = movimientos.filter((m) => m.productId === row.productId);
+      expect(propios).toHaveLength(1);
+      expect(propios[0].quantity).toBe(row.quantity);
+    }
+
+    // El PDF del comprobante se arma con este snapshot (pdf-lib corre en node).
+    const { generateStockMovementPdf } = await import("@/lib/utils/stock-movement-pdf");
+    const pdf = await generateStockMovementPdf(receipt);
+    expect(pdf.byteLength).toBeGreaterThan(0);
+  });
+
+  // Sucursal inactiva: falla antes de la transacción y no deja rastro.
+  it("con una sucursal inactiva no crea productos, inventario ni movimientos", async () => {
+    const contar = () =>
+      Promise.all([
+        prisma.product.count({ where: { codePrefix: PREFIJO_SIN_SUCURSAL } }),
+        prisma.branchInventory.count({ where: { branchId: branchInactivaId } }),
+        prisma.branchMovement.count({ where: { branchId: branchInactivaId } }),
+      ]);
+    const antes = await contar();
+
+    const resultado = await acciones.createProductsBatch({
+      branchId: branchInactivaId,
+      rows: [
+        { name: `${marca} inactiva a`, prefix: PREFIJO_SIN_SUCURSAL, price: 10, initialStock: 4 },
+      ],
+    });
+
+    expect(resultado).toEqual({ success: false, error: "Sucursal inválida o inactiva" });
+    expect(await contar()).toEqual(antes);
+  });
+
+  // La UI todavía no manda sucursal: el lote tiene que seguir igual que antes.
+  it("sin sucursal sigue creando solo productos y devuelve receipt null", async () => {
+    const resultado = await acciones.createProductsBatch({
+      rows: [
+        { name: `${marca} sin sucursal a`, prefix: PREFIJO_SIN_SUCURSAL, price: 10 },
+        { name: `${marca} sin sucursal b`, prefix: PREFIJO_SIN_SUCURSAL, price: 10, initialStock: 7 },
+      ],
+    });
+
+    expect(resultado.success).toBe(true);
+    if (!resultado.success) return;
+    expect(resultado.data.receipt).toBeNull();
+
+    const ids = resultado.data.products.map((p) => p.id);
+    expect(await prisma.branchInventory.count({ where: { productId: { in: ids } } })).toBe(0);
+    expect(await prisma.branchMovement.count({ where: { productId: { in: ids } } })).toBe(0);
+  });
+
+  // Atomicidad MULTI-SENTENCIA, la que T2b no podía probar: acá hay una segunda
+  // escritura (BranchInventory) después del insert de productos. El fallo se
+  // fuerza con un stock de 3.000 millones, que no entra en un INTEGER de
+  // Postgres: el insert de productos ya se ejecutó y el de inventario revienta.
+  it("si el stock inicial falla después del insert, no queda ningún producto ni stock", async () => {
+    const antes = await prisma.product.count({ where: { codePrefix: PREFIJO_ATOMICO_STOCK } });
+    expect(antes).toBe(0);
+
+    const consoleError = jest.spyOn(console, "error").mockImplementation(() => {});
+    const resultado = await acciones.createProductsBatch({
+      branchId,
+      rows: [
+        { name: `${marca} atomico stock a`, prefix: PREFIJO_ATOMICO_STOCK, price: 10, initialStock: 3 },
+        {
+          name: `${marca} atomico stock b`,
+          prefix: PREFIJO_ATOMICO_STOCK,
+          price: 10,
+          initialStock: 3_000_000_000,
+        },
+      ],
+    });
+    consoleError.mockRestore();
+
+    expect(resultado).toEqual({ success: false, error: "Error al crear los productos" });
+    // La fila válida (stock 3) tampoco quedó: la transacción revirtió las dos escrituras.
+    expect(await prisma.product.count({ where: { codePrefix: PREFIJO_ATOMICO_STOCK } })).toBe(0);
+    expect(
+      await prisma.branchInventory.count({
+        where: { branchId, product: { code: { startsWith: PREFIJO_ATOMICO_STOCK } } },
+      })
+    ).toBe(0);
+    expect(
+      await prisma.branchMovement.count({
+        where: { branchId, product: { code: { startsWith: PREFIJO_ATOMICO_STOCK } } },
+      })
+    ).toBe(0);
   });
 });
 

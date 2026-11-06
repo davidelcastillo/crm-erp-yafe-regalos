@@ -15,10 +15,12 @@ export const createProductSchema = z.object({
 
 /**
  * Fila del alta masiva: la misma regla que el alta individual más la
- * categoría de esa fila, opcional (S4).
+ * categoría de esa fila, opcional (S4), y su stock inicial (S2/S11), que sin
+ * valor se trata como 0.
  */
 const createProductsBatchRowSchema = createProductSchema.extend({
   categoryId: z.number().int().positive("Categoría inválida").nullable().optional(),
+  initialStock: z.number().int().min(0, "El stock no puede ser negativo").optional(),
 });
 
 /**
@@ -26,9 +28,13 @@ const createProductsBatchRowSchema = createProductSchema.extend({
  * lleva ninguna. El nombre repetido dentro del lote se marca en la fila
  * repetida; el choque con un nombre que ya existe se valida en el servidor,
  * contra los productos activos (S3).
+ *
+ * `branchId` es opcional a propósito: es la sucursal global del lote (D8) y,
+ * mientras la UI no la mande, el lote sigue creando solo productos.
  */
 export const createProductsBatchSchema = z
   .object({
+    branchId: z.number().int().positive("Sucursal inválida").optional(),
     rows: z
       .array(createProductsBatchRowSchema)
       .min(1, "Agregá al menos un producto")

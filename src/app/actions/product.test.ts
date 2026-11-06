@@ -13,6 +13,9 @@ jest.mock("@/lib/prisma", () => {
   const mockCreateManyAndReturn = jest.fn();
   const mockCategoryFindUnique = jest.fn();
   const mockCategoryFindMany = jest.fn();
+  const mockBranchFindFirst = jest.fn();
+  const mockInventoryCreateManyAndReturn = jest.fn();
+  const mockMovementCreateMany = jest.fn();
   const mockExecuteRawUnsafe = jest.fn().mockResolvedValue(undefined);
   const mockTransaction = jest.fn(async (callback: (tx: unknown) => Promise<unknown>) => {
     const tx = {
@@ -21,6 +24,8 @@ jest.mock("@/lib/prisma", () => {
         create: mockProductCreate,
         createManyAndReturn: mockCreateManyAndReturn,
       },
+      branchInventory: { createManyAndReturn: mockInventoryCreateManyAndReturn },
+      branchMovement: { createMany: mockMovementCreateMany },
       $executeRawUnsafe: mockExecuteRawUnsafe,
     };
     return callback(tx);
@@ -42,6 +47,9 @@ jest.mock("@/lib/prisma", () => {
         findUnique: mockCategoryFindUnique,
         findMany: mockCategoryFindMany,
       },
+      branch: { findFirst: mockBranchFindFirst },
+      branchInventory: { createManyAndReturn: mockInventoryCreateManyAndReturn },
+      branchMovement: { createMany: mockMovementCreateMany },
     },
   };
 });
@@ -565,6 +573,191 @@ describe("createProductsBatch", () => {
       rowErrors: [{ row: 2, field: "categoryId", message: "La categoría seleccionada no existe" }],
     });
     expect(prisma.product.createManyAndReturn).not.toHaveBeenCalled();
+  });
+});
+
+// Alta masiva con stock inicial (ODD `productos-alta-masiva`, T5; S2 y S11):
+// inventario para todas las filas, movimiento y comprobante solo para las que
+// tienen stock, y sucursal opcional mientras la UI no la mande (D8).
+describe("createProductsBatch: stock inicial y comprobante", () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  const fila = (n: number, initialStock?: number) => ({
+    name: `Producto ${n}`,
+    prefix: "ZZ",
+    price: n * 10,
+    ...(initialStock === undefined ? {} : { initialStock }),
+  });
+
+  it("el stock inicial es un entero >= 0 opcional y la sucursal del lote es opcional", () => {
+    const ok = createProductsBatchSchema.safeParse({
+      branchId: 3,
+      rows: [fila(1, 0), fila(2, 12), fila(3)],
+    });
+    expect(ok.success).toBe(true);
+    if (!ok.success) return;
+    expect(ok.data.branchId).toBe(3);
+    // Sin valor, el stock no viaja: la acción lo trata como 0.
+    expect(ok.data.rows.map((row) => row.initialStock)).toEqual([0, 12, undefined]);
+
+    // Sin sucursal sigue siendo válido: la UI todavía no la manda.
+    expect(createProductsBatchSchema.safeParse({ rows: [fila(1)] }).success).toBe(true);
+
+    const negativo = createProductsBatchSchema.safeParse({ rows: [fila(1, -1)] });
+    expect(negativo.success).toBe(false);
+    if (negativo.success) return;
+    expect(negativo.error.issues[0]?.message).toBe("El stock no puede ser negativo");
+    expect(negativo.error.issues[0]?.path).toEqual(["rows", 0, "initialStock"]);
+
+    expect(createProductsBatchSchema.safeParse({ rows: [fila(1, 1.5)] }).success).toBe(false);
+
+    for (const branchId of [0, -3]) {
+      const sucursal = createProductsBatchSchema.safeParse({ branchId, rows: [fila(1)] });
+      expect(sucursal.success).toBe(false);
+      if (sucursal.success) return;
+      expect(sucursal.error.issues[0]?.message).toBe("Sucursal inválida");
+      expect(sucursal.error.issues[0]?.path).toEqual(["branchId"]);
+    }
+  });
+
+  it("sin sucursal devuelve receipt null y no toca inventario ni movimientos", async () => {
+    (prisma.product.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.product.createManyAndReturn as jest.Mock).mockResolvedValue([
+      { id: 1, code: "ZZ000", name: "Producto 1", price: 10 },
+    ]);
+
+    const result = await createProductsBatch({ rows: [fila(1, 3)] });
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.receipt).toBeNull();
+    expect(prisma.branch.findFirst).not.toHaveBeenCalled();
+    expect(prisma.branchInventory.createManyAndReturn).not.toHaveBeenCalled();
+    expect(prisma.branchMovement.createMany).not.toHaveBeenCalled();
+  });
+
+  it("una sucursal inactiva o inexistente falla antes de la transacción y no escribe nada", async () => {
+    (prisma.branch.findFirst as jest.Mock).mockResolvedValue(null);
+
+    const result = await createProductsBatch({ branchId: 7, rows: [fila(1, 1)] });
+
+    expect(result).toEqual({ success: false, error: "Sucursal inválida o inactiva" });
+    // Una sola consulta, y trae el `code` que necesita el comprobante.
+    expect(prisma.branch.findFirst).toHaveBeenCalledWith({
+      where: { id: 7, isActive: true },
+      select: { id: true, name: true, code: true },
+    });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(prisma.product.createManyAndReturn).not.toHaveBeenCalled();
+  });
+
+  it("deja inventario de todas las filas y movimiento y comprobante solo de las que tienen stock", async () => {
+    (prisma.branch.findFirst as jest.Mock).mockResolvedValue({ id: 7, name: "Centro", code: "CE" });
+    (prisma.product.findMany as jest.Mock).mockResolvedValue([]);
+    // Devueltos al revés a propósito: todo se cruza por código o por id, nunca por posición.
+    (prisma.product.createManyAndReturn as jest.Mock).mockResolvedValue([
+      { id: 3, code: "ZZ002", name: "Producto 3", price: 30 },
+      { id: 1, code: "ZZ000", name: "Producto 1", price: 10 },
+      { id: 2, code: "ZZ001", name: "Producto 2", price: 20 },
+    ]);
+    (prisma.branchInventory.createManyAndReturn as jest.Mock).mockResolvedValue([
+      { productId: 2, stock: 0 },
+      { productId: 3, stock: 12 },
+      { productId: 1, stock: 5 },
+    ]);
+
+    const result = await createProductsBatch({
+      branchId: 7,
+      rows: [fila(1, 5), fila(2), fila(3, 12)],
+    });
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.products.map((p) => p.id)).toEqual([1, 2, 3]);
+
+    // Inventario: las tres filas, incluida la de stock 0 (S11/H1).
+    const inventario = (prisma.branchInventory.createManyAndReturn as jest.Mock).mock.calls[0][0].data;
+    expect(inventario).toEqual([
+      { branchId: 7, productId: 1, stock: 5 },
+      { branchId: 7, productId: 2, stock: 0 },
+      { branchId: 7, productId: 3, stock: 12 },
+    ]);
+
+    // Movimiento: solo las de stock > 0, con el motivo y el admin de la sesión.
+    const movimientos = (prisma.branchMovement.createMany as jest.Mock).mock.calls[0][0].data;
+    expect(movimientos).toEqual([
+      {
+        productId: 1,
+        branchId: 7,
+        movementType: "ENTRY",
+        quantity: 5,
+        reference: "ALTA DE PRODUCTOS",
+        performedBy: "test@feria.test",
+      },
+      {
+        productId: 3,
+        branchId: 7,
+        movementType: "ENTRY",
+        quantity: 12,
+        reference: "ALTA DE PRODUCTOS",
+        performedBy: "test@feria.test",
+      },
+    ]);
+
+    // Comprobante: cabecera del lote y solo las filas con stock, con el saldo devuelto.
+    expect(result.data.receipt).toEqual({
+      movementType: "ENTRY",
+      branchId: 7,
+      branchName: "Centro",
+      branchCode: "CE",
+      reference: "ALTA DE PRODUCTOS",
+      date: expect.any(String),
+      rows: [
+        { productId: 1, code: "ZZ000", name: "Producto 1", price: 10, quantity: 5, stock: 5 },
+        { productId: 3, code: "ZZ002", name: "Producto 3", price: 30, quantity: 12, stock: 12 },
+      ],
+    });
+    // El historial de movimientos cambió: se revalida junto con el resto.
+    expect(revalidatePath).toHaveBeenCalledWith("/movimientos");
+  });
+
+  it("con sucursal y ninguna fila con stock no hay movimiento ni comprobante", async () => {
+    (prisma.branch.findFirst as jest.Mock).mockResolvedValue({ id: 7, name: "Centro", code: "CE" });
+    (prisma.product.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.product.createManyAndReturn as jest.Mock).mockResolvedValue([
+      { id: 1, code: "ZZ000", name: "Producto 1", price: 10 },
+    ]);
+    (prisma.branchInventory.createManyAndReturn as jest.Mock).mockResolvedValue([
+      { productId: 1, stock: 0 },
+    ]);
+
+    const result = await createProductsBatch({ branchId: 7, rows: [fila(1)] });
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.receipt).toBeNull();
+    expect(prisma.branchInventory.createManyAndReturn).toHaveBeenCalledTimes(1);
+    expect(prisma.branchMovement.createMany).not.toHaveBeenCalled();
+    expect(revalidatePath).not.toHaveBeenCalledWith("/movimientos");
+  });
+
+  it("sin email del admin el movimiento queda con un responsable explícito", async () => {
+    const { requireAdmin } = jest.requireMock<{ requireAdmin: jest.Mock }>("@/lib/auth-guard");
+    requireAdmin.mockResolvedValueOnce({ ok: true, email: "" });
+    (prisma.branch.findFirst as jest.Mock).mockResolvedValue({ id: 7, name: "Centro", code: "CE" });
+    (prisma.product.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.product.createManyAndReturn as jest.Mock).mockResolvedValue([
+      { id: 1, code: "ZZ000", name: "Producto 1", price: 10 },
+    ]);
+    (prisma.branchInventory.createManyAndReturn as jest.Mock).mockResolvedValue([
+      { productId: 1, stock: 4 },
+    ]);
+
+    const result = await createProductsBatch({ branchId: 7, rows: [fila(1, 4)] });
+
+    expect(result.success).toBe(true);
+    const movimientos = (prisma.branchMovement.createMany as jest.Mock).mock.calls[0][0].data;
+    expect(movimientos[0].performedBy).toBe("admin");
   });
 });
 

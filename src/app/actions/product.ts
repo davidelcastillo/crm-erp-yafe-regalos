@@ -9,7 +9,11 @@ import { sortProducts } from "@/lib/product-order";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getNextCode, prefixLockKey } from "@/lib/utils/product-code";
+import type { StockMovementReceipt } from "@/lib/stock-movement-receipt";
 import { createProductSchema, createProductsBatchSchema, updateProductExtendedSchema } from "@/lib/validations/product";
+
+/** Motivo del ingreso inicial en el movimiento y en el comprobante (D9). */
+const BATCH_ENTRY_REFERENCE = "ALTA DE PRODUCTOS";
 
 // Schema for searchProducts action
 const searchProductsSchema = z.object({
@@ -130,7 +134,9 @@ function batchFailure(error: string, rowErrors: BatchRowError[] = []) {
 
 /**
  * Alta masiva de productos. Todo o nada (S7): cualquier falla revierte todas
- * las filas. Solo crea productos; el stock inicial y su movimiento son otra unidad.
+ * las filas. Con `branchId`, el lote además deja el stock inicial de cada fila
+ * en esa sucursal: `BranchInventory` siempre (S11, también en 0), movimiento
+ * `ENTRY` y comprobante solo para las filas con stock (S2).
  */
 export async function createProductsBatch(data: unknown) {
   // Se llena después de validar; el catch la usa para marcar el prefijo agotado.
@@ -147,8 +153,20 @@ export async function createProductsBatch(data: unknown) {
         rowErrorsFromZodError(parsed.error)
       );
     }
-    const { rows } = parsed.data;
+    const { rows, branchId } = parsed.data;
     filas = rows;
+
+    // Sucursal global del lote (D8): una sola consulta, antes de escribir nada.
+    const branch =
+      branchId === undefined
+        ? null
+        : await prisma.branch.findFirst({
+            where: { id: branchId, isActive: true },
+            select: { id: true, name: true, code: true },
+          });
+    if (branchId !== undefined && !branch) {
+      return batchFailure("Sucursal inválida o inactiva");
+    }
 
     // Una categoría por fila (S4): las distintas se verifican en UNA consulta,
     // nunca una por fila (H6).
@@ -205,7 +223,7 @@ export async function createProductsBatch(data: unknown) {
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        const products = await prisma.$transaction(
+        const resultado = await prisma.$transaction(
           async (tx) => {
             // Un lock por prefijo, ordenados y sin repetir: la misma clave que
             // `createProduct`, así el alta individual y el lote se serializan.
@@ -244,23 +262,84 @@ export async function createProductsBatch(data: unknown) {
                 codePrefix: row.prefix,
                 categoryId: row.categoryId ?? null,
               })),
-              select: { id: true, code: true, name: true },
+              select: { id: true, code: true, name: true, price: true },
             });
 
             // `createManyAndReturn` no promete orden: se cruza por código.
             const porCodigo = new Map(creados.map((p) => [p.code, p]));
-            return rows.map((row, i) => {
+            const filasCreadas = rows.map((row, i) => {
               const creado = porCodigo.get(codigos[i]);
               if (!creado) throw new Error("No se pudo leer uno de los productos creados");
-              return { id: creado.id, code: creado.code, name: creado.name };
+              return { producto: creado, stockInicial: row.initialStock ?? 0 };
             });
+            const products = filasCreadas.map(({ producto }) => ({
+              id: producto.id,
+              code: producto.code,
+              name: producto.name,
+            }));
+
+            // Sin sucursal el lote queda como antes: solo productos.
+            if (!branch) return { products, receipt: null };
+
+            // S11: la fila de inventario se crea siempre, también con stock 0,
+            // para que el producto nuevo se vea en la vista por sucursal (H1).
+            const inventarios = await tx.branchInventory.createManyAndReturn({
+              data: filasCreadas.map(({ producto, stockInicial }) => ({
+                branchId: branch.id,
+                productId: producto.id,
+                stock: stockInicial,
+              })),
+              select: { productId: true, stock: true },
+            });
+            const stockPorProducto = new Map(inventarios.map((i) => [i.productId, i.stock]));
+
+            // Stock 0 no es un ingreso: no deja movimiento ni va al comprobante.
+            const conStock = filasCreadas.filter((fila) => fila.stockInicial > 0);
+            if (conStock.length > 0) {
+              await tx.branchMovement.createMany({
+                data: conStock.map(({ producto, stockInicial }) => ({
+                  productId: producto.id,
+                  branchId: branch.id,
+                  movementType: "ENTRY",
+                  quantity: stockInicial,
+                  reference: BATCH_ENTRY_REFERENCE,
+                  // Calidad de auditoría, no un fix de la base: `performedBy` es
+                  // TEXT NOT NULL y acepta "" igual, pero un ingreso sin responsable es ilegible.
+                  performedBy: auth.email || "admin",
+                })),
+              });
+            }
+
+            const receipt: StockMovementReceipt | null =
+              conStock.length === 0
+                ? null
+                : {
+                    movementType: "ENTRY",
+                    branchId: branch.id,
+                    date: new Date().toISOString(),
+                    branchName: branch.name,
+                    branchCode: branch.code,
+                    reference: BATCH_ENTRY_REFERENCE,
+                    rows: conStock.map(({ producto, stockInicial }) => ({
+                      productId: producto.id,
+                      code: producto.code,
+                      name: producto.name,
+                      price: Number(producto.price),
+                      quantity: stockInicial,
+                      // Saldo confirmado por la transacción, no supuesto.
+                      stock: stockPorProducto.get(producto.id)!,
+                    })),
+                  };
+
+            return { products, receipt };
           },
           { timeout: 20_000 }
         );
 
         revalidatePath("/inventario");
         revalidatePath("/productos");
-        return { success: true as const, data: { products } };
+        if (resultado.receipt) revalidatePath("/movimientos");
+        return { success: true as const, data: resultado };
       } catch (txError) {
         if (attempt < maxRetries && isUniqueConstraintError(txError)) {
           await sleep(baseDelay * attempt);
