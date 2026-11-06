@@ -525,6 +525,7 @@ export default function InventarioPage() {
         )}
         {altaStep === 'masivo' && (
           <BulkProductForm
+            branches={branches}
             onSuccess={handleProductCreated}
             onClose={() => setAltaStep(null)}
           />

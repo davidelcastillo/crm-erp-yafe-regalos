@@ -1,10 +1,11 @@
 /**
  * @jest-environment jsdom
  *
- * Alta masiva de productos (odd/tasks/productos-alta-masiva.md, T4): el modal
- * sin stock. Lo que se fija acá es lo observable de la UI: filas que se suman y
- * se quitan, el tope de 50, Enter que no envía, el error por fila con su
- * resumen, y el resultado del envío.
+ * Alta masiva de productos (odd/tasks/productos-alta-masiva.md, T4 + T5): el
+ * modal con y sin stock inicial. Lo que se fija acá es lo observable de la UI:
+ * filas que se suman y se quitan, el tope de 50, Enter que no envía, el error
+ * por fila con su resumen, el resultado del envío y, con sucursal elegida
+ * (D8), el stock por fila con su comprobante.
  */
 import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { BulkProductForm } from "../components/BulkProductForm";
@@ -24,8 +25,28 @@ jest.mock("sweetalert2", () => ({
   fire: jest.fn().mockResolvedValue({ isConfirmed: true }),
 }));
 
+// El panel genera PDFs por import dinámico: acá solo se mira que se monte con
+// el comprobante del servidor y que el cierre ordene el cierre del modal.
+jest.mock("@/app/inventario/components/StockMovementReceiptPanel", () => ({
+  StockMovementReceiptPanel: ({
+    receipt,
+    onClose,
+  }: {
+    receipt: { reference: string };
+    onClose: () => void;
+  }) => (
+    <div role="dialog" aria-label="Comprobante">
+      <p>Comprobante {receipt.reference}</p>
+      <button type="button" onClick={onClose}>
+        Cerrar comprobante
+      </button>
+    </div>
+  ),
+}));
+
 import { createProductsBatch } from "../../actions/product";
 import { getCategoryOptions, createCategory } from "@/app/actions/category";
+import type { StockMovementReceipt } from "@/lib/stock-movement-receipt";
 import Swal from "sweetalert2";
 
 const mockGetCategoryOptions = getCategoryOptions as jest.MockedFunction<typeof getCategoryOptions>;
@@ -36,17 +57,41 @@ const mockCreateProductsBatch = createProductsBatch as jest.MockedFunction<
 >;
 const mockSwalFire = Swal.fire as jest.MockedFunction<typeof Swal.fire>;
 
-type Exito = { success: true; data: { products: { id: number; code: string; name: string }[] } };
+type Exito = {
+  success: true;
+  data: {
+    products: { id: number; code: string; name: string }[];
+    receipt: StockMovementReceipt | null;
+  };
+};
 type Falla = {
   success: false;
   error: string;
   rowErrors?: { row: number; field?: string; message: string }[];
 };
 
+/** Sucursales activas: el stock inicial es global para el lote (D8). */
+const SUCURSALES = [
+  { id: 1, name: "Sucursal Centro" },
+  { id: 2, name: "Sucursal Norte" },
+];
+
+const COMPROBANTE: StockMovementReceipt = {
+  movementType: "ENTRY",
+  branchId: 1,
+  branchName: "Sucursal Centro",
+  branchCode: "CEN",
+  date: "2026-01-01T00:00:00.000Z",
+  reference: "ALTA DE PRODUCTOS",
+  rows: [
+    { productId: 1, code: "CEN000", name: "Producto único", quantity: 5, stock: 5, price: 10 },
+  ],
+};
+
 const renderForm = async () => {
   const onClose = jest.fn();
   const onSuccess = jest.fn();
-  render(<BulkProductForm onClose={onClose} onSuccess={onSuccess} />);
+  render(<BulkProductForm branches={SUCURSALES} onClose={onClose} onSuccess={onSuccess} />);
   // La lista de categorías se carga en el mount: esperarla deja el modal listo
   // y evita actualizaciones fuera de `act`.
   await esperarCategorias();
@@ -57,6 +102,10 @@ const nombres = () => screen.getAllByLabelText(/^nombre/i);
 const prefijos = () => screen.getAllByLabelText(/^prefijo/i);
 const precios = () => screen.getAllByLabelText(/^precio/i);
 const categorias = () => screen.getAllByLabelText(/^categoría/i);
+/** Solo existe con una sucursal elegida (T5). */
+const stocks = () => screen.queryAllByLabelText(/^stock inicial/i);
+const elegirSucursal = (nombre = "Sucursal Centro") =>
+  fireEvent.click(screen.getByRole("button", { name: nombre }));
 
 /** Espera a que la lista única de categorías termine de cargar. */
 const esperarCategorias = () => waitFor(() => expect(categorias()[0]).toBeEnabled());
@@ -81,7 +130,7 @@ describe("BulkProductForm", () => {
     mockSwalFire.mockResolvedValue({ isConfirmed: true } as never);
     mockCreateProductsBatch.mockResolvedValue({
       success: true,
-      data: { products: [{ id: 1, code: "AA000", name: "Producto 1" }] },
+      data: { products: [{ id: 1, code: "AA000", name: "Producto 1" }], receipt: null },
     } as Exito as never);
   });
 
@@ -186,7 +235,7 @@ describe("BulkProductForm", () => {
     expect(screen.getByLabelText("Quitar producto 2")).toBeDisabled();
 
     await act(async () => {
-      resolver({ success: true, data: { products: [] } });
+      resolver({ success: true, data: { products: [], receipt: null } });
     });
   });
 
@@ -374,5 +423,133 @@ describe("BulkProductForm", () => {
     expect(
       await screen.findByText(/no se pudieron cargar las categorías/i),
     ).toBeInTheDocument();
+  });
+
+  // T5: la sucursal es opcional y global. Sin ella el modal es el de T4.
+  it("sin sucursal no hay campo de stock y el payload va sin stock", async () => {
+    const { onSuccess } = await renderForm();
+
+    // El estado vacío se explica, no se adivina.
+    expect(
+      screen.getByText(/sin sucursal: los productos se crean sin stock/i),
+    ).toBeInTheDocument();
+    expect(stocks()).toHaveLength(0);
+    expect(screen.queryByRole("button", { name: "No cargar stock" })).not.toBeInTheDocument();
+
+    llenarFila(0, "Producto único");
+    fireEvent.click(screen.getByRole("button", { name: /crear 1 producto/i }));
+
+    await waitFor(() => expect(onSuccess).toHaveBeenCalled());
+    // Sin sucursal no viajan `branchId` ni `initialStock`.
+    expect(mockCreateProductsBatch).toHaveBeenCalledWith({
+      rows: [{ name: "Producto único", prefix: "AA", price: 10, categoryId: null }],
+    });
+  });
+
+  it("con sucursal cada fila lleva stock inicial y el payload lleva branchId", async () => {
+    const { onSuccess } = await renderForm();
+
+    elegirSucursal();
+    expect(stocks()).toHaveLength(1);
+    expect(stocks()[0]).toHaveAttribute("inputmode", "numeric");
+
+    fireEvent.click(screen.getByRole("button", { name: /agregar producto/i }));
+    // La fila nueva también nace con su stock, vacío.
+    expect(stocks()).toHaveLength(2);
+
+    llenarFila(0, "Producto uno");
+    llenarFila(1, "Producto dos", "AA", "20");
+    fireEvent.change(stocks()[0], { target: { value: "5" } });
+
+    fireEvent.click(screen.getByRole("button", { name: /crear 2 productos/i }));
+
+    await waitFor(() => expect(onSuccess).toHaveBeenCalled());
+    // El stock vacío viaja como 0: el esquema lo acepta y la fila de
+    // inventario queda en 0 (L12).
+    expect(mockCreateProductsBatch).toHaveBeenCalledWith({
+      branchId: 1,
+      rows: [
+        { name: "Producto uno", prefix: "AA", price: 10, categoryId: null, initialStock: 5 },
+        { name: "Producto dos", prefix: "AA", price: 20, categoryId: null, initialStock: 0 },
+      ],
+    });
+  });
+
+  it("quitar la sucursal vuelve a esconder el stock y a limpiar el payload", async () => {
+    const { onSuccess } = await renderForm();
+
+    elegirSucursal();
+    expect(stocks()).toHaveLength(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "No cargar stock" }));
+    expect(stocks()).toHaveLength(0);
+
+    llenarFila(0, "Producto único");
+    fireEvent.click(screen.getByRole("button", { name: /crear 1 producto/i }));
+
+    await waitFor(() => expect(onSuccess).toHaveBeenCalled());
+    expect(mockCreateProductsBatch).toHaveBeenCalledWith({
+      rows: [{ name: "Producto único", prefix: "AA", price: 10, categoryId: null }],
+    });
+  });
+
+  it("con comprobante muestra el panel y recién al cerrarlo cierra una sola vez", async () => {
+    mockCreateProductsBatch.mockResolvedValue({
+      success: true,
+      data: { products: [{ id: 1, code: "CEN000", name: "Producto único" }], receipt: COMPROBANTE },
+    } as Exito as never);
+
+    const { onClose, onSuccess } = await renderForm();
+    elegirSucursal();
+    llenarFila(0, "Producto único");
+    fireEvent.change(stocks()[0], { target: { value: "5" } });
+
+    fireEvent.click(screen.getByRole("button", { name: /crear 1 producto/i }));
+
+    // El comprobante reemplaza al modal; no hay Swal ni cierre todavía.
+    expect(await screen.findByText(/comprobante alta de productos/i)).toBeInTheDocument();
+    expect(screen.queryByText("Productos creados")).not.toBeInTheDocument();
+    expect(onSuccess).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: /cerrar comprobante/i }));
+
+    expect(onSuccess).toHaveBeenCalledTimes(1);
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("con sucursal y stock 0 el servidor no devuelve comprobante: sigue el Swal", async () => {
+    const { onClose, onSuccess } = await renderForm();
+    elegirSucursal();
+    llenarFila(0, "Producto sin stock");
+
+    fireEvent.click(screen.getByRole("button", { name: /crear 1 producto/i }));
+
+    await waitFor(() => expect(onSuccess).toHaveBeenCalled());
+    expect(onClose).toHaveBeenCalled();
+    expect(mockSwalFire).toHaveBeenCalledWith(
+      expect.objectContaining({ text: expect.stringContaining("1 producto") }),
+    );
+    expect(screen.queryByRole("dialog", { name: "Comprobante" })).not.toBeInTheDocument();
+  });
+
+  it("el error de stock del servidor queda en el campo de la fila", async () => {
+    mockCreateProductsBatch.mockResolvedValue({
+      success: false,
+      error: "El stock no puede ser negativo",
+      rowErrors: [{ row: 0, field: "initialStock", message: "El stock no puede ser negativo" }],
+    } as Falla as never);
+
+    await renderForm();
+    elegirSucursal();
+    llenarFila(0, "Producto único");
+    fireEvent.click(screen.getByRole("button", { name: /crear 1 producto/i }));
+
+    const mensaje = await screen.findByText("El stock no puede ser negativo");
+    expect(stocks()[0]).toHaveAttribute("aria-invalid", "true");
+    expect(stocks()[0].getAttribute("aria-describedby") ?? "").toContain(mensaje.id);
+
+    fireEvent.click(screen.getByRole("button", { name: /ir a la primera/i }));
+    expect(stocks()[0]).toHaveFocus();
   });
 });

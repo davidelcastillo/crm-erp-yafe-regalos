@@ -8,18 +8,31 @@ import { getCategoryOptions } from "@/app/actions/category";
 import { createProductsBatch } from "@/app/actions/product";
 import { createProductsBatchSchema } from "@/lib/validations/product";
 import { CategorySelector } from "@/components/ui/CategorySelector";
+import { BranchPicker } from "@/components/ui/BranchPicker";
+import { StockMovementReceiptPanel } from "@/app/inventario/components/StockMovementReceiptPanel";
+import type { StockMovementReceipt } from "@/lib/stock-movement-receipt";
 
 /** Tope de filas por envío (S6). */
 const MAX_FILAS = 50;
 
-type Fila = { id: string; name: string; prefix: string; price: string; categoryId: number | null };
+type Fila = {
+  id: string;
+  name: string;
+  prefix: string;
+  price: string;
+  categoryId: number | null;
+  /** Stock inicial en la sucursal del lote; vacío es 0 (T5). */
+  initialStock: string;
+};
 /** `row` es un mensaje que no pertenece a un campo puntual: se muestra en la card. */
-type Campo = "name" | "prefix" | "price" | "categoryId" | "row";
+type Campo = "name" | "prefix" | "price" | "categoryId" | "initialStock" | "row";
 type FilaError = { field: Campo; message: string };
 
 export interface BulkProductFormProps {
   onClose: () => void;
   onSuccess?: () => void;
+  /** Sucursales activas para el stock inicial (D8). */
+  branches: Array<{ id: number; name: string }>;
 }
 
 /** Agrupa los errores del servidor o del esquema por id de fila (el `row` viene 0-based). */
@@ -32,7 +45,11 @@ function erroresPorFila(
     const fila = filas[item.row];
     if (!fila) continue;
     const field: Campo =
-      item.field === "name" || item.field === "prefix" || item.field === "price" || item.field === "categoryId"
+      item.field === "name" ||
+      item.field === "prefix" ||
+      item.field === "price" ||
+      item.field === "categoryId" ||
+      item.field === "initialStock"
         ? item.field
         : "row";
     (mapa[fila.id] ??= []).push({ field, message: item.message });
@@ -44,8 +61,13 @@ function erroresPorFila(
  * BulkProductForm
  *
  * Alta masiva de productos (S1): muchas filas en un mismo modal y un solo
- * envío «todo o nada» (S7). El stock inicial es otra unidad (T5), así que acá
- * solo van nombre, prefijo, precio y categoría por fila (S4).
+ * envío «todo o nada» (S7). Por fila: nombre, prefijo, precio, categoría (S4)
+ * y, si se elige una sucursal, stock inicial (T5).
+ *
+ * La sucursal es global para todo el lote (D8) y opcional: sin sucursal el
+ * modal crea solo productos, como antes. Con sucursal, la acción deja el stock
+ * y, para las filas con stock mayor a 0, el movimiento de ingreso con su
+ * comprobante (S2/S11).
  *
  * La lista de categorías se pide UNA vez para todo el modal y cada fila recibe
  * esa lista ya cargada (`CategorySelector` con `options` inyectadas, T10), así
@@ -56,10 +78,12 @@ function erroresPorFila(
  * (STYLE.md), con el cuerpo con scroll y el pie fijo. Enter nunca envía: pasa
  * al campo siguiente y en el último campo de la última fila agrega una fila.
  */
-export function BulkProductForm({ onClose, onSuccess }: BulkProductFormProps) {
+export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFormProps) {
   const [filas, setFilas] = useState<Fila[]>([
-    { id: "1", name: "", prefix: "", price: "", categoryId: null },
+    { id: "1", name: "", prefix: "", price: "", categoryId: null, initialStock: "" },
   ]);
+  const [branchId, setBranchId] = useState<number | null>(null);
+  const [receipt, setReceipt] = useState<StockMovementReceipt | null>(null);
   const [categorias, setCategorias] = useState<{ id: number; name: string }[]>([]);
   const [cargandoCategorias, setCargandoCategorias] = useState(true);
   const [errorCategorias, setErrorCategorias] = useState(false);
@@ -118,6 +142,7 @@ export function BulkProductForm({ onClose, onSuccess }: BulkProductFormProps) {
       prefix: filas[filas.length - 1]?.prefix ?? "", // una fila nueva copia el prefijo anterior
       price: "",
       categoryId: null,
+      initialStock: "",
     };
     idParaEnfocar.current = nueva.id;
     setFilas((prev) => [...prev, nueva]);
@@ -126,7 +151,8 @@ export function BulkProductForm({ onClose, onSuccess }: BulkProductFormProps) {
   const quitarFila = async (fila: Fila) => {
     if (filas.length <= 1) return; // la última fila no se puede quitar
 
-    const conDatos = fila.name.trim() || fila.prefix.trim() || fila.price.trim();
+    const conDatos =
+      fila.name.trim() || fila.prefix.trim() || fila.price.trim() || fila.initialStock.trim();
     if (conDatos) {
       const confirmacion = await Swal.fire({
         title: "¿Quitar esta fila?",
@@ -169,7 +195,9 @@ export function BulkProductForm({ onClose, onSuccess }: BulkProductFormProps) {
   };
 
   const cerrar = async () => {
-    const conDatos = filas.some((f) => f.name.trim() || f.prefix.trim() || f.price.trim());
+    const conDatos = filas.some(
+      (f) => f.name.trim() || f.prefix.trim() || f.price.trim() || f.initialStock.trim()
+    );
     if (!conDatos) {
       onClose();
       return;
@@ -202,12 +230,18 @@ export function BulkProductForm({ onClose, onSuccess }: BulkProductFormProps) {
     if (loading) return;
 
     // Validación de cliente con el mismo esquema: el servidor sigue siendo la autoridad.
+    // Sin sucursal el payload va como antes: sin `branchId` ni stock por fila.
     const parsed = createProductsBatchSchema.safeParse({
+      ...(branchId !== null ? { branchId } : {}),
       rows: filas.map((f) => ({
         name: f.name,
         prefix: f.prefix,
         price: Number(f.price),
         categoryId: f.categoryId,
+        // Vacío es 0: el producto igual queda en la vista por sucursal (S11).
+        ...(branchId !== null
+          ? { initialStock: f.initialStock.trim() === "" ? 0 : Number(f.initialStock) }
+          : {}),
       })),
     });
     if (!parsed.success) {
@@ -238,6 +272,12 @@ export function BulkProductForm({ onClose, onSuccess }: BulkProductFormProps) {
     setLoading(false);
 
     if (resultado.success) {
+      // Con comprobante primero se descarga (y si quiere, las etiquetas): el
+      // modal se cierra recién cuando se cierra el panel, una sola vez.
+      if (resultado.data.receipt) {
+        setReceipt(resultado.data.receipt);
+        return;
+      }
       const cantidad = resultado.data.products.length;
       await Swal.fire({
         title: "Productos creados",
@@ -268,6 +308,18 @@ export function BulkProductForm({ onClose, onSuccess }: BulkProductFormProps) {
   };
 
   if (typeof document === "undefined") return null;
+
+  if (receipt) {
+    return (
+      <StockMovementReceiptPanel
+        receipt={receipt}
+        onClose={() => {
+          onSuccess?.();
+          onClose();
+        }}
+      />
+    );
+  }
 
   const inputClass =
     "w-full px-3 py-3 min-h-[44px] scroll-mb-32 rounded-xl border border-hairline bg-surface text-ink focus:border-accent focus:ring-2 focus:ring-accent/30 outline-none transition-all";
@@ -311,6 +363,36 @@ export function BulkProductForm({ onClose, onSuccess }: BulkProductFormProps) {
             ref={cuerpoRef}
             className="order-1 min-h-0 flex-1 space-y-4 overflow-y-auto px-6 pb-4 md:order-none md:col-start-1 md:row-start-1 md:overflow-visible md:px-0 md:pb-0"
           >
+            {/* Sucursal global del lote (D8) y opcional: sin ella no hay stock. */}
+            <section className="rounded-2xl border border-hairline bg-surface-soft p-4">
+              <h3 className="text-xs font-medium uppercase tracking-wide text-ink-muted">
+                Stock inicial · todo el lote
+              </h3>
+              <p className="mt-1 text-sm text-ink-muted">
+                {branchId === null
+                  ? "Sin sucursal: los productos se crean sin stock y no se genera comprobante."
+                  : "Cada producto deja su stock en esta sucursal. Con stock mayor a 0 se genera el movimiento de ingreso y su comprobante."}
+              </p>
+              <div className="mt-3">
+                <BranchPicker
+                  branches={branches}
+                  value={branchId}
+                  onChange={setBranchId}
+                  label="Sucursal del stock inicial"
+                  emptyLabel="No hay sucursales activas: los productos se crean sin stock"
+                />
+              </div>
+              {branchId !== null && (
+                <button
+                  type="button"
+                  onClick={() => setBranchId(null)}
+                  className="btn btn-ghost mt-2"
+                >
+                  No cargar stock
+                </button>
+              )}
+            </section>
+
             {errorCategorias && (
               <p role="status" className="rounded-xl border border-hairline bg-surface-soft p-3 text-sm text-ink-muted">
                 No se pudieron cargar las categorías. Los productos se van a guardar sin
@@ -448,7 +530,7 @@ export function BulkProductForm({ onClose, onSuccess }: BulkProductFormProps) {
                       value={fila.price}
                       onChange={(e) => actualizarFila(fila.id, "price", e.target.value)}
                       onKeyDown={alPresionarEnter}
-                      enterKeyHint="done"
+                      enterKeyHint={branchId !== null ? "next" : "done"}
                       placeholder="0.00"
                       required
                       aria-invalid={mensajeDe("price") ? "true" : undefined}
@@ -461,6 +543,36 @@ export function BulkProductForm({ onClose, onSuccess }: BulkProductFormProps) {
                       </p>
                     )}
                   </div>
+
+                  {/* Stock inicial: solo tiene sentido con una sucursal elegida (D8). */}
+                  {branchId !== null && (
+                    <div>
+                      <label htmlFor={`${base}-initialStock`} className={labelClass}>
+                        Stock inicial
+                      </label>
+                      <input
+                        id={`${base}-initialStock`}
+                        data-bulk-field="initialStock"
+                        type="number"
+                        inputMode="numeric"
+                        step="1"
+                        min="0"
+                        value={fila.initialStock}
+                        onChange={(e) => actualizarFila(fila.id, "initialStock", e.target.value)}
+                        onKeyDown={alPresionarEnter}
+                        enterKeyHint="next"
+                        placeholder="0"
+                        aria-invalid={mensajeDe("initialStock") ? "true" : undefined}
+                        aria-describedby={descritoPor("initialStock")}
+                        className={inputClass}
+                      />
+                      {mensajeDe("initialStock") && (
+                        <p id={`${base}-initialStock-error`} className="mt-1 text-sm text-error-ink">
+                          {mensajeDe("initialStock")}
+                        </p>
+                      )}
+                    </div>
+                  )}
 
                   <div>
                     <label htmlFor={`${base}-categoryId`} className={labelClass}>
