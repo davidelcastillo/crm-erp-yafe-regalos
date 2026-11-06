@@ -25,6 +25,7 @@ const PREFIJO_INVALIDO = `${base}D`;
 const PREFIJO_AGOTADO = `${base}E`;
 const PREFIJO_CONCURRENTE = `${base}F`;
 const PREFIJO_CONFLICTO = `${base}G`;
+const PREFIJO_ATOMICO = `${base}H`;
 
 const PREFIJOS = [
   PREFIJO_TREINTA,
@@ -34,6 +35,7 @@ const PREFIJOS = [
   PREFIJO_AGOTADO,
   PREFIJO_CONCURRENTE,
   PREFIJO_CONFLICTO,
+  PREFIJO_ATOMICO,
 ];
 
 const NOMBRE_EXISTENTE = `${marca} nombre existente`;
@@ -226,6 +228,7 @@ describe("createProductsBatch (integración, base local)", () => {
     expect(resultado.data.products).toHaveLength(1);
   });
 
+  // Prueba que no se repiten códigos, no que las rutas se excluyan: `code` es único y ambas reintentan ante P2002, así que pasaría sin el lock.
   it("createProduct y createProductsBatch en paralelo sobre el mismo prefijo no repiten código", async () => {
     const [lote, individual] = await Promise.all([
       acciones.createProductsBatch({
@@ -248,6 +251,41 @@ describe("createProductsBatch (integración, base local)", () => {
     ];
     expect(new Set(codigos).size).toBe(4);
     expect(codigos.sort()).toEqual(["000", "001", "002", "003"].map((n) => `${PREFIJO_CONCURRENTE}${n}`));
+  });
+
+  it("si el insert choca, no queda ninguna fila del lote y el producto heredado sigue intacto", async () => {
+    // Peligro heredado (H3): un código viejo con `codePrefix` nulo no lo ve la
+    // búsqueda por prefijo, así que el lote regenera ese mismo código y el
+    // insert choca contra la unicidad global de `code`. Es el único caso que
+    // falla EN el insert: los demás abortan antes de escribir nada.
+    const codigoHeredado = `${PREFIJO_ATOMICO}000`;
+    const heredado = await prisma.product.create({
+      data: { name: `${marca} legado atomico`, code: codigoHeredado, price: 1 },
+    });
+    const antes = await prisma.product.count({ where: { code: { startsWith: PREFIJO_ATOMICO } } });
+    expect(antes).toBe(1);
+
+    const consoleError = jest.spyOn(console, "error").mockImplementation(() => {});
+    const resultado = await acciones.createProductsBatch({
+      rows: [
+        { name: `${marca} atomico a`, prefix: PREFIJO_ATOMICO, price: 1 },
+        { name: `${marca} atomico b`, prefix: PREFIJO_ATOMICO, price: 1 },
+        { name: `${marca} atomico c`, prefix: PREFIJO_ATOMICO, price: 1 },
+      ],
+    });
+    consoleError.mockRestore();
+
+    // Los 3 intentos chocan y se agotan: el error es el genérico, sin rowErrors.
+    expect(resultado).toEqual({ success: false, error: "Error al crear los productos" });
+    // Ninguna fila del lote quedó: con ese prefijo solo está el heredado.
+    expect(await prisma.product.count({ where: { code: { startsWith: PREFIJO_ATOMICO } } })).toBe(1);
+    // El heredado sigue ahí, sin tocar.
+    expect(
+      await prisma.product.findUnique({
+        where: { id: heredado.id },
+        select: { code: true, codePrefix: true, name: true },
+      })
+    ).toEqual({ code: codigoHeredado, codePrefix: null, name: `${marca} legado atomico` });
   });
 });
 

@@ -3,6 +3,8 @@
  */
 import { createProduct, createProductsBatch, getProducts, searchProducts } from "../actions/product";
 import { createProductsBatchSchema } from "@/lib/validations/product";
+import { prefixLockKey } from "@/lib/utils/product-code";
+import { revalidatePath } from "next/cache";
 
 // Mock the entire prisma module with inline factory
 jest.mock("@/lib/prisma", () => {
@@ -457,5 +459,77 @@ describe("createProductsBatch", () => {
       { id: 1, code: "ZZ000", name: "Producto A" },
       { id: 3, code: "ZZ001", name: "Producto C" },
     ]);
+  });
+
+  it("revalida /inventario y /productos al crear y no revalida nada si falla", async () => {
+    (prisma.product.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.product.createManyAndReturn as jest.Mock).mockResolvedValue([
+      { id: 1, code: "ZZ000", name: "Producto A" },
+    ]);
+
+    const exito = await createProductsBatch({ rows: [{ name: "Producto A", prefix: "ZZ", price: 10 }] });
+
+    expect(exito.success).toBe(true);
+    expect(revalidatePath).toHaveBeenCalledWith("/inventario");
+    expect(revalidatePath).toHaveBeenCalledWith("/productos");
+
+    (revalidatePath as jest.Mock).mockClear();
+    const consoleError = jest.spyOn(console, "error").mockImplementation(() => {});
+    (prisma.$transaction as jest.Mock).mockRejectedValueOnce(new Error("Database error"));
+    const fallo = await createProductsBatch({ rows: [{ name: "Producto B", prefix: "ZZ", price: 10 }] });
+    consoleError.mockRestore();
+
+    expect(fallo).toEqual({ success: false, error: "Error al crear los productos" });
+    expect(revalidatePath).not.toHaveBeenCalled();
+  });
+
+  // Cubre el mapeo de la rama P2003, no la carrera de FK que la dispara en producción.
+  it("un P2003 del insert vuelve como categoría inexistente", async () => {
+    (prisma.category.findUnique as jest.Mock).mockResolvedValue({ id: 5 });
+    (prisma.product.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.product.createManyAndReturn as jest.Mock).mockRejectedValueOnce({ code: "P2003" });
+
+    const result = await createProductsBatch({
+      categoryId: 5,
+      rows: [{ name: "Producto A", prefix: "ZZ", price: 10 }],
+    });
+
+    expect(result).toEqual({ success: false, error: "La categoría seleccionada no existe" });
+  });
+});
+
+// El alta individual y el lote tienen que tomar el MISMO advisory lock por prefijo:
+// si la clave difiere, ninguna prueba secuencial nota que dejaron de excluirse.
+describe("clave del advisory lock", () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it("createProduct y createProductsBatch toman la misma clave con el prefijo en distinta capitalización", async () => {
+    // Si la clave se calculara sobre el prefijo crudo, "ab" y "AB" no se excluirían.
+    expect(prefixLockKey("ab")).not.toBe(prefixLockKey("AB"));
+    const esperado = `SELECT pg_advisory_xact_lock(${prefixLockKey("AB")})`;
+
+    (prisma.product.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.product.create as jest.Mock).mockResolvedValue({
+      id: 1,
+      name: "Individual",
+      description: "-",
+      price: 1,
+      code: "AB000",
+      codePrefix: "AB",
+    });
+    await createProduct({ name: "Individual", prefix: "ab", price: 1 });
+
+    const sqlIndividual = (prisma.$executeRawUnsafe as jest.Mock).mock.calls.map((c) => String(c[0]));
+    expect(sqlIndividual).toEqual([esperado]);
+
+    (prisma.$executeRawUnsafe as jest.Mock).mockClear();
+    (prisma.product.createManyAndReturn as jest.Mock).mockResolvedValue([
+      { id: 2, code: "AB000", name: "Lote" },
+    ]);
+    const lote = await createProductsBatch({ rows: [{ name: "Lote", prefix: "Ab", price: 1 }] });
+
+    expect(lote.success).toBe(true);
+    const sqlLote = (prisma.$executeRawUnsafe as jest.Mock).mock.calls.map((c) => String(c[0]));
+    expect(sqlLote).toEqual(sqlIndividual);
   });
 });
