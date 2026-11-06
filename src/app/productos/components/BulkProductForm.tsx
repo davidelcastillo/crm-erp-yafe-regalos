@@ -368,43 +368,13 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
 
         <form
           onSubmit={enviar}
-          className="flex min-h-0 flex-1 flex-col md:grid md:grid-cols-2 md:items-start md:gap-x-6 md:gap-y-4 md:overflow-y-auto md:px-6 md:pb-4"
+          className="flex min-h-0 flex-1 flex-col overflow-y-auto md:grid md:grid-cols-2 md:items-start md:gap-x-6 md:gap-y-4 md:px-6 md:pb-4"
         >
-          {/* Columna izquierda desde md: el resumen y las filas. En celular va primero. */}
+          {/* Columna izquierda desde md: el resumen y las filas. */}
           <div
             ref={cuerpoRef}
-            className="order-1 min-h-0 flex-1 space-y-4 overflow-y-auto px-6 pb-4 md:order-none md:col-start-1 md:row-start-1 md:overflow-visible md:px-0 md:pb-0"
+            className="order-1 min-h-0 space-y-4 px-6 pb-4 md:order-none md:col-start-1 md:row-start-1 md:px-0 md:pb-0"
           >
-            {/* Sucursal global del lote (D8) y opcional: sin ella no hay stock. */}
-            <section className="rounded-2xl border border-hairline bg-surface-soft p-4">
-              <h3 className="text-xs font-medium uppercase tracking-wide text-ink-muted">
-                Stock inicial · todo el lote
-              </h3>
-              <p className="mt-1 text-sm text-ink-muted">
-                {branchId === null
-                  ? "Sin sucursal: los productos se crean sin stock y no se genera comprobante."
-                  : "Cada producto deja su stock en esta sucursal. Con stock mayor a 0 se genera el movimiento de ingreso y su comprobante."}
-              </p>
-              <div className="mt-3">
-                <BranchPicker
-                  branches={branches}
-                  value={branchId}
-                  onChange={setBranchId}
-                  label="Sucursal del stock inicial"
-                  emptyLabel="No hay sucursales activas: los productos se crean sin stock"
-                />
-              </div>
-              {branchId !== null && (
-                <button
-                  type="button"
-                  onClick={() => setBranchId(null)}
-                  className="btn btn-ghost mt-2"
-                >
-                  No cargar stock
-                </button>
-              )}
-            </section>
-
             {errorCategorias && (
               <p role="status" className="rounded-xl border border-hairline bg-surface-soft p-3 text-sm text-ink-muted">
                 No se pudieron cargar las categorías. Los productos se van a guardar sin
@@ -611,11 +581,43 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
             })}
           </div>
 
-          {/* Columna derecha desde md: la acción, pegajosa (`md:sticky md:top-4`).
-              En celular `contents` deja el pie al final de la columna única. */}
+          {/* Columna derecha desde md: el contexto del lote (T11) y la acción, pegajosa
+              (`md:sticky md:top-4`). En celular `contents` deja sus dos bloques como
+              items flex de la columna única, con order explícito: filas → contexto →
+              acción, para que la acción siga siendo lo último (STYLE.md). */}
           <div className="contents md:sticky md:top-4 md:col-start-2 md:row-start-1 md:block md:space-y-4">
-            {/* Pie fijo: agregar filas a la izquierda del envío, una sola acción primaria. */}
-            <div className="order-2 space-y-2 border-t border-hairline px-6 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4 md:order-none md:border-0 md:p-0">
+            {/* Sucursal global del lote (D8) y opcional: sin ella no hay stock. */}
+            <section className="order-2 mx-6 mb-4 rounded-2xl border border-hairline bg-surface-soft p-4 md:order-none md:m-0">
+              <h3 className="text-xs font-medium uppercase tracking-wide text-ink-muted">
+                Stock inicial · todo el lote
+              </h3>
+              <p className="mt-1 text-sm text-ink-muted">
+                {branchId === null
+                  ? "Sin sucursal: los productos se crean sin stock y no se genera comprobante."
+                  : "Cada producto deja su stock en esta sucursal. Con stock mayor a 0 se genera el movimiento de ingreso y su comprobante."}
+              </p>
+              <div className="mt-3">
+                <BranchPicker
+                  branches={branches}
+                  value={branchId}
+                  onChange={setBranchId}
+                  label="Sucursal del stock inicial"
+                  emptyLabel="No hay sucursales activas: los productos se crean sin stock"
+                />
+              </div>
+              {branchId !== null && (
+                <button
+                  type="button"
+                  onClick={() => setBranchId(null)}
+                  className="btn btn-ghost mt-2"
+                >
+                  No cargar stock
+                </button>
+              )}
+            </section>
+
+            {/* Pie fijo: va pegado al fondo en celular, porque el scroll es del formulario. */}
+            <div className="order-3 sticky bottom-0 space-y-2 border-t border-hairline bg-surface px-6 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4 md:order-none md:static md:border-0 md:p-0">
               <button
                 type="button"
                 onClick={agregarFila}
