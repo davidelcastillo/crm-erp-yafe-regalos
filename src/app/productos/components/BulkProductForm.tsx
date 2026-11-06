@@ -7,6 +7,7 @@ import Swal from "sweetalert2";
 import { getCategoryOptions } from "@/app/actions/category";
 import { createProductsBatch } from "@/app/actions/product";
 import { createProductsBatchSchema } from "@/lib/validations/product";
+import { CategorySelector } from "@/components/ui/CategorySelector";
 
 /** Tope de filas por envío (S6). */
 const MAX_FILAS = 50;
@@ -46,10 +47,10 @@ function erroresPorFila(
  * envío «todo o nada» (S7). El stock inicial es otra unidad (T5), así que acá
  * solo van nombre, prefijo, precio y categoría por fila (S4).
  *
- * La lista de categorías se pide UNA vez para todo el modal: `CategorySelector`
- * la carga en su mount, así que instanciarlo por fila serían N viajes. Por eso
- * cada fila usa un `<select>` nativo sobre esa misma lista, como la sucursal por
- * ítem de `AddPurchaseButton` (STYLE.md).
+ * La lista de categorías se pide UNA vez para todo el modal y cada fila recibe
+ * esa lista ya cargada (`CategorySelector` con `options` inyectadas, T10), así
+ * que el atajo «+ Nueva categoría» vuelve por fila sin sumar viajes: la
+ * categoría creada se agrega a la lista única del modal.
  *
  * Patrón: bottom-sheet montado en un portal al `body`, como `ProductForm`
  * (STYLE.md), con el cuerpo con scroll y el pie fijo. Enter nunca envía: pasa
@@ -465,24 +466,16 @@ export function BulkProductForm({ onClose, onSuccess }: BulkProductFormProps) {
                     <label htmlFor={`${base}-categoryId`} className={labelClass}>
                       Categoría
                     </label>
-                    <select
+                    <CategorySelector
                       id={`${base}-categoryId`}
-                      value={fila.categoryId ?? ""}
-                      onChange={(e) =>
-                        actualizarFila(fila.id, "categoryId", e.target.value ? Number(e.target.value) : null)
-                      }
+                      selectedId={fila.categoryId}
+                      onValueChange={(id) => actualizarFila(fila.id, "categoryId", id)}
+                      options={categorias}
+                      onOptionsChange={setCategorias}
                       disabled={cargandoCategorias || loading}
-                      aria-invalid={mensajeDe("categoryId") ? "true" : undefined}
-                      aria-describedby={descritoPor("categoryId")}
-                      className={inputClass}
-                    >
-                      <option value="">{cargandoCategorias ? "Cargando…" : "Sin categoría"}</option>
-                      {categorias.map((categoria) => (
-                        <option key={categoria.id} value={categoria.id}>
-                          {categoria.name}
-                        </option>
-                      ))}
-                    </select>
+                      invalid={Boolean(mensajeDe("categoryId"))}
+                      describedBy={descritoPor("categoryId")}
+                    />
                     {mensajeDe("categoryId") && (
                       <p id={`${base}-categoryId-error`} className="mt-1 text-sm text-error-ink">
                         {mensajeDe("categoryId")}
