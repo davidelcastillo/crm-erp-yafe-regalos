@@ -164,7 +164,7 @@ export function CategorySelector({
           type="button"
           disabled={disabled || loading}
           onClick={() => setOpen(!open)}
-          className="flex-1 inline-flex items-center justify-between gap-2 px-4 py-3 min-h-[44px] bg-surface-soft rounded-xl text-sm text-ink hover:bg-surface-strong transition-colors disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
+          className="flex-1 min-w-0 inline-flex items-center justify-between gap-2 px-4 py-3 min-h-[44px] bg-surface-soft rounded-xl text-sm text-ink hover:bg-surface-strong transition-colors disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
           aria-haspopup="listbox"
           aria-expanded={open}
         >
@@ -189,7 +189,7 @@ export function CategorySelector({
           type="button"
           disabled={disabled || creating}
           onClick={handleCreateNew}
-          className="btn btn-primary whitespace-nowrap"
+          className="btn btn-primary whitespace-nowrap shrink-0"
           aria-label="Crear nueva categoría"
         >
           {creating ? "Creando…" : (
