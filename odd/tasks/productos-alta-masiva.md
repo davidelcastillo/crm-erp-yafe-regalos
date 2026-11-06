@@ -13,6 +13,7 @@ Decisiones del humano, citadas textualmente. Las citas largas son transcripción
 - **S4.** Categoría: **una por fila**, no compartida. El humano corrigió la decisión anterior: «las categorias las pognamos por cada producto una distinta».
 - **S10.** Modal: el botón de nueva categoría «se ve mal, el de nueva categoria se ve salido de pantalla en pc chicas».
 - **S11.** Producto creado sin stock no aparece en la vista por sucursal: «Creo los productos pero no me sale nada de la sucurasal»
+- **S12.** Crear categoría desde cada fila del lote: «Si, recueperemos el de crear categoria por producto». Vuelve el atajo «+ Nueva categoría», ahora por fila y sin multiplicar las cargas.
 - **S5.** Entrada: «Paso previo con dos opciones» (un producto / varios productos).
 - **S6.** Tope: «50 filas» por envío.
 - **S7.** Falla: «Todo o nada».
@@ -30,11 +31,12 @@ Decisiones del humano, citadas textualmente. Las citas largas son transcripción
 | T4 | `BulkProductForm` con el paso previo y la guía en `docs/` | S1, S5, S6 | `src/app/productos/components/BulkProductForm.tsx`, `src/app/inventario/page.tsx`, `docs/` | hecho | `2ea6a63` |
 | T8 | Categoría por fila en vez de compartida | S4 | `src/lib/validations/product.ts`, `src/app/actions/product.ts`, `src/app/productos/components/BulkProductForm.tsx` | hecho | `3f26f81` |
 | T9 | El botón de nueva categoría desborda en pantallas chicas | S10 | `src/components/ui/CategorySelector.tsx` | hecho | `7f990a8` |
+| T10 | Recuperar «+ Nueva categoría» por fila sin multiplicar las cargas | S12 | `src/components/ui/CategorySelector.tsx`, `src/app/productos/components/BulkProductForm.tsx` | pendiente | — |
 | T5 | Stock inicial con sucursal global, movimiento ENTRY y comprobante sin etiquetas | S2, S11 | `src/app/actions/product.ts`, `src/app/productos/components/BulkProductForm.tsx` | pendiente (D5) | — |
-| T7 | Etiquetas de lo recién creado, como unidad siguiente | S2 | `src/actions/label-print.ts`, `src/app/inventario/components/StockMovementReceiptPanel.tsx` | pendiente | — |
+| T7 | Verificar el comprobante con etiquetas de un lote real (sale gratis del panel reusado) | S2 | `src/app/inventario/components/StockMovementReceiptPanel.tsx`, `src/actions/label-print.ts` | pendiente, cambia a verificación | — |
 | T6 | Corregir H2: la categoría elegida al crear se descarta | S8 | `src/app/productos/components/ProductForm.tsx`, `src/app/actions/product.ts` | pendiente | — |
 
-Orden de entrega: T1, T2 (con T3 adentro), T2b, T4, T9, T8, T6, T5 y después T7 (etiquetas).
+Orden de entrega: T1, T2 (con T3 adentro), T2b, T4, T9, T8, T10, T6, T5 y después T7 (etiquetas).
 
 **T3 se absorbió en T2**: el escritor hizo los tests junto con la acción, con RED observado primero (6 unitarios y 9 casos de base local). No se hizo como unidad aparte para no comitear una acción sin su prueba.
 
@@ -448,7 +450,7 @@ Si se decide corregir H2 (la categoría que se descarta en el alta individual), 
   - Cargar decenas de productos "en un local" es el caso que motivó el pedido, y otra sucursal se resuelve con un segundo lote o con un traslado.
 - **Decidido por el humano:** las filas con stock 0 crean una fila `BranchInventory` en 0 en esa sucursal, para que el producto se vea en la vista por sucursal (H1, `src/app/actions/inventory.ts:247-254`). No generan movimiento ni van al comprobante, porque no hubo ingreso.
 
-**D9. ¿Qué comprobante emite el alta con stock? — DECIDIDA: (a), el comprobante de ingreso actual. Las etiquetas pasan a una unidad siguiente (T7).**
+**D9. ¿Qué comprobante emite el alta con stock? — DECIDIDA: (a), el comprobante de ingreso actual; las etiquetas salen gratis y T7 pasa a ser verificación.**
 - (a) **El comprobante de ingreso actual, sin cambios**: `StockMovementReceipt` ENTRY más `StockMovementReceiptPanel`.
   - Con `bfeae6c` trae gratis "Comprobante + etiquetas" (hermano `StockMovementReceiptPanel.tsx:110-115`).
   - Costo: 0 líneas de PDF.
@@ -489,3 +491,5 @@ Si se decide corregir H2 (la categoría que se descarta en el alta individual), 
 - **L23.** T8 commiteado en `3f26f81`: la categoría va por fila; la acción valida los ids distintos en **una** consulta y falla el lote entero marcando solo las filas afectadas. RED observado en las tres suites antes de implementar; después 28/28 unitarios, 12/12 base local y 13/13 de UI, con `tsc` limpio. **Trade-off que hay que decidir:** el modal perdió el atajo «+ Nueva categoría», porque `CategorySelector` carga y crea por su cuenta y una instancia por fila serían 50 requests y 50 botones de alta. Ahora es un select por fila con una sola carga. Si el humano quiere crear categorías desde el lote, es una unidad aparte (picker compartido con la lista inyectada).
 - **L24.** T9 commiteado en `7f990a8`: el disparador del selector era `flex-1` sin `min-w-0` y no podía encogerse, así que empujaba la píldora afuera en la columna angosta. Verificado: ningún consumidor se rompe, la fila más angosta real mide 316 px y la píldora ~161 px; por debajo de ~230 px desbordaría igual. Se sumó el primer test del componente (3 casos). Ojo: el control no guarda estado propio, muestra la selección solo cuando el padre actualiza `selectedId`.
 - **L25.** Verificación independiente de T8 (`3f26f81`): 8 de 8 confirmados; una categoría inexistente en una fila falla el lote antes de escribir y el conteo cubre todo el lote, y las dos categorías se leen de vuelta con su propio id. Hueco corregido: si fallaba la carga de categorías el select quedaba en «Sin categoría» sin avisar, así que se podían guardar 20 productos sin categoría creyendo que no existían. Ahora el modal avisa que no se pudieron cargar y que se guardarán sin categoría, con test (14/14 en la suite del modal). Quedan sin cubrir: el descarte silencioso de un `categoryId` a nivel de lote (aceptado: un solo consumidor interno) y el aviso de H1, que es T5.
+- **L26.** Verificación de premisas de T5 (antes de que existiera el código): todas confirmadas. `BranchInventory` tiene única `(branchId, productId)`, `stock: 0` es legal y la lista filtrada por sucursal incluye stock 0 (`inventory.ts:250-256`), así que la fila en 0 es lo que arregla H1. `BranchMovement` no tiene índice único que rechace dos movimientos del lote, y `performedBy` acepta vacío: el fallback es calidad de auditoría, no un bloqueo. El patrón de `adjustBranchStockBatch` coincide con el plan (inventario → movimientos → lectura única, con `stock` posterior). Correcciones pasadas al worker: validar la sucursal antes de la transacción con `code`, cruzar por `productId` y nunca por índice, y **excluir del comprobante las filas con stock 0**, porque `label-print.ts:455` exige cantidad mínima 1 y un 0 haría fallar el botón de etiquetas en runtime sin que ninguna suite lo note.
+- **L27.** T7 cambia de naturaleza: el panel del comprobante ya trae «Comprobante + etiquetas» para todo ENTRY (`StockMovementReceiptPanel.tsx:110-112`), así que las etiquetas llegan sin escribir código. Esconder el botón sería código para ocultar algo pedido. T7 queda como verificación de que el PDF combinado sale bien con un lote real, no como unidad de desarrollo. Verificado además que el ENTRY con `reference: "ALTA DE PRODUCTOS"` aparece en el historial del producto y en la lista pública de movimientos como «Entrada», sin exponer el motivo (`inventory.external.ts:102-107`), y que ningún reporte filtra por ese prefijo.
