@@ -113,6 +113,14 @@ export async function createProduct(data: unknown) {
     if (error instanceof Error && error.message.includes("agotado")) {
       return { success: false, error: error.message };
     }
+    if (
+      error instanceof Object &&
+      "code" in error &&
+      (error as { code: unknown }).code === "P2003"
+    ) {
+      // La categoría desapareció entre la elección y el guardado.
+      return { success: false, error: "La categoría seleccionada no existe" };
+    }
     console.error("Error creating product:", error);
     return { success: false, error: "Error al crear el producto" };
   }

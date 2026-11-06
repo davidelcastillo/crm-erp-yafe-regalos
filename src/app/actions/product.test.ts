@@ -201,6 +201,22 @@ describe("createProduct Server Action - Integration", () => {
     expect(result.success).toBe(false);
     expect(result.error).toBe("Error al crear el producto");
   });
+
+  it("avisa cuando la categoría elegida ya no existe", async () => {
+    (prisma.$transaction as jest.Mock).mockRejectedValueOnce(
+      Object.assign(new Error("Foreign key constraint failed"), { code: "P2003" }),
+    );
+
+    const result = await createProduct({
+      name: "Test Product",
+      prefix: "AA",
+      price: 100,
+      categoryId: 7,
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe("La categoría seleccionada no existe");
+  });
 });
 
 describe("getProducts Server Action", () => {
