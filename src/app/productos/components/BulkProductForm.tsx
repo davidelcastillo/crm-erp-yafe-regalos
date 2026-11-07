@@ -373,7 +373,7 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
           {/* Columna izquierda desde md: el resumen y las filas. */}
           <div
             ref={cuerpoRef}
-            className="min-h-0 space-y-4 px-6 pb-4 md:col-start-1 md:row-start-1 md:px-0 md:pb-0"
+            className="order-1 min-h-0 space-y-4 px-6 pb-4 md:order-none md:col-start-1 md:row-start-1 md:px-0 md:pb-0"
           >
             {errorCategorias && (
               <p role="status" className="rounded-xl border border-hairline bg-surface-soft p-3 text-sm text-ink-muted">
@@ -582,11 +582,12 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
           </div>
 
           {/* Columna derecha desde md: el contexto del lote (T11) y la acción, pegajosa
-              (`md:sticky md:top-4`). En celular es un bloque normal después de las filas,
-              así que el orden del DOM ya es el orden visual: filas → sucursal → pie (S15). */}
-          <div className="md:sticky md:top-4 md:col-start-2 md:row-start-1 md:space-y-4">
+              (`md:sticky md:top-4`). En celular `contents` deja sus dos bloques como
+              items flex de la columna única, con order explícito: filas → contexto →
+              acción, para que la acción siga siendo lo último (STYLE.md). */}
+          <div className="contents md:sticky md:top-4 md:col-start-2 md:row-start-1 md:block md:space-y-4">
             {/* Sucursal global del lote (D8) y opcional: sin ella no hay stock. */}
-            <section className="mx-6 mb-4 rounded-2xl border border-hairline bg-surface-soft p-4 md:m-0">
+            <section className="order-2 mx-6 mb-4 rounded-2xl border border-hairline bg-surface-soft p-4 md:order-none md:m-0">
               <h3 className="text-xs font-medium uppercase tracking-wide text-ink-muted">
                 Stock inicial · todo el lote
               </h3>
@@ -616,7 +617,7 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
             </section>
 
             {/* Pie fijo: va pegado al fondo en celular, porque el scroll es del formulario. */}
-            <div className="sticky bottom-0 space-y-2 border-t border-hairline bg-surface px-6 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4 md:static md:border-0 md:p-0">
+            <div className="order-3 sticky bottom-0 space-y-2 border-t border-hairline bg-surface px-6 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4 md:order-none md:static md:border-0 md:p-0">
               <button
                 type="button"
                 onClick={agregarFila}
