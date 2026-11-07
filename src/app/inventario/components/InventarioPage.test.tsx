@@ -201,8 +201,10 @@ describe("InventarioPage — FAB crear producto (spec inventory-ui)", () => {
     fireEvent.click(screen.getByLabelText("Agregar producto"));
     fireEvent.click(await screen.findByRole("button", { name: /varios productos/i }));
 
-    // Se abre BulkProductForm con su primera fila y su acción propia.
+    // Se abre BulkProductForm en el paso 1 y «Continuar» muestra la primera fila
+    // con su acción propia (T15).
     const dialogo = await screen.findByRole("dialog", { name: "Varios productos" });
+    fireEvent.click(within(dialogo).getByRole("button", { name: "Continuar" }));
     expect(within(dialogo).getByText("Producto 1")).toBeInTheDocument();
     expect(within(dialogo).getByRole("button", { name: /crear 1 producto/i })).toBeInTheDocument();
     // Y NO se abre el alta individual.

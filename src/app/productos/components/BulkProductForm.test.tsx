@@ -92,9 +92,11 @@ const renderForm = async () => {
   const onClose = jest.fn();
   const onSuccess = jest.fn();
   render(<BulkProductForm branches={SUCURSALES} onClose={onClose} onSuccess={onSuccess} />);
-  // La lista de categorías se carga en el mount: esperarla deja el modal listo
-  // y evita actualizaciones fuera de `act`.
-  await esperarCategorias();
+  // El wizard abre en el paso 1 (T15). La lista de categorías se pide igual en
+  // el mount, así que esperar el microtask deja el modal sin actualizaciones
+  // pendientes aunque todavía no haya filas en pantalla.
+  await screen.findByRole("heading", { name: "Elegí la sucursal" });
+  await act(async () => {});
   return { onClose, onSuccess };
 };
 
@@ -109,6 +111,12 @@ const elegirSucursal = (nombre = "Sucursal Centro") =>
 
 /** Espera a que la lista única de categorías termine de cargar. */
 const esperarCategorias = () => waitFor(() => expect(categorias()[0]).toBeEnabled());
+
+/** Paso 1 → paso 2 (T15): Continuar y esperar la lista única de categorías. */
+const continuar = async () => {
+  fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
+  await esperarCategorias();
+};
 
 /** Completa una fila por índice (0-based). */
 const llenarFila = (i: number, name: string, prefix = "AA", price = "10") => {
@@ -136,6 +144,7 @@ describe("BulkProductForm", () => {
 
   it("agrega y quita filas", async () => {
     await renderForm();
+    await continuar();
 
     expect(nombres()).toHaveLength(1);
     expect(screen.queryByLabelText("Quitar producto 1")).not.toBeInTheDocument();
@@ -151,6 +160,7 @@ describe("BulkProductForm", () => {
 
   it("la última fila no se puede quitar", async () => {
     await renderForm();
+    await continuar();
 
     expect(screen.queryByLabelText("Quitar producto 1")).not.toBeInTheDocument();
 
@@ -162,6 +172,7 @@ describe("BulkProductForm", () => {
 
   it("quitar una fila con datos pide confirmación", async () => {
     await renderForm();
+    await continuar();
     fireEvent.click(screen.getByRole("button", { name: /agregar producto/i }));
     llenarFila(1, "Producto con datos");
 
@@ -173,6 +184,7 @@ describe("BulkProductForm", () => {
 
   it("el tope es de 50 filas y el botón pasa a 'Máximo 50'", async () => {
     await renderForm();
+    await continuar();
 
     for (let i = 0; i < 49; i++) {
       fireEvent.click(screen.getByRole("button", { name: /agregar producto/i }));
@@ -188,6 +200,7 @@ describe("BulkProductForm", () => {
 
   it("una fila nueva copia el prefijo de la anterior", async () => {
     await renderForm();
+    await continuar();
     fireEvent.change(prefijos()[0], { target: { value: "ab" } });
 
     fireEvent.click(screen.getByRole("button", { name: /agregar producto/i }));
@@ -199,6 +212,7 @@ describe("BulkProductForm", () => {
 
   it("Enter no envía: pasa al campo siguiente y en el último agrega una fila", async () => {
     await renderForm();
+    await continuar();
     llenarFila(0, "Producto único");
 
     // Enter en el primer campo: se mueve al prefijo, no envía.
@@ -214,6 +228,7 @@ describe("BulkProductForm", () => {
 
   it("mientras se envía no se puede agregar ni quitar filas", async () => {
     await renderForm();
+    await continuar();
     fireEvent.click(screen.getByRole("button", { name: /agregar producto/i }));
     llenarFila(0, "Producto uno");
     llenarFila(1, "Producto dos");
@@ -248,6 +263,7 @@ describe("BulkProductForm", () => {
     mockCreateProductsBatch.mockResolvedValue(falla as Falla as never);
 
     await renderForm();
+    await continuar();
     fireEvent.click(screen.getByRole("button", { name: /agregar producto/i }));
     llenarFila(0, "Producto libre");
     llenarFila(1, "Producto repetido");
@@ -285,6 +301,7 @@ describe("BulkProductForm", () => {
     } as never);
 
     await renderForm();
+    await continuar();
     llenarFila(0, "Producto único");
     fireEvent.click(screen.getByRole("button", { name: /crear 1 producto/i }));
 
@@ -299,6 +316,7 @@ describe("BulkProductForm", () => {
 
   it("valida en el cliente antes de llamar a la acción", async () => {
     await renderForm();
+    await continuar();
 
     // Prefijo inválido (un número): el mismo esquema del servidor lo rechaza.
     fireEvent.change(nombres()[0], { target: { value: "Producto único" } });
@@ -313,6 +331,7 @@ describe("BulkProductForm", () => {
 
   it("si sale bien muestra la cantidad, llama a onSuccess y cierra", async () => {
     const { onClose, onSuccess } = await renderForm();
+    await continuar();
     llenarFila(0, "Producto único");
 
     fireEvent.click(screen.getByRole("button", { name: /crear 1 producto/i }));
@@ -331,6 +350,7 @@ describe("BulkProductForm", () => {
     mockCreateProductsBatch.mockResolvedValue({ success: false, error: "Error al crear los productos" } as never);
 
     const { onClose, onSuccess } = await renderForm();
+    await continuar();
     llenarFila(0, "Producto A");
     fireEvent.click(screen.getByRole("button", { name: /crear 1 producto/i }));
 
@@ -344,6 +364,7 @@ describe("BulkProductForm", () => {
   // S4: una categoría por fila. La lista se pide una sola vez para todo el modal.
   it("cada fila tiene su categoría y viaja con su fila", async () => {
     const { onSuccess } = await renderForm();
+    await continuar();
 
     fireEvent.click(screen.getByRole("button", { name: /agregar producto/i }));
     llenarFila(0, "Producto uno");
@@ -375,6 +396,7 @@ describe("BulkProductForm", () => {
     } as never);
 
     const { onSuccess } = await renderForm();
+    await continuar();
     fireEvent.click(screen.getByRole("button", { name: /agregar producto/i }));
     llenarFila(0, "Producto uno");
     llenarFila(1, "Producto dos");
@@ -406,6 +428,7 @@ describe("BulkProductForm", () => {
 
   it("pide la lista de categorías una sola vez aunque haya varias filas", async () => {
     await renderForm();
+    await continuar();
     await esperarCategorias();
 
     fireEvent.click(screen.getByRole("button", { name: /agregar producto/i }));
@@ -419,6 +442,7 @@ describe("BulkProductForm", () => {
     mockGetCategoryOptions.mockResolvedValue({ success: false, error: "sin permisos" } as never);
 
     await renderForm();
+    fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
 
     expect(
       await screen.findByText(/no se pudieron cargar las categorías/i),
@@ -429,10 +453,13 @@ describe("BulkProductForm", () => {
   it("sin sucursal no hay campo de stock y el payload va sin stock", async () => {
     const { onSuccess } = await renderForm();
 
-    // El estado vacío se explica, no se adivina.
+    // El estado vacío se explica en el paso 1, no se adivina.
     expect(
       screen.getByText(/sin sucursal: los productos se crean sin stock/i),
     ).toBeInTheDocument();
+    await continuar();
+
+    // En el paso 2 no hay stock ni la acción de quitarlo.
     expect(stocks()).toHaveLength(0);
     expect(screen.queryByRole("button", { name: "No cargar stock" })).not.toBeInTheDocument();
 
@@ -450,6 +477,7 @@ describe("BulkProductForm", () => {
     const { onSuccess } = await renderForm();
 
     elegirSucursal();
+    await continuar();
     expect(stocks()).toHaveLength(1);
     expect(stocks()[0]).toHaveAttribute("inputmode", "numeric");
 
@@ -479,6 +507,7 @@ describe("BulkProductForm", () => {
     const { onSuccess } = await renderForm();
 
     elegirSucursal();
+    await continuar();
     expect(stocks()).toHaveLength(1);
 
     fireEvent.click(screen.getByRole("button", { name: "No cargar stock" }));
@@ -501,6 +530,7 @@ describe("BulkProductForm", () => {
 
     const { onClose, onSuccess } = await renderForm();
     elegirSucursal();
+    await continuar();
     llenarFila(0, "Producto único");
     fireEvent.change(stocks()[0], { target: { value: "5" } });
 
@@ -521,6 +551,7 @@ describe("BulkProductForm", () => {
   it("con sucursal y stock 0 el servidor no devuelve comprobante: sigue el Swal", async () => {
     const { onClose, onSuccess } = await renderForm();
     elegirSucursal();
+    await continuar();
     llenarFila(0, "Producto sin stock");
 
     fireEvent.click(screen.getByRole("button", { name: /crear 1 producto/i }));
@@ -542,6 +573,7 @@ describe("BulkProductForm", () => {
 
     await renderForm();
     elegirSucursal();
+    await continuar();
     llenarFila(0, "Producto único");
     fireEvent.click(screen.getByRole("button", { name: /crear 1 producto/i }));
 
@@ -555,7 +587,8 @@ describe("BulkProductForm", () => {
 
   it("quitar la sucursal borra el error de stock, que ya no tiene campo", async () => {
     await renderForm();
-    await elegirSucursal();
+    elegirSucursal();
+    await continuar();
     llenarFila(0, "Producto con error");
     mockCreateProductsBatch.mockResolvedValue({
       success: false,
@@ -571,5 +604,81 @@ describe("BulkProductForm", () => {
     await waitFor(() =>
       expect(screen.queryByText("El stock no puede ser negativo")).not.toBeInTheDocument(),
     );
+  });
+  // T15 (S17): wizard de dos pasos. El paso 1 no comparte el scroll con las
+  // filas, que es lo que pintaba la sucursal encima de la primera card (S18).
+  it("abre en el paso 1 y recién Continuar revela las filas", async () => {
+    await renderForm();
+
+    expect(screen.getByText("Paso 1 de 2")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Sucursal Centro" })).toBeInTheDocument();
+    // El paso 1 no tiene filas ni acción de crear.
+    expect(screen.queryAllByLabelText(/^nombre/i)).toHaveLength(0);
+    expect(screen.queryByRole("button", { name: /crear \d+ producto/i })).not.toBeInTheDocument();
+    // Una sola acción principal en pantalla (STYLE.md).
+    const primarios = screen
+      .getAllByRole("button")
+      .filter((b) => b.className.includes("btn-primary"));
+    expect(primarios).toHaveLength(1);
+    expect(primarios[0]).toHaveTextContent("Continuar");
+
+    await continuar();
+
+    expect(screen.getByText("Paso 2 de 2")).toBeInTheDocument();
+    expect(nombres()).toHaveLength(1);
+    expect(screen.getByRole("button", { name: /crear 1 producto/i })).toBeInTheDocument();
+  });
+
+  it("volver al paso 1 conserva lo tipeado y no vuelve a pedir las categorías", async () => {
+    await renderForm();
+    await continuar();
+    fireEvent.click(screen.getByRole("button", { name: /agregar producto/i }));
+    llenarFila(0, "Producto uno");
+    llenarFila(1, "Producto dos", "AB", "20");
+
+    fireEvent.click(screen.getByRole("button", { name: "Volver" }));
+
+    // De vuelta en el paso 1 no hay filas, pero tampoco se perdió nada.
+    expect(screen.getByText("Paso 1 de 2")).toBeInTheDocument();
+    expect(screen.queryAllByLabelText(/^nombre/i)).toHaveLength(0);
+
+    fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
+
+    expect(nombres()).toHaveLength(2);
+    expect(nombres()[0]).toHaveValue("Producto uno");
+    expect(nombres()[1]).toHaveValue("Producto dos");
+    expect(prefijos()[1]).toHaveValue("AB");
+    expect(precios()[1]).toHaveValue(20);
+    // La lista de categorías se pide una sola vez, en el mount.
+    expect(mockGetCategoryOptions).toHaveBeenCalledTimes(1);
+  });
+
+  it("al cambiar de paso el foco entra al título del paso nuevo", async () => {
+    await renderForm();
+    const tituloSucursal = screen.getByRole("heading", { name: "Elegí la sucursal" });
+    await waitFor(() => expect(tituloSucursal).toHaveFocus());
+
+    await continuar();
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { name: "Cargá los productos" })).toHaveFocus(),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Volver" }));
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { name: "Elegí la sucursal" })).toHaveFocus(),
+    );
+  });
+
+  it("sin sucursales activas igual se puede seguir al paso de productos", async () => {
+    // La sucursal es opcional (D8): un negocio sin sucursales no puede quedar
+    // encerrado en un paso donde no hay nada que elegir.
+    render(<BulkProductForm branches={[]} onClose={jest.fn()} onSuccess={jest.fn()} />);
+
+    const seguir = await screen.findByRole("button", { name: "Continuar" });
+    expect(seguir).toBeEnabled();
+
+    fireEvent.click(seguir);
+    await esperarCategorias();
+    expect(screen.getByRole("heading", { name: "Cargá los productos" })).toBeInTheDocument();
   });
 });

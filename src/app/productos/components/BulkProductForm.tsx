@@ -27,6 +27,8 @@ type Fila = {
 /** `row` es un mensaje que no pertenece a un campo puntual: se muestra en la card. */
 type Campo = "name" | "prefix" | "price" | "categoryId" | "initialStock" | "row";
 type FilaError = { field: Campo; message: string };
+/** Paso 1: sucursal del stock inicial. Paso 2: las filas de productos (S17). */
+type Paso = "sucursal" | "productos";
 
 export interface BulkProductFormProps {
   onClose: () => void;
@@ -74,14 +76,21 @@ function erroresPorFila(
  * que el atajo «+ Nueva categoría» vuelve por fila sin sumar viajes: la
  * categoría creada se agrega a la lista única del modal.
  *
- * Patrón: bottom-sheet montado en un portal al `body`, como `ProductForm`
- * (STYLE.md), con el cuerpo con scroll y el pie fijo. Enter nunca envía: pasa
- * al campo siguiente y en el último campo de la última fila agrega una fila.
+ * Dos pasos como `LabelSelector` (S17): primero la sucursal y después las
+ * filas, así el bloque de sucursal no comparte el scroll con las cards. El paso
+ * 2 conserva todo lo tipeado al volver y no vuelve a pedir las categorías.
+ *
+ * Patrón: bottom-sheet montado en un portal al `body` (STYLE.md). El panel es
+ * una columna con altura tope, el cuerpo del paso es el ÚNICO scroller y el pie
+ * va después, reservado en el flujo: nada se pinta encima de las cards ni de los
+ * campos (S18). Enter nunca envía: pasa al campo siguiente y en el último campo
+ * de la última fila agrega una fila.
  */
 export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFormProps) {
   const [filas, setFilas] = useState<Fila[]>([
     { id: "1", name: "", prefix: "", price: "", categoryId: null, initialStock: "" },
   ]);
+  const [paso, setPaso] = useState<Paso>("sucursal");
   const [branchId, setBranchId] = useState<number | null>(null);
   const [receipt, setReceipt] = useState<StockMovementReceipt | null>(null);
   const [categorias, setCategorias] = useState<{ id: number; name: string }[]>([]);
@@ -104,6 +113,7 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
 
   const nextId = useRef(1);
   const cuerpoRef = useRef<HTMLDivElement>(null);
+  const pasoTituloRef = useRef<HTMLHeadingElement>(null);
   const resumenRef = useRef<HTMLDivElement>(null);
   const idParaEnfocar = useRef<string | null>(null);
   const enfocarResumen = useRef(false);
@@ -128,6 +138,12 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
       cancelado = true;
     };
   }, []);
+
+  // El paso nuevo se anuncia por su título: el panel conserva su `h2` y el paso
+  // se nombra con un `h3` enfocable.
+  useEffect(() => {
+    pasoTituloRef.current?.focus();
+  }, [paso]);
 
   // Foco diferido: la fila nueva (o el resumen) todavía no existe cuando se pide.
   useEffect(() => {
@@ -228,6 +244,7 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
   };
 
   const filasConError = filas.filter((f) => (errores[f.id]?.length ?? 0) > 0);
+  const nombreSucursal = branches.find((b) => b.id === branchId)?.name ?? "";
 
   const irAPrimeraConError = () => {
     const fila = filasConError[0];
@@ -353,6 +370,9 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
             <p className="mt-1 text-sm text-ink-muted">
               Hasta {MAX_FILAS} por carga. Se crean todos o ninguno.
             </p>
+            <p className="mt-2 text-xs font-medium uppercase tracking-wide text-ink-muted">
+              Paso {paso === "sucursal" ? 1 : 2} de 2
+            </p>
           </div>
           <button
             type="button"
@@ -366,273 +386,330 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
           </button>
         </div>
 
-        <form
-          onSubmit={enviar}
-          className="flex min-h-0 flex-1 flex-col overflow-y-auto md:grid md:grid-cols-2 md:items-start md:gap-x-6 md:gap-y-4 md:px-6 md:pb-4"
-        >
-          {/* Columna izquierda desde md: el resumen y las filas. */}
-          <div
-            ref={cuerpoRef}
-            className="order-1 min-h-0 space-y-4 px-6 pb-4 md:order-none md:col-start-1 md:row-start-1 md:px-0 md:pb-0"
-          >
-            {errorCategorias && (
-              <p role="status" className="rounded-xl border border-hairline bg-surface-soft p-3 text-sm text-ink-muted">
-                No se pudieron cargar las categorías. Los productos se van a guardar sin
-                categoría; podés asignarla después desde el inventario.
-              </p>
-            )}
-
-            {filasConError.length > 0 && (
-              <div
-                ref={resumenRef}
-                role="alert"
-                tabIndex={-1}
-                className="rounded-2xl border border-error bg-error-surface p-4 text-error-ink"
-              >
-                <p className="text-sm font-medium">
-                  {filasConError.length === 1
-                    ? "1 fila con errores"
-                    : `${filasConError.length} filas con errores`}
-                </p>
-                <button type="button" onClick={irAPrimeraConError} className="btn btn-ghost mt-2">
-                  Ir a la primera
-                </button>
-              </div>
-            )}
-
-            {filas.map((fila, index) => {
-              const erroresFila = errores[fila.id] ?? [];
-              const mensajeDe = (campo: Campo) =>
-                erroresFila.find((e) => e.field === campo)?.message;
-              const base = `bulk-row-${fila.id}`;
-              const errorCard = mensajeDe("row");
-              /** aria-describedby: el mensaje del campo más el de la card, si existen. */
-              const descritoPor = (campo: Campo) =>
-                [mensajeDe(campo) ? `${base}-${campo}-error` : null, errorCard ? `${base}-row-error` : null]
-                  .filter(Boolean)
-                  .join(" ") || undefined;
-
-              return (
-                <div
-                  key={fila.id}
-                  className={`rounded-2xl border p-4 space-y-3 ${
-                    erroresFila.length > 0
-                      ? "border-error bg-error-surface"
-                      : "border-hairline bg-surface-soft"
-                  }`}
+        <form onSubmit={enviar} className="flex min-h-0 flex-1 flex-col">
+          {/* Único scroller del panel: el cuerpo del paso. */}
+          <div ref={cuerpoRef} className="min-h-0 flex-1 overflow-y-auto px-6 pb-4">
+            {paso === "sucursal" ? (
+              <div className="md:mx-auto md:max-w-md">
+                <h3
+                  ref={pasoTituloRef}
+                  tabIndex={-1}
+                  className="text-base font-semibold text-ink outline-none"
                 >
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-xs font-medium uppercase tracking-wide text-ink-muted">
-                      Producto {index + 1}
-                    </span>
-                    {filas.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => quitarFila(fila)}
-                        disabled={loading}
-                        className="btn btn-icon text-ink-muted hover:bg-surface-strong"
-                        aria-label={`Quitar producto ${index + 1}`}
-                      >
-                        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    )}
-                  </div>
-
-                  {errorCard && (
-                    <p id={`${base}-row-error`} className="text-sm text-error-ink">
-                      {errorCard}
-                    </p>
-                  )}
-
-                  <div>
-                    <label htmlFor={`${base}-name`} className={labelClass}>
-                      Nombre *
-                    </label>
-                    <input
-                      id={`${base}-name`}
-                      data-bulk-field="name"
-                      type="text"
-                      value={fila.name}
-                      onChange={(e) => actualizarFila(fila.id, "name", e.target.value)}
-                      onKeyDown={alPresionarEnter}
-                      enterKeyHint="next"
-                      placeholder="Ej: Jabón de Avena y Arroz"
-                      required
-                      aria-invalid={mensajeDe("name") ? "true" : undefined}
-                      aria-describedby={descritoPor("name")}
-                      className={inputClass}
-                    />
-                    {mensajeDe("name") && (
-                      <p id={`${base}-name-error`} className="mt-1 text-sm text-error-ink">
-                        {mensajeDe("name")}
-                      </p>
-                    )}
-                  </div>
-
-                  <div>
-                    <label htmlFor={`${base}-prefix`} className={labelClass}>
-                      Prefijo (2-4 letras) *
-                    </label>
-                    <input
-                      id={`${base}-prefix`}
-                      data-bulk-field="prefix"
-                      type="text"
-                      maxLength={4}
-                      autoCapitalize="characters"
-                      value={fila.prefix}
-                      onChange={(e) => actualizarFila(fila.id, "prefix", e.target.value.toUpperCase())}
-                      onKeyDown={alPresionarEnter}
-                      enterKeyHint="next"
-                      placeholder="Ej: AA"
-                      required
-                      aria-invalid={mensajeDe("prefix") ? "true" : undefined}
-                      aria-describedby={descritoPor("prefix")}
-                      className={`${inputClass} uppercase`}
-                    />
-                    {mensajeDe("prefix") && (
-                      <p id={`${base}-prefix-error`} className="mt-1 text-sm text-error-ink">
-                        {mensajeDe("prefix")}
-                      </p>
-                    )}
-                  </div>
-
-                  <div>
-                    <label htmlFor={`${base}-price`} className={labelClass}>
-                      Precio de venta *
-                    </label>
-                    <input
-                      id={`${base}-price`}
-                      data-bulk-field="price"
-                      type="number"
-                      inputMode="decimal"
-                      step="0.01"
-                      min="0"
-                      value={fila.price}
-                      onChange={(e) => actualizarFila(fila.id, "price", e.target.value)}
-                      onKeyDown={alPresionarEnter}
-                      enterKeyHint={branchId !== null ? "next" : "done"}
-                      placeholder="0.00"
-                      required
-                      aria-invalid={mensajeDe("price") ? "true" : undefined}
-                      aria-describedby={descritoPor("price")}
-                      className={inputClass}
-                    />
-                    {mensajeDe("price") && (
-                      <p id={`${base}-price-error`} className="mt-1 text-sm text-error-ink">
-                        {mensajeDe("price")}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Stock inicial: solo tiene sentido con una sucursal elegida (D8). */}
-                  {branchId !== null && (
-                    <div>
-                      <label htmlFor={`${base}-initialStock`} className={labelClass}>
-                        Stock inicial
-                      </label>
-                      <input
-                        id={`${base}-initialStock`}
-                        data-bulk-field="initialStock"
-                        type="number"
-                        inputMode="numeric"
-                        step="1"
-                        min="0"
-                        value={fila.initialStock}
-                        onChange={(e) => actualizarFila(fila.id, "initialStock", e.target.value)}
-                        onKeyDown={alPresionarEnter}
-                        enterKeyHint="next"
-                        placeholder="0"
-                        aria-invalid={mensajeDe("initialStock") ? "true" : undefined}
-                        aria-describedby={descritoPor("initialStock")}
-                        className={inputClass}
-                      />
-                      {mensajeDe("initialStock") && (
-                        <p id={`${base}-initialStock-error`} className="mt-1 text-sm text-error-ink">
-                          {mensajeDe("initialStock")}
-                        </p>
-                      )}
-                    </div>
-                  )}
-
-                  <div>
-                    <label htmlFor={`${base}-categoryId`} className={labelClass}>
-                      Categoría
-                    </label>
-                    <CategorySelector
-                      id={`${base}-categoryId`}
-                      selectedId={fila.categoryId}
-                      onValueChange={(id) => actualizarFila(fila.id, "categoryId", id)}
-                      options={categorias}
-                      onOptionsChange={setCategorias}
-                      disabled={cargandoCategorias || loading}
-                      invalid={Boolean(mensajeDe("categoryId"))}
-                      describedBy={descritoPor("categoryId")}
-                    />
-                    {mensajeDe("categoryId") && (
-                      <p id={`${base}-categoryId-error`} className="mt-1 text-sm text-error-ink">
-                        {mensajeDe("categoryId")}
-                      </p>
-                    )}
-                  </div>
+                  Elegí la sucursal
+                </h3>
+                <p className="mt-1 text-sm text-ink-muted">
+                  Con sucursal, cada producto deja su stock ahí; con stock mayor a 0 se genera el
+                  movimiento de ingreso y su comprobante.
+                </p>
+                <div className="mt-4">
+                  <BranchPicker
+                    branches={branches}
+                    value={branchId}
+                    onChange={setBranchId}
+                    columns={2}
+                    label="Sucursal del stock inicial"
+                    emptyLabel="No hay sucursales activas: los productos se crean sin stock"
+                  />
                 </div>
-              );
-            })}
-          </div>
-
-          {/* Columna derecha desde md: el contexto del lote (T11) y la acción, pegajosa
-              (`md:sticky md:top-4`). En celular `contents` deja sus dos bloques como
-              items flex de la columna única, con order explícito: filas → contexto →
-              acción, para que la acción siga siendo lo último (STYLE.md). */}
-          <div className="contents md:sticky md:top-4 md:col-start-2 md:row-start-1 md:block md:space-y-4">
-            {/* Sucursal global del lote (D8) y opcional: sin ella no hay stock. */}
-            <section className="order-2 mx-6 mb-4 rounded-2xl border border-hairline bg-surface-soft p-4 md:order-none md:m-0">
-              <h3 className="text-xs font-medium uppercase tracking-wide text-ink-muted">
-                Stock inicial · todo el lote
-              </h3>
-              <p className="mt-1 text-sm text-ink-muted">
-                {branchId === null
-                  ? "Sin sucursal: los productos se crean sin stock y no se genera comprobante."
-                  : "Cada producto deja su stock en esta sucursal. Con stock mayor a 0 se genera el movimiento de ingreso y su comprobante."}
-              </p>
-              <div className="mt-3">
-                <BranchPicker
-                  branches={branches}
-                  value={branchId}
-                  onChange={setBranchId}
-                  label="Sucursal del stock inicial"
-                  emptyLabel="No hay sucursales activas: los productos se crean sin stock"
-                />
-              </div>
-              {branchId !== null && (
+                <p className="mt-4 text-sm text-ink-muted">
+                  Sin sucursal: los productos se crean sin stock y no se genera comprobante.
+                </p>
                 <button
                   type="button"
                   onClick={() => setBranchId(null)}
-                  className="btn btn-ghost mt-2"
+                  aria-pressed={branchId === null}
+                  className={`btn mt-2 w-full ${branchId === null ? "btn-active" : "btn-ghost"}`}
                 >
                   No cargar stock
                 </button>
-              )}
-            </section>
+              </div>
+            ) : (
+              <div className="space-y-4 md:grid md:grid-cols-2 md:items-start md:gap-x-6 md:gap-y-4">
+                <div className="space-y-4 md:col-start-1 md:row-start-1">
+                  <h3
+                      ref={pasoTituloRef}
+                    tabIndex={-1}
+                    className="text-base font-semibold text-ink outline-none"
+                  >
+                    Cargá los productos
+                  </h3>
+                  {errorCategorias && (
+                    <p role="status" className="rounded-xl border border-hairline bg-surface-soft p-3 text-sm text-ink-muted">
+                      No se pudieron cargar las categorías. Los productos se van a guardar sin
+                      categoría; podés asignarla después desde el inventario.
+                    </p>
+                  )}
 
-            {/* Pie fijo: va pegado al fondo en celular, porque el scroll es del formulario. */}
-            <div className="order-3 sticky bottom-0 space-y-2 border-t border-hairline bg-surface px-6 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4 md:order-none md:static md:border-0 md:p-0">
-              <button
-                type="button"
-                onClick={agregarFila}
-                disabled={filas.length >= MAX_FILAS || loading}
-                className="btn btn-secondary w-full"
-              >
-                {filas.length >= MAX_FILAS ? "Máximo 50" : "+ Agregar producto"}
-              </button>
-              <button type="submit" disabled={loading} className="btn btn-primary w-full">
-                {loading
-                  ? "Creando…"
-                  : `Crear ${filas.length} ${filas.length === 1 ? "producto" : "productos"}`}
-              </button>
-            </div>
+                  {filasConError.length > 0 && (
+                    <div
+                      ref={resumenRef}
+                      role="alert"
+                      tabIndex={-1}
+                      className="rounded-2xl border border-error bg-error-surface p-4 text-error-ink"
+                    >
+                      <p className="text-sm font-medium">
+                        {filasConError.length === 1
+                          ? "1 fila con errores"
+                          : `${filasConError.length} filas con errores`}
+                      </p>
+                      <button type="button" onClick={irAPrimeraConError} className="btn btn-ghost mt-2">
+                        Ir a la primera
+                      </button>
+                    </div>
+                  )}
+
+                  {filas.map((fila, index) => {
+                    const erroresFila = errores[fila.id] ?? [];
+                    const mensajeDe = (campo: Campo) =>
+                      erroresFila.find((e) => e.field === campo)?.message;
+                    const base = `bulk-row-${fila.id}`;
+                    const errorCard = mensajeDe("row");
+                    /** aria-describedby: el mensaje del campo más el de la card, si existen. */
+                    const descritoPor = (campo: Campo) =>
+                      [mensajeDe(campo) ? `${base}-${campo}-error` : null, errorCard ? `${base}-row-error` : null]
+                        .filter(Boolean)
+                        .join(" ") || undefined;
+
+                    return (
+                      <div
+                        key={fila.id}
+                        className={`rounded-2xl border p-4 space-y-3 ${
+                          erroresFila.length > 0
+                            ? "border-error bg-error-surface"
+                            : "border-hairline bg-surface-soft"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-xs font-medium uppercase tracking-wide text-ink-muted">
+                            Producto {index + 1}
+                          </span>
+                          {filas.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => quitarFila(fila)}
+                              disabled={loading}
+                              className="btn btn-icon text-ink-muted hover:bg-surface-strong"
+                              aria-label={`Quitar producto ${index + 1}`}
+                            >
+                              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          )}
+                        </div>
+
+                        {errorCard && (
+                          <p id={`${base}-row-error`} className="text-sm text-error-ink">
+                            {errorCard}
+                          </p>
+                        )}
+
+                        <div>
+                          <label htmlFor={`${base}-name`} className={labelClass}>
+                            Nombre *
+                          </label>
+                          <input
+                            id={`${base}-name`}
+                            data-bulk-field="name"
+                            type="text"
+                            value={fila.name}
+                            onChange={(e) => actualizarFila(fila.id, "name", e.target.value)}
+                            onKeyDown={alPresionarEnter}
+                            enterKeyHint="next"
+                            placeholder="Ej: Jabón de Avena y Arroz"
+                            required
+                            aria-invalid={mensajeDe("name") ? "true" : undefined}
+                            aria-describedby={descritoPor("name")}
+                            className={inputClass}
+                          />
+                          {mensajeDe("name") && (
+                            <p id={`${base}-name-error`} className="mt-1 text-sm text-error-ink">
+                              {mensajeDe("name")}
+                            </p>
+                          )}
+                        </div>
+
+                        <div>
+                          <label htmlFor={`${base}-prefix`} className={labelClass}>
+                            Prefijo (2-4 letras) *
+                          </label>
+                          <input
+                            id={`${base}-prefix`}
+                            data-bulk-field="prefix"
+                            type="text"
+                            maxLength={4}
+                            autoCapitalize="characters"
+                            value={fila.prefix}
+                            onChange={(e) => actualizarFila(fila.id, "prefix", e.target.value.toUpperCase())}
+                            onKeyDown={alPresionarEnter}
+                            enterKeyHint="next"
+                            placeholder="Ej: AA"
+                            required
+                            aria-invalid={mensajeDe("prefix") ? "true" : undefined}
+                            aria-describedby={descritoPor("prefix")}
+                            className={`${inputClass} uppercase`}
+                          />
+                          {mensajeDe("prefix") && (
+                            <p id={`${base}-prefix-error`} className="mt-1 text-sm text-error-ink">
+                              {mensajeDe("prefix")}
+                            </p>
+                          )}
+                        </div>
+
+                        <div>
+                          <label htmlFor={`${base}-price`} className={labelClass}>
+                            Precio de venta *
+                          </label>
+                          <input
+                            id={`${base}-price`}
+                            data-bulk-field="price"
+                            type="number"
+                            inputMode="decimal"
+                            step="0.01"
+                            min="0"
+                            value={fila.price}
+                            onChange={(e) => actualizarFila(fila.id, "price", e.target.value)}
+                            onKeyDown={alPresionarEnter}
+                            enterKeyHint={branchId !== null ? "next" : "done"}
+                            placeholder="0.00"
+                            required
+                            aria-invalid={mensajeDe("price") ? "true" : undefined}
+                            aria-describedby={descritoPor("price")}
+                            className={inputClass}
+                          />
+                          {mensajeDe("price") && (
+                            <p id={`${base}-price-error`} className="mt-1 text-sm text-error-ink">
+                              {mensajeDe("price")}
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Stock inicial: solo tiene sentido con una sucursal elegida (D8). */}
+                        {branchId !== null && (
+                          <div>
+                            <label htmlFor={`${base}-initialStock`} className={labelClass}>
+                              Stock inicial
+                            </label>
+                            <input
+                              id={`${base}-initialStock`}
+                              data-bulk-field="initialStock"
+                              type="number"
+                              inputMode="numeric"
+                              step="1"
+                              min="0"
+                              value={fila.initialStock}
+                              onChange={(e) => actualizarFila(fila.id, "initialStock", e.target.value)}
+                              onKeyDown={alPresionarEnter}
+                              enterKeyHint="next"
+                              placeholder="0"
+                              aria-invalid={mensajeDe("initialStock") ? "true" : undefined}
+                              aria-describedby={descritoPor("initialStock")}
+                              className={inputClass}
+                            />
+                            {mensajeDe("initialStock") && (
+                              <p id={`${base}-initialStock-error`} className="mt-1 text-sm text-error-ink">
+                                {mensajeDe("initialStock")}
+                              </p>
+                            )}
+                          </div>
+                        )}
+
+                        <div>
+                          <label htmlFor={`${base}-categoryId`} className={labelClass}>
+                            Categoría
+                          </label>
+                          <CategorySelector
+                            id={`${base}-categoryId`}
+                            selectedId={fila.categoryId}
+                            onValueChange={(id) => actualizarFila(fila.id, "categoryId", id)}
+                            options={categorias}
+                            onOptionsChange={setCategorias}
+                            disabled={cargandoCategorias || loading}
+                            invalid={Boolean(mensajeDe("categoryId"))}
+                            describedBy={descritoPor("categoryId")}
+                          />
+                          {mensajeDe("categoryId") && (
+                            <p id={`${base}-categoryId-error`} className="mt-1 text-sm text-error-ink">
+                              {mensajeDe("categoryId")}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Sucursal elegida en el paso 1: se muestra como dato y la
+                    salida sin stock sigue alcanzable acá (T15). */}
+                <aside className="space-y-3 rounded-2xl border border-hairline bg-surface-soft p-4 md:col-start-2 md:row-start-1 md:sticky md:top-4">
+                  <h4 className="text-xs font-medium uppercase tracking-wide text-ink-muted">
+                    Stock inicial · todo el lote
+                  </h4>
+                  <p className="text-sm text-ink-muted">
+                    {nombreSucursal
+                      ? `Sucursal: ${nombreSucursal}. Cada producto deja su stock ahí.`
+                      : "Sin sucursal: los productos se crean sin stock y no se genera comprobante."}
+                  </p>
+                  {branchId !== null && (
+                    <button
+                      type="button"
+                      onClick={() => setBranchId(null)}
+                      disabled={loading}
+                      className="btn btn-ghost w-full"
+                    >
+                      No cargar stock
+                    </button>
+                  )}
+                </aside>
+              </div>
+            )}
           </div>
+
+          {/* Pie reservado y fuera del scroll: no se pinta sobre campos ni cards (S18). */}
+          {paso === "sucursal" ? (
+            <div className="border-t border-hairline bg-surface px-6 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4 md:pb-4">
+              <div className="md:mx-auto md:max-w-md">
+                <button
+                  type="button"
+                  onClick={() => setPaso("productos")}
+                  className="btn btn-primary w-full"
+                >
+                  Continuar
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="border-t border-hairline bg-surface px-6 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4 md:grid md:grid-cols-2 md:gap-x-6 md:pb-4">
+              {/* Desde md alineado con la columna derecha del cuerpo: filas a la
+                  izquierda, acción a la derecha. */}
+              <div className="space-y-2 md:col-start-2">
+                <button
+                  type="button"
+                  onClick={agregarFila}
+                  disabled={filas.length >= MAX_FILAS || loading}
+                  className="btn btn-secondary w-full"
+                >
+                  {filas.length >= MAX_FILAS ? "Máximo 50" : "+ Agregar producto"}
+                </button>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPaso("sucursal")}
+                    disabled={loading}
+                    className="btn btn-secondary"
+                  >
+                    Volver
+                  </button>
+                  <button type="submit" disabled={loading} className="btn btn-primary flex-1">
+                    {loading
+                      ? "Creando…"
+                      : `Crear ${filas.length} ${filas.length === 1 ? "producto" : "productos"}`}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </form>
       </div>
     </div>,
