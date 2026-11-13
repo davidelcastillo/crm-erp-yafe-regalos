@@ -353,12 +353,14 @@ describe("moveStockBatchBetweenBranches (Fase 3) — atomic batch", () => {
     expect(result.data).toMatchObject({
       receipt: {
         movementType: "TRANSFER",
+        // S2: el comprobante lleva la sucursal y el producto para poder etiquetar.
+        branchId: 2,
         branchName: "Destino", branchCode: "DES",
         sourceBranchName: "Origen", sourceBranchCode: "ORI",
         date: expect.any(String), reference: expect.stringMatching(/^MOVE-/),
         rows: [
-          { code: "JAB", name: "Jabón", quantity: 3, stock: 3, sourceStock: 7, price: 150 },
-          { code: "SHA", name: "Shampoo", quantity: 7, stock: 10, sourceStock: 8, price: 300 },
+          { productId: 1, code: "JAB", name: "Jabón", quantity: 3, stock: 3, sourceStock: 7, price: 150 },
+          { productId: 2, code: "SHA", name: "Shampoo", quantity: 7, stock: 10, sourceStock: 8, price: 300 },
         ],
       },
     });

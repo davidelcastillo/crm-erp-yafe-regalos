@@ -16,6 +16,7 @@ import {
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { SHRIKHAND_TTF_BASE64 } from '@/lib/fonts/shrikhand';
+import { generateStockMovementPdf } from '@/lib/utils/stock-movement-pdf';
 import {
   BOX_COLOR,
   BOX_LEFT_MM,
@@ -34,6 +35,7 @@ import {
   HANDLE_MAX_WIDTH_RATIO,
   HANDLE_TEXT,
   HANDLE_TOP_MM,
+  LABELS_PER_SHEET,
   LABEL_BACKGROUND_COLOR,
   LABEL_HEIGHT_MM,
   LABEL_WIDTH_MM,
@@ -62,6 +64,8 @@ export type LabelSelection = {
 export type GenerateLabelsInput = {
   branchId: number;
   selections: LabelSelection[];
+  /** Rellena la última hoja con etiquetas vacías para escribir a mano (S4). */
+  fillLastSheet?: boolean;
 };
 
 export type GenerateLabelsResult =
@@ -82,6 +86,7 @@ const generateLabelsSchema = z.object({
       })
     )
     .min(1, 'Seleccioná al menos un producto'),
+  fillLastSheet: z.boolean().optional(),
 });
 
 const mm = (value: number) => value * MM_TO_PT;
@@ -169,11 +174,14 @@ const drawCutMarks = (page: PDFPage, slots: LabelSlot[]) => {
 
 type LabelContent = { code: string; price: number };
 
-/** Una etiqueta: fondo, cajas redondeadas y sus cuatro textos. */
+/**
+ * Una etiqueta: fondo, cajas redondeadas y sus cuatro textos. Sin contenido se
+ * dibuja solo el fondo rosa, que es el relleno para escribir a mano (S4).
+ */
 const drawLabel = (
   page: PDFPage,
   slot: LabelSlot,
-  { code, price }: LabelContent,
+  content: LabelContent | null,
   fonts: { display: PDFFont; bold: PDFFont }
 ) => {
   const { display, bold } = fonts;
@@ -186,6 +194,9 @@ const drawLabel = (
     height: mm(LABEL_HEIGHT_MM),
     color: color(LABEL_BACKGROUND_COLOR),
   });
+
+  if (!content) return;
+  const { code, price } = content;
 
   const boxX = slot.x + BOX_LEFT_MM;
   const boxWidthPt = mm(BOX_WIDTH_MM);
@@ -282,6 +293,95 @@ const buildLabelsFileName = (branchCode: string, date: Date) => {
   return `etiquetas-${branchCode}-${yyyy}${month}${day}.pdf`;
 };
 
+/** `comprobante-ingreso-<código de sucursal>-<AAAAMMDD>-etiquetas.pdf` */
+const buildEntryReceiptFileName = (branchCode: string, date: string) =>
+  `comprobante-ingreso-${branchCode}-${date.replace(/[^0-9]/g, '').slice(0, 8)}-etiquetas.pdf`;
+
+/** Hojas de etiquetas como bytes: el comprobante de ingreso necesita las mismas. */
+const renderLabelsPdf = async (
+  labels: LabelContent[],
+  fillLastSheet = false
+): Promise<Uint8Array> => {
+  const pdfDoc = await PDFDocument.create();
+  pdfDoc.registerFontkit(fontkit);
+  const fonts = {
+    display: await pdfDoc.embedFont(Buffer.from(SHRIKHAND_TTF_BASE64, 'base64')),
+    bold: await pdfDoc.embedFont(StandardFonts.HelveticaBold),
+  };
+
+  // Con relleno la hoja va completa: las sobrantes salen vacías para escribir a mano (S4).
+  const total = fillLastSheet
+    ? calculateSheetCount(labels.length) * LABELS_PER_SHEET
+    : labels.length;
+
+  // Una página por hoja: las etiquetas de la última hoja quedan al principio.
+  const pages = Array.from({ length: calculateSheetCount(total) }, () =>
+    pdfDoc.addPage([mm(SHEET_WIDTH_MM), mm(SHEET_HEIGHT_MM)])
+  );
+  for (const slot of calculateLabelSlots(total)) {
+    drawCutMarks(pages[slot.page], [slot]);
+    drawLabel(pages[slot.page], slot, labels[slot.index] ?? null, fonts);
+  }
+
+  return pdfDoc.save();
+};
+
+type LabelSheetData = { branchCode: string; labels: LabelContent[] };
+
+type Resolved<T> = { ok: true; data: T } | { ok: false; error: string };
+
+/**
+ * Re-valida en el servidor lo que el wizard ya filtró: sucursal existente y que
+ * cada producto esté **activo con stock > 0 en esa sucursal** (S6). Devuelve una
+ * etiqueta por unidad pedida, en el orden de la selección.
+ */
+const resolveLabelSheets = async (
+  branchId: number,
+  selections: LabelSelection[]
+): Promise<Resolved<LabelSheetData>> => {
+  const branch = await prisma.branch.findUnique({
+    where: { id: branchId },
+    select: { code: true },
+  });
+  if (!branch) {
+    return { ok: false, error: 'Sucursal no encontrada' };
+  }
+
+  const productIds = [...new Set(selections.map((s) => s.productId))];
+  const products = await prisma.product.findMany({
+    where: {
+      id: { in: productIds },
+      active: true,
+      inventory: { some: { branchId, stock: { gt: 0 } } },
+    },
+    select: { id: true, code: true, price: true },
+  });
+
+  const byId = new Map(
+    products.map((product) => [
+      product.id,
+      { code: product.code, price: Number(product.price) },
+    ])
+  );
+  if (productIds.some((id) => !byId.has(id))) {
+    return {
+      ok: false,
+      error: 'Hay productos inactivos o sin stock en la sucursal seleccionada',
+    };
+  }
+
+  // Una etiqueta por unidad pedida, en el orden de la selección.
+  const labels: LabelContent[] = [];
+  for (const selection of selections) {
+    const product = byId.get(selection.productId)!;
+    for (let unit = 0; unit < selection.quantity; unit++) {
+      labels.push(product);
+    }
+  }
+
+  return { ok: true, data: { branchCode: branch.code, labels } };
+};
+
 /**
  * Genera el PDF de etiquetas de precio de una sucursal según la plantilla del
  * usuario (§S3): una página por hoja A4 horizontal con 72 etiquetas.
@@ -295,72 +395,18 @@ export async function generateProductLabels(data: unknown): Promise<GenerateLabe
     const auth = await requireAdmin();
     if (!auth.ok) return { success: false as const, error: auth.error };
 
-    const { branchId, selections } = generateLabelsSchema.parse(data);
+    const { branchId, selections, fillLastSheet } = generateLabelsSchema.parse(data);
 
-    const branch = await prisma.branch.findUnique({
-      where: { id: branchId },
-      select: { code: true },
-    });
-    if (!branch) {
-      return { success: false, error: 'Sucursal no encontrada' };
-    }
+    const sheets = await resolveLabelSheets(branchId, selections);
+    if (!sheets.ok) return { success: false, error: sheets.error };
 
-    const productIds = [...new Set(selections.map((s) => s.productId))];
-    const products = await prisma.product.findMany({
-      where: {
-        id: { in: productIds },
-        active: true,
-        inventory: { some: { branchId, stock: { gt: 0 } } },
-      },
-      select: { id: true, code: true, price: true },
-    });
-
-    const byId = new Map(
-      products.map((product) => [
-        product.id,
-        { code: product.code, price: Number(product.price) },
-      ])
-    );
-    if (productIds.some((id) => !byId.has(id))) {
-      return {
-        success: false,
-        error: 'Hay productos inactivos o sin stock en la sucursal seleccionada',
-      };
-    }
-
-    // Una etiqueta por unidad pedida, en el orden de la selección.
-    const labels: LabelContent[] = [];
-    for (const selection of selections) {
-      const product = byId.get(selection.productId)!;
-      for (let unit = 0; unit < selection.quantity; unit++) {
-        labels.push(product);
-      }
-    }
-
-    const pdfDoc = await PDFDocument.create();
-    pdfDoc.registerFontkit(fontkit);
-    const fonts = {
-      display: await pdfDoc.embedFont(Buffer.from(SHRIKHAND_TTF_BASE64, 'base64')),
-      bold: await pdfDoc.embedFont(StandardFonts.HelveticaBold),
-    };
-
-    // Una página por hoja: las etiquetas de la última hoja quedan al principio.
-    const pages = Array.from({ length: calculateSheetCount(labels.length) }, () =>
-      pdfDoc.addPage([mm(SHEET_WIDTH_MM), mm(SHEET_HEIGHT_MM)])
-    );
-    const slots = calculateLabelSlots(labels.length);
-    for (const slot of slots) {
-      drawCutMarks(pages[slot.page], [slot]);
-      drawLabel(pages[slot.page], slot, labels[slot.index], fonts);
-    }
-
-    const pdfBytes = await pdfDoc.save();
+    const pdfBytes = await renderLabelsPdf(sheets.data.labels, fillLastSheet);
 
     return {
       success: true,
       data: {
         pdfBase64: Buffer.from(pdfBytes).toString('base64'),
-        filename: buildLabelsFileName(branch.code, new Date()),
+        filename: buildLabelsFileName(sheets.data.branchCode, new Date()),
       },
     };
   } catch (error) {
@@ -372,5 +418,91 @@ export async function generateProductLabels(data: unknown): Promise<GenerateLabe
     }
     console.error('Error generating product labels:', error);
     return { success: false, error: 'Error al generar las etiquetas' };
+  }
+}
+
+// --- Comprobante de un ingreso con sus etiquetas (S1, S2, S4, S5) -----------
+
+export type GenerateEntryReceiptWithLabelsResult =
+  | { success: true; data: { pdfBase64: string; filename: string } }
+  | { success: false; error: string };
+
+/** Snapshot del comprobante de un ingreso: lo único que se dibuja y etiqueta. */
+const entryReceiptSchema = z.object({
+  movementType: z.enum(['ENTRY', 'EXIT', 'TRANSFER']),
+  branchId: z.number().int().positive('Sucursal inválida'),
+  date: z.string().min(1, 'La fecha del comprobante es requerida'),
+  branchName: z.string().min(1),
+  branchCode: z.string().min(1),
+  sourceBranchName: z.string().optional(),
+  sourceBranchCode: z.string().optional(),
+  reference: z.string(),
+  rows: z
+    .array(
+      z.object({
+        productId: z.number().int().positive('Producto inválido'),
+        code: z.string(),
+        name: z.string(),
+        quantity: z.number().int().min(1, 'La cantidad mínima es 1'),
+        stock: z.number(),
+        price: z.number(),
+        sourceStock: z.number().optional(),
+      })
+    )
+    .min(1, 'El comprobante no tiene productos'),
+});
+
+/**
+ * Un único PDF con el comprobante de un ingreso **y** las etiquetas de lo
+ * ingresado (S2): primero las páginas del comprobante, después una hoja con una
+ * etiqueta por unidad y la última rellena para escribir a mano (S4, S5).
+ *
+ * No vuelve a registrar nada (S6): re-lee lo confirmado y sólo dibuja.
+ */
+export async function generateEntryReceiptWithLabels(
+  data: unknown
+): Promise<GenerateEntryReceiptWithLabelsResult> {
+  try {
+    const auth = await requireAdmin();
+    if (!auth.ok) return { success: false as const, error: auth.error };
+
+    const receipt = entryReceiptSchema.parse(data);
+    if (receipt.movementType !== 'ENTRY') {
+      return { success: false, error: 'Solo el comprobante de un ingreso lleva etiquetas' };
+    }
+
+    const sheets = await resolveLabelSheets(
+      receipt.branchId,
+      receipt.rows.map((row) => ({ productId: row.productId, quantity: row.quantity }))
+    );
+    if (!sheets.ok) return { success: false, error: sheets.error };
+
+    // Cada PDF embebe sus propias fuentes (Poppins en el comprobante, Shrikhand en
+    // las etiquetas), así que el comprobante se dibuja primero y las hojas de
+    // etiquetas se le copian como páginas: `copyPages` se lleva el recurso entero
+    // y el texto de ambas partes sigue leyéndose (lo fija
+    // `label-print.combined.test.ts` con el lector de PDFs).
+    const pdf = await PDFDocument.load(await generateStockMovementPdf(receipt));
+    const labelsPdf = await PDFDocument.load(await renderLabelsPdf(sheets.data.labels, true));
+    for (const page of await pdf.copyPages(labelsPdf, labelsPdf.getPageIndices())) {
+      pdf.addPage(page);
+    }
+
+    return {
+      success: true,
+      data: {
+        pdfBase64: Buffer.from(await pdf.save()).toString('base64'),
+        filename: buildEntryReceiptFileName(receipt.branchCode, receipt.date),
+      },
+    };
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return {
+        success: false,
+        error: error.issues.map((issue) => issue.message).join(', '),
+      };
+    }
+    console.error('Error generating entry receipt with labels:', error);
+    return { success: false, error: 'Error al generar el comprobante con etiquetas' };
   }
 }

@@ -5,9 +5,9 @@ import { readPdfContent as readPdf } from '@/lib/fonts/pdf-test-reader';
 import { generateStockMovementPdf } from './stock-movement-pdf';
 
 const receipt: StockMovementReceipt = {
-  movementType: 'ENTRY', date: '2026-08-06T18:30:00.000Z',
+  movementType: 'ENTRY', branchId: 5, date: '2026-08-06T18:30:00.000Z',
   branchName: 'Sucursal Centro', branchCode: 'CEN', reference: 'Conteo físico',
-  rows: [{ code: 'PR001', name: 'Producto de prueba', quantity: 3, stock: 17, price: 1250, sourceStock: 22 }],
+  rows: [{ productId: 9, code: 'PR001', name: 'Producto de prueba', quantity: 3, stock: 17, price: 1250, sourceStock: 22 }],
 };
 
 describe('generateStockMovementPdf', () => {

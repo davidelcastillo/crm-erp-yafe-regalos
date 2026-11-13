@@ -89,11 +89,13 @@ async function setQuantity(name: string, value: string) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  // El orden elegido se recuerda en el navegador: cada caso arranca limpio.
+  window.localStorage.clear();
   mockGetBranchInventory.mockResolvedValue({ success: true, data: productOptions } as never);
   mockMoveBatch.mockResolvedValue({
     success: true,
     data: {
-      receipt: { movementType: "TRANSFER", date: "2026-08-06T18:30:00.000Z", branchName: "Centro", branchCode: "CEN", sourceBranchName: "Principal", sourceBranchCode: "PRI", reference: "MOVE-1", rows: [] },
+      receipt: { movementType: "TRANSFER", branchId: 2, date: "2026-08-06T18:30:00.000Z", branchName: "Centro", branchCode: "CEN", sourceBranchName: "Principal", sourceBranchCode: "PRI", reference: "MOVE-1", rows: [] },
       reference: "MOVE-1",
       sourceBranchId: 1,
       destBranchId: 2,
@@ -101,6 +103,33 @@ beforeEach(() => {
     },
   });
   mockSwalFire.mockResolvedValue({ isConfirmed: true });
+});
+
+describe("MoveStockModal — orden de la lista", () => {
+  it("arranca por código y cambia a última modificación desde el control de orden", async () => {
+    mockGetBranchInventory.mockResolvedValue({
+      success: true,
+      data: [
+        { id: 1, name: "Viejo", code: "AAA001", stock: 5, updatedAt: "2026-01-01T00:00:00.000Z" },
+        { id: 2, name: "Nuevo", code: "ZZZ999", stock: 5, updatedAt: "2026-05-01T00:00:00.000Z" },
+      ],
+    } as never);
+
+    renderModal();
+    await goToStep2();
+
+    const nombres = () =>
+      screen
+        .getAllByRole("checkbox", { name: /^Seleccionar / })
+        .map((checkbox) => checkbox.getAttribute("aria-label"));
+
+    expect(nombres()).toEqual(["Seleccionar Viejo", "Seleccionar Nuevo"]);
+    expect(screen.getByRole("group", { name: "Ordenar por" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Última modificación" }));
+
+    expect(nombres()).toEqual(["Seleccionar Nuevo", "Seleccionar Viejo"]);
+  });
 });
 
 describe("MoveStockModal", () => {

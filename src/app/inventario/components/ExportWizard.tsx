@@ -8,6 +8,8 @@ import {
   exportBranchProductsPdf,
 } from "@/app/actions/inventory";
 import { BranchPicker } from "@/components/ui/BranchPicker";
+import { ProductSortToggle } from "@/components/ui/ProductSortToggle";
+import { useProductSortMode } from "@/lib/hooks/useProductSortMode";
 import { sortProducts } from "@/lib/product-order";
 
 type BranchOption = { id: number; name: string };
@@ -36,6 +38,9 @@ export function ExportWizard({ open, onClose, branches }: ExportWizardProps) {
   const [loadAttempt, setLoadAttempt] = useState(0);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [generating, setGenerating] = useState(false);
+  // El orden de la lista y el del PDF son el mismo; el elegido se recuerda
+  // para el resto de las listas de productos.
+  const [sortMode, setSortMode] = useProductSortMode();
 
   const selectedBranch = useMemo(
     () => branches.find((b) => b.id === branchId) ?? null,
@@ -68,8 +73,8 @@ export function ExportWizard({ open, onClose, branches }: ExportWizardProps) {
   }, [open, step, branchId, loadAttempt]);
 
   const availableProducts = useMemo(
-    () => sortProducts(rows.filter((row) => row.stock > 0), "code"),
-    [rows]
+    () => sortProducts(rows.filter((row) => row.stock > 0), sortMode),
+    [rows, sortMode]
   );
 
   const selectedCount = selectedIds.length;
@@ -121,7 +126,7 @@ export function ExportWizard({ open, onClose, branches }: ExportWizardProps) {
     const result = await exportBranchProductsPdf({
       branchId,
       selectedProductIds: selectedIds,
-      sortBy: "code",
+      sortBy: sortMode,
     });
     if (result.success && result.data) {
       downloadPdf(result.data.pdfBase64, result.data.filename);
@@ -241,6 +246,10 @@ export function ExportWizard({ open, onClose, branches }: ExportWizardProps) {
             <h3 className="text-base font-semibold text-ink mb-3">
               Seleccionar productos
             </h3>
+
+            <div className="flex justify-center mb-3">
+              <ProductSortToggle value={sortMode} onChange={setSortMode} />
+            </div>
 
             <div className="md:grid md:grid-cols-2 md:gap-5 md:items-start">
               <div className="min-w-0">

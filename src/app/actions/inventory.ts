@@ -72,6 +72,7 @@ export async function getBranchInventory(data: unknown) {
         name: true,
         code: true,
         active: true,
+        updatedAt: true,
         inventory: {
           where: {
             branchId,
@@ -92,6 +93,7 @@ export async function getBranchInventory(data: unknown) {
         code: p.code,
         stock: p.inventory[0]?.stock ?? 0,
         active: p.active,
+        updatedAt: p.updatedAt.toISOString(),
       }))
     );
     return { success: true, data: parseArray(result) };
@@ -649,27 +651,34 @@ export async function moveStockBatchBetweenBranches(data: unknown) {
         });
       }
 
+      // El comprobante es el snapshot que viaja al cliente: se tipa como la
+      // interfaz (`branchId` y `productId` son el contrato aditivo de S1/S5) y no
+      // como literal de esta función.
+      const receipt: StockMovementReceipt = {
+        movementType: "TRANSFER",
+        branchId: destBranchId,
+        date: new Date().toISOString(),
+        branchName: destBranch.name,
+        branchCode: destBranch.code,
+        sourceBranchName: sourceBranch.name,
+        sourceBranchCode: sourceBranch.code,
+        reference,
+        rows: itemResults.map((item) => {
+          const product = products.find((p) => p.id === item.productId)!;
+          return {
+            productId: item.productId,
+            code: product.code, name: product.name, price: Number(product.price),
+            quantity: item.quantity, stock: item.newDestStock, sourceStock: item.newSourceStock,
+          };
+        }),
+      };
+
       return {
         reference,
         sourceBranchId,
         destBranchId,
         items: itemResults,
-        receipt: {
-          movementType: "TRANSFER",
-          date: new Date().toISOString(),
-          branchName: destBranch.name,
-          branchCode: destBranch.code,
-          sourceBranchName: sourceBranch.name,
-          sourceBranchCode: sourceBranch.code,
-          reference,
-          rows: itemResults.map((item) => {
-            const product = products.find((p) => p.id === item.productId)!;
-            return {
-              code: product.code, name: product.name, price: Number(product.price),
-              quantity: item.quantity, stock: item.newDestStock, sourceStock: item.newSourceStock,
-            };
-          }),
-        } satisfies StockMovementReceipt,
+        receipt,
       };
     });
 
@@ -780,24 +789,29 @@ export async function adjustBranchStockBatch(data: unknown) {
       });
       const stockPorProducto = new Map(stockFinal.map((f) => [f.productId, f.stock]));
 
+      // Mismo contrato aditivo que el traslado: sucursal y producto en el snapshot.
+      const receipt: StockMovementReceipt = {
+        movementType,
+        branchId,
+        date: new Date().toISOString(),
+        branchName: branch.name,
+        branchCode: branch.code,
+        reference: motivo,
+        rows: items.map((item) => {
+          const row = stockFinal.find((f) => f.productId === item.productId)!;
+          return {
+            productId: item.productId,
+            code: row.product.code, name: row.product.name, price: Number(row.product.price),
+            quantity: item.quantity, stock: row.stock,
+          };
+        }),
+      };
+
       return {
         branchId,
         movementType,
         reference: motivo,
-        receipt: {
-          movementType,
-          date: new Date().toISOString(),
-          branchName: branch.name,
-          branchCode: branch.code,
-          reference: motivo,
-          rows: items.map((item) => {
-            const row = stockFinal.find((f) => f.productId === item.productId)!;
-            return {
-              code: row.product.code, name: row.product.name, price: Number(row.product.price),
-              quantity: item.quantity, stock: row.stock,
-            };
-          }),
-        } satisfies StockMovementReceipt,
+        receipt,
         items: items.map((item) => ({
           productId: item.productId,
           quantity: item.quantity,

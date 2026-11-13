@@ -313,3 +313,60 @@ describe('etiquetas: autorización admin', () => {
     expect(mockProductFindMany).not.toHaveBeenCalled();
   });
 });
+
+// S4: la última hoja se completa con etiquetas vacías para escribir a mano.
+describe('generateProductLabels — última hoja rellenada (S4)', () => {
+  /** Operadores de relleno (`rg`) de un color de la plantilla. */
+  const fillOps = (base64: string, hex: string) => {
+    const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+    const op = `${r} ${g} ${b} rg`;
+    return pageStreams(base64).join('\n').split(op).length - 1;
+  };
+
+  test('con el relleno pedido completa la hoja con etiquetas sin código ni precio', async () => {
+    const result = await generateProductLabels({
+      branchId: 1,
+      selections: [{ productId: 1, quantity: 5 }],
+      fillLastSheet: true,
+    });
+    if (!result.success) throw new Error(result.error);
+
+    const pdfDoc = await loadPdf(result.data.pdfBase64);
+    expect(pdfDoc.getPageCount()).toBe(1);
+
+    // Las 5 etiquetas reales llevan sus 4 textos; las 67 de relleno, ninguno.
+    expect(pdfText(result.data.pdfBase64).match(/AAA001/g)).toHaveLength(5);
+    expect(textOperators(result.data.pdfBase64)).toBe(5 * 4);
+
+    // El relleno conserva la etiqueta rosa (72 fondos) y las marcas de corte (72 × 8).
+    expect(fillOps(result.data.pdfBase64, '#fcd2d3')).toBe(LABELS_PER_SHEET);
+    expect(strokeOps(result.data.pdfBase64)).toBe(LABELS_PER_SHEET * 8);
+    // Cajas del código y del precio solo en las 5 reales: 6 rellenos por caja.
+    expect(fillOps(result.data.pdfBase64, '#ffeff3')).toBe(5 * 2 * 6);
+  });
+
+  test('sin el relleno la hoja queda como estaba: solo las etiquetas pedidas', async () => {
+    const result = await generateProductLabels({
+      branchId: 1,
+      selections: [{ productId: 1, quantity: 5 }],
+    });
+    if (!result.success) throw new Error(result.error);
+
+    expect(fillOps(result.data.pdfBase64, '#fcd2d3')).toBe(5);
+    expect(strokeOps(result.data.pdfBase64)).toBe(5 * 8);
+    expect(fillOps(result.data.pdfBase64, '#ffeff3')).toBe(5 * 2 * 6);
+  });
+
+  test('el relleno se suma a las hojas ya completas sin agregar páginas', async () => {
+    const result = await generateProductLabels({
+      branchId: 1,
+      selections: [{ productId: 1, quantity: LABELS_PER_SHEET + 1 }],
+      fillLastSheet: true,
+    });
+    if (!result.success) throw new Error(result.error);
+
+    expect((await loadPdf(result.data.pdfBase64)).getPageCount()).toBe(2);
+    expect(textOperators(result.data.pdfBase64)).toBe((LABELS_PER_SHEET + 1) * 4);
+    expect(strokeOps(result.data.pdfBase64)).toBe(2 * LABELS_PER_SHEET * 8);
+  });
+});

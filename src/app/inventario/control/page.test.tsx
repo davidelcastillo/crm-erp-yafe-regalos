@@ -85,6 +85,8 @@ beforeAll(() => {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  // El orden elegido se recuerda en el navegador: cada caso arranca limpio.
+  window.localStorage.clear();
   mockUltimo.mockResolvedValue({ success: true, data: { id: 4, closedAt: "2026-01-11T12:00:00.000Z", closedBy: "qa" } } as never);
   mockIniciar.mockResolvedValue({ success: true, data: { controlId: 9, branchId: 1, status: "DRAFT", startedAt: "2026-01-10T12:00:00.000Z", reused: false } } as never);
   mockDetalle.mockResolvedValue({ success: true, data: control } as never);
@@ -271,6 +273,51 @@ describe("Control de stock por sucursal", () => {
     await abrirControl();
 
     expect(screen.getByLabelText(/Motivo del ajuste/)).toHaveValue("cierre quincenal");
+  });
+
+  it("ordena el conteo por código y cambia a última modificación", async () => {
+    mockDetalle.mockResolvedValue({
+      success: true,
+      data: {
+        ...control,
+        items: [
+          {
+            productId: 10,
+            code: "AAA001",
+            name: "Viejo",
+            price: 100,
+            systemStock: 5,
+            countedStock: 5,
+            decision: "PENDING" as const,
+            updatedAt: "2026-01-01T00:00:00.000Z",
+          },
+          {
+            productId: 11,
+            code: "ZZZ999",
+            name: "Nuevo",
+            price: 50,
+            systemStock: 8,
+            countedStock: 8,
+            decision: "PENDING" as const,
+            updatedAt: "2026-05-01T00:00:00.000Z",
+          },
+        ],
+      },
+    } as never);
+
+    await abrirControl();
+
+    const codigos = () =>
+      screen
+        .getAllByText(/^[A-Z]{3}\d{3} ·/)
+        .map((nodo) => nodo.textContent?.split(" ·")[0]);
+
+    expect(codigos()).toEqual(["AAA001", "ZZZ999"]);
+    expect(screen.getByRole("group", { name: "Ordenar por" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Última modificación" }));
+
+    expect(codigos()).toEqual(["ZZZ999", "AAA001"]);
   });
 });
 

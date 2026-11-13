@@ -113,13 +113,15 @@ describe('adjustBranchStockBatch (integración, base local)', () => {
     expect(resultado.data).toMatchObject({
       receipt: {
         movementType: 'ENTRY',
+        // S2: con la sucursal y el producto del comprobante se piden las etiquetas.
+        branchId,
         branchName: `QA ajuste ${sufijo}`,
         branchCode: `QA${sufijo}`,
         reference,
         date: expect.any(String),
         rows: [
-          { code: `QD${sufijo}`, name: `QA ajuste ${sufijo}`, quantity: 4, stock: 9, price: 10 },
-          { code: `QE${sufijo}`, name: `QA ajuste nuevo ${sufijo}`, quantity: 7, stock: 7, price: 10 },
+          { productId, code: `QD${sufijo}`, name: `QA ajuste ${sufijo}`, quantity: 4, stock: 9, price: 10 },
+          { productId: productoSinFilaId, code: `QE${sufijo}`, name: `QA ajuste nuevo ${sufijo}`, quantity: 7, stock: 7, price: 10 },
         ],
       },
     })
@@ -150,8 +152,8 @@ describe('adjustBranchStockBatch (integración, base local)', () => {
     expect(await stock(branchId, productId)).toBe(6)
     expect(resultado.data).toMatchObject({
       receipt: {
-        movementType: 'EXIT', reference,
-        rows: [{ code: `QD${sufijo}`, quantity: 3, stock: 6, price: 10 }],
+        movementType: 'EXIT', reference, branchId,
+        rows: [{ productId, code: `QD${sufijo}`, quantity: 3, stock: 6, price: 10 }],
       },
     })
 

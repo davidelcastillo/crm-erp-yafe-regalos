@@ -73,6 +73,8 @@ const seleccionar = (nombre: string, cantidad: number) => {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  // El orden elegido se recuerda en el navegador: cada caso arranca limpio.
+  window.localStorage.clear();
   mockProductos.mockResolvedValue({ success: true, data: productos } as never);
   mockAjustar.mockResolvedValue({ success: true, data: { receipt: { movementType: "ENTRY", date: "2026-08-06T18:30:00.000Z", branchName: "Principal", branchCode: "PRI", reference: "Conteo físico", rows: [] } } } as never);
   mockGetUser.mockResolvedValue({ email: "admin@feriaconexx.com" });
@@ -174,5 +176,42 @@ describe("StockAdjustmentModal", () => {
     fireEvent.click(screen.getByRole("dialog"));
 
     expect(onClose).not.toHaveBeenCalled();
+  });
+});
+
+describe("StockAdjustmentModal — orden de la lista", () => {
+  it("arranca por código y cambia a última modificación desde el control de orden", async () => {
+    mockProductos.mockResolvedValue({
+      success: true,
+      data: [
+        {
+          id: 1,
+          name: "Viejo",
+          code: "AAA001",
+          updatedAt: "2026-01-01T00:00:00.000Z",
+          inventory: [{ branchId: 1, stock: 10 }],
+        },
+        {
+          id: 2,
+          name: "Nuevo",
+          code: "ZZZ999",
+          updatedAt: "2026-05-01T00:00:00.000Z",
+          inventory: [{ branchId: 1, stock: 10 }],
+        },
+      ],
+    } as never);
+
+    renderModal();
+    await irAlPaso2();
+
+    const nombres = () =>
+      checkboxes().map((checkbox) => checkbox.getAttribute("aria-label"));
+
+    expect(nombres()).toEqual(["Seleccionar Viejo", "Seleccionar Nuevo"]);
+    expect(screen.getByRole("group", { name: "Ordenar por" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Última modificación" }));
+
+    expect(nombres()).toEqual(["Seleccionar Nuevo", "Seleccionar Viejo"]);
   });
 });

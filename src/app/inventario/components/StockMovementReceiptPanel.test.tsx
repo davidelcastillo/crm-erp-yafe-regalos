@@ -2,23 +2,37 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { StockMovementReceiptPanel } from './StockMovementReceiptPanel';
 import { generateStockMovementPdf } from '@/lib/utils/stock-movement-pdf';
+import { generateEntryReceiptWithLabels } from '@/actions/label-print';
 import type { StockMovementReceipt } from '@/lib/stock-movement-receipt';
 
 jest.mock('@/lib/utils/stock-movement-pdf', () => ({ generateStockMovementPdf: jest.fn() }));
+jest.mock('@/actions/label-print', () => ({ generateEntryReceiptWithLabels: jest.fn() }));
 const generate = generateStockMovementPdf as jest.MockedFunction<typeof generateStockMovementPdf>;
+const combined = generateEntryReceiptWithLabels as jest.MockedFunction<typeof generateEntryReceiptWithLabels>;
 const receipt: StockMovementReceipt = {
-  movementType: 'EXIT', date: '2026-08-06T18:30:00.000Z', branchName: 'Centro', branchCode: 'CEN',
-  reference: 'Rotura', rows: [{ code: 'PR001', name: 'Producto', quantity: 3, stock: 0, price: 25 }],
+  movementType: 'EXIT', branchId: 3, date: '2026-08-06T18:30:00.000Z', branchName: 'Centro', branchCode: 'CEN',
+  reference: 'Rotura', rows: [{ productId: 1, code: 'PR001', name: 'Producto', quantity: 3, stock: 0, price: 25 }],
 };
 const transfer: StockMovementReceipt = {
   ...receipt, movementType: 'TRANSFER', reference: 'MOVE-1',
   sourceBranchName: 'Depósito', sourceBranchCode: 'DEP',
-  rows: [{ code: 'PR001', name: 'Producto', quantity: 3, stock: 12, price: 25, sourceStock: 5 }],
+  rows: [{ productId: 1, code: 'PR001', name: 'Producto', quantity: 3, stock: 12, price: 25, sourceStock: 5 }],
+};
+const entry: StockMovementReceipt = {
+  ...receipt, movementType: 'ENTRY', reference: 'Conteo físico',
+  rows: [{ productId: 1, code: 'PR001', name: 'Producto', quantity: 3, stock: 17, price: 25 }],
 };
 let click: jest.SpyInstance;
 beforeEach(() => {
   jest.clearAllMocks();
   generate.mockResolvedValue(new Uint8Array([1, 2, 3]));
+  combined.mockResolvedValue({
+    success: true,
+    data: {
+      pdfBase64: Buffer.from([1, 2, 3]).toString('base64'),
+      filename: 'comprobante-ingreso-CEN-20260806-etiquetas.pdf',
+    },
+  });
   URL.createObjectURL = jest.fn().mockReturnValue('blob:receipt');
   URL.revokeObjectURL = jest.fn();
   click = jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
@@ -64,4 +78,59 @@ it('distingue un fallo del PDF de la operación exitosa y reintenta el mismo sna
   await waitFor(() => expect(click).toHaveBeenCalledTimes(1));
   expect(generate).toHaveBeenNthCalledWith(2, receipt, 'DESTINATION');
   expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+});
+
+// S2/S3: solo el ingreso ofrece las etiquetas de lo que se acaba de ingresar.
+describe('ingreso registrado', () => {
+  it('ofrece comprobante, comprobante con etiquetas y cerrar', () => {
+    render(<StockMovementReceiptPanel receipt={entry} onClose={jest.fn()} />);
+
+    expect(screen.getAllByRole('button').map((button) => button.textContent)).toEqual([
+      'Descargar comprobante',
+      'Comprobante + etiquetas',
+      'Cerrar comprobante',
+    ]);
+  });
+
+  it('descarga el PDF combinado que arma el servidor, sin volver a pedir el comprobante suelto', async () => {
+    render(<StockMovementReceiptPanel receipt={entry} onClose={jest.fn()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Comprobante + etiquetas' }));
+
+    await waitFor(() => expect(click).toHaveBeenCalledTimes(1));
+    expect(combined).toHaveBeenCalledWith(entry);
+    expect(generate).not.toHaveBeenCalled();
+    expect(URL.createObjectURL).toHaveBeenCalledWith(expect.any(Blob));
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:receipt');
+    const link = click.mock.instances[0] as HTMLAnchorElement;
+    expect(link.download).toBe('comprobante-ingreso-CEN-20260806-etiquetas.pdf');
+  });
+
+  it('avisa cuando el servidor no puede agregar las etiquetas y deja reintentar', async () => {
+    combined.mockResolvedValueOnce({
+      success: false,
+      error: 'Hay productos inactivos o sin stock en la sucursal seleccionada',
+    });
+    render(<StockMovementReceiptPanel receipt={entry} onClose={jest.fn()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Comprobante + etiquetas' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'El movimiento ya se registró, pero no se pudo generar el PDF'
+    );
+    expect(click).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Comprobante + etiquetas' }));
+    await waitFor(() => expect(click).toHaveBeenCalledTimes(1));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('el egreso y el traslado no ofrecen etiquetas', () => {
+    const { unmount } = render(<StockMovementReceiptPanel receipt={receipt} onClose={jest.fn()} />);
+    expect(screen.queryByRole('button', { name: 'Comprobante + etiquetas' })).toBeNull();
+    unmount();
+
+    render(<StockMovementReceiptPanel receipt={transfer} onClose={jest.fn()} />);
+    expect(screen.queryByRole('button', { name: 'Comprobante + etiquetas' })).toBeNull();
+  });
 });

@@ -9,6 +9,9 @@ import {
 } from "@/app/actions/inventory";
 import { getUser } from "@/actions/auth";
 import { BranchPicker } from "@/components/ui/BranchPicker";
+import { ProductSortToggle } from "@/components/ui/ProductSortToggle";
+import { useProductSortMode } from "@/lib/hooks/useProductSortMode";
+import { sortProducts } from "@/lib/product-order";
 
 /**
  * Entrada o salida de stock de un LOTE de productos en UNA sucursal: la forma
@@ -29,7 +32,13 @@ export interface StockAdjustmentModalProps {
 type Tipo = "ENTRY" | "EXIT";
 type Step = 1 | 2 | 3;
 
-type Fila = { id: number; name: string; code: string; stock: number };
+type Fila = {
+  id: number;
+  name: string;
+  code: string;
+  stock: number;
+  updatedAt?: string | Date | null;
+};
 
 const TIPOS: Array<{ value: Tipo; label: string; ayuda: string }> = [
   { value: "ENTRY", label: "Entrada", ayuda: "Suma unidades al stock" },
@@ -54,6 +63,8 @@ export const StockAdjustmentModal = ({
   const [quantities, setQuantities] = useState<Record<number, string>>({});
   const [motivo, setMotivo] = useState("");
   const [pending, setPending] = useState(false);
+  // Mismo control y misma memoria que el resto de las listas de productos.
+  const [sortMode, setSortMode] = useProductSortMode();
 
   // Los productos se cargan en el handler (no en un effect): misma forma que
   // MoveStockModal, y evita el setState sincrónico dentro de un effect.
@@ -82,12 +93,14 @@ export const StockAdjustmentModal = ({
         id: number;
         name: string;
         code: string;
+        updatedAt?: string | Date | null;
         inventory?: Array<{ branchId: number; stock: number }>;
       }>).map((p) => ({
         id: p.id,
         name: p.name,
         code: p.code,
         stock: p.inventory?.find((i) => i.branchId === branch)?.stock ?? 0,
+        updatedAt: p.updatedAt ?? null,
       }))
     );
   };
@@ -103,13 +116,15 @@ export const StockAdjustmentModal = ({
 
   const visibles = useMemo(() => {
     const texto = busqueda.trim().toLowerCase();
-    if (!texto) return filas;
-    return filas.filter(
-      (f) =>
-        f.name.toLowerCase().includes(texto) ||
-        f.code.toLowerCase().includes(texto)
-    );
-  }, [filas, busqueda]);
+    const filtradas = texto
+      ? filas.filter(
+          (f) =>
+            f.name.toLowerCase().includes(texto) ||
+            f.code.toLowerCase().includes(texto)
+        )
+      : filas;
+    return sortProducts(filtradas, sortMode);
+  }, [filas, busqueda, sortMode]);
 
   const seleccionadas = useMemo(
     () => filas.filter((f) => selectedIds.includes(f.id)),
@@ -326,6 +341,10 @@ export const StockAdjustmentModal = ({
                 aria-label="Buscar producto"
                 className="w-full px-3 py-3 mb-3 min-h-[48px] rounded-xl border border-hairline focus:border-accent focus:ring-2 focus:ring-accent/30 outline-none transition-all text-sm touch-manipulation"
               />
+
+              <div className="flex justify-center mb-3">
+                <ProductSortToggle value={sortMode} onChange={setSortMode} />
+              </div>
 
               {loading && (
                 <p className="py-8 text-center text-sm text-ink-muted">

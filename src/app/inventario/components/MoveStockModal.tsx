@@ -7,6 +7,9 @@ import {
 } from "@/app/actions/inventory";
 import Swal from "sweetalert2";
 import { BranchPicker } from "@/components/ui/BranchPicker";
+import { ProductSortToggle } from "@/components/ui/ProductSortToggle";
+import { useProductSortMode } from "@/lib/hooks/useProductSortMode";
+import { sortProducts } from "@/lib/product-order";
 import type { StockMovementReceipt } from "@/lib/stock-movement-receipt";
 import { StockMovementReceiptPanel } from "./StockMovementReceiptPanel";
 
@@ -18,7 +21,13 @@ export interface MoveStockModalProps {
   onConfirm: () => void;
 }
 
-type MovableProduct = { id: number; name: string; code?: string; stock: number };
+type MovableProduct = {
+  id: number;
+  name: string;
+  code: string;
+  stock: number;
+  updatedAt?: string | null;
+};
 type Step = 1 | 2;
 
 export const MoveStockModal = ({
@@ -39,6 +48,8 @@ export const MoveStockModal = ({
   const [pending, setPending] = useState(false);
   const [loadingOrigin, setLoadingOrigin] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Mismo control y misma memoria que el resto de las listas de productos.
+  const [sortMode, setSortMode] = useProductSortMode();
 
   const selectedRows = useMemo(
     () => productOptions.filter((p) => selectedIds.includes(p.id)),    [productOptions, selectedIds]
@@ -47,13 +58,15 @@ export const MoveStockModal = ({
   /** Filtro local del paso 2: por nombre o por código, como en Entrada/Salida. */
   const visibles = useMemo(() => {
     const texto = busqueda.trim().toLowerCase();
-    if (!texto) return productOptions;
-    return productOptions.filter(
-      (p) =>
-        p.name.toLowerCase().includes(texto) ||
-        (p.code ?? "").toLowerCase().includes(texto)
-    );
-  }, [productOptions, busqueda]);
+    const filtrados = texto
+      ? productOptions.filter(
+          (p) =>
+            p.name.toLowerCase().includes(texto) ||
+            (p.code ?? "").toLowerCase().includes(texto)
+        )
+      : productOptions;
+    return sortProducts(filtrados, sortMode);
+  }, [productOptions, busqueda, sortMode]);
 
   const summary = useMemo(
     () => ({
@@ -292,6 +305,10 @@ export const MoveStockModal = ({
                   aria-label="Buscar producto"
                   className="mb-3 min-h-[48px] w-full rounded-xl border border-hairline px-3 py-3 text-sm outline-none transition-all focus:border-accent focus:ring-2 focus:ring-accent/30 touch-manipulation"
                 />
+
+                <div className="flex justify-center mb-3">
+                  <ProductSortToggle value={sortMode} onChange={setSortMode} />
+                </div>
 
                 {productOptions.length === 0 ? (
                   <p className="py-8 text-center text-sm text-ink-muted">

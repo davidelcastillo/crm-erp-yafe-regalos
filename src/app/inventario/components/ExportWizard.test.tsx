@@ -76,6 +76,8 @@ const checkboxesDeProductos = () =>
 
 beforeEach(() => {
   jest.clearAllMocks();
+  // El orden elegido se recuerda en el navegador: cada caso arranca limpio.
+  window.localStorage.clear();
   mockGetBranchProductsForExport.mockResolvedValue({
     success: true,
     data: stockRows,
@@ -198,7 +200,7 @@ describe("ExportWizard", () => {
     expect(screen.getByText(/1 seleccionados/i)).toBeInTheDocument();
   });
 
-  it("ordena la lista por código y exporta en ese orden, sin selector (S4/S17)", async () => {
+  it("ordena la lista por código y exporta en ese orden (S4/S17)", async () => {
     URL.createObjectURL = jest.fn(() => "blob:test");
     URL.revokeObjectURL = jest.fn();
     const originalClick = HTMLAnchorElement.prototype.click;
@@ -247,9 +249,12 @@ describe("ExportWizard", () => {
       expect(codigos()[1]).toContain("AAA099");
       expect(codigos()[2]).toContain("BBB888");
 
-      // El modal de exportar ya no ofrece elegir el orden: es la única lista del
-      // sistema con ese control, así que se sacó para que todas se comporten igual.
-      expect(screen.queryByRole("group", { name: "Ordenar por" })).not.toBeInTheDocument();
+      // El control de orden está en la lista y arranca por código.
+      expect(screen.getByRole("group", { name: "Ordenar por" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Código" })).toHaveAttribute(
+        "aria-pressed",
+        "true"
+      );
 
       fireEvent.click(checkboxesDeProductos()[0]);
       fireEvent.click(screen.getByRole("button", { name: /siguiente/i }));
@@ -258,6 +263,71 @@ describe("ExportWizard", () => {
       await waitFor(() => {
         expect(mockExportBranchProductsPdf).toHaveBeenCalledWith(
           expect.objectContaining({ branchId: 1, sortBy: "code" })
+        );
+      });
+    } finally {
+      HTMLAnchorElement.prototype.click = originalClick;
+    }
+  });
+
+  it("ordena por última modificación y exporta en ese orden cuando se elige", async () => {
+    URL.createObjectURL = jest.fn(() => "blob:test");
+    URL.revokeObjectURL = jest.fn();
+    const originalClick = HTMLAnchorElement.prototype.click;
+    HTMLAnchorElement.prototype.click = jest.fn();
+
+    mockGetBranchProductsForExport.mockResolvedValue({
+      success: true,
+      data: [
+        {
+          id: 3,
+          code: "BBB888",
+          name: "Alfa",
+          stock: 3,
+          price: 10,
+          updatedAt: "2026-04-03T00:00:00.000Z",
+        },
+        {
+          id: 2,
+          code: "AAA099",
+          name: "Zeta",
+          stock: 2,
+          price: 10,
+          updatedAt: "2026-01-02T00:00:00.000Z",
+        },
+        {
+          id: 1,
+          code: "AAA001",
+          name: "Mmm",
+          stock: 1,
+          price: 10,
+          updatedAt: "2026-01-01T00:00:00.000Z",
+        },
+      ],
+    });
+
+    try {
+      await goToStep2();
+
+      fireEvent.click(screen.getByRole("button", { name: "Última modificación" }));
+
+      const codigos = () =>
+        checkboxesDeProductos().map(
+          (checkbox) => checkbox.closest("label")?.textContent ?? ""
+        );
+
+      // La más nueva (BBB888) primero, después AAA099 y AAA001.
+      expect(codigos()[0]).toContain("BBB888");
+      expect(codigos()[1]).toContain("AAA099");
+      expect(codigos()[2]).toContain("AAA001");
+
+      fireEvent.click(checkboxesDeProductos()[0]);
+      fireEvent.click(screen.getByRole("button", { name: /siguiente/i }));
+      fireEvent.click(screen.getByRole("button", { name: /generar pdf/i }));
+
+      await waitFor(() => {
+        expect(mockExportBranchProductsPdf).toHaveBeenCalledWith(
+          expect.objectContaining({ branchId: 1, sortBy: "updated" })
         );
       });
     } finally {
