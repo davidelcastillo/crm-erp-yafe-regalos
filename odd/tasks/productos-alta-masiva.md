@@ -44,7 +44,7 @@ Decisiones del humano, citadas textualmente. Las citas largas son transcripción
 | T14 | Comprobante + etiquetas como acción principal; descargar y cerrar como secundarias | S16 | `src/app/inventario/components/StockMovementReceiptPanel.tsx` | hecho | `4865ab3` |
 | T15 | Alta masiva en dos pasos: sucursal, después productos | S17, S18 | `src/app/productos/components/BulkProductForm.tsx` | hecho | `e98af1f` |
 | T5 | Stock inicial con sucursal global, movimiento ENTRY y comprobante sin etiquetas | S2, S11 | `src/app/actions/product.ts`, `src/app/productos/components/BulkProductForm.tsx` | hecho (servidor + UI) | `4be4888` + `0820aa5` |
-| T7 | Verificar el comprobante con etiquetas de un lote real (sale gratis del panel reusado) | S2 | `src/app/inventario/components/StockMovementReceiptPanel.tsx`, `src/actions/label-print.ts` | pendiente, cambia a verificación | — |
+| T7 | Verificar el comprobante con etiquetas de un lote real (sale gratis del panel reusado) | S2 | `src/app/inventario/components/StockMovementReceiptPanel.tsx`, `src/actions/label-print.ts` | verificado por el humano (L46) | — |
 | T6 | Corregir H2: la categoría elegida al crear se descarta | S8 | `src/app/productos/components/ProductForm.tsx`, `src/app/actions/product.ts` | hecho | `22a8c91` |
 
 Orden de entrega: T1, T2 (con T3 adentro), T2b, T4, T9, T8, T10, T5, T11, T12, T6, T14, T15 y después T7 (etiquetas). T13 quedó descartada: la reemplaza T15.
@@ -475,6 +475,25 @@ Si se decide corregir H2 (la categoría que se descarta en el alta individual), 
 - **Recomendación: (a).** Es el mismo documento que el humano ya acepta "como ya pasa en el ingreso de stock" y suma las etiquetas de lo recién creado sin código nuevo.
 - Motivo (`reference`): recomiendo uno fijo, «ALTA DE PRODUCTOS», con el estilo de «ENTRADA»/«SALIDA» (`src/app/actions/inventory.ts:759-763`). Queda igual en el movimiento y en el PDF, y distingue el alta de un ingreso común sin un formato nuevo. Una nota libre no se pidió.
 
+## Cierre
+
+Todas las tareas quedaron cerradas o descartadas: T3 absorbida en T2, T13 descartada por S17 (la reemplaza T15), T7 verificada por el humano. El humano confirmó que el flujo anda bien, incluido el wizard de dos pasos en celular y el comprobante con etiquetas.
+
+**Gates observados al cerrar** (`feat/productos-alta-masiva`, sobre `adcd8b7` más el commit de cierre):
+
+- `npx tsc --noEmit`: 0 errores.
+- `npm run lint`: 0 errores, 36 avisos preexistentes.
+- `npm run test:local-db` (base aislada en `127.0.0.1:54322`): 115/115 suites, 926/926 tests.
+- `npm run build`: compila y prerenderiza; el proxy sale como `ƒ Proxy (Middleware)`.
+- `npm test` contra el `.env` del repo: 15 suites y 27 tests en rojo por el guard de `src/lib/prisma.ts`. No es una regresión: es la trampa de L38 y la razón de existir de `test:local-db`.
+
+**Entrega: dos PRs encadenados.** El slice real de esta feature son 25 archivos y 3735 líneas contra `bfeae6c`; contra `main` se le suman las 1138 líneas ajenas de `feat/orden-listas-modales`.
+
+1. `feat/orden-listas-modales` → `main` (2 commits, 1138 líneas): el comprobante de ingreso con las etiquetas de lo ingresado y el orden de las listas de los modales.
+2. `feat/productos-alta-masiva` → `feat/orden-listas-modales` (32 commits, 3735 líneas): esta feature.
+
+Deuda anotada, no bloqueante: el `eslint-disable` de `aria-invalid` (L28), el nombre que se inserta sin `trim` (L16) y la aserción no nula de L30.
+
 ## Log
 
 - **L1.** Pedido original (transcripto de la sesión): «agreguemos una funcionalidad de "bulk insert" osea que en una misma transacción y dentro de un mismo modal,puedamos crear varios productos, porque aveces el clnte debe crear muchos productos y el proceso acrual de crear uno por uno lleva mucho tiempo».
@@ -522,3 +541,6 @@ Si se decide corregir H2 (la categoría que se descarta en el alta individual), 
 - **L43.** Hipótesis viva para el síntoma de celular, sin confirmar: con el teclado abierto el `dvh` se encoge, el formulario scrollea y lo que queda pegado sobre el pie es el bloque de sucursal, que se lee como «la sucursal está arriba del primer producto»; el solapamiento del pie ya estaba anotado en L36. Para cerrarlo hace falta una captura del celular con el estado exacto (teclado abierto o no, y con cuántas filas).
 - **L44.** El humano aportó la captura y el dato que faltaba: teclado cerrado, y con **una sola fila** ya pasa. La imagen muestra el bloque de sucursal pintado **encima** de la card del producto, con los campos del producto (precio, stock, categoría) por debajo del pie fijo. O sea: no es orden de DOM ni el teclado, es superposición de cajas. En vez de seguir cazando el apilado en el mismo scroll, propuso pasar a un **wizard de dos pasos** (sucursal, después productos) como el flujo de venta. Se adopta: elimina el problema por diseño y usa un patrón que el repo ya tiene. T13 queda descartada.
 - **L45.** T15 commiteado en `e98af1f`: panel con el cuerpo del paso como **único scroller** y el pie **en flujo**, sin `sticky`, sin `contents` y sin `order-*`. Eso ataca las dos mitades: la sucursal ya no comparte espacio con la card (es el paso 1) y ningún campo queda debajo del pie. Paso 1 con `BranchPicker`, explicación por opción y salida explícita sin stock; «Continuar» nunca deshabilitado, para que un negocio sin sucursales activas no quede encerrado. Paso 2 con filas, categoría y stock por fila, sucursal como texto y `Volver`. Foco al `h3` de cada paso. 27/27 en el modal (incluido un caso nuevo de `branches: []`), 18/18 en la página y 8/8 en el comprobante. Sigue sin verificación visual: el apilado y la banda segura del pie solo los confirma un celular.
+- **L46.** Pedido del humano, textual: «Confirmado todo, eso anda bien, cerrremos el cambio con el commit push y pr a main, preparemos y limpiemos todo para el sigueinte cambio -> cambio grande que requiere tocar la bdd y la exposicion de algunas pages». Con eso quedan verificados por el humano el wizard de dos pasos en celular (el pendiente de L45) y el comprobante con etiquetas de un lote real (T7). Decisión de entrega, elegida por el humano entre dos opciones: **dos PRs encadenados**, `feat/orden-listas-modales` → `main` y `feat/productos-alta-masiva` → `feat/orden-listas-modales`, en vez de un único PR de 45 archivos y 4866 líneas.
+- **L47.** Gates de cierre corridos antes del push, sin creerle a la memoria: `npx tsc --noEmit` 0 errores; `npm run lint` 0 errores y 36 avisos; `npm run test:local-db` 115/115 suites y 926/926 tests; `npm run build` compila y prerenderiza. La primera pasada de `npm test` (sin base local) dio 15 suites y 27 tests en rojo, todas por el guard de `src/lib/prisma.ts` contra el pooler remoto: es L38, no una regresión de esta rama.
+- **L48.** Entorno al cerrar: Docker Desktop estaba apagado, así que la base aislada no existía. Se levantó el escritorio de Docker y volvió el contenedor `supabase_db_seguimientos-compras`. `npm run db:local:push` falló igual con «FATAL: the database system is starting up» mientras el volumen terminaba de arrancar, pero el esquema ya estaba aplicado y la suite corrió igual: 115/115 y 926/926 contra `127.0.0.1:54322`. Para la próxima: esperar el arranque del contenedor antes del `push`, no interpretar ese FATAL como base perdida.
