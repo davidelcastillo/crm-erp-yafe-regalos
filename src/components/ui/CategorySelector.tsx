@@ -27,9 +27,22 @@ export interface CategorySelectorProps {
    * any caller still using the old prop name.
    */
   onChange?: (id: number | null) => void;
+  /**
+   * Lista de categorías inyectada por el padre. Si viene, el componente NO pide
+   * la lista (`getCategoryOptions` no se llama) y el padre queda como única
+   * fuente de verdad: sirve para poner una instancia por fila sin multiplicar
+   * los viajes. Sin esta prop el comportamiento es el de siempre.
+   */
+  options?: CategoryOption[];
+  /** Avisa la lista actualizada cuando este selector crea una categoría. */
+  onOptionsChange?: (options: CategoryOption[]) => void;
+  /** Id del disparador, para que el `<label htmlFor>` del padre lo apunte. */
+  id?: string;
+  /** Marca el disparador como inválido (`aria-invalid`). */
+  invalid?: boolean;
+  /** Ids de los mensajes de error del campo dueño (`aria-describedby`). */
+  describedBy?: string;
 }
-
-type Option = { id: number; name: string } | { id: number; name: string };
 
 /**
  * CategorySelector
@@ -37,6 +50,10 @@ type Option = { id: number; name: string } | { id: number; name: string };
  * Reusable category dropdown with a "+ Nueva categoría" affordance that opens
  * a nested bottom-sheet modal and calls `createCategory`. After creation the new
  * category is auto-selected.
+ *
+ * Con `options` inyectadas no pide la lista y avisa la lista nueva con
+ * `onOptionsChange`, así que N instancias (una por fila) comparten una sola
+ * carga y el padre sigue siendo la fuente de verdad.
  *
  * Design tokens (Airbnb-inspired, see STYLE.md):
  *  - White canvas, ink (#222222) text, muted (#6a6a6a) helper.
@@ -51,22 +68,29 @@ export function CategorySelector({
   disabled = false,
   onChange,
   onValueChange,
+  options: opcionesInyectadas,
+  onOptionsChange,
+  id: triggerId,
+  invalid = false,
+  describedBy,
 }: CategorySelectorProps) {
-  const [options, setOptions] = useState<Option[]>([]);
-  const [loading, setLoading] = useState(true);
+  const inyectadas = opcionesInyectadas !== undefined;
+  const [cargadas, setCargadas] = useState<CategoryOption[]>([]);
+  const [loading, setLoading] = useState(!inyectadas);
   const [open, setOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Load category options once on mount
+  // Load category options once on mount (salvo que el padre inyecte la lista)
   useEffect(() => {
+    if (inyectadas) return;
     let cancelled = false;
     (async () => {
       setLoading(true);
       try {
         const result = await getCategoryOptions();
         if (!cancelled && result.success && result.data) {
-          setOptions(result.data as Option[]);
+          setCargadas(result.data as CategoryOption[]);
         }
       } catch (err) {
         console.error("Error loading category options:", err);
@@ -77,7 +101,7 @@ export function CategorySelector({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [inyectadas]);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -90,6 +114,7 @@ export function CategorySelector({
     return () => document.removeEventListener("mousedown", handleClick);
   }, [open]);
 
+  const options = inyectadas ? opcionesInyectadas : cargadas;
   const selected = options.find((o) => o.id === selectedId) ?? null;
   const handleClick = (id: number | null) => {
     onChange?.(id);
@@ -126,10 +151,13 @@ export function CategorySelector({
     try {
       const result = await createCategory({ name });
       if (result.success && result.data) {
-        const created = result.data as { id: number; name: string };
-        setOptions((prev) =>
-          [...prev, created].sort((a, b) => a.name.localeCompare(b.name))
+        const created = result.data as CategoryOption;
+        const actualizadas = [...options, created].sort((a, b) =>
+          a.name.localeCompare(b.name)
         );
+        // Con la lista inyectada, el padre es la fuente de verdad (T10).
+        if (inyectadas) onOptionsChange?.(actualizadas);
+        else setCargadas(actualizadas);
         handleClick(created.id);
         await Swal.fire({
           title: "Categoría creada",
@@ -160,13 +188,19 @@ export function CategorySelector({
         <span className="text-xs text-ink-muted font-medium">{label}</span>
       )}
       <div className="flex items-stretch gap-2 w-full">
+        {/* El error del campo dueño se anuncia desde el disparador (T10); el rol
+            del control sigue siendo `button` para no romper a sus consumidores. */}
+        {/* eslint-disable-next-line jsx-a11y/role-supports-aria-props */}
         <button
           type="button"
+          id={triggerId}
           disabled={disabled || loading}
           onClick={() => setOpen(!open)}
-          className="flex-1 inline-flex items-center justify-between gap-2 px-4 py-3 min-h-[44px] bg-surface-soft rounded-xl text-sm text-ink hover:bg-surface-strong transition-colors disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
+          className="flex-1 min-w-0 inline-flex items-center justify-between gap-2 px-4 py-3 min-h-[44px] bg-surface-soft rounded-xl text-sm text-ink hover:bg-surface-strong transition-colors disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
           aria-haspopup="listbox"
           aria-expanded={open}
+          aria-invalid={invalid ? "true" : undefined}
+          aria-describedby={describedBy}
         >
           <span className="truncate">
             {loading
@@ -189,7 +223,7 @@ export function CategorySelector({
           type="button"
           disabled={disabled || creating}
           onClick={handleCreateNew}
-          className="btn btn-primary whitespace-nowrap"
+          className="btn btn-primary whitespace-nowrap shrink-0"
           aria-label="Crear nueva categoría"
         >
           {creating ? "Creando…" : (

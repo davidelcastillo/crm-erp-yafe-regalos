@@ -55,6 +55,12 @@ it('descarga solo al pedirlo y permite cerrar sin acciones de stock', async () =
   expect(onClose).toHaveBeenCalledTimes(1);
 });
 
+it('sin etiquetas disponibles, el botón principal sigue siendo descargar el comprobante', () => {
+  render(<StockMovementReceiptPanel receipt={receipt} onClose={jest.fn()} />);
+  expect(screen.getByRole('button', { name: 'Descargar comprobante' })).toHaveClass('btn-primary');
+  expect(screen.getByRole('button', { name: 'Cerrar comprobante' })).toHaveClass('btn-secondary');
+});
+
 it('un traslado descarga el comprobante de la sucursal que recibe y el de la que envía', async () => {
   render(<StockMovementReceiptPanel receipt={transfer} onClose={jest.fn()} />);
   fireEvent.click(screen.getByRole('button', { name: 'Comprobante de la sucursal que envía' }));
@@ -82,14 +88,18 @@ it('distingue un fallo del PDF de la operación exitosa y reintenta el mismo sna
 
 // S2/S3: solo el ingreso ofrece las etiquetas de lo que se acaba de ingresar.
 describe('ingreso registrado', () => {
-  it('ofrece comprobante, comprobante con etiquetas y cerrar', () => {
+  it('ofrece comprobante con etiquetas como acción principal, después el comprobante suelto y cerrar', () => {
     render(<StockMovementReceiptPanel receipt={entry} onClose={jest.fn()} />);
 
     expect(screen.getAllByRole('button').map((button) => button.textContent)).toEqual([
-      'Descargar comprobante',
       'Comprobante + etiquetas',
+      'Descargar comprobante',
       'Cerrar comprobante',
     ]);
+    // S16: la jerarquía es condicional; con etiquetas disponibles, el principal es el combinado.
+    expect(screen.getByRole('button', { name: 'Comprobante + etiquetas' })).toHaveClass('btn-primary');
+    expect(screen.getByRole('button', { name: 'Descargar comprobante' })).toHaveClass('btn-secondary');
+    expect(screen.getByRole('button', { name: 'Cerrar comprobante' })).toHaveClass('btn-secondary');
   });
 
   it('descarga el PDF combinado que arma el servidor, sin volver a pedir el comprobante suelto', async () => {

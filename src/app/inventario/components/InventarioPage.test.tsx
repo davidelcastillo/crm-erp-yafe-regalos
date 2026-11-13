@@ -187,10 +187,28 @@ describe("InventarioPage — FAB crear producto (spec inventory-ui)", () => {
   it("al tocar el FAB abre el ProductForm 'Nuevo Producto'", async () => {
     await renderPage();
 
+    // Paso previo del alta (S5): el FAB abre el menú y «Un producto» el alta de a uno.
     fireEvent.click(screen.getByLabelText("Agregar producto"));
+    fireEvent.click(await screen.findByRole("button", { name: /un producto/i }));
 
     expect(await screen.findByText("Nuevo Producto")).toBeInTheDocument();
     expect(screen.getByLabelText(/nombre/i)).toBeInTheDocument();
+  });
+
+  it("'Varios productos' abre el alta masiva y no el ProductForm de alta", async () => {
+    await renderPage();
+
+    fireEvent.click(screen.getByLabelText("Agregar producto"));
+    fireEvent.click(await screen.findByRole("button", { name: /varios productos/i }));
+
+    // Se abre BulkProductForm en el paso 1 y «Continuar» muestra la primera fila
+    // con su acción propia (T15).
+    const dialogo = await screen.findByRole("dialog", { name: "Varios productos" });
+    fireEvent.click(within(dialogo).getByRole("button", { name: "Continuar" }));
+    expect(within(dialogo).getByText("Producto 1")).toBeInTheDocument();
+    expect(within(dialogo).getByRole("button", { name: /crear 1 producto/i })).toBeInTheDocument();
+    // Y NO se abre el alta individual.
+    expect(screen.queryByText("Nuevo Producto")).not.toBeInTheDocument();
   });
 
   it("crear un producto re-ejecuta getProductsWithBranchStock con los filtros activos", async () => {
@@ -223,8 +241,9 @@ describe("InventarioPage — FAB crear producto (spec inventory-ui)", () => {
       });
     });
 
-    // Abrir el FAB y crear el producto "Jabón de Avena".
+    // Abrir el FAB, elegir «Un producto» (paso previo, S5) y crear "Jabón de Avena".
     fireEvent.click(screen.getByLabelText("Agregar producto"));
+    fireEvent.click(await screen.findByRole("button", { name: /un producto/i }));
     fireEvent.change(await screen.findByLabelText(/nombre/i), {
       target: { value: "Jabón de Avena" },
     });

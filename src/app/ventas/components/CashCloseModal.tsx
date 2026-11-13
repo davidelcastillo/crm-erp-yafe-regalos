@@ -177,7 +177,7 @@ export const CashCloseModal = ({
             {loading && <p className="mt-4 text-sm text-ink-muted">Calculando el cierre...</p>}
 
             {!loading && (
-              <div className="md:flex md:justify-end">
+              <div className="md:flex md:justify-center">
                 <button
                   type="button"
                   onClick={handleContinuar}

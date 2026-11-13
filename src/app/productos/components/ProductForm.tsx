@@ -94,10 +94,10 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
           description: formData.description,
           prefix: formData.prefix,
           price: formData.price,
-          // Note: categoryId / active are NOT part of createProduct's schema in HU2.
-          // They are persisted on the product only after creation, via the extended
-          // update path. For simplicity the create flow leaves them at defaults
-          // (categoryId=null, active=true) and the user can edit afterwards.
+          // La categoría elegida viaja en el alta (H2). Sin elección va null
+          // explícito: el esquema la acepta nullable y el producto queda igual
+          // que antes (categoryId=null).
+          categoryId: categoryId,
         };
 
     const result = isEdit

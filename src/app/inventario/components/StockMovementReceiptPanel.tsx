@@ -88,7 +88,7 @@ export function StockMovementReceiptPanel({
           Descargarlo no vuelve a registrar el movimiento.
         </p>
         {error && <p role="alert" className="mt-4 text-sm text-error">{error}</p>}
-        <div className="mt-6 flex flex-col gap-3 md:flex-row md:justify-end md:flex-wrap">
+        <div className="mt-6 flex flex-col gap-3 md:flex-row md:justify-center md:flex-wrap">
           {isTransfer && (
             <>
               <button type="button" className="btn btn-primary min-h-12" autoFocus
@@ -103,16 +103,18 @@ export function StockMovementReceiptPanel({
           )}
           {!isTransfer && (
             <>
-              <button type="button" className="btn btn-primary min-h-12" autoFocus
-                onClick={() => download("DESTINATION")} disabled={generating}>
-                {generating ? "Generando PDF…" : "Descargar comprobante"}
-              </button>
+              {/* S16: con etiquetas disponibles (ENTRY) el combinado es el principal y va primero;
+                  sin ellas (EXIT) el principal sigue siendo el comprobante suelto. */}
               {isEntry && (
-                <button type="button" className="btn btn-secondary min-h-12"
+                <button type="button" className="btn btn-primary min-h-12" autoFocus
                   onClick={downloadWithLabels} disabled={generating}>
                   {generating ? "Generando PDF…" : "Comprobante + etiquetas"}
                 </button>
               )}
+              <button type="button" className={`btn ${isEntry ? "btn-secondary" : "btn-primary"} min-h-12`}
+                autoFocus={!isEntry} onClick={() => download("DESTINATION")} disabled={generating}>
+                {generating ? "Generando PDF…" : "Descargar comprobante"}
+              </button>
             </>
           )}
           <button type="button" className="btn btn-secondary min-h-12" onClick={onClose} disabled={generating}>

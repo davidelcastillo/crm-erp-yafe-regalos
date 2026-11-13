@@ -283,3 +283,5 @@ describe("createPurchaseWithBranchSplit (escala, base local)", () => {
     expect(queries.length).toBeLessThanOrEqual(TECHO_DE_VIAJES);
   });
 });
+
+export {};

@@ -228,7 +228,7 @@ export function ExportWizard({ open, onClose, branches }: ExportWizardProps) {
             {branchError && (
               <p className="mt-2 text-sm text-negative">{branchError}</p>
             )}
-            <div className="md:flex md:justify-end">
+            <div className="md:flex md:justify-center">
               <button
                 type="button"
                 onClick={handleContinue}
@@ -371,7 +371,7 @@ export function ExportWizard({ open, onClose, branches }: ExportWizardProps) {
               </aside>
             </div>
 
-            <div className="flex items-center justify-between gap-3 mt-6 md:justify-end">
+            <div className="flex items-center justify-between gap-3 mt-6 md:justify-center">
               {backButton(1)}
               <button
                 type="button"
@@ -408,7 +408,7 @@ export function ExportWizard({ open, onClose, branches }: ExportWizardProps) {
               </div>
             </div>
 
-            <div className="flex items-center justify-between gap-3 mt-6 md:justify-end">
+            <div className="flex items-center justify-between gap-3 mt-6 md:justify-center">
               {backButton(2)}
               <button
                 type="button"

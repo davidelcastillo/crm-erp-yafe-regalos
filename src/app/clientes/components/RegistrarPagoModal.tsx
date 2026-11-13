@@ -126,7 +126,7 @@ export const RegistrarPagoModal = ({
             </button>
           </div>
         ) : (
-          <div className="mt-4 flex flex-col gap-2 md:flex-row md:justify-end">
+          <div className="mt-4 flex flex-col gap-2 md:flex-row md:justify-center">
             <button
               type="button"
               onClick={onClose}

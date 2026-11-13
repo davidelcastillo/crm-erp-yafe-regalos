@@ -511,7 +511,7 @@ export const StockAdjustmentModal = ({
               </section>
             </div>
 
-            <div className="flex items-center justify-between gap-3 mt-6 md:justify-end">
+            <div className="flex items-center justify-between gap-3 mt-6 md:justify-center">
               <button
                 type="button"
                 onClick={() => setStep(2)}

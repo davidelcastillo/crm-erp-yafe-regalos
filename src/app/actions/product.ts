@@ -8,17 +8,12 @@ import { readProductMovements, type ProductMovementRow } from "@/lib/product-mov
 import { sortProducts } from "@/lib/product-order";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { getNextCode } from "@/lib/utils/product-code";
-import { updateProductExtendedSchema } from "@/lib/validations/product";
+import { getNextCode, prefixLockKey } from "@/lib/utils/product-code";
+import type { StockMovementReceipt } from "@/lib/stock-movement-receipt";
+import { createProductSchema, createProductsBatchSchema, updateProductExtendedSchema } from "@/lib/validations/product";
 
-// Schema de validación para crear producto
-// Note: stock is no longer on Product; it lives in BranchInventory per branch.
-const createProductSchema = z.object({
-  name: z.string().min(1, "El nombre es requerido").max(255, "El nombre es muy largo"),
-  description: z.string().max(500, "La descripción es muy larga").optional(),
-  prefix: z.string().regex(/^[A-Za-z]{2,4}$/, "Prefijo: 2-4 letras (A-Z)").transform(v => v.toUpperCase()),
-  price: z.number().min(0, "El precio no puede ser negativo"),
-});
+/** Motivo del ingreso inicial en el movimiento y en el comprobante (D9). */
+const BATCH_ENTRY_REFERENCE = "ALTA DE PRODUCTOS";
 
 // Schema for searchProducts action
 const searchProductsSchema = z.object({
@@ -69,7 +64,7 @@ export async function createProduct(data: unknown) {
       try {
         const product = await prisma.$transaction(async (tx) => {
           // Advisory lock on prefix hash to prevent concurrent code generation for same prefix
-          const lockKey = Math.abs(validatedData.prefix.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0));
+          const lockKey = prefixLockKey(validatedData.prefix);
           await tx.$executeRawUnsafe(`SELECT pg_advisory_xact_lock(${lockKey})`);
 
           // Fetch existing codes for this prefix within transaction
@@ -90,6 +85,7 @@ export async function createProduct(data: unknown) {
               price: validatedData.price,
               code,
               codePrefix: validatedData.prefix,
+              categoryId: validatedData.categoryId ?? null,
             },
           });
         });
@@ -117,8 +113,282 @@ export async function createProduct(data: unknown) {
     if (error instanceof Error && error.message.includes("agotado")) {
       return { success: false, error: error.message };
     }
+    if (
+      error instanceof Object &&
+      "code" in error &&
+      (error as { code: unknown }).code === "P2003"
+    ) {
+      // La categoría desapareció entre la elección y el guardado.
+      return { success: false, error: "La categoría seleccionada no existe" };
+    }
     console.error("Error creating product:", error);
     return { success: false, error: "Error al crear el producto" };
+  }
+}
+
+type BatchRowError = { row: number; field?: string; message: string };
+
+/** Errores de Zod por fila: el `path` del issue es ["rows", índice, campo]. */
+function rowErrorsFromZodError(error: z.ZodError): BatchRowError[] {
+  return error.issues.flatMap((issue) => {
+    const [raiz, row, field] = issue.path;
+    if (raiz !== "rows" || typeof row !== "number") return [];
+    return [{ row, ...(typeof field === "string" ? { field } : {}), message: issue.message }];
+  });
+}
+
+function batchFailure(error: string, rowErrors: BatchRowError[] = []) {
+  return { success: false as const, error, ...(rowErrors.length > 0 ? { rowErrors } : {}) };
+}
+
+/**
+ * Alta masiva de productos. Todo o nada (S7): cualquier falla revierte todas
+ * las filas. Con `branchId`, el lote además deja el stock inicial de cada fila
+ * en esa sucursal: `BranchInventory` siempre (S11, también en 0), movimiento
+ * `ENTRY` y comprobante solo para las filas con stock (S2).
+ */
+export async function createProductsBatch(data: unknown) {
+  // Se llena después de validar; el catch la usa para marcar el prefijo agotado.
+  let filas: { prefix: string }[] = [];
+
+  try {
+    const auth = await requireAdmin();
+    if (!auth.ok) return { success: false as const, error: auth.error };
+
+    const parsed = createProductsBatchSchema.safeParse(data);
+    if (!parsed.success) {
+      return batchFailure(
+        parsed.error.issues.map((e) => e.message).join(", "),
+        rowErrorsFromZodError(parsed.error)
+      );
+    }
+    const { rows, branchId } = parsed.data;
+    filas = rows;
+
+    // Sucursal global del lote (D8): una sola consulta, antes de escribir nada.
+    const branch =
+      branchId === undefined
+        ? null
+        : await prisma.branch.findFirst({
+            where: { id: branchId, isActive: true },
+            select: { id: true, name: true, code: true },
+          });
+    if (branchId !== undefined && !branch) {
+      return batchFailure("Sucursal inválida o inactiva");
+    }
+
+    // Una categoría por fila (S4): las distintas se verifican en UNA consulta,
+    // nunca una por fila (H6).
+    const categoriasPedidas = [
+      ...new Set(rows.flatMap((row) => (row.categoryId == null ? [] : [row.categoryId]))),
+    ];
+    if (categoriasPedidas.length > 0) {
+      const categorias = await prisma.category.findMany({
+        where: { id: { in: categoriasPedidas } },
+        select: { id: true },
+      });
+      const existentesIds = new Set(categorias.map((categoria) => categoria.id));
+      const faltantes = new Set(categoriasPedidas.filter((id) => !existentesIds.has(id)));
+      if (faltantes.size > 0) {
+        return batchFailure(
+          "La categoría seleccionada no existe",
+          rows.flatMap((row, rowIndex) =>
+            row.categoryId != null && faltantes.has(row.categoryId)
+              ? [
+                  {
+                    row: rowIndex,
+                    field: "categoryId",
+                    message: "La categoría seleccionada no existe",
+                  },
+                ]
+              : []
+          )
+        );
+      }
+    }
+
+    // Solo bloquean los nombres de productos ACTIVOS, sin distinguir mayúsculas (S3).
+    const existentes = await prisma.product.findMany({
+      where: {
+        active: true,
+        OR: rows.map((row) => ({ name: { equals: row.name.trim(), mode: "insensitive" } })),
+      },
+      select: { name: true },
+    });
+    if (existentes.length > 0) {
+      const bloqueados = new Set(existentes.map((p) => p.name.trim().toLowerCase()));
+      return batchFailure(
+        "Ya existe un producto con ese nombre",
+        rows.flatMap((row, rowIndex) =>
+          bloqueados.has(row.name.trim().toLowerCase())
+            ? [{ row: rowIndex, field: "name", message: "Ya existe un producto con ese nombre" }]
+            : []
+        )
+      );
+    }
+
+    const maxRetries = 3;
+    const baseDelay = 50;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const resultado = await prisma.$transaction(
+          async (tx) => {
+            // Un lock por prefijo, ordenados y sin repetir: la misma clave que
+            // `createProduct`, así el alta individual y el lote se serializan.
+            const prefijos = [...new Set(rows.map((row) => row.prefix))].sort();
+            for (const prefijo of prefijos) {
+              await tx.$executeRawUnsafe(`SELECT pg_advisory_xact_lock(${prefixLockKey(prefijo)})`);
+            }
+
+            const existentesCodigos = await tx.product.findMany({
+              where: { codePrefix: { in: prefijos } },
+              select: { code: true, codePrefix: true },
+            });
+            const codigosPorPrefijo = new Map<string, string[]>(prefijos.map((p) => [p, []]));
+            for (const existente of existentesCodigos) {
+              if (existente.code && existente.codePrefix) {
+                codigosPorPrefijo.get(existente.codePrefix)?.push(existente.code);
+              }
+            }
+
+            // Códigos en memoria: cada código generado suma a su prefijo, así el
+            // mismo prefijo sigue contando y el tope de 999 se respeta.
+            const codigos = rows.map((row) => {
+              const delPrefijo = codigosPorPrefijo.get(row.prefix) ?? [];
+              const code = getNextCode(row.prefix, delPrefijo);
+              delPrefijo.push(code);
+              codigosPorPrefijo.set(row.prefix, delPrefijo);
+              return code;
+            });
+
+            const creados = await tx.product.createManyAndReturn({
+              data: rows.map((row, i) => ({
+                name: row.name,
+                description: row.description || "-",
+                price: row.price,
+                code: codigos[i],
+                codePrefix: row.prefix,
+                categoryId: row.categoryId ?? null,
+              })),
+              select: { id: true, code: true, name: true, price: true },
+            });
+
+            // `createManyAndReturn` no promete orden: se cruza por código.
+            const porCodigo = new Map(creados.map((p) => [p.code, p]));
+            const filasCreadas = rows.map((row, i) => {
+              const creado = porCodigo.get(codigos[i]);
+              if (!creado) throw new Error("No se pudo leer uno de los productos creados");
+              return { producto: creado, stockInicial: row.initialStock ?? 0 };
+            });
+            const products = filasCreadas.map(({ producto }) => ({
+              id: producto.id,
+              code: producto.code,
+              name: producto.name,
+            }));
+
+            // Sin sucursal el lote queda como antes: solo productos.
+            if (!branch) return { products, receipt: null };
+
+            // S11: la fila de inventario se crea siempre, también con stock 0,
+            // para que el producto nuevo se vea en la vista por sucursal (H1).
+            const inventarios = await tx.branchInventory.createManyAndReturn({
+              data: filasCreadas.map(({ producto, stockInicial }) => ({
+                branchId: branch.id,
+                productId: producto.id,
+                stock: stockInicial,
+              })),
+              select: { productId: true, stock: true },
+            });
+            const stockPorProducto = new Map(inventarios.map((i) => [i.productId, i.stock]));
+
+            // Stock 0 no es un ingreso: no deja movimiento ni va al comprobante.
+            const conStock = filasCreadas.filter((fila) => fila.stockInicial > 0);
+            if (conStock.length > 0) {
+              await tx.branchMovement.createMany({
+                data: conStock.map(({ producto, stockInicial }) => ({
+                  productId: producto.id,
+                  branchId: branch.id,
+                  movementType: "ENTRY",
+                  quantity: stockInicial,
+                  reference: BATCH_ENTRY_REFERENCE,
+                  // Calidad de auditoría, no un fix de la base: `performedBy` es
+                  // TEXT NOT NULL y acepta "" igual, pero un ingreso sin responsable es ilegible.
+                  // Fallback explícito: `requireAdmin` puede devolver email vacío y `performedBy` es obligatorio.
+                  performedBy: auth.email || "sistema",
+                })),
+              });
+            }
+
+            const receipt: StockMovementReceipt | null =
+              conStock.length === 0
+                ? null
+                : {
+                    movementType: "ENTRY",
+                    branchId: branch.id,
+                    date: new Date().toISOString(),
+                    branchName: branch.name,
+                    branchCode: branch.code,
+                    reference: BATCH_ENTRY_REFERENCE,
+                    rows: conStock.map(({ producto, stockInicial }) => ({
+                      productId: producto.id,
+                      code: producto.code,
+                      name: producto.name,
+                      price: Number(producto.price),
+                      quantity: stockInicial,
+                      // Saldo confirmado por la transacción, no supuesto.
+                      stock: stockPorProducto.get(producto.id)!,
+                    })),
+                  };
+
+            return { products, receipt };
+          },
+          { timeout: 20_000 }
+        );
+
+        revalidatePath("/inventario");
+        revalidatePath("/productos");
+        if (resultado.receipt) revalidatePath("/movimientos");
+        return { success: true as const, data: resultado };
+      } catch (txError) {
+        if (attempt < maxRetries && isUniqueConstraintError(txError)) {
+          await sleep(baseDelay * attempt);
+          continue;
+        }
+        throw txError;
+      }
+    }
+
+    throw new Error("Max retries exceeded for code generation");
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return batchFailure(
+        error.issues.map((e) => e.message).join(", "),
+        rowErrorsFromZodError(error)
+      );
+    }
+    if (error instanceof Error && error.message.includes("agotado")) {
+      // `getNextCode` nombra el prefijo agotado: esas filas son las que fallan.
+      const prefijo = /Prefijo\s+([A-Za-z]{2,4})\s+agotado/.exec(error.message)?.[1]?.toUpperCase();
+      return batchFailure(
+        error.message,
+        prefijo
+          ? filas.flatMap((fila, row) =>
+              fila.prefix === prefijo ? [{ row, message: error.message }] : []
+            )
+          : []
+      );
+    }
+    if (
+      error &&
+      typeof error === "object" &&
+      "code" in error &&
+      (error as { code: unknown }).code === "P2003"
+    ) {
+      return batchFailure("La categoría seleccionada no existe");
+    }
+    console.error("Error creating products batch:", error);
+    return batchFailure("Error al crear los productos");
   }
 }
 

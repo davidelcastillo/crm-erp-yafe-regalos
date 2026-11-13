@@ -299,7 +299,7 @@ export function AddSaleButton({ products, onSuccess }: AddSaleButtonProps) {
                 />
 
                 {/* En celular la acción ocupa el ancho; desde `md` no se estira al ancho del panel. */}
-                <div className="md:flex md:justify-end">
+                <div className="md:flex md:justify-center">
                   <button
                     type="button"
                     onClick={() => setPaso("productos")}

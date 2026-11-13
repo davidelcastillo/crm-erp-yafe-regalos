@@ -46,6 +46,7 @@ jest.mock("sweetalert2", () => ({
 }));
 
 import { createProduct, updateProductExtended } from "../../actions/product";
+import { createProductSchema } from "@/lib/validations/product";
 import { useRouter } from "next/navigation";
 import Swal from "sweetalert2";
 
@@ -140,8 +141,47 @@ describe("ProductForm Component", () => {
         description: "Jabón artesanal exfoliante",
         prefix: "AA",
         price: 1500,
+        // Sin categoría elegida el alta manda null explícito (H2): el esquema
+        // la acepta como nullable, así que el payload sigue siendo válido.
+        categoryId: null,
       });
     });
+  });
+
+  it("sends the chosen category in the create payload (H2)", async () => {
+    render(<ProductForm product={null} onClose={() => {}} />);
+
+    fireEvent.change(screen.getByLabelText(/nombre/i), { target: { value: "Con categoría" } });
+    fireEvent.change(screen.getByLabelText(/prefijo.*2-4 letras/i), { target: { value: "AA" } });
+    fireEvent.change(screen.getByLabelText(/precio de venta/i), { target: { value: "100" } });
+
+    // El mock de CategorySelector avisa 42 al hacer clic
+    fireEvent.click(screen.getByLabelText(/select-category/i));
+
+    fireEvent.click(screen.getByRole("button", { name: /crear producto/i }));
+
+    await waitFor(() => {
+      expect(mockCreateProduct).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "Con categoría", categoryId: 42 })
+      );
+    });
+  });
+
+  it("keeps the create payload valid for the schema when no category is chosen", async () => {
+    render(<ProductForm product={null} onClose={() => {}} />);
+
+    fireEvent.change(screen.getByLabelText(/nombre/i), { target: { value: "Sin categoría" } });
+    fireEvent.change(screen.getByLabelText(/prefijo.*2-4 letras/i), { target: { value: "AA" } });
+    fireEvent.change(screen.getByLabelText(/precio de venta/i), { target: { value: "100" } });
+
+    fireEvent.click(screen.getByRole("button", { name: /crear producto/i }));
+
+    await waitFor(() => expect(mockCreateProduct).toHaveBeenCalled());
+
+    const payload = mockCreateProduct.mock.calls[0][0];
+    const parsed = createProductSchema.safeParse(payload);
+    expect(parsed.success).toBe(true);
+    expect(parsed.success && parsed.data.categoryId).toBeNull();
   });
 
   it("displays error message when createProduct fails", async () => {
