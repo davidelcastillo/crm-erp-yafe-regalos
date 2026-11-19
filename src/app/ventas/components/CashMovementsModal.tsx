@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Swal from "sweetalert2";
 import { getCashMovements, registerCashMovement } from "@/app/actions/cash";
 import { getUser } from "@/actions/auth";
@@ -20,6 +20,9 @@ export interface CashMovementsModalProps {
   onClose: () => void;
   branches: Array<{ id: number; name: string }>;
   onConfirm: () => void;
+  /** Sucursal ya elegida en el paso previo de la página (M2): fija la caja y
+   * oculta el selector; sin ella (o «Todas»), el modal pide como siempre. */
+  fixedBranchId?: number | null;
 }
 
 type Tipo = "INGRESO" | "EGRESO";
@@ -60,8 +63,10 @@ export const CashMovementsModal = ({
   onClose,
   branches,
   onConfirm,
+  fixedBranchId = null,
 }: CashMovementsModalProps) => {
-  const [branchId, setBranchId] = useState<number | null>(null);
+  const [branchIdPropio, setBranchIdPropio] = useState<number | null>(null);
+  const branchId = fixedBranchId ?? branchIdPropio;
   const [movimientos, setMovimientos] = useState<Movimiento[]>([]);
   const [totales, setTotales] = useState<Totales>({ ingresos: 0, egresos: 0, balance: 0 });
   const [loading, setLoading] = useState(false);
@@ -91,7 +96,7 @@ export const CashMovementsModal = ({
   };
 
   const reset = () => {
-    setBranchId(null);
+    setBranchIdPropio(null);
     setMovimientos([]);
     setTotales({ ingresos: 0, egresos: 0, balance: 0 });
     setTipo("INGRESO");
@@ -101,6 +106,17 @@ export const CashMovementsModal = ({
     setDetalle("");
     setError(null);
   };
+
+  // M2: con la sucursal fijada desde el paso previo, la caja abre directo en
+  // esa sucursal y carga su libro sin preguntar otra vez. Diferido un tick:
+  // `cargar` arranca con `setLoading(true)` síncrono y el compilador de React lo
+  // marca si se llama directo desde el efecto (misma trampa que Fase 4).
+  useEffect(() => {
+    if (open && fixedBranchId != null) {
+      const t = setTimeout(() => void cargar(fixedBranchId), 0);
+      return () => clearTimeout(t);
+    }
+  }, [open, fixedBranchId]);
 
   const handleClose = () => {
     reset();
@@ -179,17 +195,23 @@ export const CashMovementsModal = ({
           </button>
         </div>
 
-        <p className="block text-xs text-ink-muted mb-2">Sucursal</p>
-        <BranchPicker
-          branches={branches}
-          value={branchId}
-          onChange={(id) => {
-            setBranchId(id);
-            setError(null);
-            void cargar(id);
-          }}
-          label="Sucursal"
-        />
+        {fixedBranchId == null ? (
+          <>
+            <p className="block text-xs text-ink-muted mb-2">Sucursal</p>
+            <BranchPicker
+              branches={branches}
+              value={branchId}
+              onChange={(id) => {
+                setBranchIdPropio(id);
+                setError(null);
+                void cargar(id);
+              }}
+              label="Sucursal"
+            />
+          </>
+        ) : (
+          <p className="block text-xs text-ink-muted mb-2">Caja de {sucursalElegida?.name}</p>
+        )}
 
         {branchId === null && (
           <p className="mt-4 text-sm text-ink-muted">

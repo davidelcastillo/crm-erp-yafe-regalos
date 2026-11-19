@@ -14,6 +14,7 @@ import { ActionCard } from '@/components/ui/ActionCard';
 import { Spinner } from '@/components/ui/Spinner';
 import { CardSkeleton, Skeleton } from '@/components/ui/Skeleton';
 import { BranchSelector } from '@/components/ui/BranchSelector';
+import { useBranch } from '@/lib/context/BranchContext';
 import { useReloadKey } from '@/lib/hooks/useReloadKey';
 import { useEffect, useState } from 'react';
 import { motion, useReducedMotion, useScroll, useTransform } from 'motion/react';
@@ -64,7 +65,11 @@ export default function VentasPage() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [branchId, setBranchId] = useState<number | null>(null);
+  // La sucursal elegida vive en el BranchContext global (la escribe el selector
+  // del encabezado y también el dashboard): leerla de acá y no de un estado
+  // local evita que el header muestre una sucursal mientras la caja vuelve a
+  // preguntarla (M2, segunda vuelta).
+  const { branchId, setBranchId } = useBranch();
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   // Sucursales y acceso a la caja (plata), pedidos en S14.
@@ -274,6 +279,7 @@ export default function VentasPage() {
         onClose={() => setCashStep(null)}
         branches={branches}
         onConfirm={bump}
+        fixedBranchId={branchId}
       />
       <CashCloseModal
         open={cashStep === 'cierre'}
