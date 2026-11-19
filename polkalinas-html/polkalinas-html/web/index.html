@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Polkalina's · Ropa second hand, intervenida y cositas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,400;1,9..144,600&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--crema:#FFF6F0;--rosa:#F2C4CC;--frutilla:#C8323C;--cacao:#4A2C2A;--gris:#D8D2D0;--blanco:#FFFFFF;--suave:#76574F;--borde:#EADAD6;
+--ok-bg:#E3EFE3;--ok:#2F5B33;--warn-bg:#FBE7C8;--warn:#7A4A06;--bad-bg:#F6D5D7;--bad:#8E1F28;--serif:'Fraunces',serif;--sans:'Work Sans',sans-serif}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--crema);color:var(--cacao);font-family:var(--sans);font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased}
+a{color:inherit}
+img{max-width:100%;display:block}
+button,input,select,textarea{font:inherit;color:inherit}
+h1,h2,h3{margin:0;font-weight:400}
+.serif{font-family:var(--serif)}
+.it{font-family:var(--serif);font-style:italic}
+.rojo{color:var(--frutilla)}
+.muted{color:var(--suave)}
+.visually-hidden{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:12px 22px;border-radius:999px;border:2px solid var(--cacao);background:transparent;color:var(--cacao);font-weight:600;font-size:15px;text-decoration:none;cursor:pointer;white-space:nowrap}
+.btn-primary{background:var(--cacao);color:var(--crema)}
+.btn-rojo{background:var(--frutilla);border-color:var(--frutilla);color:var(--crema)}
+.btn-sm{min-height:40px;padding:8px 14px;font-size:14px}
+.btn-block{width:100%}
+.btn:hover{filter:brightness(1.08)}
+.btn:focus-visible,.icon-btn:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--frutilla);outline-offset:2px}
+.icon-btn{width:44px;height:44px;display:inline-flex;align-items:center;justify-content:center;border:none;background:transparent;border-radius:999px;cursor:pointer;position:relative;flex-shrink:0}
+.icon-btn.bordered{border:1.5px solid var(--borde);background:var(--blanco)}
+.badge{position:absolute;top:4px;right:2px;min-width:18px;height:18px;padding:0 4px;border-radius:999px;background:var(--frutilla);color:var(--crema);font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:var(--blanco);border:1px solid var(--borde);font-size:13px;font-weight:600;white-space:nowrap;text-decoration:none}
+.chip.activo{background:var(--cacao);border-color:var(--cacao);color:var(--crema)}
+.estado{display:inline-flex;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap}
+.estado.ok{background:var(--ok-bg);color:var(--ok)}.estado.warn{background:var(--warn-bg);color:var(--warn)}.estado.bad{background:var(--bad-bg);color:var(--bad)}.estado.neutro{background:#ECE6E4;color:#5E4E4B}
+.ph{background:var(--gris);display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--cacao);text-align:center}
+.ph.rosa{background:var(--rosa)}
+.piano{position:relative;display:flex;height:34px;border-top:1.5px solid var(--cacao);border-bottom:1.5px solid var(--cacao);background:var(--blanco)}
+.piano span{flex:1;border-right:1.5px solid var(--cacao)}
+.piano span:last-of-type{border-right:none}
+.piano i{position:absolute;top:0;width:4.2%;height:60%;background:var(--cacao)}
+.piano.crema{background:var(--crema)}
+.logo{display:inline-flex;align-items:center;gap:8px;text-decoration:none}
+.logo b{font-family:var(--serif);font-style:italic;font-weight:400;font-size:30px;line-height:1}
+.only-mobile{display:none!important}
+@media (max-width:760px){.only-mobile{display:revert!important}.only-desktop{display:none!important}}
+
+.wrap{max-width:1240px;margin:0 auto;padding:0 40px}
+.topbar{background:var(--cacao);color:var(--crema);font-size:14px;text-align:center;padding:9px 12px}
+.site-header{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:18px 0}
+.nav{display:flex;flex-wrap:wrap;gap:4px 26px}
+.nav a{text-decoration:none;padding:8px 0;font-size:16px}
+.nav a:hover,.nav a[aria-current]{color:var(--frutilla)}
+.header-actions{display:flex;align-items:center;gap:2px}
+.cat-chips{display:none;gap:8px;overflow-x:auto;padding:4px 0 12px;scrollbar-width:none}
+.drawer{position:fixed;inset:0;z-index:50;display:none}
+.drawer.open{display:block}
+.drawer-bg{position:absolute;inset:0;background:rgba(74,44,42,.45)}
+.drawer-panel{position:absolute;top:0;left:0;bottom:0;width:min(86vw,340px);background:var(--crema);padding:20px;display:flex;flex-direction:column;gap:6px;overflow-y:auto}
+.drawer-panel a{display:flex;min-height:48px;align-items:center;font-size:18px;text-decoration:none;border-bottom:1px solid var(--borde)}
+.sec{padding-top:72px}
+.sec-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px}
+.sec-head h2{font-family:var(--serif);font-size:40px;line-height:1.1}
+.link-mas{display:inline-flex;align-items:center;gap:4px;font-weight:600;font-size:15px;text-decoration:none;min-height:44px}
+.hero{display:flex;gap:40px;align-items:stretch;padding:72px 0 32px}
+.hero-txt{flex:1;display:flex;flex-direction:column;justify-content:center;gap:20px}
+.kicker{font-size:13px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--frutilla)}
+.hero h1{font-family:var(--serif);font-size:clamp(40px,5.4vw,72px);line-height:1}
+.hero p{margin:0;font-size:18px;max-width:520px}
+.hero-btns{display:flex;flex-wrap:wrap;gap:12px}
+.hero-img{flex:1;position:relative;min-height:520px;border-radius:24px}
+.colgante{position:absolute;left:18px;bottom:18px;width:150px;background:var(--crema);border:1px solid var(--borde);border-radius:14px 14px 10px 10px;padding:14px;display:flex;flex-direction:column;align-items:center;gap:6px}
+.colgante .agujero{width:14px;height:14px;border-radius:50%;background:var(--rosa);border:2px solid var(--cacao)}
+.colgante strong{font-family:var(--serif);font-style:italic;font-weight:400;font-size:20px}
+.colgante small{font-size:13px}
+.grid-cat{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:24px}
+.cat{border-radius:18px;padding:20px;min-height:160px;display:flex;flex-direction:column;justify-content:space-between;text-decoration:none;border:1px solid var(--borde);background:var(--crema)}
+.cat.oscuro{background:var(--cacao);color:var(--crema);border-color:var(--cacao)}
+.cat.rosa{background:var(--rosa);border-color:var(--rosa)}
+.cat strong{font-family:var(--serif);font-style:italic;font-weight:400;font-size:26px;line-height:1}
+.cat small{font-size:13px;opacity:.85}
+.grid-prod{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:24px}
+.prod{display:flex;flex-direction:column;gap:10px}
+.prod.vendida{opacity:.55}
+.prod-foto{position:relative;aspect-ratio:4/5;border-radius:14px}
+.prod-tag{position:absolute;left:10px;top:10px;background:var(--crema);color:var(--frutilla);border-radius:999px;padding:4px 10px;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
+.prod-fav{position:absolute;right:8px;top:8px;width:36px;height:36px;border-radius:999px;border:none;background:var(--crema);display:flex;align-items:center;justify-content:center;cursor:pointer}
+.prod-aviso{position:absolute;left:10px;right:10px;bottom:10px;border-radius:10px;padding:8px;text-align:center;font-size:13px;font-weight:600}
+.prod-aviso.reservada{background:var(--warn-bg);color:var(--warn)}
+.prod-aviso.vendida{background:var(--cacao);color:var(--crema)}
+.prod-nombre{font-family:var(--serif);font-size:18px;line-height:1.2;text-decoration:none}
+.prod-meta{font-size:13px;color:var(--suave)}
+.prod-precio{font-weight:600}
+.banner{margin-top:72px;background-color:var(--rosa);background-image:radial-gradient(var(--crema) 14%,transparent 16%);background-size:32px 32px}
+.banner-in{display:flex;gap:24px;align-items:center;padding:48px 0}
+.banner-card{flex:1;background:var(--crema);border-radius:22px;padding:28px;display:flex;flex-direction:column;gap:14px;align-items:flex-start}
+.banner-card h2{font-family:var(--serif);font-size:40px;line-height:1.05}
+.banner-fotos{flex:1;display:grid;grid-template-columns:repeat(3,1fr);gap:10px;align-self:stretch}
+.banner-fotos div{border-radius:14px;aspect-ratio:3/4}
+.pasos{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:24px}
+.paso{display:flex;gap:14px;align-items:flex-start}
+.paso-n{width:44px;height:44px;flex-shrink:0;border-radius:50%;background:var(--frutilla);color:var(--crema);display:flex;align-items:center;justify-content:center;font-family:var(--serif);font-style:italic;font-size:22px}
+.paso strong{display:block;font-size:17px}
+.paso p{margin:4px 0 0;font-size:15px}
+.valores{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.valor{background:var(--blanco);border:1px solid var(--borde);border-radius:18px;padding:22px}
+.valor b{display:block;color:var(--frutilla);font-size:22px;font-weight:400}
+.valor h3{font-family:var(--serif);font-size:21px;line-height:1.15;margin:6px 0}
+.valor p{margin:0;font-size:15px;color:var(--suave)}
+.grid-ig{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
+.grid-ig div{aspect-ratio:1;border-radius:10px}
+.footer{background:var(--cacao);color:var(--crema);margin-top:72px}
+.footer .piano{background:var(--crema)}
+.footer-cols{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:32px;padding:44px 0}
+.footer-cols h3{font-size:13px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--rosa);margin-bottom:10px}
+.footer-cols a,.footer-cols span{display:block;text-decoration:none;font-size:15px;padding:4px 0}
+.footer .logo b{font-size:34px}
+.footer-legal{border-top:1px solid #6B4A46;padding:18px 0 28px;font-size:13px;color:var(--rosa)}
+.migas{font-size:13px;color:var(--suave);padding:18px 0}
+.migas a{color:var(--suave)}
+/* catálogo */
+.cat-titulo{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 16px;padding-bottom:18px}
+.cat-titulo h1{font-family:var(--serif);font-size:40px}
+.cat-layout{display:flex;gap:40px;align-items:flex-start}
+.filtros{width:260px;flex-shrink:0}
+.filtros-head{display:flex;justify-content:space-between;align-items:center;padding-bottom:8px}
+.filtros fieldset{border:none;border-top:1px solid var(--borde);margin:0;padding:16px 0;display:flex;flex-direction:column;gap:8px}
+.filtros legend{font-weight:600;float:left;width:100%;margin-bottom:6px}
+.check{display:flex;align-items:center;gap:10px;min-height:34px;font-size:15px;cursor:pointer}
+.check input{width:18px;height:18px;accent-color:var(--cacao)}
+.check em{margin-left:auto;font-style:normal;font-size:13px;color:var(--suave)}
+.talles{display:flex;flex-wrap:wrap;gap:8px}
+.talle{min-width:44px;min-height:40px;padding:0 10px;border-radius:10px;border:1.5px solid var(--borde);background:var(--blanco);font-weight:600;cursor:pointer}
+.talle[aria-pressed=true]{background:var(--cacao);border-color:var(--cacao);color:var(--crema)}
+.campo{display:flex;flex-direction:column;gap:4px;font-size:13px;flex:1}
+.campo input,.campo select,.select{min-height:40px;border:1.5px solid var(--borde);border-radius:10px;padding:0 10px;background:var(--blanco);font-size:15px;width:100%}
+.cat-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:18px}
+.toolbar{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:12px}
+.activos{display:flex;flex-wrap:wrap;gap:8px}
+.activo{display:inline-flex;align-items:center;gap:4px;padding:4px 4px 4px 12px;border-radius:999px;background:var(--rosa);font-size:13px;font-weight:600}
+.activo button{width:28px;height:28px;border:none;background:transparent;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.ordenar{display:flex;align-items:center;gap:8px;font-size:14px}
+.ordenar .select{width:auto}
+.mob-bar{display:none;grid-template-columns:1fr 1fr;gap:10px}
+.sheet-close{display:none}
+/* producto */
+.pdp{display:flex;gap:48px;align-items:flex-start}
+.pdp-gal{width:58%;display:flex;flex-direction:column;gap:10px}
+.pdp-foto{position:relative;aspect-ratio:4/5;border-radius:20px;font-size:15px}
+.thumbs{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.thumb{aspect-ratio:4/5;border-radius:10px;border:1px solid var(--borde);background:var(--gris);cursor:pointer;padding:0}
+.thumb[aria-current=true]{border:2px solid var(--cacao)}
+.dots-gal{display:none;position:absolute;bottom:14px;left:0;right:0;justify-content:center;gap:6px}
+.dots-gal span{width:8px;height:8px;border-radius:99px;background:var(--crema)}
+.dots-gal span.on{width:20px;background:var(--cacao)}
+.pdp-info{width:42%;display:flex;flex-direction:column;gap:16px}
+.pdp-info h1{font-family:var(--serif);font-size:40px;line-height:1.1}
+.precio{font-size:26px;font-weight:600}
+.talle-fijo{display:flex;align-items:center;gap:12px}
+.talle-fijo b{min-width:48px;min-height:44px;display:inline-flex;align-items:center;justify-content:center;border-radius:10px;background:var(--cacao);color:var(--crema)}
+.fila{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-top:1px solid var(--borde);font-size:15px}
+.info-row{display:flex;gap:12px;align-items:flex-start;padding:12px 0;border-top:1px solid var(--borde)}
+.info-row strong{display:block;font-size:15px}
+.info-row span{font-size:14px;color:var(--suave)}
+.relacionados{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:24px}
+@media (max-width:760px){
+ .wrap{padding:0 18px}
+ .topbar{font-size:12px}
+ .site-header{padding:8px 0}
+ .nav{display:none}
+ .cat-chips{display:flex}
+ .logo b{font-size:24px}
+ .sec{padding-top:44px}
+ .sec-head h2,.cat-titulo h1,.pdp-info h1,.banner-card h2{font-size:30px}
+ .hero{flex-direction:column;padding:28px 0 16px;gap:24px}
+ .hero-btns .btn{flex:1 1 100%}
+ .hero-img{min-height:380px}
+ .grid-cat{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+ .grid-prod,.relacionados{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+ .prod-nombre{font-size:15px}
+ .banner{margin-top:44px}
+ .banner-in{flex-direction:column}
+ .banner-fotos{width:100%}
+ .pasos,.valores,.footer-cols{grid-template-columns:1fr}
+ .grid-ig{grid-template-columns:repeat(3,minmax(0,1fr))}
+ .footer{margin-top:44px}
+ .piano{height:24px}
+ .filtros{display:none}
+ .filtros.open{display:block;position:fixed;left:0;right:0;bottom:0;max-height:85vh;overflow-y:auto;width:auto;z-index:60;background:var(--crema);border-radius:22px 22px 0 0;padding:18px 18px 24px;box-shadow:0 -10px 30px rgba(74,44,42,.25)}
+ .sheet-close{display:flex}
+ .mob-bar{display:grid}
+ .cat-layout{display:block}
+ .toolbar .ordenar{display:none}
+ .pdp{flex-direction:column;gap:20px}
+ .pdp-gal,.pdp-info{width:100%}
+ .thumbs{display:none}
+ .dots-gal{display:flex}
+}
+</style>
+</head>
+<body>
+<div class="topbar">Envíos a todo el país desde Salta · Compras por WhatsApp ♡</div>
+<div class="wrap">
+<header class="site-header">
+<button class="icon-btn only-mobile" type="button" aria-label="Abrir menú" aria-controls="menu" aria-expanded="false" data-open="menu"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+<a class="logo" href="index.html" aria-label="Polkalina's, inicio"><svg width="39" height="39" viewBox="0 0 100 100" aria-hidden="true"><path d="M50 94 C30 86 14 64 16 46 C18 32 32 28 50 33 C68 28 82 32 84 46 C86 64 70 86 50 94 Z" fill="#C8323C"></path><path d="M50 36 C44 30 34 30 28 33 C34 26 42 24 47 26 C46 20 48 14 50 10 C52 14 54 20 53 26 C58 24 66 26 72 33 C66 30 56 30 50 36 Z" fill="#4A2C2A"></path><circle cx="38" cy="54" r="6" fill="#FFF6F0"></circle><circle cx="62" cy="54" r="6" fill="#FFF6F0"></circle><circle cx="50" cy="74" r="6" fill="#FFF6F0"></circle></svg><b>Polkalina's</b></a>
+<nav class="nav" aria-label="Principal"><a href="catalogo.html">Nuevo</a><a href="catalogo.html">Second hand</a><a href="catalogo.html">Intervenido</a><a href="catalogo.html">Cositas</a><a href="catalogo.html">Accesorios</a><a href="index.html#comprar">Cómo comprar</a></nav>
+<div class="header-actions">
+<button class="icon-btn" type="button" aria-label="Buscar"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 4a7 7 0 1 0 0 14a7 7 0 1 0 0-14z M20 20l-3.5-3.5"/></svg></button>
+<button class="icon-btn only-desktop" type="button" aria-label="Favoritas"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 10c0 5.5-7 10-7 10z"/></svg></button>
+<button class="icon-btn" type="button" aria-label="Mi bolsita, 2 prendas"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8h12l-1 12H7L6 8z M9 8V6a3 3 0 0 1 6 0v2"/></svg><span class="badge">2</span></button>
+</div>
+</header>
+<nav class="cat-chips" aria-label="Categorías"><a class="chip activo" href="catalogo.html">Todo</a><a class="chip" href="catalogo.html">Nuevo</a><a class="chip" href="catalogo.html">Second hand</a><a class="chip" href="catalogo.html">Intervenido</a><a class="chip" href="catalogo.html">Cositas</a><a class="chip" href="catalogo.html">Accesorios</a></nav>
+</div>
+<div class="drawer" id="menu" aria-hidden="true"><div class="drawer-bg" data-close="menu"></div><div class="drawer-panel" role="dialog" aria-label="Menú">
+<div style="display:flex;justify-content:space-between;align-items:center;padding-bottom:10px"><a class="logo" href="index.html" aria-label="Polkalina's, inicio"><svg width="31" height="31" viewBox="0 0 100 100" aria-hidden="true"><path d="M50 94 C30 86 14 64 16 46 C18 32 32 28 50 33 C68 28 82 32 84 46 C86 64 70 86 50 94 Z" fill="#C8323C"></path><path d="M50 36 C44 30 34 30 28 33 C34 26 42 24 47 26 C46 20 48 14 50 10 C52 14 54 20 53 26 C58 24 66 26 72 33 C66 30 56 30 50 36 Z" fill="#4A2C2A"></path><circle cx="38" cy="54" r="6" fill="#FFF6F0"></circle><circle cx="62" cy="54" r="6" fill="#FFF6F0"></circle><circle cx="50" cy="74" r="6" fill="#FFF6F0"></circle></svg><b>Polkalina's</b></a><button class="icon-btn" type="button" aria-label="Cerrar menú" data-close="menu"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+<a href="catalogo.html">Nuevo</a><a href="catalogo.html">Second hand</a><a href="catalogo.html">Intervenido</a><a href="catalogo.html">Cositas</a><a href="catalogo.html">Accesorios</a><a href="index.html#comprar">Cómo comprar</a><a href="#">Mi bolsita</a><a href="#">Favoritas</a>
+<a href="#">WhatsApp [NÚMERO]</a></div></div>
+
+<div class="piano " aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><i style="left:5%"></i><i style="left:12.2%"></i><i style="left:26.5%"></i><i style="left:33.6%"></i><i style="left:40.8%"></i><i style="left:55%"></i><i style="left:62.2%"></i><i style="left:76.5%"></i><i style="left:83.6%"></i><i style="left:90.8%"></i></div>
+<main>
+<div class="wrap">
+<section class="hero">
+<div class="hero-txt">
+<span class="kicker">Nuevo drop · [FECHA]</span>
+<h1>Segundas <i class="rojo">oportunidades</i> para prendas hermosas.</h1>
+<p>Ropa second hand e intervenida, elegida una por una, y cositas cute para tu cuarto y tu mochila.</p>
+<div class="hero-btns"><a class="btn btn-rojo" href="catalogo.html">Ver catálogo</a><a class="btn" href="#comprar">Cómo comprar</a></div>
+</div>
+<div class="hero-img ph">foto principal del drop<div class="colgante"><span class="agujero"></span><strong>Pieza única</strong><small>Talle [T] · $ [precio]</small></div></div>
+</section>
+<section style="padding-top:24px"><div class="sec-head"><h2>Categorías</h2></div><div class="grid-cat"><a class="cat " href="catalogo.html"><svg width="40" height="40" viewBox="0 0 100 100" aria-hidden="true"><path d="M50 94 C30 86 14 64 16 46 C18 32 32 28 50 33 C68 28 82 32 84 46 C86 64 70 86 50 94 Z" fill="#C8323C"></path><path d="M50 36 C44 30 34 30 28 33 C34 26 42 24 47 26 C46 20 48 14 50 10 C52 14 54 20 53 26 C58 24 66 26 72 33 C66 30 56 30 50 36 Z" fill="#4A2C2A"></path><circle cx="38" cy="54" r="6" fill="#FFF6F0"></circle><circle cx="62" cy="54" r="6" fill="#FFF6F0"></circle><circle cx="50" cy="74" r="6" fill="#FFF6F0"></circle></svg><span><strong>Second hand</strong><br><small>Prendas elegidas una por una</small></span></a><a class="cat oscuro" href="catalogo.html"><svg width="40" height="40" viewBox="0 0 100 100" aria-hidden="true"><path d="M50 94 C30 86 14 64 16 46 C18 32 32 28 50 33 C68 28 82 32 84 46 C86 64 70 86 50 94 Z" fill="#C8323C"></path><path d="M50 36 C44 30 34 30 28 33 C34 26 42 24 47 26 C46 20 48 14 50 10 C52 14 54 20 53 26 C58 24 66 26 72 33 C66 30 56 30 50 36 Z" fill="#F2C4CC"></path><circle cx="38" cy="54" r="6" fill="#FFF6F0"></circle><circle cx="62" cy="54" r="6" fill="#FFF6F0"></circle><circle cx="50" cy="74" r="6" fill="#FFF6F0"></circle></svg><span><strong>Intervenido</strong><br><small>Detalles hechos a mano</small></span></a><a class="cat rosa" href="catalogo.html"><svg width="40" height="40" viewBox="0 0 100 100" aria-hidden="true"><path d="M50 94 C30 86 14 64 16 46 C18 32 32 28 50 33 C68 28 82 32 84 46 C86 64 70 86 50 94 Z" fill="#C8323C"></path><path d="M50 36 C44 30 34 30 28 33 C34 26 42 24 47 26 C46 20 48 14 50 10 C52 14 54 20 53 26 C58 24 66 26 72 33 C66 30 56 30 50 36 Z" fill="#4A2C2A"></path><circle cx="38" cy="54" r="6" fill="#FFF6F0"></circle><circle cx="62" cy="54" r="6" fill="#FFF6F0"></circle><circle cx="50" cy="74" r="6" fill="#FFF6F0"></circle></svg><span><strong>Cositas</strong><br><small>Llaveros, peluches, librería</small></span></a><a class="cat " href="catalogo.html"><svg width="40" height="40" viewBox="0 0 100 100" aria-hidden="true"><path d="M50 94 C30 86 14 64 16 46 C18 32 32 28 50 33 C68 28 82 32 84 46 C86 64 70 86 50 94 Z" fill="#C8323C"></path><path d="M50 36 C44 30 34 30 28 33 C34 26 42 24 47 26 C46 20 48 14 50 10 C52 14 54 20 53 26 C58 24 66 26 72 33 C66 30 56 30 50 36 Z" fill="#4A2C2A"></path><circle cx="38" cy="54" r="6" fill="#FFF6F0"></circle><circle cx="62" cy="54" r="6" fill="#FFF6F0"></circle><circle cx="50" cy="74" r="6" fill="#FFF6F0"></circle></svg><span><strong>Accesorios</strong><br><small>Colgantes y más para tu outfit</small></span></a></div></section>
+<section class="sec"><div class="sec-head"><h2>Recién <i>llegado</i></h2><a class="link-mas" href="catalogo.html">Ver todo<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></a></div><div class="grid-prod"><article class="prod">
+<div class="prod-foto ph ">foto<span class="prod-tag">Intervenido</span><button class="prod-fav" type="button" aria-label="Guardar Campera de jean intervenida en favoritas" aria-pressed="false"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 10c0 5.5-7 10-7 10z"/></svg></button></div>
+<div><a class="prod-nombre" href="producto.html">Campera de jean intervenida</a><div class="prod-meta">Talle M · única</div><div class="prod-precio">$ [precio]</div></div>
+</article><article class="prod">
+<div class="prod-foto ph ">foto<span class="prod-tag">Nuevo</span><button class="prod-fav" type="button" aria-label="Guardar Cardigan coquette con moños en favoritas" aria-pressed="false"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 10c0 5.5-7 10-7 10z"/></svg></button></div>
+<div><a class="prod-nombre" href="producto.html">Cardigan coquette con moños</a><div class="prod-meta">Talle S · única</div><div class="prod-precio">$ [precio]</div></div>
+</article><article class="prod">
+<div class="prod-foto ph ">foto<span class="prod-tag">Second hand</span><button class="prod-fav" type="button" aria-label="Guardar Pollera escocesa vintage en favoritas" aria-pressed="false"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 10c0 5.5-7 10-7 10z"/></svg></button><span class="prod-aviso reservada">Reservada · consultá</span></div>
+<div><a class="prod-nombre" href="producto.html">Pollera escocesa vintage</a><div class="prod-meta">Talle 38 · única</div><div class="prod-precio">$ [precio]</div></div>
+</article><article class="prod">
+<div class="prod-foto ph rosa">foto<span class="prod-tag">Cositas</span><button class="prod-fav" type="button" aria-label="Guardar Llavero frutilla en favoritas" aria-pressed="false"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 10c0 5.5-7 10-7 10z"/></svg></button></div>
+<div><a class="prod-nombre" href="producto.html">Llavero frutilla</a><div class="prod-meta">Cositas</div><div class="prod-precio">$ [precio]</div></div>
+</article><article class="prod">
+<div class="prod-foto ph ">foto<span class="prod-tag">Nuevo</span><button class="prod-fav" type="button" aria-label="Guardar Remera baby tee Y2K en favoritas" aria-pressed="false"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 10c0 5.5-7 10-7 10z"/></svg></button></div>
+<div><a class="prod-nombre" href="producto.html">Remera baby tee Y2K</a><div class="prod-meta">Talle S · única</div><div class="prod-precio">$ [precio]</div></div>
+</article><article class="prod">
+<div class="prod-foto ph rosa">foto<span class="prod-tag">Accesorios</span><button class="prod-fav" type="button" aria-label="Guardar Colgante cruz con perlas en favoritas" aria-pressed="false"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 10c0 5.5-7 10-7 10z"/></svg></button></div>
+<div><a class="prod-nombre" href="producto.html">Colgante cruz con perlas</a><div class="prod-meta">Accesorios</div><div class="prod-precio">$ [precio]</div></div>
+</article><article class="prod vendida">
+<div class="prod-foto ph ">foto<span class="prod-tag">Second hand</span><button class="prod-fav" type="button" aria-label="Guardar Vestido lencero satinado en favoritas" aria-pressed="false"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 10c0 5.5-7 10-7 10z"/></svg></button><span class="prod-aviso vendida">Vendida ♡</span></div>
+<div><a class="prod-nombre" href="producto.html">Vestido lencero satinado</a><div class="prod-meta">Talle M · única</div><div class="prod-precio">$ [precio]</div></div>
+</article><article class="prod">
+<div class="prod-foto ph rosa">foto<span class="prod-tag">Cositas</span><button class="prod-fav" type="button" aria-label="Guardar Peluche osito en favoritas" aria-pressed="false"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 10c0 5.5-7 10-7 10z"/></svg></button></div>
+<div><a class="prod-nombre" href="producto.html">Peluche osito</a><div class="prod-meta">Cositas</div><div class="prod-precio">$ [precio]</div></div>
+</article></div></section>
+</div>
+<section class="banner"><div class="wrap"><div class="banner-in">
+<div class="banner-card"><span class="kicker">Próximo drop · [DÍA] [HORA]</span><h2>Las prendas únicas <i>vuelan.</i></h2><p style="margin:0">Sumate a la lista de difusión y te avisamos por WhatsApp antes que nadie.</p><a class="btn btn-primary" href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H9l-5 4V5z"/></svg>Avisame del próximo drop</a></div>
+<div class="banner-fotos"><div class="ph"></div><div class="ph"></div><div class="ph"></div></div>
+</div></div></section>
+<div class="wrap">
+<section class="sec" id="comprar"><div class="sec-head"><h2>Cómo <i class="rojo">comprar</i></h2></div><div class="pasos"><div class="paso"><span class="paso-n">1</span><div><strong>Elegí</strong><p>Tocá «Lo quiero» en lo que te guste o sumalo a tu bolsita.</p></div></div><div class="paso"><span class="paso-n">2</span><div><strong>Escribinos</strong><p>Se abre WhatsApp con tu pedido ya escrito.</p></div></div><div class="paso"><span class="paso-n">3</span><div><strong>Pagá</strong><p>Transferencia, Mercado Pago o efectivo en el local.</p></div></div><div class="paso"><span class="paso-n">4</span><div><strong>Recibí</strong><p>Retiro en Salta o envío a todo el país.</p></div></div></div></section>
+<section class="sec"><div class="sec-head"><h2>Por qué <i class="rojo">Polkalina&#39;s</i></h2></div><div class="valores"><div class="valor"><b>♡</b><h3>Prendas con personalidad</h3><p>Ropa diferente, con estilos únicos y detalles especiales.</p></div><div class="valor"><b>♡</b><h3>Precios accesibles</h3><p>Vestirse lindo no debería costar una fortuna.</p></div><div class="valor"><b>♡</b><h3>Moda para expresarte</h3><p>De lo coquette a lo alternativo, vintage y Y2K.</p></div><div class="valor"><b>♡</b><h3>Prendas seleccionadas</h3><p>Elegimos cada cosita para que encuentres algo especial.</p></div><div class="valor"><b>♡</b><h3>Segundas oportunidades</h3><p>Le damos una nueva vida a prendas hermosas.</p></div><div class="valor"><b>♡</b><h3>Atención cercana</h3><p>Un emprendimiento que crece con esfuerzo y cariño.</p></div></div></section>
+<section class="sec"><div class="sec-head"><h2>Seguinos en Instagram</h2><a class="link-mas" href="#">@[tu_usuario]<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></a></div><div class="grid-ig"><div class="ph "></div><div class="ph rosa"></div><div class="ph "></div><div class="ph rosa"></div><div class="ph "></div><div class="ph rosa"></div></div></section>
+</div>
+</main>
+<footer class="footer">
+<div class="piano crema" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><i style="left:5%"></i><i style="left:12.2%"></i><i style="left:26.5%"></i><i style="left:33.6%"></i><i style="left:40.8%"></i><i style="left:55%"></i><i style="left:62.2%"></i><i style="left:76.5%"></i><i style="left:83.6%"></i><i style="left:90.8%"></i></div>
+<div class="wrap"><div class="footer-cols">
+<div><a class="logo" href="index.html" aria-label="Polkalina's, inicio"><svg width="44" height="44" viewBox="0 0 100 100" aria-hidden="true"><path d="M50 94 C30 86 14 64 16 46 C18 32 32 28 50 33 C68 28 82 32 84 46 C86 64 70 86 50 94 Z" fill="#C8323C"></path><path d="M50 36 C44 30 34 30 28 33 C34 26 42 24 47 26 C46 20 48 14 50 10 C52 14 54 20 53 26 C58 24 66 26 72 33 C66 30 56 30 50 36 Z" fill="#F2C4CC"></path><circle cx="38" cy="54" r="6" fill="#FFF6F0"></circle><circle cx="62" cy="54" r="6" fill="#FFF6F0"></circle><circle cx="50" cy="74" r="6" fill="#FFF6F0"></circle></svg><b>Polkalina's</b></a><p style="color:var(--rosa);font-size:15px">Ropa second hand e intervenida y cositas cute. Salta · envíos a todo el país.</p></div>
+<div><h3>Comprar</h3><a href="catalogo.html">Nuevo</a><a href="catalogo.html">Second hand</a><a href="catalogo.html">Intervenido</a><a href="catalogo.html">Cositas</a><a href="catalogo.html">Accesorios</a></div><div><h3>Ayuda</h3><a href="catalogo.html">Cómo comprar</a><a href="catalogo.html">Envíos y retiros</a><a href="catalogo.html">Medios de pago</a><a href="catalogo.html">Guía de talles</a><a href="catalogo.html">Cambios</a></div>
+<div><h3>Contacto</h3><a href="#">WhatsApp [NÚMERO]</a><a href="#">Instagram @[tu_usuario]</a><a href="#">TikTok @[tu_usuario]</a><span>Punto físico: [DIRECCIÓN]</span></div>
+</div>
+<div class="footer-legal">© Polkalina's · Hecho con cariño en Salta</div></div>
+</footer>
+
+<script>
+document.querySelectorAll('[data-open]').forEach(b=>b.addEventListener('click',()=>{const t=document.getElementById(b.dataset.open);t.classList.add('open');t.setAttribute('aria-hidden','false');b.setAttribute('aria-expanded','true');}));
+document.querySelectorAll('[data-close]').forEach(b=>b.addEventListener('click',()=>{const t=document.getElementById(b.dataset.close);t.classList.remove('open');t.setAttribute('aria-hidden','true');document.querySelectorAll('[data-open="'+b.dataset.close+'"]').forEach(o=>o.setAttribute('aria-expanded','false'));}));
+document.querySelectorAll('[aria-pressed]').forEach(b=>b.addEventListener('click',()=>b.setAttribute('aria-pressed',b.getAttribute('aria-pressed')==='true'?'false':'true')));
+document.querySelectorAll('.prod-fav').forEach(b=>b.addEventListener('click',()=>{const on=b.getAttribute('aria-pressed')==='true';b.style.color=on?'var(--frutilla)':'';}));
+</script>
+
+<script>
+/* En el celu se muestran 4 productos en «Recién llegado» */
+if (matchMedia('(max-width:760px)').matches) document.querySelectorAll('.grid-prod .prod').forEach((p,i)=>{ if(i>3) p.style.display='none'; });
+</script>
+</body>
+</html>

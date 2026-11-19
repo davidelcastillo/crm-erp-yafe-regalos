@@ -1,0 +1,65 @@
+%% Modelo propuesto del catálogo externo — ver docs/adr/catalogo-externo.md
+%% Pegar en https://mermaid.live o abrir con la extensión de Mermaid del IDE.
+%%
+%% Regla de oro: CatalogItem y CatalogItemBranch NO cuelgan de BranchInventory.
+%% Son una capa de curaduría al lado de las existencias. El stock se une solo al leer.
+
+erDiagram
+  Category ||--o{ Product : "clasifica"
+  Product ||--o{ ProductImage : "hasta 4"
+  Product ||--o| CatalogItem : "una ficha por producto"
+  CatalogItem ||--o{ CatalogItemBranch : "sucursales nombrables"
+  Branch ||--o{ CatalogItemBranch : ""
+  Product ||--o{ BranchInventory : "existencias"
+  Branch ||--o{ BranchInventory : ""
+  Product ||--o{ BranchMovement : "movimientos"
+  Branch ||--o{ BranchMovement : ""
+
+  Product {
+    int id PK
+    string code UK "editable, no usar en URLs"
+    string name
+    string description
+    decimal price "global al producto"
+    int categoryId FK
+    boolean active
+  }
+
+  Branch {
+    int id PK
+    string code UK
+    string name
+    boolean isActive
+    boolean isPublic "hoy gobierna el portal por sucursal"
+  }
+
+  BranchInventory {
+    int branchId FK
+    int productId FK
+    int stock
+    datetime lastUpdated
+  }
+
+  CatalogItem {
+    int id PK
+    int productId FK "unique"
+    boolean visible "publicar sin perder curaduria"
+    boolean featured
+    int sortOrder
+    string title "si falta usa Product.name"
+  }
+
+  CatalogItemBranch {
+    int id PK
+    int catalogItemId FK
+    int branchId FK
+  }
+
+  ProductImage {
+    int id PK
+    int productId FK
+    int position "0 a 3, unico por producto"
+    string path "ruta en el bucket, no URL"
+    string alt
+    int bytes
+  }

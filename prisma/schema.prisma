@@ -9,22 +9,27 @@ datasource db {
 }
 
 model Product {
-  id                Int                @id @default(autoincrement())
+  id                Int                 @id @default(autoincrement())
   name              String
-  description       String?            @default("-")
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
-  code              String             @unique
+  description       String?             @default("-")
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  code              String              @unique
   codePrefix        String?
-  price             Decimal            @default(0) @db.Decimal(10, 2)
+  price             Decimal             @default(0) @db.Decimal(10, 2)
   categoryId        Int?
-  category          Category?          @relation(fields: [categoryId], references: [id])
-  active            Boolean            @default(true)
+  category          Category?           @relation(fields: [categoryId], references: [id])
+  active            Boolean             @default(true)
+  // Aditivo: una prenda es un Product con ficha PrendaDetalle (variante C).
+  kind              ProductKind         @default(PRODUCT)
+  prenda            PrendaDetalle?
+  publicaciones     PrendaPublicacion[]
   purchaseItems     PurchaseItem[]
   saleItems         SaleItem[]
+  pedidoItems       PedidoItem[]
   inventory         BranchInventory[]
-  movements         BranchMovement[]   @relation("ProductMovements")
-  stockControlItems StockControlItem[] @relation("ProductStockControlItems")
+  movements         BranchMovement[]    @relation("ProductMovements")
+  stockControlItems StockControlItem[]  @relation("ProductStockControlItems")
 }
 
 model Branch {
@@ -47,6 +52,7 @@ model Branch {
   cashMovements CashMovement[]    @relation("BranchCashMovements")
   cashCloses    CashClose[]       @relation("BranchCashCloses")
   stockControls StockControl[]    @relation("BranchStockControls")
+  pedidoItems   PedidoItem[]
 
   @@index([isActive])
   @@index([authUserId])
@@ -108,6 +114,7 @@ model Sale {
   branch         Branch        @relation("BranchSales", fields: [branchId], references: [id])
   customer       Customer?     @relation(fields: [customerId], references: [id])
   items          SaleItem[]
+  pedido         Pedido?
 
   @@index([customerId])
   @@index([branchId])
@@ -134,8 +141,10 @@ model Customer {
   totalBalance Decimal   @default(0) @db.Decimal(10, 2)
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
+  phone        String?
   payments     Payment[]
   sales        Sale[]
+  pedidos      Pedido[]
 }
 
 model Payment {
@@ -280,4 +289,185 @@ model StockControlItem {
 enum StockControlDecision {
   PENDING
   ACCEPTED
+}
+
+// --- Prendas ----------------------------------------------------------------
+// Variante C: una prenda es un Product (nombre, código, precio, fotos, stock,
+// ventas) con una ficha 1:1 para lo propio de la ropa. El costo vive acá, no en
+// Product, para que la vista pública del catálogo nunca lo lea.
+enum ProductKind {
+  PRODUCT
+  PRENDA
+}
+
+model PrendaDetalle {
+  productId           Int             @id
+  product             Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  esUnica             Boolean // second hand/intervenido = 1 unidad; ropa nueva admite cantidades
+  categoriaId         Int
+  categoria           CategoriaPrenda @relation(fields: [categoriaId], references: [id])
+  condicionId         Int
+  condicion           CondicionPrenda @relation(fields: [condicionId], references: [id])
+  talle               String // texto libre, admite «Único»
+  detalleCondicion    String? // «Con detalles (aclarar)»: texto libre junto a la condición
+  detalleIntervencion String?
+  costo               Decimal         @db.Decimal(10, 2)
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+  estilos             PrendaEstilo[]
+  medidas             PrendaMedida[]
+
+  @@index([categoriaId])
+  @@index([condicionId])
+}
+
+// Taxonomías creables: se desactivan, nunca se borran (hay prendas que las usan).
+model CategoriaPrenda {
+  id                Int             @id @default(autoincrement())
+  name              String          @unique
+  esUnicaPorDefecto Boolean         @default(true) // solo precarga el formulario
+  active            Boolean         @default(true)
+  prendas           PrendaDetalle[]
+}
+
+model CondicionPrenda {
+  id      Int             @id @default(autoincrement())
+  name    String          @unique
+  active  Boolean         @default(true)
+  prendas PrendaDetalle[]
+}
+
+model EstiloPrenda {
+  id      Int            @id @default(autoincrement())
+  name    String         @unique
+  active  Boolean        @default(true)
+  prendas PrendaEstilo[]
+}
+
+model PrendaEstilo {
+  productId Int
+  estiloId  Int
+  prenda    PrendaDetalle @relation(fields: [productId], references: [productId], onDelete: Cascade)
+  estilo    EstiloPrenda  @relation(fields: [estiloId], references: [id])
+
+  @@id([productId, estiloId])
+  @@index([estiloId])
+}
+
+model MedidaTipo {
+  id      Int            @id @default(autoincrement())
+  name    String         @unique
+  active  Boolean        @default(true)
+  prendas PrendaMedida[]
+}
+
+model PrendaMedida {
+  productId    Int
+  medidaTipoId Int
+  valorCm      Decimal       @db.Decimal(5, 1)
+  prenda       PrendaDetalle @relation(fields: [productId], references: [productId], onDelete: Cascade)
+  medidaTipo   MedidaTipo    @relation(fields: [medidaTipoId], references: [id])
+
+  @@id([productId, medidaTipoId])
+  @@index([medidaTipoId])
+}
+
+// Registro simple de «publicada en»: el sistema no publica en ningún canal.
+// `canal` es texto libre a propósito (no FK a CanalVenta, que es del pedido).
+model PrendaPublicacion {
+  productId Int
+  canal     String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@id([productId, canal])
+}
+
+// --- Pedidos ----------------------------------------------------------------
+// Un pedido sale de UNA sucursal y, al pasar a PAGADO, genera la Sale que entra
+// a caja (un solo registro de la verdad de la plata). El número V-0001 se
+// genera con lock en el servidor. La reserva NO descuenta stock: es derivada.
+model Pedido {
+  id          Int               @id @default(autoincrement())
+  numero      String            @unique
+  customerId  Int
+  customer    Customer          @relation(fields: [customerId], references: [id])
+  canalId     Int
+  canal       CanalVenta        @relation(fields: [canalId], references: [id])
+  estado      PedidoEstado      @default(RESERVADO)
+  total       Decimal           @db.Decimal(10, 2)
+  venceEl     DateTime?
+  envioMetodo EnvioMetodo?
+  envioEstado EnvioPreparacion?
+  ciudad      String?
+  notas       String?
+  saleId      Int?              @unique
+  sale        Sale?             @relation(fields: [saleId], references: [id])
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  pagadoAt    DateTime?
+  entregadoAt DateTime?
+  canceladoAt DateTime?
+  createdBy   String
+  updatedBy   String
+  items       PedidoItem[]
+  pagos       PedidoPago[]
+
+  @@index([estado, canalId])
+  @@index([estado, venceEl])
+  @@index([customerId])
+}
+
+model PedidoItem {
+  id        Int     @id @default(autoincrement())
+  pedidoId  Int
+  pedido    Pedido  @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+  productId Int
+  product   Product @relation(fields: [productId], references: [id])
+  branchId  Int
+  branch    Branch  @relation(fields: [branchId], references: [id])
+  cantidad  Int
+  precio    Decimal @db.Decimal(10, 2) // foto del precio al reservar
+  subtotal  Decimal @db.Decimal(10, 2)
+
+  @@index([pedidoId])
+  @@index([productId, branchId])
+}
+
+model PedidoPago {
+  id          Int           @id @default(autoincrement())
+  pedidoId    Int
+  pedido      Pedido        @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+  monto       Decimal       @db.Decimal(10, 2)
+  metodo      PaymentMethod
+  fecha       DateTime      @default(now())
+  performedBy String
+
+  @@index([pedidoId])
+}
+
+enum PedidoEstado {
+  RESERVADO
+  PAGADO
+  PARA_ENVIAR
+  ENTREGADO
+  CANCELADO
+}
+
+model CanalVenta {
+  id      Int      @id @default(autoincrement())
+  name    String   @unique
+  active  Boolean  @default(true)
+  pedidos Pedido[]
+}
+
+enum EnvioMetodo {
+  CORREO
+  ENCOMIENDA
+  RETIRO
+}
+
+enum EnvioPreparacion {
+  COORDINAR
+  FALTA_EMBALAR
+  ETIQUETA_LISTA
 }
