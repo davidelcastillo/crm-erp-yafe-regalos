@@ -49,26 +49,39 @@ jest.mock("@/lib/context/BranchContext", () => ({
 }));
 
 jest.mock("@/components/ProductSearch", () => ({
-  ProductSearch: ({
-    onSelect,
-  }: {
+  ProductSearch: (props: {
     onSelect: (p: {
       id: number;
       name: string;
       code: string;
       price: number;
     }) => void;
-  }) => (
-    <button
-      type="button"
-      onClick={() =>
-        onSelect({ id: 1, name: "Producto A", code: "P1", price: 100 })
-      }
-    >
-      mock-select-product
-    </button>
-  ),
+    products?: MockSearchCatalog[];
+  }) => {
+    mockProductSearchProps = props;
+    return (
+      <button
+        type="button"
+        onClick={() =>
+          props.onSelect({ id: 1, name: "Producto A", code: "P1", price: 100 })
+        }
+      >
+        mock-select-product
+      </button>
+    );
+  },
 }));
+
+type MockSearchCatalog = {
+  id: number;
+  code: string;
+  name: string;
+  price: number;
+  stock: number;
+};
+
+// Últimas props recibidas por el buscador: el catálogo va inyectado (M3).
+let mockProductSearchProps: { products?: MockSearchCatalog[] } = {};
 
 const PRODUCTS = [
   { id: 1, name: "Producto A", code: "P1", price: 100, stock: 10 },
@@ -241,6 +254,20 @@ describe("AddSaleButton: pasos y medios de pago (pedido L30)", () => {
 
     expect(screen.getByText(/no hay productos registrados/i)).toBeInTheDocument();
     expect(screen.getByText(/sección Inventario/i)).toBeInTheDocument();
+  });
+
+  // M3: el buscador recibe el catálogo que la página ya cargó y filtra en memoria.
+  it("pasa el catálogo cargado al buscador para filtrar en memoria", () => {
+    mockProductSearchProps = {};
+    setup();
+
+    expect(mockProductSearchProps.products).toHaveLength(1);
+    expect(mockProductSearchProps.products?.[0]).toMatchObject({
+      id: 1,
+      code: "P1",
+      name: "Producto A",
+      price: 100,
+    });
   });
 
   // Bug 7.1 del usuario: al cambiar el producto de una fila se agregaba una fila

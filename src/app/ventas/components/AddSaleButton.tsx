@@ -15,10 +15,13 @@ import { BranchPicker } from "@/components/ui/BranchPicker";
 import { ValueChange } from "@/components/ui/ValueChange";
 
 interface AddSaleButtonProps {
-  products: Product[];
+  products: SaleProduct[];
   /** Called after a successful sale, so the page can re-run its load effect. */
   onSuccess?: () => void;
 }
+
+/** Producto con el stock de la sucursal que agrega `getProducts` (include inventory). */
+type SaleProduct = Product & { inventory?: Array<{ stock: number }> };
 
 interface CustomerOption {
   id: number;
@@ -121,6 +124,16 @@ export function AddSaleButton({ products, onSuccess }: AddSaleButtonProps) {
 
   // Sucursal elegida en el paso 1: el paso 2 la muestra como etiqueta, sin selector.
   const sucursalNombre = branches.find((b) => b.id === saleBranchId)?.name ?? "";
+
+  // El buscador filtra en memoria sobre el catálogo que ya cargó la página (M3):
+  // antes consultaba al servidor por cada tecla.
+  const searchCatalog: ProductSearchResult[] = products.map((p) => ({
+    id: p.id,
+    code: p.code,
+    name: p.name,
+    price: Number(p.price),
+    stock: p.inventory?.reduce((sum, row) => sum + row.stock, 0) ?? 0,
+  }));
 
   const getProductDisplay = (item: SaleItem) => {
     if (!item.productId) return "Seleccionar producto...";
@@ -537,7 +550,7 @@ export function AddSaleButton({ products, onSuccess }: AddSaleButtonProps) {
          onClose={() => setIsProductSearchOpen(false)}
          onSelect={handleProductSelect}
          placeholder="Buscar producto por código o nombre..."
-         branchId={saleBranchId}
+         products={searchCatalog}
        />
     </>
   );

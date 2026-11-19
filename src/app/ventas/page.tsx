@@ -104,22 +104,33 @@ export default function VentasPage() {
     return () => clearTimeout(timer);
   }, [search]);
 
-  // Initial load + reload whenever the branch or (debounced) search changes.
+  // Los productos no dependen de la búsqueda: se piden una vez por sucursal y
+  // sobreviven a cada tecla (antes se re-pedían en el mismo Promise.all que las
+  // ventas).
+  useEffect(() => {
+    let cancelled = false;
+    getProducts(branchId ?? undefined).then((result) => {
+      if (cancelled) return;
+      setProducts(result.success && result.data ? (result.data as never[]) : []);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [branchId, reloadKey]);
+
+  // Las ventas sí dependen de la sucursal y de la búsqueda (debounced). El
+  // listado no espera a los productos: es el que decide el fin de la carga.
   useEffect(() => {
     let cancelled = false;
     const branchParam = branchId ?? undefined;
     (async () => {
-      const [productsResult, salesResult] = await Promise.all([
-        getProducts(branchParam),
-        getSales({
-          branchId: branchParam,
-          search: debouncedSearch || undefined,
-          take: PAGE_SIZE,
-          skip: 0,
-        }),
-      ]);
+      const salesResult = await getSales({
+        branchId: branchParam,
+        search: debouncedSearch || undefined,
+        take: PAGE_SIZE,
+        skip: 0,
+      });
       if (cancelled) return;
-      setProducts(productsResult.success && productsResult.data ? productsResult.data as never[] : []);
       setSales(
         salesResult.success && salesResult.data
           ? salesResult.data.items as never[]

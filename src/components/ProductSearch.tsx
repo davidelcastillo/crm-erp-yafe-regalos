@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { searchProducts } from "@/app/actions/product";
 
 export interface ProductSearchResult {
@@ -11,49 +11,75 @@ export interface ProductSearchResult {
   stock: number;
 }
 
-type ProductSearchModalProps = {
+type ProductSearchBaseProps = {
+  onSelect: (product: ProductSearchResult) => void;
+  placeholder?: string;
+  branchId?: number | null;
+  /**
+   * Catálogo ya cargado por la página. Si viene, el filtro es en memoria (como
+   * en los modales de stock) y no se consulta al servidor por cada tecla.
+   */
+  products?: ProductSearchResult[];
+};
+
+type ProductSearchModalProps = ProductSearchBaseProps & {
   mode: "modal";
   isOpen: boolean;
   onClose: () => void;
-  onSelect: (product: ProductSearchResult) => void;
-  placeholder?: string;
-  branchId?: number | null;
 };
 
-type ProductSearchInlineProps = {
+type ProductSearchInlineProps = ProductSearchBaseProps & {
   mode: "inline";
-  onSelect: (product: ProductSearchResult) => void;
-  placeholder?: string;
-  branchId?: number | null;
 };
 
 type ProductSearchProps = ProductSearchModalProps | ProductSearchInlineProps;
 
 const DEBOUNCE_MS = 300;
 const MAX_RESULTS = 10;
+/** En memoria no cuesta nada mostrar más: el catálogo ya está en el cliente. */
+const MAX_LOCAL_RESULTS = 20;
 
 export function ProductSearch(props: ProductSearchProps) {
-  const { mode, onSelect, placeholder = "Buscar producto por código o nombre...", branchId } = props;
+  const { mode, onSelect, placeholder = "Buscar producto por código o nombre...", branchId, products: catalog } = props;
   
   // Modal-specific props
   const isOpen = mode === "modal" ? props.isOpen : true;
   const onClose = mode === "modal" ? props.onClose : () => {};
 
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<ProductSearchResult[]>([]);
+  const [serverResults, setServerResults] = useState<ProductSearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  // Guarda de respuestas fuera de orden: solo la última búsqueda puede escribir.
+  const requestIdRef = useRef(0);
+
+  // Filtro local por nombre o código, igual que el del servidor.
+  const results = useMemo(() => {
+    if (!catalog) return serverResults;
+    const term = query.trim().toLowerCase();
+    if (!term) return [];
+    return catalog
+      .filter(
+        (p) =>
+          p.name.toLowerCase().includes(term) ||
+          p.code.toLowerCase().includes(term)
+      )
+      .slice(0, MAX_LOCAL_RESULTS);
+  }, [catalog, serverResults, query]);
 
   // Debounced search effect
   useEffect(() => {
     if (mode === "modal" && !isOpen) {
       setQuery("");
-      setResults([]);
+      setServerResults([]);
       setError(null);
       return;
     }
+
+    // Con el catálogo inyectado no hay servidor: el filtro es local y síncrono.
+    if (catalog) return;
 
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
@@ -63,32 +89,36 @@ export function ProductSearch(props: ProductSearchProps) {
       const trimmedQuery = query.trim();
       
       if (!trimmedQuery) {
-        setResults([]);
+        setServerResults([]);
         setError(null);
         return;
       }
 
+      const requestId = ++requestIdRef.current;
       setLoading(true);
       setError(null);
 
       try {
         const result = await searchProducts({ query: trimmedQuery, branchId: branchId ?? undefined });
+        // Otra búsqueda salió después: esta respuesta ya no es la que se ve.
+        if (requestIdRef.current !== requestId) return;
         if (result.success) {
           // Convert Decimal price to number for ProductSearchResult
           const converted = result.data?.slice(0, MAX_RESULTS).map(p => ({
             ...p,
             price: Number(p.price)
           })) ?? [];
-          setResults(converted);
+          setServerResults(converted);
         } else {
           setError(result.error ?? "Error al buscar productos");
-          setResults([]);
+          setServerResults([]);
         }
       } catch {
+        if (requestIdRef.current !== requestId) return;
         setError("Error de conexión");
-        setResults([]);
+        setServerResults([]);
       } finally {
-        setLoading(false);
+        if (requestIdRef.current === requestId) setLoading(false);
       }
     }, DEBOUNCE_MS);
 
@@ -97,7 +127,7 @@ export function ProductSearch(props: ProductSearchProps) {
         clearTimeout(debounceRef.current);
       }
     };
-  }, [query, mode, isOpen, branchId]);
+  }, [query, mode, isOpen, branchId, catalog]);
 
   // Focus input when modal opens
   useEffect(() => {
@@ -112,7 +142,7 @@ export function ProductSearch(props: ProductSearchProps) {
       onClose();
     }
     setQuery("");
-    setResults([]);
+    setServerResults([]);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {

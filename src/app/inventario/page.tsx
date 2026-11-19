@@ -22,7 +22,8 @@ import { ProductForm } from "../productos/components/ProductForm";
 import { BulkProductForm } from "../productos/components/BulkProductForm";
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useReloadKey } from '@/lib/hooks/useReloadKey';
 import { Product } from "@prisma/client";
 import Swal from "sweetalert2";
 import { motion, useReducedMotion, useScroll, useTransform } from 'motion/react';
@@ -30,7 +31,8 @@ import { motion, useReducedMotion, useScroll, useTransform } from 'motion/react'
 type BranchOption = { id: number; name: string };
 type CategoryOption = { id: number; name: string };
 
-const DEBOUNCE_MS = 300;
+/** Producto con la categoría que trae `getProductsWithBranchStock` (búsqueda por nombre de categoría). */
+type InventoryProduct = Product & { category: { id: number; name: string } | null };
 
 /** Paso del acceso único al stock (S4): el menú o ya una de sus acciones. */
 type StockStep = 'menu' | 'mover' | 'ajuste';
@@ -90,7 +92,8 @@ const InventarioLoading = () => (
 );
 
 export default function InventarioPage() {
-  const [products, setProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<InventoryProduct[]>([]);
+  const [reloadKey, bumpReloadKey] = useReloadKey();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [movementsModalOpen, setMovementsModalOpen] = useState(false);
@@ -109,11 +112,9 @@ export default function InventarioPage() {
 
   const router = useRouter();
 
-  // Task 4.6: unified search (debounce 300 ms) that drives the server-side
-  // `search` param of getProductsWithBranchStock. The old client-side filtering
-  // in InventarioList was removed in favor of this server-driven search.
+  // Task 4.6: unified search that drives the in-memory filter of the loaded
+  // catalog (M3: antes cada término disparaba una consulta al servidor).
   const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
   // El orden vive acá, junto a la categoría: los dos selectores de la lista
   // comparten contenedor y control (S2).
   const [sortBy, setSortBy] = useState<InventorySortOption>('code');
@@ -125,31 +126,22 @@ export default function InventarioPage() {
   const brandOpacity = useTransform(scrollY, [0, 140], [1, 0.45]);
   const reduceMotion = useReducedMotion();
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(search.trim());
-    }, DEBOUNCE_MS);
-    return () => clearTimeout(timer);
-  }, [search]);
-
-  const fetchProducts = useCallback(async (bId: number | null, cId: number | null, term: string) => {
+  const fetchProducts = useCallback(async (bId: number | null) => {
     const result = await getProductsWithBranchStock({
       branchId: bId ?? undefined,
-      categoryId: cId ?? undefined,
-      search: term.trim() || undefined,
       activeOnly: true,
     });
     if (!result.success) {
       throw new Error(result.error ?? 'Failed to load products');
     }
-    return result.data as Product[];
+    return result.data as InventoryProduct[];
   }, []);
 
-  // Load products whenever the branch, category or (debounced) search changes.
+  // Load the catalog whenever the branch changes or a mutation asks for it.
   // The cancelled-flag prevents a stale response from overwriting a newer one.
   useEffect(() => {
     let cancelled = false;
-    fetchProducts(branchId, selectedCategoryId, debouncedSearch)
+    fetchProducts(branchId)
       .then((data) => {
         if (cancelled) return;
         setProducts(data);
@@ -165,7 +157,25 @@ export default function InventarioPage() {
     return () => {
       cancelled = true;
     };
-  }, [branchId, selectedCategoryId, debouncedSearch, fetchProducts]);
+  }, [branchId, reloadKey, fetchProducts]);
+
+  // Búsqueda y categoría se filtran en memoria, como en los modales de stock:
+  // el catálogo se pide una vez por sucursal, no una vez por letra.
+  const visibleProducts = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    const byTerm = term
+      ? products.filter(
+          (p) =>
+            p.name.toLowerCase().includes(term) ||
+            p.code.toLowerCase().includes(term) ||
+            (p.description ?? '').toLowerCase().includes(term) ||
+            (p.category?.name ?? '').toLowerCase().includes(term)
+        )
+      : products;
+    return selectedCategoryId === null
+      ? byTerm
+      : byTerm.filter((p) => p.categoryId === selectedCategoryId);
+  }, [products, search, selectedCategoryId]);
 
   // Load branch + category options once on mount (for the filters and the
   // Move Stock modal, which needs the branch list to choose origen/destino).
@@ -180,18 +190,10 @@ export default function InventarioPage() {
     })();
   }, []);
 
-  // Refetch tras crear un producto desde el FAB: respeta los filtros AND
-  // activos (sucursal + categoría + búsqueda) SIN resetearlos (spec
-  // inventory-ui). Si el producto nuevo no matchea los filtros, no aparece
-  // en la lista — comportamiento correcto del AND.
-  const handleProductCreated = async (_created?: Product) => {
-    try {
-      const data = await fetchProducts(branchId, selectedCategoryId, debouncedSearch);
-      setProducts(data);
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al cargar productos');
-    }
+  // Refetch tras crear un producto desde el FAB. Los filtros activos (sucursal,
+  // categoría y búsqueda) no se resetean: los dos últimos son locales (M3).
+  const handleProductCreated = () => {
+    bumpReloadKey();
   };
 
   // "Nueva categoría" del header — patrón Swal exacto de CategorySelector
@@ -403,8 +405,8 @@ export default function InventarioPage() {
         </div>
 
         <InventarioList 
-          products={products} 
-          searchActive={debouncedSearch !== ''}
+          products={visibleProducts} 
+          searchActive={search.trim() !== ''}
           categories={categories}
           sortBy={sortBy}
           onViewMovements={(product) => {
@@ -458,16 +460,7 @@ export default function InventarioPage() {
             onClose={() => setStockStep(null)}
             productId={0}
             branches={branches}
-            onConfirm={() => {
-              fetchProducts(branchId, selectedCategoryId, debouncedSearch)
-                .then((data) => {
-                  setProducts(data);
-                  setError(null);
-                })
-                .catch((err) =>
-                  setError(err instanceof Error ? err.message : 'Error al cargar productos')
-                );
-            }}
+            onConfirm={bumpReloadKey}
           />
         )}
 
@@ -478,16 +471,7 @@ export default function InventarioPage() {
             open
             onClose={() => setStockStep(null)}
             branches={branches}
-            onConfirm={() => {
-              fetchProducts(branchId, selectedCategoryId, debouncedSearch)
-                .then((data) => {
-                  setProducts(data);
-                  setError(null);
-                })
-                .catch((err) =>
-                  setError(err instanceof Error ? err.message : 'Error al cargar productos')
-                );
-            }}
+            onConfirm={bumpReloadKey}
           />
         )}
 
