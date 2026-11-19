@@ -164,6 +164,28 @@ export const StockAdjustmentModal = ({
   const selectedBranchName =
     branches.find((b) => b.id === branchId)?.name ?? "-";
 
+  // Repaso de lo elegido con su cantidad, dentro del resumen. Se reusa en el
+  // paso 2 y en el paso 3 (nunca se ven a la vez). Sin selección no hay lista:
+  // el estado vacío del resumen queda como estaba.
+  const listaResumen = seleccionadas.length > 0 && (
+    <ul
+      aria-label="Productos seleccionados"
+      className="mt-3 space-y-1 border-t border-hairline pt-3"
+    >
+      {seleccionadas.map((f) => (
+        <li
+          key={f.id}
+          className="flex items-baseline justify-between gap-3 text-sm text-ink-body"
+        >
+          <span className="min-w-0 truncate">{f.name}</span>
+          <span className="shrink-0 tabular-nums">
+            ×{parseInt(quantities[f.id], 10) || 0}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+
   const reset = () => {
     setStep(1);
     setBranchId(null);
@@ -428,6 +450,8 @@ export const StockAdjustmentModal = ({
                 </span>
               </div>
 
+              {listaResumen}
+
               <div className="mt-4 flex items-center justify-between gap-3">
                 <button
                   type="button"
@@ -508,6 +532,8 @@ export const StockAdjustmentModal = ({
                     {totalUnidades}
                   </span>
                 </div>
+
+                {listaResumen}
               </section>
             </div>
 

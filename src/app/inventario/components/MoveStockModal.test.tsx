@@ -1,7 +1,7 @@
 /**
  * @jest-environment jsdom
  */
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { MoveStockModal } from "./MoveStockModal";
 import type { MoveStockModalProps } from "./MoveStockModal";
 
@@ -103,6 +103,56 @@ beforeEach(() => {
     },
   });
   mockSwalFire.mockResolvedValue({ isConfirmed: true });
+});
+
+describe("MoveStockModal — productos elegidos en el resumen", () => {
+  const listaResumen = () =>
+    screen.getByRole("list", { name: "Productos seleccionados" });
+  const filasResumen = () =>
+    within(listaResumen())
+      .getAllByRole("listitem")
+      .map((fila) => fila.textContent ?? "");
+
+  it("lista cada producto elegido con su cantidad", async () => {
+    renderModal();
+    await goToStep2();
+
+    await selectProduct("Producto A");
+    await selectProduct("Producto B");
+    await setQuantity("Producto A", "3");
+    await setQuantity("Producto B", "7");
+
+    expect(filasResumen()).toHaveLength(2);
+    expect(filasResumen()[0]).toMatch(/Producto A\s*×3/);
+    expect(filasResumen()[1]).toMatch(/Producto B\s*×7/);
+    // Las filas son un repaso, no un editor: no traen controles propios.
+    expect(within(listaResumen()).queryAllByRole("button")).toHaveLength(0);
+    expect(within(listaResumen()).queryAllByRole("spinbutton")).toHaveLength(0);
+  });
+
+  it("actualiza la cantidad del producto en el resumen", async () => {
+    renderModal();
+    await goToStep2();
+
+    await selectProduct("Producto A");
+    await setQuantity("Producto A", "3");
+    expect(filasResumen()[0]).toMatch(/Producto A\s*×3/);
+
+    await setQuantity("Producto A", "8");
+
+    expect(filasResumen()[0]).toMatch(/Producto A\s*×8/);
+    expect(filasResumen()[0]).not.toMatch(/×3/);
+  });
+
+  it("sin productos elegidos el resumen no lista filas", async () => {
+    renderModal();
+    await goToStep2();
+
+    expect(screen.getByText("Resumen")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("list", { name: "Productos seleccionados" })
+    ).not.toBeInTheDocument();
+  });
 });
 
 describe("MoveStockModal — orden de la lista", () => {
