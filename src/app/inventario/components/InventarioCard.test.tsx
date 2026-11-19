@@ -95,3 +95,16 @@ describe("InventarioCard — el stock no se edita a mano (S20)", () => {
     expect(mockAjustarStock).not.toHaveBeenCalled();
   });
 });
+
+describe("InventarioCard — el nombre largo no rompe la card", () => {
+  it("el título puede encoger dentro de su fila flex junto al chip del código", () => {
+    renderCard();
+
+    // El título comparte una fila flex con el chip `shrink-0` del código: sin
+    // `min-w-0` el `break-words` nunca actúa y un nombre largo empuja el chip
+    // y desborda la card (reporte del dueño con nombres grandes).
+    const titulo = screen.getByRole("heading", { name: "Jabón de Avena" });
+    expect(titulo.className).toContain("min-w-0");
+    expect(titulo.className).toContain("break-words");
+  });
+});
