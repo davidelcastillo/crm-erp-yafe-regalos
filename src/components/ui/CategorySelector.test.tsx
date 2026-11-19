@@ -115,4 +115,15 @@ describe("CategorySelector", () => {
     // Nunca pidió la lista: el padre es la fuente de verdad.
     expect(mockOpciones).not.toHaveBeenCalled();
   });
+
+  it("el contenedor raiz posiciona el popup en su propia fila", async () => {
+    // El listbox es `absolute z-50`: sin un ancestro con `relative` se cuelga
+    // del overlay del modal y no acompania el scroll de las filas, asi que en
+    // el lote la lista aparece desfasada desde la fila 2 en adelante (M1).
+    // El patron de la casa es el de FilterSelect/BranchSelector: `relative`
+    // en el contenedor que envuelve disparador y listbox.
+    const { container } = render(<CategorySelector options={opciones} />);
+    const raiz = container.firstElementChild as HTMLElement;
+    expect(raiz.className).toContain("relative");
+  });
 });

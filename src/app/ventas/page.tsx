@@ -14,6 +14,7 @@ import { ActionCard } from '@/components/ui/ActionCard';
 import { Spinner } from '@/components/ui/Spinner';
 import { CardSkeleton, Skeleton } from '@/components/ui/Skeleton';
 import { BranchSelector } from '@/components/ui/BranchSelector';
+import { useBranch } from '@/lib/context/BranchContext';
 import { useReloadKey } from '@/lib/hooks/useReloadKey';
 import { useEffect, useState } from 'react';
 import { motion, useReducedMotion, useScroll, useTransform } from 'motion/react';
@@ -64,7 +65,11 @@ export default function VentasPage() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [branchId, setBranchId] = useState<number | null>(null);
+  // La sucursal elegida vive en el BranchContext global (la escribe el selector
+  // del encabezado y también el dashboard): leerla de acá y no de un estado
+  // local evita que el header muestre una sucursal mientras la caja vuelve a
+  // preguntarla (M2, segunda vuelta).
+  const { branchId, setBranchId } = useBranch();
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   // Sucursales y acceso a la caja (plata), pedidos en S14.
@@ -99,22 +104,33 @@ export default function VentasPage() {
     return () => clearTimeout(timer);
   }, [search]);
 
-  // Initial load + reload whenever the branch or (debounced) search changes.
+  // Los productos no dependen de la búsqueda: se piden una vez por sucursal y
+  // sobreviven a cada tecla (antes se re-pedían en el mismo Promise.all que las
+  // ventas).
+  useEffect(() => {
+    let cancelled = false;
+    getProducts(branchId ?? undefined).then((result) => {
+      if (cancelled) return;
+      setProducts(result.success && result.data ? (result.data as never[]) : []);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [branchId, reloadKey]);
+
+  // Las ventas sí dependen de la sucursal y de la búsqueda (debounced). El
+  // listado no espera a los productos: es el que decide el fin de la carga.
   useEffect(() => {
     let cancelled = false;
     const branchParam = branchId ?? undefined;
     (async () => {
-      const [productsResult, salesResult] = await Promise.all([
-        getProducts(branchParam),
-        getSales({
-          branchId: branchParam,
-          search: debouncedSearch || undefined,
-          take: PAGE_SIZE,
-          skip: 0,
-        }),
-      ]);
+      const salesResult = await getSales({
+        branchId: branchParam,
+        search: debouncedSearch || undefined,
+        take: PAGE_SIZE,
+        skip: 0,
+      });
       if (cancelled) return;
-      setProducts(productsResult.success && productsResult.data ? productsResult.data as never[] : []);
       setSales(
         salesResult.success && salesResult.data
           ? salesResult.data.items as never[]
@@ -274,6 +290,7 @@ export default function VentasPage() {
         onClose={() => setCashStep(null)}
         branches={branches}
         onConfirm={bump}
+        fixedBranchId={branchId}
       />
       <CashCloseModal
         open={cashStep === 'cierre'}

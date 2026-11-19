@@ -266,7 +266,7 @@ export function InventarioCard({ product, dataProductId, isHighlighted, onViewMo
        <div className="flex items-start justify-between gap-3">
          <div className="min-w-0 flex-1">
            <div className="flex items-center gap-2 mb-1">
-             <h3 className="text-base font-semibold text-ink break-words">{product.name}</h3>
+             <h3 className="min-w-0 text-base font-semibold text-ink break-words">{product.name}</h3>
              <code className="shrink-0 px-2 py-0.5 bg-surface-strong rounded text-xs font-mono text-ink-muted">
                {product.code}
              </code>

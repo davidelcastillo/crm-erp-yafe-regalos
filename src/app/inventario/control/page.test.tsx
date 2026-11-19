@@ -331,3 +331,54 @@ describe("Control de stock: volver al inventario a la vista", () => {
     expect(volver).toHaveAttribute("href", "/inventario");
   });
 });
+
+describe("Control de stock: recap de ajustes antes de cerrar", () => {
+  const recap = () => screen.queryByRole("list", { name: "Ajustes a aplicar" });
+
+  it("muestra solo la diferencia aceptada con su cantidad y su delta", async () => {
+    await abrirControl();
+
+    fireEvent.change(screen.getByLabelText("Cantidad contada de Aguja"), { target: { value: "3" } });
+    fireEvent.change(screen.getByLabelText("Cantidad contada de Hilo"), { target: { value: "10" } });
+    fireEvent.click(within(fila("P1")).getByRole("button", { name: "Aceptar ajuste" }));
+
+    // El cierre aplica lo aceptado: el repaso lo dice antes de cerrar.
+    const lista = recap();
+    expect(lista).not.toBeNull();
+    const filas = within(lista as HTMLElement).getAllByRole("listitem");
+    expect(filas).toHaveLength(1);
+    expect(within(filas[0]).getByText("Aguja")).toBeInTheDocument();
+    expect(within(filas[0]).getByText("×3")).toBeInTheDocument();
+    expect(within(filas[0]).getByText("-2")).toBeInTheDocument();
+    // Hilo sigue pendiente: no se va a ajustar.
+    expect(within(lista as HTMLElement).queryByText("Hilo")).not.toBeInTheDocument();
+  });
+
+  it("el atajo deja en el recap todas las diferencias, con los dos signos", async () => {
+    await abrirControl();
+
+    fireEvent.change(screen.getByLabelText("Cantidad contada de Aguja"), { target: { value: "3" } });
+    fireEvent.change(screen.getByLabelText("Cantidad contada de Hilo"), { target: { value: "10" } });
+    fireEvent.click(screen.getByRole("button", { name: "Aceptar diferencias" }));
+
+    const lista = recap() as HTMLElement;
+    const filas = within(lista).getAllByRole("listitem");
+    expect(filas).toHaveLength(2);
+    // Faltante y sobrante se leen con su signo contra el teórico.
+    expect(within(filas[0]).getByText("-2")).toBeInTheDocument();
+    expect(within(filas[1]).getByText("+2")).toBeInTheDocument();
+    // El repaso es de lectura: no se decide desde acá.
+    expect(within(lista).queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("sin diferencias aceptadas no hay recap", async () => {
+    await abrirControl();
+
+    // Sin diferencias cargadas el panel queda como estaba.
+    expect(recap()).toBeNull();
+
+    // Una diferencia pendiente tampoco se lista: todavía no se va a ajustar.
+    fireEvent.change(screen.getByLabelText("Cantidad contada de Aguja"), { target: { value: "3" } });
+    expect(recap()).toBeNull();
+  });
+});

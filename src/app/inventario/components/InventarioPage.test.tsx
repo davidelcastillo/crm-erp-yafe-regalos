@@ -211,7 +211,7 @@ describe("InventarioPage — FAB crear producto (spec inventory-ui)", () => {
     expect(screen.queryByText("Nuevo Producto")).not.toBeInTheDocument();
   });
 
-  it("crear un producto re-ejecuta getProductsWithBranchStock con los filtros activos", async () => {
+  it("crear un producto re-ejecuta getProductsWithBranchStock (sucursal; el resto es local)", async () => {
     await renderPage();
 
     // Filtro de sucursal: B1 "Principal".
@@ -232,11 +232,10 @@ describe("InventarioPage — FAB crear producto (spec inventory-ui)", () => {
     fireEvent.change(screen.getByLabelText(/buscar producto/i), {
       target: { value: "jabón" },
     });
+    // La búsqueda ya no viaja al servidor (M3): filtra en memoria.
     await waitFor(() => {
       expect(mockGetProductsWithBranchStock).toHaveBeenLastCalledWith({
         branchId: 1,
-        categoryId: 1,
-        search: "jabón",
         activeOnly: true,
       });
     });
@@ -255,12 +254,11 @@ describe("InventarioPage — FAB crear producto (spec inventory-ui)", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: /crear producto/i }));
 
-    // El refetch post-creación respeta los filtros AND activos (sin resetearlos).
+    // El refetch post-creación mantiene la sucursal activa (sin resetearla); la
+    // categoría y la búsqueda siguen aplicadas en memoria.
     await waitFor(() => {
       expect(mockGetProductsWithBranchStock).toHaveBeenLastCalledWith({
         branchId: 1,
-        categoryId: 1,
-        search: "jabón",
         activeOnly: true,
       });
     });
@@ -268,6 +266,61 @@ describe("InventarioPage — FAB crear producto (spec inventory-ui)", () => {
     await waitFor(() => {
       expect(screen.queryByText("Nuevo Producto")).not.toBeInTheDocument();
     });
+  });
+
+  // M3: buscar y filtrar por categoría es local, como en los modales de stock.
+  it("el buscador filtra en memoria y no repite la consulta al servidor", async () => {
+    const detergente = {
+      ...createdProduct,
+      id: 2,
+      name: "Detergente Limón",
+      code: "DE000",
+    } as unknown as Product;
+    mockGetProductsWithBranchStock.mockResolvedValue({
+      success: true,
+      data: [createdProduct, detergente],
+    } as never);
+
+    await renderPage();
+    expect(screen.getByText("Detergente Limón")).toBeInTheDocument();
+    const llamadas = mockGetProductsWithBranchStock.mock.calls.length;
+
+    fireEvent.change(screen.getByLabelText(/buscar producto/i), {
+      target: { value: "detergente" },
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByText("Jabón de Avena")).not.toBeInTheDocument();
+    });
+    expect(screen.getByText("Detergente Limón")).toBeInTheDocument();
+    // Sin nueva consulta: el catálogo se pidió una sola vez.
+    expect(mockGetProductsWithBranchStock).toHaveBeenCalledTimes(llamadas);
+  });
+
+  it("el filtro de categoría también es local", async () => {
+    const detergente = {
+      ...createdProduct,
+      id: 2,
+      name: "Detergente Limón",
+      code: "DE000",
+      categoryId: 1,
+    } as unknown as Product;
+    mockGetProductsWithBranchStock.mockResolvedValue({
+      success: true,
+      data: [createdProduct, detergente],
+    } as never);
+
+    await renderPage();
+    const llamadas = mockGetProductsWithBranchStock.mock.calls.length;
+
+    fireEvent.click(screen.getByRole("button", { name: "Categoría" }));
+    fireEvent.click(screen.getByRole("button", { name: "Limpieza" }));
+
+    await waitFor(() => {
+      expect(screen.queryByText("Jabón de Avena")).not.toBeInTheDocument();
+    });
+    expect(screen.getByText("Detergente Limón")).toBeInTheDocument();
+    expect(mockGetProductsWithBranchStock).toHaveBeenCalledTimes(llamadas);
   });
 
   it("crea una categoría desde el header, refresca opciones y muestra Swal de éxito", async () => {

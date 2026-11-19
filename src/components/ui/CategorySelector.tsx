@@ -183,7 +183,7 @@ export function CategorySelector({
   };
 
   return (
-    <div className="flex flex-col gap-1" ref={containerRef}>
+    <div className="relative flex flex-col gap-1" ref={containerRef}>
       {label && (
         <span className="text-xs text-ink-muted font-medium">{label}</span>
       )}

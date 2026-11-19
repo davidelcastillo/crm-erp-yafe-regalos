@@ -268,4 +268,24 @@ describe("CashMovementsModal — layout de escritorio", () => {
       "md:w-auto"
     );
   });
+
+  it("con la sucursal fijada desde el paso previo no vuelve a pedirla", async () => {
+    render(
+      <CashMovementsModal
+        open
+        branches={branches}
+        onClose={jest.fn()}
+        onConfirm={onConfirm}
+        fixedBranchId={2}
+      />
+    );
+
+    // M2: la página ya eligió «Centro» en su selector; la caja abre fija ahí y
+    // no se muestra el selector de sucursales otra vez.
+    expect(await screen.findByText("Conteo de caja")).toBeInTheDocument();
+    expect(mockListar).toHaveBeenCalledWith({ branchId: 2 });
+    expect(screen.queryByRole("group", { name: "Sucursal" })).not.toBeInTheDocument();
+    expect(screen.getByText(/Caja de Centro/)).toBeInTheDocument();
+    expect(screen.getByLabelText("Monto")).toBeInTheDocument();
+  });
 });

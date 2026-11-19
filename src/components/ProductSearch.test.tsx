@@ -136,6 +136,66 @@ describe("ProductSearch Component", () => {
       expect(screen.getByText("DB Error")).toBeInTheDocument();
     });
 
+    // M3: con el catálogo inyectado (el que ya tiene la página) el filtro es
+    // local: ni debounce con servidor ni spinner por tecla.
+    it("con productos inyectados filtra en memoria y no llama a searchProducts", async () => {
+      const onSelect = jest.fn();
+      render(
+        <ProductSearch mode="inline" onSelect={onSelect} products={mockResults} />
+      );
+
+      const input = screen.getByPlaceholderText("Buscar producto por código o nombre...");
+      fireEvent.change(input, { target: { value: "glicerina" } });
+
+      await act(async () => {
+        jest.advanceTimersByTime(300);
+      });
+
+      expect(screen.getByText("Jabón de Glicerina")).toBeInTheDocument();
+      expect(screen.queryByText("Jabón de Avena")).not.toBeInTheDocument();
+      expect(mockSearchProducts).not.toHaveBeenCalled();
+
+      // También matchea por código, como el buscador del servidor.
+      fireEvent.change(input, { target: { value: "AA001" } });
+      expect(screen.getByText("Jabón de Avena")).toBeInTheDocument();
+      expect(screen.queryByText("Jabón de Glicerina")).not.toBeInTheDocument();
+      expect(mockSearchProducts).not.toHaveBeenCalled();
+    });
+
+    // Guarda de respuestas fuera de orden: la vieja no puede pisar la nueva.
+    it("ignora una respuesta vieja que llega después de la nueva", async () => {
+      const pending: Array<(value: SearchResponse) => void> = [];
+      mockSearchProducts.mockImplementation(
+        () => new Promise<SearchResponse>((resolve) => pending.push(resolve))
+      );
+
+      const onSelect = jest.fn();
+      render(<ProductSearch mode="inline" onSelect={onSelect} />);
+      const input = screen.getByPlaceholderText("Buscar producto por código o nombre...");
+
+      fireEvent.change(input, { target: { value: "AA" } });
+      await act(async () => {
+        jest.advanceTimersByTime(300);
+      });
+      fireEvent.change(input, { target: { value: "AA2" } });
+      await act(async () => {
+        jest.advanceTimersByTime(300);
+      });
+
+      // Responde primero la última búsqueda y después la anterior.
+      await act(async () => {
+        pending[1]({ success: true, data: [mockResults[1]] });
+        await Promise.resolve();
+      });
+      await act(async () => {
+        pending[0]({ success: true, data: [mockResults[0]] });
+        await Promise.resolve();
+      });
+
+      expect(screen.getByText("Jabón de Glicerina")).toBeInTheDocument();
+      expect(screen.queryByText("Jabón de Avena")).not.toBeInTheDocument();
+    });
+
     it("calls onSelect when item clicked", async () => {
       mockSearchProducts.mockResolvedValue({ success: true, data: mockResults });
       const onSelect = jest.fn();

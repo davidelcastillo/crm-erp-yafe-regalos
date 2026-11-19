@@ -118,7 +118,9 @@ export default function LoginForm() {
           )}
 
           {success && (
-            <p role="status" className="mt-2 text-sm text-positive">{success}</p>
+            <div role="status" className="mt-2 rounded-xl bg-positive/10 border border-positive/25 px-4 py-3 text-sm text-positive font-medium">
+              {success}
+            </div>
           )}
           {/* Botón de Login: en celular se hunde un poco al tocarlo (feedback táctil). */}
           <button 

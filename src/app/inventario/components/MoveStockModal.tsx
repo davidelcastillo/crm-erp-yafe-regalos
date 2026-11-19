@@ -375,6 +375,27 @@ export const MoveStockModal = ({
                   {summaryText}
                 </p>
 
+                {/* Repaso de lo elegido con su cantidad; sin selección no hay
+                    filas y el resumen queda como estaba. */}
+                {selectedRows.length > 0 && (
+                  <ul
+                    aria-label="Productos seleccionados"
+                    className="mt-3 space-y-1 border-t border-hairline pt-3"
+                  >
+                    {selectedRows.map((p) => (
+                      <li
+                        key={p.id}
+                        className="flex items-baseline justify-between gap-3 text-sm text-ink-body"
+                      >
+                        <span className="min-w-0 truncate">{p.name}</span>
+                        <span className="shrink-0 tabular-nums">
+                          ×{parseInt(quantities[p.id], 10) || 0}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
                 <div className="mt-3 flex items-baseline justify-between gap-4 border-t border-hairline pt-3">
                   <span className="text-sm font-medium text-ink">
                     Unidades a mover

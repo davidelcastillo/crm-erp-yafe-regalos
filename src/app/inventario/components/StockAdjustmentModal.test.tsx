@@ -179,6 +179,68 @@ describe("StockAdjustmentModal", () => {
   });
 });
 
+describe("StockAdjustmentModal — productos elegidos en el resumen", () => {
+  const listaResumen = () =>
+    screen.getByRole("list", { name: "Productos seleccionados" });
+  const filasResumen = () =>
+    within(listaResumen())
+      .getAllByRole("listitem")
+      .map((fila) => fila.textContent ?? "");
+
+  it("lista cada producto elegido con su cantidad", async () => {
+    renderModal();
+    await irAlPaso2("Entrada");
+
+    seleccionar("Producto A", 4);
+    seleccionar("Producto B", 2);
+
+    expect(filasResumen()).toHaveLength(2);
+    expect(filasResumen()[0]).toMatch(/Producto A\s*×4/);
+    expect(filasResumen()[1]).toMatch(/Producto B\s*×2/);
+    // Las filas son un repaso, no un editor: no traen controles propios.
+    expect(within(listaResumen()).queryAllByRole("button")).toHaveLength(0);
+    expect(within(listaResumen()).queryAllByRole("spinbutton")).toHaveLength(0);
+  });
+
+  it("actualiza la cantidad del producto en el resumen", async () => {
+    renderModal();
+    await irAlPaso2("Entrada");
+
+    seleccionar("Producto A", 4);
+    expect(filasResumen()[0]).toMatch(/Producto A\s*×4/);
+
+    fireEvent.change(screen.getByLabelText("Cantidad Producto A"), {
+      target: { value: "9" },
+    });
+
+    expect(filasResumen()[0]).toMatch(/Producto A\s*×9/);
+    expect(filasResumen()[0]).not.toMatch(/×4/);
+  });
+
+  it("sin productos elegidos el resumen no lista filas", async () => {
+    renderModal();
+    await irAlPaso2("Entrada");
+
+    expect(screen.getByText("Resumen")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("list", { name: "Productos seleccionados" })
+    ).not.toBeInTheDocument();
+  });
+
+  it("el detalle del paso 3 repite los productos con sus cantidades", async () => {
+    renderModal();
+    await irAlPaso2("Entrada");
+
+    seleccionar("Producto A", 4);
+    seleccionar("Producto B", 2);
+    fireEvent.click(screen.getByRole("button", { name: "Siguiente" }));
+
+    expect(filasResumen()).toHaveLength(2);
+    expect(filasResumen()[0]).toMatch(/Producto A\s*×4/);
+    expect(filasResumen()[1]).toMatch(/Producto B\s*×2/);
+  });
+});
+
 describe("StockAdjustmentModal — orden de la lista", () => {
   it("arranca por código y cambia a última modificación desde el control de orden", async () => {
     mockProductos.mockResolvedValue({

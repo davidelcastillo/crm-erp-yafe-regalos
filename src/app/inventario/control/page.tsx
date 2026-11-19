@@ -224,6 +224,12 @@ export default function ControlStockPage() {
     };
   }, [control]);
 
+  // Repaso del cierre: lo aceptado con su delta es lo único que se va a
+  // ajustar. Sin aceptadas no hay lista y el panel queda como estaba.
+  const ajustes = itemsOrdenados.filter(
+    (item) => item.decision === "ACCEPTED" && item.countedStock !== item.systemStock
+  );
+
   const borrador = () => ({
     controlId: control!.id,
     // El motivo se guarda con el borrador para no perderlo al retomar el control.
@@ -521,6 +527,31 @@ export default function ControlStockPage() {
 
               {control.status === "DRAFT" && (
                 <section className="mt-4 rounded-2xl border border-hairline bg-surface-soft p-4">
+                  {ajustes.length > 0 && (
+                    <ul
+                      aria-label="Ajustes a aplicar"
+                      className="mb-3 space-y-1 border-b border-hairline pb-3"
+                    >
+                      {ajustes.map((item) => {
+                        const delta = item.countedStock - item.systemStock;
+                        return (
+                          <li
+                            key={item.productId}
+                            className="flex items-baseline justify-between gap-3 text-sm text-ink-body"
+                          >
+                            <span className="min-w-0 truncate">{item.name}</span>
+                            <span className="shrink-0 tabular-nums">×{item.countedStock}</span>
+                            <span
+                              className="shrink-0 font-semibold tabular-nums"
+                              style={{ color: delta < 0 ? "#b91c1c" : "#15803d" }}
+                            >
+                              {delta > 0 ? `+${delta}` : delta}
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
                   <label htmlFor="motivo" className="block text-sm font-semibold text-ink">
                     Motivo del ajuste{diferencias > 0 ? "" : " (opcional sin diferencias)"}
                   </label>
