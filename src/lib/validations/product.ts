@@ -7,21 +7,52 @@ import { z } from "zod";
  * `categoryId` es opcional y nullable (H2): sin categoría elegida queda en null.
  * Note: stock is no longer on Product; it lives in BranchInventory per branch.
  */
-export const createProductSchema = z.object({
+const productFields = {
   name: z.string().min(1, "El nombre es requerido").max(255, "El nombre es muy largo"),
   description: z.string().max(500, "La descripción es muy larga").optional(),
   prefix: z.string().regex(/^[A-Za-z]{2,4}$/, "Prefijo: 2-4 letras (A-Z)").transform(v => v.toUpperCase()),
   price: z.number().min(0, "El precio no puede ser negativo"),
   categoryId: z.number().int().positive("Categoría inválida").nullable().optional(),
-});
+};
+
+/**
+ * Alta individual (T3 de `talles-y-compra-alta.md`): gana sucursal, cantidad
+ * inicial y costo, todos opcionales. Sin ellos el alta queda exactamente como
+ * antes. Con cantidad ≥ 1 se crea el inventario y su `ENTRY`; con costo > 0
+ * además la compra del alta, que necesita sucursal y cantidad para existir.
+ */
+export const createProductSchema = z
+  .object({
+    ...productFields,
+    branchId: z.number().int().positive("Sucursal inválida").optional(),
+    cantidadInicial: z
+      .number()
+      .int("La cantidad inicial debe ser un número entero")
+      .min(0, "La cantidad inicial no puede ser negativa")
+      .max(999, "La cantidad inicial no puede superar 999")
+      .optional(),
+    costoUnitario: z.number().min(0, "El costo no puede ser negativo").optional(),
+  })
+  .superRefine((data, ctx) => {
+    if ((data.costoUnitario ?? 0) <= 0) return;
+    if (data.branchId === undefined || (data.cantidadInicial ?? 0) < 1) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Para registrar el costo cargá la sucursal y la cantidad inicial",
+        path: ["costoUnitario"],
+      });
+    }
+  });
 
 /**
  * Fila del alta masiva: la misma regla que el alta individual (que ya trae la
  * categoría de esa fila, opcional, S4) más su stock inicial (S2/S11), que sin
- * valor se trata como 0.
+ * valor se trata como 0, y su costo (T4), que sin valor tampoco compra nada.
  */
-const createProductsBatchRowSchema = createProductSchema.extend({
+const createProductsBatchRowSchema = z.object({
+  ...productFields,
   initialStock: z.number().int().min(0, "El stock no puede ser negativo").optional(),
+  costo: z.number().min(0, "El costo no puede ser negativo").optional(),
 });
 
 /**
@@ -55,6 +86,15 @@ export const createProductsBatchSchema = z
       }
       vistos.add(clave);
     });
+
+    // T4: la compra del lote usa la sucursal global; sin ella el costo se perdería.
+    if (data.branchId === undefined && data.rows.some((row) => (row.costo ?? 0) > 0)) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Para registrar el costo elegí la sucursal del lote",
+        path: ["branchId"],
+      });
+    }
   });
 
 export type CreateProductsBatchValues = z.infer<typeof createProductsBatchSchema>;

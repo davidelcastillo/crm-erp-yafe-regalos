@@ -32,6 +32,11 @@ jest.mock("@/components/ui/CategorySelector", () => ({
   ),
 }));
 
+// El alta pide la sucursal del stock inicial (T3): se mockean las opciones.
+jest.mock("@/app/actions/branch", () => ({
+  getBranchOptions: jest.fn(),
+}));
+
 // Mock next/navigation
 jest.mock("next/navigation", () => ({
   useRouter: jest.fn(() => ({
@@ -46,6 +51,7 @@ jest.mock("sweetalert2", () => ({
 }));
 
 import { createProduct, updateProductExtended } from "../../actions/product";
+import { getBranchOptions } from "@/app/actions/branch";
 import { createProductSchema } from "@/lib/validations/product";
 import { useRouter } from "next/navigation";
 import Swal from "sweetalert2";
@@ -470,5 +476,99 @@ describe("ProductForm Component", () => {
       // Confirmation was requested but cancelled → toggle stays active
       expect(toggle).toHaveAttribute("aria-checked", "true");
     });
+  });
+});
+
+/**
+ * T3 (odd/tasks/talles-y-compra-alta.md): el alta individual gana sucursal,
+ * cantidad inicial y costo. Sin sucursal elegida el alta queda como hoy.
+ */
+describe("ProductForm · alta con stock y costo (T3)", () => {
+  const SUCURSALES = [
+    { id: 1, name: "Sucursal Centro" },
+    { id: 2, name: "Sucursal Norte" },
+  ];
+
+  const mockGetBranchOptions = getBranchOptions as jest.MockedFunction<typeof getBranchOptions>;
+
+  /** Elige la sucursal y espera los campos que dependen de ella. */
+  const elegirSucursal = async () => {
+    fireEvent.click(await screen.findByRole("button", { name: "Sucursal Centro" }));
+    await screen.findByLabelText(/cantidad inicial/i);
+  };
+
+  const llenarAlta = () => {
+    fireEvent.change(screen.getByLabelText(/nombre/i), { target: { value: "Jabón de Avena" } });
+    fireEvent.change(screen.getByLabelText(/prefijo.*2-4 letras/i), { target: { value: "AA" } });
+    fireEvent.change(screen.getByLabelText(/precio de venta/i), { target: { value: "1500" } });
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockGetBranchOptions.mockResolvedValue({ success: true, data: SUCURSALES } as never);
+    mockCreateProduct.mockResolvedValue({ success: true, data: { id: 1 } } as never);
+  });
+
+  it("sin sucursal elegida no muestra cantidad inicial ni costo", async () => {
+    render(<ProductForm product={null} onClose={() => {}} />);
+
+    expect(await screen.findByRole("group", { name: "Sucursal" })).toBeInTheDocument();
+    expect(screen.queryByLabelText(/cantidad inicial/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/^costo/i)).not.toBeInTheDocument();
+  });
+
+  it("con sucursal carga cantidad y costo, y el payload los lleva", async () => {
+    render(<ProductForm product={null} onClose={() => {}} />);
+    llenarAlta();
+    await elegirSucursal();
+
+    fireEvent.change(screen.getByLabelText(/cantidad inicial/i), { target: { value: "5" } });
+    fireEvent.change(screen.getByLabelText(/^costo/i), { target: { value: "100" } });
+    fireEvent.click(screen.getByRole("button", { name: /crear producto/i }));
+
+    await waitFor(() => expect(mockCreateProduct).toHaveBeenCalled());
+
+    const payload = mockCreateProduct.mock.calls[0][0];
+    expect(payload).toEqual(
+      expect.objectContaining({ branchId: 1, cantidadInicial: 5, costoUnitario: 100 })
+    );
+    expect(createProductSchema.safeParse(payload).success).toBe(true);
+  });
+
+  it("con sucursal y sin costo el payload viaja con costo 0", async () => {
+    render(<ProductForm product={null} onClose={() => {}} />);
+    llenarAlta();
+    await elegirSucursal();
+    fireEvent.change(screen.getByLabelText(/cantidad inicial/i), { target: { value: "3" } });
+    fireEvent.click(screen.getByRole("button", { name: /crear producto/i }));
+
+    await waitFor(() => expect(mockCreateProduct).toHaveBeenCalled());
+
+    expect(mockCreateProduct.mock.calls[0][0]).toEqual(
+      expect.objectContaining({ branchId: 1, cantidadInicial: 3, costoUnitario: 0 })
+    );
+  });
+
+  it("en la edición no hay sucursal, cantidad ni costo", async () => {
+    const product = {
+      id: 1,
+      name: "Producto Existente",
+      description: "-",
+      categoryId: null,
+      active: true,
+      price: 500,
+      code: "EX001",
+      codePrefix: "EX",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    } as unknown as Product;
+
+    render(<ProductForm product={product} onClose={() => {}} />);
+
+    expect(screen.queryByRole("group", { name: "Sucursal" })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/cantidad inicial/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/^costo/i)).not.toBeInTheDocument();
+    // La edición no pide las sucursales.
+    expect(mockGetBranchOptions).not.toHaveBeenCalled();
   });
 });

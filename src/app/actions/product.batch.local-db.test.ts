@@ -33,6 +33,7 @@ const PREFIJO_ATOMICO = `${base}H`;
 const PREFIJO_STOCK = `${base}J`;
 const PREFIJO_SIN_SUCURSAL = `${base}K`;
 const PREFIJO_ATOMICO_STOCK = `${base}L`;
+const PREFIJO_COMPRA_LOTE = `${base}M`;
 
 const PREFIJOS = [
   PREFIJO_TREINTA,
@@ -46,6 +47,7 @@ const PREFIJOS = [
   PREFIJO_STOCK,
   PREFIJO_SIN_SUCURSAL,
   PREFIJO_ATOMICO_STOCK,
+  PREFIJO_COMPRA_LOTE,
 ];
 
 const NOMBRE_SUCURSAL = `QA lote sucursal ${sufijo}`;
@@ -83,6 +85,10 @@ describe("createProductsBatch (integración, base local)", () => {
     await limpiar();
 
     // `code` de sucursal es único: si una corrida anterior se cortó, se limpia antes.
+    // Las compras del alta retienen la sucursal por el FK: se borran antes.
+    await prisma.purchase.deleteMany({
+      where: { branch: { code: { in: [CODIGO_SUCURSAL, CODIGO_SUCURSAL_INACTIVA] } } },
+    });
     await prisma.branch.deleteMany({ where: { code: { in: [CODIGO_SUCURSAL, CODIGO_SUCURSAL_INACTIVA] } } });
     // `authUserId` no nulo: `branchAdminService.populateAuthUserIds` actualiza
     // todas las sucursales sin authUserId y pisaría las fixtures.
@@ -116,8 +122,58 @@ describe("createProductsBatch (integración, base local)", () => {
   afterAll(async () => {
     await limpiar();
     await prisma.category.deleteMany({ where: { id: { in: [categoryId, categoryId2] } } });
+    // Las compras del lote retienen la sucursal por el FK: se borran antes.
+    await prisma.purchase.deleteMany({ where: { branchId: { in: [branchId, branchInactivaId] } } });
     await prisma.branch.deleteMany({ where: { id: { in: [branchId, branchInactivaId] } } });
     await prisma.$disconnect();
+  });
+
+  it("con costos por fila genera UNA compra del lote con solo las filas con costo y stock (S2/S3)", async () => {
+    const resultado = await acciones.createProductsBatch({
+      branchId,
+      rows: [
+        { name: `${marca} compra a`, prefix: PREFIJO_COMPRA_LOTE, price: 10, initialStock: 5, costo: 2.5 },
+        { name: `${marca} compra b`, prefix: PREFIJO_COMPRA_LOTE, price: 20, initialStock: 3, costo: 4 },
+        // Fuera de la compra: sin stock y sin costo.
+        { name: `${marca} compra c`, prefix: PREFIJO_COMPRA_LOTE, price: 30, initialStock: 0, costo: 9 },
+        { name: `${marca} compra d`, prefix: PREFIJO_COMPRA_LOTE, price: 40, initialStock: 2, costo: 0 },
+      ],
+    });
+
+    expect(resultado.success).toBe(true);
+    if (!resultado.success) return;
+    const productos = await prisma.product.findMany({
+      where: { codePrefix: PREFIJO_COMPRA_LOTE },
+      select: { id: true, name: true },
+    });
+    expect(productos).toHaveLength(4);
+    const idDe = (nombre: string) => productos.find((p) => p.name.endsWith(nombre))!.id;
+
+    // Una sola cabecera para todo el lote, con los items de las dos filas válidas.
+    const compras = await prisma.purchase.findMany({
+      where: { branchId },
+      select: {
+        totalAmount: true,
+        items: {
+          select: { productId: true, price: true, quantity: true, subtotal: true },
+          orderBy: { productId: "asc" },
+        },
+      },
+    });
+    expect(compras).toHaveLength(1);
+    // 2.5×5 + 4×3 = 24.5
+    expect(Number(compras[0].totalAmount)).toBe(24.5);
+    expect(compras[0].items).toHaveLength(2);
+    const ids = [idDe("compra a"), idDe("compra b")].sort((x, y) => x - y);
+    expect(compras[0].items.map((item) => item.productId)).toEqual(ids);
+    const itemA = compras[0].items.find((item) => item.productId === idDe("compra a"))!;
+    expect(Number(itemA.price)).toBe(2.5);
+    expect(itemA.quantity).toBe(5);
+    expect(Number(itemA.subtotal)).toBe(12.5);
+    const itemB = compras[0].items.find((item) => item.productId === idDe("compra b"))!;
+    expect(Number(itemB.price)).toBe(4);
+    expect(itemB.quantity).toBe(3);
+    expect(Number(itemB.subtotal)).toBe(12);
   });
 
   it("crea 30 filas del mismo prefijo con códigos consecutivos en el orden de las filas", async () => {

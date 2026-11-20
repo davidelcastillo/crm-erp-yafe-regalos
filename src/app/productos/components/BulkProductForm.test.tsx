@@ -106,6 +106,8 @@ const precios = () => screen.getAllByLabelText(/^precio/i);
 const categorias = () => screen.getAllByLabelText(/^categoría/i);
 /** Solo existe con una sucursal elegida (T5). */
 const stocks = () => screen.queryAllByLabelText(/^stock inicial/i);
+/** Costo por fila (T4): también solo con sucursal, porque la compra es del lote. */
+const costos = () => screen.queryAllByLabelText(/^costo/i);
 const elegirSucursal = (nombre = "Sucursal Centro") =>
   fireEvent.click(screen.getByRole("button", { name: nombre }));
 
@@ -461,6 +463,7 @@ describe("BulkProductForm", () => {
 
     // En el paso 2 no hay stock ni la acción de quitarlo.
     expect(stocks()).toHaveLength(0);
+    expect(costos()).toHaveLength(0);
     expect(screen.queryByRole("button", { name: "No cargar stock" })).not.toBeInTheDocument();
 
     llenarFila(0, "Producto único");
@@ -503,12 +506,44 @@ describe("BulkProductForm", () => {
     });
   });
 
+  // T4: el costo de cada fila genera UNA compra del lote (solo con sucursal,
+  // porque la compra necesita la sucursal global).
+  it("con sucursal cada fila lleva costo y el payload lo incluye solo si se cargó", async () => {
+    const { onSuccess } = await renderForm();
+
+    elegirSucursal();
+    await continuar();
+    expect(costos()).toHaveLength(1);
+
+    fireEvent.click(screen.getByRole("button", { name: /agregar producto/i }));
+    // La fila nueva también nace con su costo, vacío.
+    expect(costos()).toHaveLength(2);
+
+    llenarFila(0, "Producto uno");
+    llenarFila(1, "Producto dos", "AA", "20");
+    fireEvent.change(stocks()[0], { target: { value: "2" } });
+    fireEvent.change(costos()[0], { target: { value: "100" } });
+
+    fireEvent.click(screen.getByRole("button", { name: /crear 2 productos/i }));
+
+    await waitFor(() => expect(onSuccess).toHaveBeenCalled());
+    // El costo vacío no viaja: la fila sin costo no entra en la compra.
+    expect(mockCreateProductsBatch).toHaveBeenCalledWith({
+      branchId: 1,
+      rows: [
+        { name: "Producto uno", prefix: "AA", price: 10, categoryId: null, initialStock: 2, costo: 100 },
+        { name: "Producto dos", prefix: "AA", price: 20, categoryId: null, initialStock: 0 },
+      ],
+    });
+  });
+
   it("quitar la sucursal vuelve a esconder el stock y a limpiar el payload", async () => {
     const { onSuccess } = await renderForm();
 
     elegirSucursal();
     await continuar();
     expect(stocks()).toHaveLength(1);
+    expect(costos()).toHaveLength(1);
 
     fireEvent.click(screen.getByRole("button", { name: "No cargar stock" }));
     expect(stocks()).toHaveLength(0);

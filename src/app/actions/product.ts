@@ -9,11 +9,15 @@ import { sortProducts } from "@/lib/product-order";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getNextCode, prefixLockKey } from "@/lib/utils/product-code";
+import { registrarCompraDelAlta } from "@/lib/compra-alta";
 import type { StockMovementReceipt } from "@/lib/stock-movement-receipt";
 import { createProductSchema, createProductsBatchSchema, updateProductExtendedSchema } from "@/lib/validations/product";
 
 /** Motivo del ingreso inicial en el movimiento y en el comprobante (D9). */
 const BATCH_ENTRY_REFERENCE = "ALTA DE PRODUCTOS";
+
+/** Motivo del ingreso del alta individual (T3). */
+const PRODUCT_ENTRY_REFERENCE = "ALTA DE PRODUCTO";
 
 // Schema for searchProducts action
 const searchProductsSchema = z.object({
@@ -56,6 +60,19 @@ export async function createProduct(data: unknown) {
 
     const validatedData = createProductSchema.parse(data);
 
+    // Sucursal del stock inicial (T3): se valida antes de escribir, como el lote.
+    const branch =
+      validatedData.branchId === undefined
+        ? null
+        : await prisma.branch.findFirst({
+            where: { id: validatedData.branchId, isActive: true },
+            select: { id: true },
+          });
+    if (validatedData.branchId !== undefined && !branch) {
+      return { success: false as const, error: "Sucursal inválida o inactiva" };
+    }
+    const cantidadInicial = validatedData.cantidadInicial ?? 0;
+
     // Retry logic with advisory lock to handle race conditions
     const maxRetries = 3;
     const baseDelay = 50; // ms
@@ -78,7 +95,7 @@ export async function createProduct(data: unknown) {
           const code = getNextCode(validatedData.prefix, existingCodes);
 
           // Create product with generated code (stock lives in BranchInventory)
-          return await tx.product.create({
+          const creado = await tx.product.create({
             data: {
               name: validatedData.name,
               description: validatedData.description || "-",
@@ -88,6 +105,39 @@ export async function createProduct(data: unknown) {
               categoryId: validatedData.categoryId ?? null,
             },
           });
+
+          // Sin sucursal ni cantidad el alta queda como antes.
+          if (!branch || cantidadInicial < 1) return creado;
+
+          await tx.branchInventory.create({
+            data: { branchId: branch.id, productId: creado.id, stock: cantidadInicial },
+          });
+
+          await tx.branchMovement.create({
+            data: {
+              productId: creado.id,
+              branchId: branch.id,
+              movementType: "ENTRY",
+              quantity: cantidadInicial,
+              reference: PRODUCT_ENTRY_REFERENCE,
+              // `performedBy` es obligatorio: sin email queda un responsable explícito.
+              performedBy: auth.email || "sistema",
+            },
+          });
+
+          // T3/S2: con costo > 0 la compra del alta se registra en la misma
+          // transacción (solo registro: el ENTRY de arriba ya ingresó el stock).
+          if ((validatedData.costoUnitario ?? 0) > 0) {
+            await registrarCompraDelAlta(tx, branch.id, [
+              {
+                productId: creado.id,
+                price: validatedData.costoUnitario!,
+                quantity: cantidadInicial,
+              },
+            ]);
+          }
+
+          return creado;
         });
 
         return { success: true, data: parseObject(product) };
@@ -279,7 +329,11 @@ export async function createProductsBatch(data: unknown) {
             const filasCreadas = rows.map((row, i) => {
               const creado = porCodigo.get(codigos[i]);
               if (!creado) throw new Error("No se pudo leer uno de los productos creados");
-              return { producto: creado, stockInicial: row.initialStock ?? 0 };
+              return {
+                producto: creado,
+                stockInicial: row.initialStock ?? 0,
+                costo: row.costo ?? 0,
+              };
             });
             const products = filasCreadas.map(({ producto }) => ({
               id: producto.id,
@@ -318,6 +372,21 @@ export async function createProductsBatch(data: unknown) {
                   performedBy: auth.email || "sistema",
                 })),
               });
+            }
+
+            // T4: UNA sola compra del lote, solo con las filas que tienen costo y
+            // stock. El ENTRY de arriba ya ingresó el stock: la compra no lo toca.
+            const conCompra = conStock.filter((fila) => fila.costo > 0);
+            if (conCompra.length > 0) {
+              await registrarCompraDelAlta(
+                tx,
+                branch.id,
+                conCompra.map(({ producto, stockInicial, costo }) => ({
+                  productId: producto.id,
+                  price: costo,
+                  quantity: stockInicial,
+                }))
+              );
             }
 
             const receipt: StockMovementReceipt | null =
