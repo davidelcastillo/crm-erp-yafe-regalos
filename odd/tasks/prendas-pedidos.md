@@ -178,3 +178,17 @@ unidad. Los docs de fase (`docs/adr/*`, `polkalinas-html/`) se commitean con U1.
   3. **Modo oscuro**: la spec es solo-clara; el repo tiene un bloque dark parcial en `globals.css`
      y `docs/Nuevas cosas.md` pide tema oscuro a elección del usuario. Decidir en U9 si el dark
      se congela hasta después del pilot de recolor.
+- **L10.** U6 commiteada. Unidad de DINERO/STOCK con doble firma: worker + verificación
+  independiente (veredicto READY TO COMMIT). Evidencia: `reserva.ts` nuevo (R1 extraída de
+  pedido.ts — el verificador confirmó extracción pura contra HEAD: mismos where/orden, con una
+  desviación de borde en `productIds` vacío que el coordinador cerró con una guarda de 3 líneas
+  antes del commit); `registerSale` y ambos traspasos chequean `stock − reservado ≥ cantidad`
+  dentro de la transacción y bajo advisory locks en orden ascendente (sin deadlock con
+  pedido.ts, verificado); el lote aborta antes del primer upsert (rollback total); wiring-only
+  de las 3 suites viejas confirmado por diff (cero expect tocados); proof end-to-end en base
+  local: reservar → venta directa rechazada con stock intacto → traspaso rechazado → cobrar
+  decrementa una sola vez → cancelar libera y la venta pasa (4/4). Suites: 116/116 en las seis,
+  4/4 + 2/2 + 10/10 en base local, tsc 0, lint 0. Dos deudas CONFIRMADAS por el verificador:
+  (a) `adjustBranchStockBatch` y el cierre del control de stock NO miran reservas — el ADR §2.2
+  lo prometía y ninguna unidad lo tenía agendado: se mueve a U7; (b) `auth-guard.actions.test.ts`
+  roja desde U3/U4 (lista de módulos pinneada sin pedido/prenda/prendaTaxonomy): se suma a U7.
