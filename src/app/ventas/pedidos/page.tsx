@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Swal from "sweetalert2";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { FilterSelect } from "@/components/ui/FilterSelect";
 import { useReloadKey } from "@/lib/hooks/useReloadKey";
 import { useBranch } from "@/lib/context/BranchContext";
 import { inicioDelDia, toLocalDateKey } from "@/lib/dates";
@@ -662,15 +661,10 @@ export default function PedidosPage() {
     void mover(origen.pedido, origen.estado, hacia);
   };
 
-  const opcionesCanal = [
-    { value: "", label: "Todos" },
-    ...canales.map((item) => ({ value: String(item.id), label: item.name })),
-  ];
-
   return (
     <div className="min-h-screen bg-surface pb-20">
       {/* El degradé de marca como capa de fondo del encabezado, como en /ventas. */}
-      <div className="relative isolate pb-16">
+      <div className="relative isolate pb-6">
         <div className="brand-gradient pointer-events-none absolute inset-0" aria-hidden="true" />
         <PageHeader
           title="Pedidos"
@@ -681,19 +675,45 @@ export default function PedidosPage() {
           }
         />
 
-        {/* Acciones de la página sobre la banda, como en /ventas. */}
-        <div className="mt-4 px-3 md:hidden">
-          <button type="button" onClick={() => setFormOpen(true)} className="btn btn-primary w-full">
-            Nuevo pedido
-          </button>
-        </div>
-
-        <div className="mt-3 flex flex-wrap items-center gap-2 px-3">
-          <FilterSelect label="Canal" value={canal} options={opcionesCanal} onChange={setCanal} />
+        {/* Filtro de canal en chips, como los tabs de los mockups: no un select
+            nativo aplastado sobre el degradé. */}
+        <div className="mt-3 flex gap-2 overflow-x-auto px-3 pb-1" role="group" aria-label="Filtrar por canal">
+          {[{ value: "", label: "Todos" }, ...canales.map((item) => ({ value: String(item.id), label: item.name }))].map(
+            (opcion) => {
+              const elegido = canal === opcion.value;
+              return (
+                <button
+                  key={opcion.value || "todos"}
+                  type="button"
+                  aria-pressed={elegido}
+                  onClick={() => setCanal(opcion.value)}
+                  className={`min-h-[40px] shrink-0 rounded-full border px-4 text-sm font-medium transition-colors ${
+                    elegido
+                      ? "border-transparent bg-ink text-background"
+                      : "border-hairline bg-surface-strong text-ink-muted hover:bg-surface-soft"
+                  }`}
+                >
+                  {opcion.label}
+                </button>
+              );
+            }
+          )}
         </div>
       </div>
 
-      <main className="px-3 pt-4">
+      {/* En celular el alta vive en un FAB, como el de /compras. */}
+      <button
+        type="button"
+        onClick={() => setFormOpen(true)}
+        className="btn-fab fixed bottom-24 right-6 z-40 md:hidden"
+        aria-label="Nuevo pedido"
+      >
+        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+        </svg>
+      </button>
+
+      <main className="px-3 pt-3">
         {/* Celular: un selector por estado y una sola columna a la vista. */}
         <div
           role="tablist"
