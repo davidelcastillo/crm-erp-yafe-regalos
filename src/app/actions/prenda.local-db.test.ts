@@ -44,6 +44,8 @@ describe("createPrenda (integración, base local)", () => {
     acciones = await import("@/app/actions/prenda");
 
     await limpiarProductos();
+    // Compras de corridas previas que retienen la sucursal por el FK.
+    await prisma.purchase.deleteMany({ where: { branch: { code: CODIGO_SUCURSAL } } });
     await prisma.branch.deleteMany({ where: { code: CODIGO_SUCURSAL } });
     await prisma.categoriaPrenda.deleteMany({ where: { name: { startsWith: marca } } });
     await prisma.condicionPrenda.deleteMany({ where: { name: { startsWith: marca } } });
@@ -75,6 +77,8 @@ describe("createPrenda (integración, base local)", () => {
     await prisma.condicionPrenda.deleteMany({ where: { id: condicionId } });
     await prisma.estiloPrenda.deleteMany({ where: { id: { in: [estiloId, estiloId2] } } });
     await prisma.medidaTipo.deleteMany({ where: { id: medidaTipoId } });
+    // Las compras del alta referencian la sucursal: sin esto, el FK la retiene.
+    await prisma.purchase.deleteMany({ where: { branchId } });
     await prisma.branch.deleteMany({ where: { id: branchId } });
     await prisma.$disconnect();
   });
@@ -85,14 +89,13 @@ describe("createPrenda (integración, base local)", () => {
     precio: 12000,
     costo: 4000,
     categoriaPrendaId: categoriaId,
-    talle: "Único",
+    talles: [{ talle: "Único", cantidad: 1 }],
     condicionId,
     detalleCondicion: "Mancha chica",
     detalleIntervencion: "",
     estilos: [estiloId, estiloId2],
     medidas: [{ medidaTipoId, valorCm: 48.5 }],
     esUnica: true,
-    cantidad: 1,
     branchId,
     publicadaEn: ["Web", "Instagram"],
   });
@@ -127,12 +130,12 @@ describe("createPrenda (integración, base local)", () => {
             esUnica: true,
             categoriaId: true,
             condicionId: true,
-            talle: true,
             detalleCondicion: true,
             detalleIntervencion: true,
             costo: true,
             estilos: { select: { estiloId: true } },
             medidas: { select: { medidaTipoId: true, valorCm: true } },
+            talles: { select: { talle: true, cantidad: true } },
           },
         },
         publicaciones: { select: { canal: true } },
@@ -145,10 +148,10 @@ describe("createPrenda (integración, base local)", () => {
       esUnica: true,
       categoriaId,
       condicionId,
-      talle: "Único",
       detalleCondicion: "Mancha chica",
       detalleIntervencion: null,
     });
+    expect(fila?.prenda?.talles).toEqual([{ talle: "Único", cantidad: 1 }]);
     expect(Number(fila?.prenda?.costo)).toBe(4000);
     expect(fila?.prenda?.estilos.map((e) => e.estiloId).sort()).toEqual([estiloId, estiloId2].sort());
     expect(fila?.prenda?.medidas).toHaveLength(1);
@@ -189,6 +192,18 @@ describe("createPrenda (integración, base local)", () => {
     expect(receipt.rows).toEqual([
       { productId, code: product.code, name: product.name, price: 12000, quantity: 1, stock: 1 },
     ]);
+
+    // S2: la compra del alta queda registrada en la sucursal, sin tocar stock.
+    const compras = await prisma.purchase.findMany({
+      where: { branchId, items: { some: { productId } } },
+      select: { totalAmount: true, items: { select: { price: true, quantity: true, subtotal: true } } },
+    });
+    expect(compras).toHaveLength(1);
+    expect(Number(compras[0].totalAmount)).toBe(4000);
+    expect(compras[0].items).toHaveLength(1);
+    expect(Number(compras[0].items[0].price)).toBe(4000);
+    expect(compras[0].items[0].quantity).toBe(1);
+    expect(Number(compras[0].items[0].subtotal)).toBe(4000);
 
     // El PDF del comprobante se arma con este snapshot.
     const { generateStockMovementPdf } = await import("@/lib/utils/stock-movement-pdf");

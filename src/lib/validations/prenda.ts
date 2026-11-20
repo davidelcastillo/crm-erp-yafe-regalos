@@ -32,6 +32,38 @@ const medidaSchema = z.object({
     .multipleOf(0.1, "Hasta 1 decimal"),
 });
 
+/** S1: filas «Talle + Cantidad»; el total de la prenda es la suma de las filas. */
+const cantidadSchema = z
+  .number({ message: "La cantidad debe ser un número" })
+  .int("La cantidad debe ser un número entero")
+  .min(1, "La cantidad mínima es 1")
+  .max(999, "Máximo 999 unidades");
+
+const talleFilaSchema = z.object({
+  talle: z
+    .string()
+    .trim()
+    .min(1, "El talle es requerido")
+    .max(20, "Máximo 20 caracteres"),
+  cantidad: cantidadSchema,
+});
+
+const tallesSchema = z
+  .array(talleFilaSchema)
+  .min(1, "Cargá al menos un talle")
+  // Un talle repetido no aporta nada: se suman sus cantidades.
+  .transform((filas) => {
+    const porTalle = new Map<string, { talle: string; cantidad: number }>();
+    for (const fila of filas) {
+      const previa = porTalle.get(fila.talle);
+      porTalle.set(fila.talle, {
+        talle: fila.talle,
+        cantidad: (previa?.cantidad ?? 0) + fila.cantidad,
+      });
+    }
+    return [...porTalle.values()];
+  });
+
 /** Lo que comparten el alta y la edición: todo menos el stock y el código. */
 const camposPrenda = {
   nombre: z
@@ -47,11 +79,7 @@ const camposPrenda = {
     .number({ message: "El costo debe ser un número" })
     .min(0, "El costo no puede ser negativo"),
   categoriaPrendaId: idRequerido("Categoría de prenda inválida"),
-  talle: z
-    .string()
-    .trim()
-    .min(1, "El talle es requerido")
-    .max(20, "Máximo 20 caracteres"),
+  talles: tallesSchema,
   condicionId: idRequerido("Condición inválida"),
   detalleCondicion: textoOpcional(200, "Máximo 200 caracteres"),
   detalleIntervencion: textoOpcional(200, "Máximo 200 caracteres"),
@@ -77,28 +105,25 @@ const camposPrenda = {
     ]),
 };
 
-const cantidadSchema = z
-  .number({ message: "La cantidad debe ser un número" })
-  .int("La cantidad debe ser un número entero")
-  .min(1, "La cantidad mínima es 1")
-  .max(999, "Máximo 999 unidades");
-
 /**
  * Alta. La sucursal es obligatoria (C5: el mockup no la muestra, el modelo la
- * necesita) y la cantidad de una prenda única es siempre 1.
+ * necesita) y la cantidad total se deriva de las filas de talle (S1): una
+ * prenda única lleva un solo talle con cantidad 1.
  */
 export const createPrendaSchema = z
   .object({
     ...camposPrenda,
     branchId: idRequerido("Sucursal inválida"),
-    cantidad: cantidadSchema,
   })
   .superRefine((data, ctx) => {
-    if (data.esUnica && data.cantidad !== 1) {
+    // El array vacío ya lo reporta `min(1)`: acá no se duplica.
+    if (!data.esUnica || data.talles.length === 0) return;
+    const cantidadTotal = data.talles.reduce((suma, fila) => suma + fila.cantidad, 0);
+    if (data.talles.length !== 1 || cantidadTotal !== 1) {
       ctx.addIssue({
         code: "custom",
-        path: ["cantidad"],
-        message: "Una prenda única lleva cantidad 1",
+        path: ["talles"],
+        message: "Una prenda única lleva un solo talle con cantidad 1",
       });
     }
   });
@@ -121,7 +146,7 @@ export type PrendaEditable = {
   precio: number;
   categoriaPrendaId: number;
   condicionId: number;
-  talle: string;
+  talles: Array<{ talle: string; cantidad: number }>;
   detalleCondicion: string;
   detalleIntervencion: string;
   costo: number;

@@ -49,10 +49,9 @@ async function altaPrenda(nombre: string, precio: number) {
     precio,
     costo: 1000,
     categoriaPrendaId: categoriaId,
-    talle: "Único",
+    talles: [{ talle: "Único", cantidad: 1 }],
     condicionId,
     esUnica: true,
-    cantidad: 1,
     branchId,
     estilos: [],
     medidas: [],
@@ -81,6 +80,8 @@ describe("pedidos (integración, base local)", () => {
     prendas = await import("@/app/actions/prenda");
 
     await limpiarProductos();
+    // Compras de corridas previas que retienen la sucursal por el FK.
+    await prisma.purchase.deleteMany({ where: { branch: { code: CODIGO_SUCURSAL } } });
     await prisma.branch.deleteMany({ where: { code: CODIGO_SUCURSAL } });
     await prisma.categoriaPrenda.deleteMany({ where: { name: { startsWith: marca } } });
     await prisma.condicionPrenda.deleteMany({ where: { name: { startsWith: marca } } });
@@ -117,6 +118,8 @@ describe("pedidos (integración, base local)", () => {
     await prisma.canalVenta.deleteMany({ where: { id: canalId } });
     await prisma.categoriaPrenda.deleteMany({ where: { id: categoriaId } });
     await prisma.condicionPrenda.deleteMany({ where: { id: condicionId } });
+    // Las compras del alta referencian la sucursal: sin esto, el FK la retiene.
+    await prisma.purchase.deleteMany({ where: { branchId } });
     await prisma.branch.deleteMany({ where: { id: branchId } });
     await prisma.$disconnect();
   });

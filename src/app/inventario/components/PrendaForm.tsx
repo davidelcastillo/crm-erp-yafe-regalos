@@ -33,6 +33,7 @@ export interface PrendaFormProps {
 }
 
 type MedidaFila = { key: number; medidaTipoId: string; valorCm: string };
+type TalleFila = { key: number; talle: string; cantidad: string };
 
 /**
  * Alta y edición de prenda (U3): bottom-sheet con la ficha completa de la ropa
@@ -51,10 +52,11 @@ export function PrendaForm({ prenda, branches = [], onClose, onSuccess }: Prenda
     descripcion: "",
     precio: "",
     costo: "",
-    talle: "",
     detalleCondicion: "",
     detalleIntervencion: "",
   });
+  /** S1: filas «Talle + Cantidad»; el total se deriva, nunca se escribe a mano. */
+  const [talles, setTalles] = useState<TalleFila[]>([{ key: 1, talle: "", cantidad: "1" }]);
   const [categoriaId, setCategoriaId] = useState<number | null>(null);
   const [condicionId, setCondicionId] = useState<number | null>(null);
   const [estilos, setEstilos] = useState<number[]>([]);
@@ -63,7 +65,6 @@ export function PrendaForm({ prenda, branches = [], onClose, onSuccess }: Prenda
   /** Una vez que la persona toca la marca, la categoría deja de precargarla. */
   const [esUnicaTocada, setEsUnicaTocada] = useState(false);
   const [branchId, setBranchId] = useState<number | null>(null);
-  const [cantidad, setCantidad] = useState("1");
   const [publicadaEn, setPublicadaEn] = useState<string[]>([]);
   const [code, setCode] = useState("");
 
@@ -123,10 +124,16 @@ export function PrendaForm({ prenda, branches = [], onClose, onSuccess }: Prenda
         descripcion: ficha.descripcion,
         precio: String(ficha.precio),
         costo: String(ficha.costo),
-        talle: ficha.talle,
         detalleCondicion: ficha.detalleCondicion,
         detalleIntervencion: ficha.detalleIntervencion,
       });
+      setTalles(
+        ficha.talles.map((fila, i) => ({
+          key: i + 1,
+          talle: fila.talle,
+          cantidad: String(fila.cantidad),
+        }))
+      );
       setCategoriaId(ficha.categoriaPrendaId);
       setCondicionId(ficha.condicionId);
       setEstilos(ficha.estilos);
@@ -155,6 +162,11 @@ export function PrendaForm({ prenda, branches = [], onClose, onSuccess }: Prenda
 
   const precioNumero = Number(form.precio) || 0;
   const costoNumero = Number(form.costo) || 0;
+  /** S1: la cantidad total de la prenda se deriva de las filas de talle. */
+  const cantidadTotal = talles.reduce(
+    (suma, fila) => suma + (Number(fila.cantidad) > 0 ? Number(fila.cantidad) : 0),
+    0
+  );
   const ganancia = new Intl.NumberFormat("es-AR", {
     style: "currency",
     currency: "ARS",
@@ -288,6 +300,24 @@ export function PrendaForm({ prenda, branches = [], onClose, onSuccess }: Prenda
   const quitarMedida = (key: number) =>
     setMedidas((prev) => prev.filter((medida) => medida.key !== key));
 
+  const agregarTalle = () =>
+    setTalles((prev) => [
+      ...prev,
+      {
+        key: prev.length === 0 ? 1 : Math.max(...prev.map((f) => f.key)) + 1,
+        talle: "",
+        cantidad: "1",
+      },
+    ]);
+
+  const quitarTalle = (key: number) =>
+    setTalles((prev) => prev.filter((fila) => fila.key !== key));
+
+  const actualizarTalle = (key: number, campo: "talle" | "cantidad", valor: string) =>
+    setTalles((prev) =>
+      prev.map((fila) => (fila.key === key ? { ...fila, [campo]: valor } : fila))
+    );
+
   const actualizarMedida = (key: number, campo: "medidaTipoId" | "valorCm", valor: string) =>
     setMedidas((prev) =>
       prev.map((medida) => (medida.key === key ? { ...medida, [campo]: valor } : medida))
@@ -308,7 +338,12 @@ export function PrendaForm({ prenda, branches = [], onClose, onSuccess }: Prenda
     precio: precioNumero,
     costo: costoNumero,
     categoriaPrendaId: categoriaId as number,
-    talle: form.talle,
+    talles: talles
+      .filter((fila) => fila.talle.trim() !== "")
+      .map((fila) => ({
+        talle: fila.talle.trim(),
+        cantidad: Number(fila.cantidad) || 0,
+      })),
     condicionId: condicionId as number,
     detalleCondicion: form.detalleCondicion.trim() || undefined,
     detalleIntervencion: form.detalleIntervencion.trim() || undefined,
@@ -328,6 +363,9 @@ export function PrendaForm({ prenda, branches = [], onClose, onSuccess }: Prenda
     if (guardando) return;
 
     // Chequeo de cliente: el servidor vuelve a validarlo todo.
+    const tallesValidos = talles.filter(
+      (fila) => fila.talle.trim() !== "" && Number(fila.cantidad) >= 1
+    );
     const faltante =
       !form.nombre.trim()
         ? "El nombre es requerido"
@@ -335,17 +373,19 @@ export function PrendaForm({ prenda, branches = [], onClose, onSuccess }: Prenda
           ? "El precio debe ser mayor a 0"
           : form.costo.trim() === ""
             ? "El costo es requerido"
-            : !form.talle.trim()
-              ? "El talle es requerido"
-              : categoriaId === null
-                ? "Elegí la categoría de prenda"
-                : condicionId === null
-                  ? "Elegí la condición"
-                  : !isEdit && branchId === null
-                    ? "Elegí la sucursal"
-                    : !isEdit && !esUnica && !(Number(cantidad) >= 1)
-                      ? "La cantidad mínima es 1"
-                      : null;
+            : talles.length === 0 || tallesValidos.length === 0
+              ? "Cargá al menos un talle con su cantidad"
+              : tallesValidos.length !== talles.length
+                ? "Cada talle necesita una cantidad de 1 o más"
+                : esUnica && (tallesValidos.length !== 1 || Number(tallesValidos[0].cantidad) !== 1)
+                  ? "Una prenda única lleva un solo talle con cantidad 1"
+                  : categoriaId === null
+                    ? "Elegí la categoría de prenda"
+                    : condicionId === null
+                      ? "Elegí la condición"
+                      : !isEdit && branchId === null
+                        ? "Elegí la sucursal"
+                        : null;
     if (faltante) {
       setError(faltante);
       return;
@@ -377,7 +417,6 @@ export function PrendaForm({ prenda, branches = [], onClose, onSuccess }: Prenda
     const resultado = await createPrenda({
       ...payload,
       branchId: branchId as number,
-      cantidad: esUnica ? 1 : Number(cantidad),
     });
     setGuardando(false);
 
@@ -530,19 +569,64 @@ export function PrendaForm({ prenda, branches = [], onClose, onSuccess }: Prenda
                   />
                 </div>
 
+                {/* S1: filas «Talle + Cantidad»; una prenda única lleva un solo talle. */}
                 <div>
-                  <label htmlFor="prenda-talle" className={labelClass}>
-                    Talle *
-                  </label>
-                  <input
-                    id="prenda-talle"
-                    type="text"
-                    value={form.talle}
-                    onChange={(e) => setForm({ ...form, talle: e.target.value })}
-                    placeholder="Único"
-                    maxLength={20}
-                    className={inputClass}
-                  />
+                  <span className={labelClass}>Talles *</span>
+                  <div className="space-y-2">
+                    {talles.map((fila, indice) => (
+                      <div key={fila.key} className="flex items-center gap-2">
+                        <input
+                          id={indice === 0 ? "prenda-talle" : `prenda-talle-${fila.key}`}
+                          type="text"
+                          value={fila.talle}
+                          onChange={(e) => actualizarTalle(fila.key, "talle", e.target.value)}
+                          placeholder="Único"
+                          maxLength={20}
+                          aria-label={`Talle ${indice + 1}`}
+                          className={inputClass}
+                        />
+                        {!esUnica && (
+                          <>
+                            <input
+                              id={`prenda-talle-cantidad-${fila.key}`}
+                              type="number"
+                              inputMode="numeric"
+                              step="1"
+                              min="1"
+                              max="999"
+                              value={fila.cantidad}
+                              onChange={(e) =>
+                                actualizarTalle(fila.key, "cantidad", e.target.value)
+                              }
+                              aria-label={`Cantidad del talle ${indice + 1}`}
+                              className={`${inputClass} w-24 text-center`}
+                            />
+                            {talles.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => quitarTalle(fila.key)}
+                                className="btn btn-icon text-ink-muted hover:bg-surface-strong"
+                                aria-label={`Quitar talle ${indice + 1}`}
+                              >
+                                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                              </button>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  {!esUnica && (
+                    <button
+                      type="button"
+                      onClick={agregarTalle}
+                      className="btn btn-ghost mt-2 text-sm text-accent"
+                    >
+                      ＋ Agregar talle
+                    </button>
+                  )}
                 </div>
 
                 <div>
@@ -759,28 +843,27 @@ export function PrendaForm({ prenda, branches = [], onClose, onSuccess }: Prenda
                     onChange={(e) => {
                       setEsUnica(e.target.checked);
                       setEsUnicaTocada(true);
+                      // Una prenda única colapsa las filas a un solo talle (S1).
+                      if (e.target.checked) {
+                        setTalles((prev) => [
+                          { key: prev[0]?.key ?? 1, talle: prev[0]?.talle ?? "", cantidad: "1" },
+                        ]);
+                      }
                     }}
                     className="h-5 w-5 accent-accent"
                   />
                 </div>
 
-                {/* El stock solo se carga en el alta y nunca con más de una unidad. */}
-                {!isEdit && !esUnica && (
+                {/* El total de unidades se deriva de los talles (S1), nunca se escribe a mano. */}
+                {!esUnica && (
                   <div>
-                    <label htmlFor="prenda-cantidad" className={labelClass}>
-                      Cantidad *
-                    </label>
-                    <input
-                      id="prenda-cantidad"
-                      type="number"
-                      inputMode="numeric"
-                      step="1"
-                      min="1"
-                      max="999"
-                      value={cantidad}
-                      onChange={(e) => setCantidad(e.target.value)}
-                      className={inputClass}
-                    />
+                    <span className={labelClass}>Total de unidades</span>
+                    <p
+                      data-testid="prenda-cantidad-total"
+                      className={`${inputClass} bg-surface-strong text-sm text-ink-muted`}
+                    >
+                      {cantidadTotal} {cantidadTotal === 1 ? "unidad" : "unidades"}
+                    </p>
                   </div>
                 )}
 

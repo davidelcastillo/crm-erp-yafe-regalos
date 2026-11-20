@@ -87,7 +87,7 @@ const prenda = {
   precio: 12000,
   categoriaPrendaId: 1,
   condicionId: 2,
-  talle: "M",
+  talles: [{ talle: "M", cantidad: 1 }],
   detalleCondicion: "",
   detalleIntervencion: "",
   costo: 4000,
@@ -204,7 +204,7 @@ describe("PrendaForm: alta", () => {
         precio: 12000,
         costo: 4000,
         categoriaPrendaId: 1,
-        talle: "M",
+        talles: [{ talle: "M", cantidad: 1 }],
         condicionId: 2,
         detalleCondicion: undefined,
         detalleIntervencion: undefined,
@@ -212,7 +212,6 @@ describe("PrendaForm: alta", () => {
         medidas: [],
         esUnica: true,
         branchId: 1,
-        cantidad: 1,
         publicadaEn: ["Web"],
       })
     );
@@ -285,6 +284,46 @@ describe("PrendaForm: edición", () => {
       )
     );
     expect(mockCreate).not.toHaveBeenCalled();
+  });
+});
+
+describe("PrendaForm: filas de talle (S1)", () => {
+  it("agrega filas de talle con cantidad y deriva el total", async () => {
+    mockCreate.mockResolvedValue({ success: true, data: { product: {}, receipt: null } } as never);
+    renderAlta();
+    await esperarOpciones();
+
+    // La categoría con stock apaga «prenda única» y habilita las filas.
+    fireEvent.change(screen.getByLabelText(/categoría de prenda/i), { target: { value: "2" } });
+    fireEvent.change(screen.getByLabelText(/^talle/i), { target: { value: "S" } });
+    fireEvent.change(screen.getByLabelText(/cantidad del talle 1/i), { target: { value: "2" } });
+
+    fireEvent.click(screen.getByRole("button", { name: /agregar talle/i }));
+    fireEvent.change(screen.getByLabelText("Talle 2"), { target: { value: "M" } });
+    fireEvent.change(screen.getByLabelText("Cantidad del talle 2"), { target: { value: "3" } });
+
+    // El total se deriva de las filas, nunca se escribe a mano.
+    expect(screen.getByTestId("prenda-cantidad-total")).toHaveTextContent("5 unidades");
+
+    // Quitar una fila la saca del total y del payload.
+    fireEvent.click(screen.getByRole("button", { name: /quitar talle 2/i }));
+    expect(screen.getByTestId("prenda-cantidad-total")).toHaveTextContent("2 unidades");
+
+    // Se completa el resto y se envía.
+    fireEvent.change(screen.getByLabelText(/^nombre/i), { target: { value: "Campera" } });
+    fireEvent.change(screen.getByLabelText(/precio de venta/i), { target: { value: "100" } });
+    fireEvent.change(screen.getByLabelText(/^costo/i), { target: { value: "50" } });
+    fireEvent.change(screen.getByLabelText(/^condición/i), { target: { value: "2" } });
+    fireEvent.click(screen.getByRole("button", { name: /depósito/i }));
+    fireEvent.click(screen.getByRole("button", { name: /crear prenda/i }));
+
+    await waitFor(() =>
+      expect(mockCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          talles: [{ talle: "S", cantidad: 2 }],
+        })
+      )
+    );
   });
 });
 

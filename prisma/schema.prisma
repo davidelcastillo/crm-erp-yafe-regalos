@@ -308,7 +308,6 @@ model PrendaDetalle {
   categoria           CategoriaPrenda @relation(fields: [categoriaId], references: [id])
   condicionId         Int
   condicion           CondicionPrenda @relation(fields: [condicionId], references: [id])
-  talle               String // texto libre, admite «Único»
   detalleCondicion    String? // «Con detalles (aclarar)»: texto libre junto a la condición
   detalleIntervencion String?
   costo               Decimal         @db.Decimal(10, 2)
@@ -316,9 +315,21 @@ model PrendaDetalle {
   updatedAt           DateTime        @updatedAt
   estilos             PrendaEstilo[]
   medidas             PrendaMedida[]
+  talles              PrendaTalle[]
 
   @@index([categoriaId])
   @@index([condicionId])
+}
+
+// S1: filas «Talle + Cantidad»; una prenda única lleva una sola (talle, 1).
+model PrendaTalle {
+  productId Int
+  talle     String
+  cantidad  Int
+  prenda    PrendaDetalle @relation(fields: [productId], references: [productId], onDelete: Cascade)
+
+  @@id([productId, talle])
+  @@index([productId])
 }
 
 // Taxonomías creables: se desactivan, nunca se borran (hay prendas que las usan).

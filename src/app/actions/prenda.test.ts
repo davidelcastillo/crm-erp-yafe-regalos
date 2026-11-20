@@ -29,6 +29,9 @@ jest.mock("@/lib/prisma", () => {
     categoriaPrenda: { findFirst: jest.fn() },
     product: delegate(),
     prendaDetalle: delegate(),
+    prendaTalle: delegate(),
+    purchase: delegate(),
+    purchaseItem: delegate(),
     prendaEstilo: delegate(),
     prendaMedida: delegate(),
     prendaPublicacion: delegate(),
@@ -64,14 +67,13 @@ const alta = {
   precio: 12000,
   costo: 4000,
   categoriaPrendaId: 1,
-  talle: "M",
+  talles: [{ talle: "M", cantidad: 1 }],
   condicionId: 2,
   detalleCondicion: "Mancha chica en el puño",
   detalleIntervencion: "Sin intervenir",
   estilos: [4, 5],
   medidas: [{ medidaTipoId: 6, valorCm: 48.5 }],
   esUnica: true,
-  cantidad: 1,
   branchId: 3,
   publicadaEn: ["Web", "WhatsApp"],
 };
@@ -99,6 +101,7 @@ function prepararLecturas() {
     price: 12000,
   });
   (prisma.branchInventory.create as jest.Mock).mockResolvedValue({ stock: 1 });
+  (prisma.purchase.create as jest.Mock).mockResolvedValue({ id: 77 });
 }
 
 beforeEach(() => {
@@ -119,7 +122,11 @@ describe("createPrenda: autorización y validación", () => {
   });
 
   it("un payload inválido devuelve el mensaje de Zod y no abre transacción", async () => {
-    const result = await createPrenda({ ...alta, nombre: "   ", talle: "" });
+    const result = await createPrenda({
+      ...alta,
+      nombre: "   ",
+      talles: [{ talle: "   ", cantidad: 1 }],
+    });
 
     expect(result.success).toBe(false);
     if (result.success) return;
@@ -128,12 +135,31 @@ describe("createPrenda: autorización y validación", () => {
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
-  it("una prenda única no admite cantidad distinta de 1", async () => {
-    const result = await createPrenda({ ...alta, esUnica: true, cantidad: 3 });
+  it("una prenda única lleva un solo talle con cantidad 1", async () => {
+    const tres = await createPrenda({ ...alta, talles: [{ talle: "M", cantidad: 3 }] });
+    expect(tres).toEqual({
+      success: false,
+      error: "Una prenda única lleva un solo talle con cantidad 1",
+    });
 
-    expect(result.success).toBe(false);
-    if (result.success) return;
-    expect(result.error).toBe("Una prenda única lleva cantidad 1");
+    const dos = await createPrenda({
+      ...alta,
+      talles: [
+        { talle: "M", cantidad: 1 },
+        { talle: "L", cantidad: 1 },
+      ],
+    });
+    expect(dos).toEqual({
+      success: false,
+      error: "Una prenda única lleva un solo talle con cantidad 1",
+    });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("sin talles el alta se rechaza antes de abrir transacción", async () => {
+    const result = await createPrenda({ ...alta, talles: [] });
+
+    expect(result).toEqual({ success: false, error: "Cargá al menos un talle" });
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
@@ -199,18 +225,23 @@ describe("createPrenda: alta completa", () => {
       kind: "PRENDA",
     });
 
-    // La ficha: todo lo propio de la ropa, incluido el costo.
+    // La ficha: todo lo propio de la ropa, incluido el costo. El talle vive en
+    // sus filas (S1), no acá.
     const ficha = (prisma.prendaDetalle.create as jest.Mock).mock.calls[0][0].data;
     expect(ficha).toEqual({
       productId: 9,
       esUnica: true,
       categoriaId: 1,
       condicionId: 2,
-      talle: "M",
       detalleCondicion: "Mancha chica en el puño",
       detalleIntervencion: "Sin intervenir",
       costo: 4000,
     });
+
+    // Talles: una fila por talle con su cantidad (S1).
+    expect((prisma.prendaTalle.createMany as jest.Mock).mock.calls[0][0].data).toEqual([
+      { productId: 9, talle: "M", cantidad: 1 },
+    ]);
 
     expect((prisma.prendaEstilo.createMany as jest.Mock).mock.calls[0][0].data).toEqual([
       { productId: 9, estiloId: 4 },
@@ -239,6 +270,16 @@ describe("createPrenda: alta completa", () => {
       performedBy: "test@feria.test",
     });
 
+    // Compra del alta (S2): con costo > 0 se registra en la misma transacción,
+    // sin tocar stock (el ENTRY de arriba ya lo ingresó).
+    expect((prisma.purchase.create as jest.Mock).mock.calls[0][0].data).toEqual({
+      totalAmount: 4000,
+      branchId: 3,
+    });
+    expect((prisma.purchaseItem.createMany as jest.Mock).mock.calls[0][0].data).toEqual([
+      { purchaseId: 77, productId: 9, price: 4000, quantity: 1, subtotal: 4000 },
+    ]);
+
     // Comprobante: la misma forma que consume el panel del alta masiva.
     expect(result.data.receipt).toEqual({
       movementType: "ENTRY",
@@ -255,17 +296,40 @@ describe("createPrenda: alta completa", () => {
     expect(mockRevalidate).toHaveBeenCalledWith("/inventario");
   });
 
-  it("una prenda nueva con cantidad carga el stock y el movimiento de esa cantidad", async () => {
-    (prisma.branchInventory.create as jest.Mock).mockResolvedValue({ stock: 4 });
+  it("una prenda con varios talles suma las cantidades para el stock, el movimiento y la compra", async () => {
+    (prisma.branchInventory.create as jest.Mock).mockResolvedValue({ stock: 5 });
 
-    const result = await createPrenda({ ...alta, esUnica: false, cantidad: 4 });
+    const result = await createPrenda({
+      ...alta,
+      esUnica: false,
+      talles: [
+        { talle: "S", cantidad: 2 },
+        { talle: "M", cantidad: 3 },
+      ],
+    });
 
     expect(result.success).toBe(true);
     if (!result.success) return;
-    expect((prisma.branchInventory.create as jest.Mock).mock.calls[0][0].data.stock).toBe(4);
-    expect((prisma.branchMovement.create as jest.Mock).mock.calls[0][0].data.quantity).toBe(4);
-    expect(result.data.receipt?.rows[0].quantity).toBe(4);
-    expect(result.data.receipt?.rows[0].stock).toBe(4);
+    expect((prisma.branchInventory.create as jest.Mock).mock.calls[0][0].data.stock).toBe(5);
+    expect((prisma.branchMovement.create as jest.Mock).mock.calls[0][0].data.quantity).toBe(5);
+    expect(result.data.receipt?.rows[0].quantity).toBe(5);
+    expect(result.data.receipt?.rows[0].stock).toBe(5);
+    // La compra lleva el total de unidades (S2).
+    expect((prisma.purchaseItem.createMany as jest.Mock).mock.calls[0][0].data[0]).toEqual({
+      purchaseId: 77,
+      productId: 9,
+      price: 4000,
+      quantity: 5,
+      subtotal: 20000,
+    });
+    expect((prisma.purchase.create as jest.Mock).mock.calls[0][0].data.totalAmount).toBe(20000);
+  });
+
+  it("costo 0 no genera compra", async () => {
+    await createPrenda({ ...alta, costo: 0 });
+
+    expect(prisma.purchase.create).not.toHaveBeenCalled();
+    expect(prisma.purchaseItem.createMany).not.toHaveBeenCalled();
   });
 
   it("ignora canales vacíos o desconocidos en «Publicar en»", async () => {
@@ -351,12 +415,19 @@ describe("updatePrenda", () => {
     expect((prisma.prendaDetalle.update as jest.Mock).mock.calls[0][0].data).toEqual({
       categoriaId: 1,
       condicionId: 2,
-      talle: "M",
       detalleCondicion: "Mancha chica en el puño",
       detalleIntervencion: "Sin intervenir",
       costo: 4000,
       esUnica: true,
     });
+
+    // Talles: reemplazo entero, como estilos y medidas (S1).
+    expect((prisma.prendaTalle.deleteMany as jest.Mock).mock.calls[0][0]).toEqual({
+      where: { productId: 9 },
+    });
+    expect((prisma.prendaTalle.createMany as jest.Mock).mock.calls[0][0].data).toEqual([
+      { productId: 9, talle: "M", cantidad: 1 },
+    ]);
 
     // Se reemplazan enteras: borrar primero y volver a crear solo lo elegido.
     expect((prisma.prendaEstilo.deleteMany as jest.Mock).mock.calls[0][0]).toEqual({
@@ -485,12 +556,12 @@ describe("getPrenda", () => {
         esUnica: true,
         categoriaId: 1,
         condicionId: 2,
-        talle: "M",
         detalleCondicion: null,
         detalleIntervencion: null,
         costo: 4000,
         estilos: [{ estiloId: 4 }],
         medidas: [{ medidaTipoId: 6, valorCm: 48.5 }],
+        talles: [{ talle: "M", cantidad: 1 }],
       },
       publicaciones: [{ canal: "Web" }],
     });
@@ -507,7 +578,7 @@ describe("getPrenda", () => {
         precio: 12000,
         categoriaPrendaId: 1,
         condicionId: 2,
-        talle: "M",
+        talles: [{ talle: "M", cantidad: 1 }],
         detalleCondicion: "",
         detalleIntervencion: "",
         costo: 4000,

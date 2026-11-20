@@ -2,6 +2,7 @@
 "use server";
 import { requireAdmin } from "@/lib/auth-guard";
 
+import { registrarCompraDelAlta } from "@/lib/compra-alta";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -79,6 +80,8 @@ export async function createPrenda(data: unknown) {
     if (!auth.ok) return { success: false as const, error: auth.error };
 
     const parsed = createPrendaSchema.parse(data);
+    // S1: la cantidad total se deriva de las filas de talle, nunca la manda el cliente.
+    const cantidadTotal = parsed.talles.reduce((suma, fila) => suma + fila.cantidad, 0);
 
     const branch = await prisma.branch.findFirst({
       where: { id: parsed.branchId, isActive: true },
@@ -138,11 +141,19 @@ export async function createPrenda(data: unknown) {
           esUnica: parsed.esUnica,
           categoriaId: parsed.categoriaPrendaId,
           condicionId: parsed.condicionId,
-          talle: parsed.talle,
           detalleCondicion: parsed.detalleCondicion ?? null,
           detalleIntervencion: parsed.detalleIntervencion ?? null,
           costo: parsed.costo,
         },
+      });
+
+      // S1: una fila por talle con su cantidad; el total las suma.
+      await tx.prendaTalle.createMany({
+        data: parsed.talles.map((fila) => ({
+          productId: product.id,
+          talle: fila.talle,
+          cantidad: fila.cantidad,
+        })),
       });
 
       if (parsed.estilos.length > 0) {
@@ -166,7 +177,7 @@ export async function createPrenda(data: unknown) {
       }
 
       const inventario = await tx.branchInventory.create({
-        data: { branchId: branch.id, productId: product.id, stock: parsed.cantidad },
+        data: { branchId: branch.id, productId: product.id, stock: cantidadTotal },
         select: { stock: true },
       });
 
@@ -176,12 +187,20 @@ export async function createPrenda(data: unknown) {
           productId: product.id,
           branchId: branch.id,
           movementType: "ENTRY",
-          quantity: parsed.cantidad,
+          quantity: cantidadTotal,
           reference: PRENDA_ENTRY_REFERENCE,
           // `performedBy` es obligatorio: sin email queda un responsable explícito.
           performedBy: auth.email || "sistema",
         },
       });
+
+      // S2: con costo > 0, la compra del alta se registra en la misma
+      // transacción (solo el registro: el ENTRY de arriba ya ingresó el stock).
+      if (parsed.costo > 0) {
+        await registrarCompraDelAlta(tx, branch.id, [
+          { productId: product.id, price: parsed.costo, quantity: cantidadTotal },
+        ]);
+      }
 
       const receipt: StockMovementReceipt = {
         movementType: "ENTRY",
@@ -196,7 +215,7 @@ export async function createPrenda(data: unknown) {
             code: product.code,
             name: product.name,
             price: Number(product.price),
-            quantity: parsed.cantidad,
+            quantity: cantidadTotal,
             // Saldo confirmado por la transacción, no supuesto.
             stock: inventario.stock,
           },
@@ -280,7 +299,6 @@ export async function updatePrenda(data: unknown) {
         data: {
           categoriaId: parsed.categoriaPrendaId,
           condicionId: parsed.condicionId,
-          talle: parsed.talle,
           detalleCondicion: parsed.detalleCondicion ?? null,
           detalleIntervencion: parsed.detalleIntervencion ?? null,
           costo: parsed.costo,
@@ -289,6 +307,16 @@ export async function updatePrenda(data: unknown) {
       });
 
       // Reemplazo entero de las filas hijas: borrar y volver a crear lo elegido.
+      // Talles incluidos (S1): son datos de la ficha; el stock nunca se toca acá.
+      await tx.prendaTalle.deleteMany({ where: { productId: parsed.id } });
+      await tx.prendaTalle.createMany({
+        data: parsed.talles.map((fila) => ({
+          productId: parsed.id,
+          talle: fila.talle,
+          cantidad: fila.cantidad,
+        })),
+      });
+
       await tx.prendaEstilo.deleteMany({ where: { productId: parsed.id } });
       if (parsed.estilos.length > 0) {
         await tx.prendaEstilo.createMany({
@@ -346,12 +374,12 @@ export async function getPrenda(id: number) {
             esUnica: true,
             categoriaId: true,
             condicionId: true,
-            talle: true,
             detalleCondicion: true,
             detalleIntervencion: true,
             costo: true,
             estilos: { select: { estiloId: true } },
             medidas: { select: { medidaTipoId: true, valorCm: true } },
+            talles: { select: { talle: true, cantidad: true } },
           },
         },
         publicaciones: { select: { canal: true } },
@@ -369,7 +397,10 @@ export async function getPrenda(id: number) {
       precio: Number(product.price),
       categoriaPrendaId: product.prenda.categoriaId,
       condicionId: product.prenda.condicionId,
-      talle: product.prenda.talle,
+      talles: product.prenda.talles.map((fila) => ({
+        talle: fila.talle,
+        cantidad: fila.cantidad,
+      })),
       detalleCondicion: product.prenda.detalleCondicion ?? "",
       detalleIntervencion: product.prenda.detalleIntervencion ?? "",
       costo: Number(product.prenda.costo),
