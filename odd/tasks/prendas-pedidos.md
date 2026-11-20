@@ -192,3 +192,18 @@ unidad. Los docs de fase (`docs/adr/*`, `polkalinas-html/`) se commitean con U1.
   (a) `adjustBranchStockBatch` y el cierre del control de stock NO miran reservas — el ADR §2.2
   lo prometía y ninguna unidad lo tenía agendado: se mueve a U7; (b) `auth-guard.actions.test.ts`
   roja desde U3/U4 (lista de módulos pinneada sin pedido/prenda/prendaTaxonomy): se suma a U7.
+- **L11.** U7 commiteada. Unidad de DINERO con doble firma: worker + verificación independiente
+  (veredicto READY TO COMMIT). Evidencia: núcleo `cobrarTx` extraído de `cobrarPedido` (los 43
+  tests del cobro sin tocar una aserción, byte-idénticos y verdes); `entregarPedido` solo desde
+  RESERVADO, transición optimista → núcleo de cobro → `saleId` en la MISMA transacción (el
+  verificador confirmó: transición primero para que la reserva propia no cuente, sin ventana de
+  sobreventa, y un crash no deja Entregado sin Sale); MIXTO/total-0 por el mismo camino del cobro.
+  Las CUATRO bajas de stock fuera de venta/traspaso (adjustProductStock, assignStockToBranch,
+  adjustBranchStockBatch EXIT y el cierre del control) pasan por `verificarDisponible` — las dos
+  deudas de L10 saldadas; la meta-test de auth-guard verde registrando los módulos nuevos
+  (conteo pinneado 64→99, honesto según conteo independiente del verificador). El coordinador
+  cerró el hallazgo bajo del verificador ANTES del commit: guarda nueva en `moverPedido`
+  (PARA_ENVIAR→ENTREGADO exige `saleId`: ninguna fila legada llega a Entregado sin su venta —
+  invariante del dueño) con test propio (51 en pedido.test). Totales: 128/128 + guardia 72/72,
+  3/3 base local end-to-end (reservar → entregar → Sale/stock/EXIT únicos), tsc 0, lint 0.
+  Verificado en navegador por el dueño («okey») y sesión cerrada al final del día 2026-11-19/20.
