@@ -130,7 +130,9 @@ describe("reserva derivada R1 (integración, base local)", () => {
     ).id;
     canalId = (await prisma.canalVenta.create({ data: { name: `${marca} whatsapp` } })).id;
     categoriaId = (
-      await prisma.categoriaPrenda.create({ data: { name: `${marca} categoria` } })
+      await prisma.categoriaPrenda.create({
+        data: { name: `${marca} categoria`, codePrefix: "QR" },
+      })
     ).id;
     condicionId = (
       await prisma.condicionPrenda.create({ data: { name: `${marca} condicion` } })

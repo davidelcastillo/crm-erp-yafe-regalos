@@ -60,9 +60,9 @@ const SEEDS = [
   [
     "categoriaPrenda",
     [
-      { name: "Second hand", esUnicaPorDefecto: true },
-      { name: "Intervenido", esUnicaPorDefecto: true },
-      { name: "Nuevo", esUnicaPorDefecto: false },
+      { name: "Second hand", esUnicaPorDefecto: true, codePrefix: "RPH" },
+      { name: "Intervenido", esUnicaPorDefecto: true, codePrefix: "RPI" },
+      { name: "Nuevo", esUnicaPorDefecto: false, codePrefix: "RP" },
     ],
   ],
   [
@@ -91,11 +91,22 @@ async function main() {
     for (const [model, rows] of SEEDS) {
       let insertadas = 0;
       for (const row of rows) {
+        // `codePrefix` solo existe en categoriaPrenda: el select se arma por fila.
         const existente = await prisma[model].findFirst({
           where: { name: { equals: row.name, mode: "insensitive" } },
-          select: { id: true },
+          select: row.codePrefix !== undefined ? { id: true, codePrefix: true } : { id: true },
         });
-        if (existente) continue;
+        if (existente) {
+          // U8: las categorías sembradas antes de los prefijos los reciben ahora.
+          if (row.codePrefix !== undefined && existente.codePrefix == null) {
+            await prisma[model].update({
+              where: { id: existente.id },
+              data: { codePrefix: row.codePrefix },
+            });
+            console.log(`categoriaPrenda: prefijo ${row.codePrefix} completado en «${row.name}»`);
+          }
+          continue;
+        }
 
         await prisma[model].create({ data: row });
         insertadas += 1;

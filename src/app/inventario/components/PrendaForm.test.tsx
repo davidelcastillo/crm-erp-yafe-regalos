@@ -232,10 +232,12 @@ describe("PrendaForm: alta", () => {
 
   it("ofrece crear la categoría cuando todavía no hay ninguna", async () => {
     (getCategoriaPrendaOptions as jest.Mock).mockResolvedValue({ success: true, data: [] });
-    mockSwal.mockResolvedValue({ isConfirmed: true, value: "Intervenida" });
+    mockSwal
+      .mockResolvedValueOnce({ isConfirmed: true, value: "Intervenida" })
+      .mockResolvedValueOnce({ isConfirmed: true, value: "RPI" });
     mockCrearCategoria.mockResolvedValue({
       success: true,
-      data: { id: 7, name: "Intervenida", esUnicaPorDefecto: true },
+      data: { id: 7, name: "Intervenida", esUnicaPorDefecto: true, codePrefix: "RPI" },
     } as never);
 
     renderAlta();
@@ -244,7 +246,7 @@ describe("PrendaForm: alta", () => {
     fireEvent.click(screen.getByRole("button", { name: /nueva categoría/i }));
 
     await waitFor(() =>
-      expect(mockCrearCategoria).toHaveBeenCalledWith({ name: "Intervenida" })
+      expect(mockCrearCategoria).toHaveBeenCalledWith({ name: "Intervenida", codePrefix: "RPI" })
     );
     // La categoría recién creada queda elegida.
     await waitFor(() =>

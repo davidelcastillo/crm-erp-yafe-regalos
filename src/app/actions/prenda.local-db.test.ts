@@ -58,7 +58,7 @@ describe("createPrenda (integración, base local)", () => {
 
     categoriaId = (
       await prisma.categoriaPrenda.create({
-        data: { name: `${marca} categoria`, esUnicaPorDefecto: true },
+        data: { name: `${marca} categoria`, esUnicaPorDefecto: true, codePrefix: "QP" },
       })
     ).id;
     condicionId = (
@@ -105,8 +105,8 @@ describe("createPrenda (integración, base local)", () => {
     const { product, receipt } = resultado.data;
     const productId = product.id;
 
-    // Código del generador real, con el prefijo de las prendas.
-    expect(product.code).toMatch(/^PK\d{3}$/);
+    // Código del generador real, con el prefijo de la categoría (U8).
+    expect(product.code).toMatch(/^QP\d{3}$/);
     expect(product.code).toBe(
       await prisma.product
         .findUnique({ where: { id: productId }, select: { code: true } })
@@ -139,7 +139,7 @@ describe("createPrenda (integración, base local)", () => {
       },
     });
     expect(fila?.kind).toBe("PRENDA");
-    expect(fila?.codePrefix).toBe("PK");
+    expect(fila?.codePrefix).toBe("QP");
     expect(Number(fila?.price)).toBe(12000);
     expect(fila?.prenda).toMatchObject({
       esUnica: true,
@@ -208,7 +208,7 @@ describe("createPrenda (integración, base local)", () => {
     });
   });
 
-  it("los códigos de prenda siguen la secuencia del prefijo PK", async () => {
+  it("los códigos de prenda siguen la secuencia del prefijo de su categoría", async () => {
     const primera = await acciones.createPrenda(altaUnica(`${marca} remera a`));
     const segunda = await acciones.createPrenda(altaUnica(`${marca} remera b`));
 
@@ -223,9 +223,12 @@ describe("createPrenda (integración, base local)", () => {
 
   it("si una escritura falla después del insert del producto, no queda nada a medias", async () => {
     const nombre = `${marca} atomica`;
+    // Con `categoriaId`: el conteo de fichas se limita a esta suite. Sin el
+    // alcance, la cuenta total compite con otras suites que crean prendas en
+    // paralelo y el assert es una carrera.
     const antes = await Promise.all([
       prisma.product.count({ where: { name: nombre } }),
-      prisma.prendaDetalle.count(),
+      prisma.prendaDetalle.count({ where: { categoriaId } }),
       prisma.branchInventory.count({ where: { branchId } }),
       prisma.branchMovement.count({ where: { branchId } }),
     ]);
@@ -240,7 +243,7 @@ describe("createPrenda (integración, base local)", () => {
     expect(
       await Promise.all([
         prisma.product.count({ where: { name: nombre } }),
-        prisma.prendaDetalle.count(),
+        prisma.prendaDetalle.count({ where: { categoriaId } }),
         prisma.branchInventory.count({ where: { branchId } }),
         prisma.branchMovement.count({ where: { branchId } }),
       ])

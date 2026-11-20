@@ -13,9 +13,6 @@ import {
   type PrendaEditable,
 } from "@/lib/validations/prenda";
 
-/** Prefijo fijo de las prendas (decisión del dueño: `PK0143`, sin guion). */
-const PRENDA_PREFIX = "PK";
-
 /** Motivo del ingreso inicial en el movimiento y en el comprobante. */
 const PRENDA_ENTRY_REFERENCE = "ALTA DE PRENDA";
 
@@ -71,9 +68,10 @@ async function taxonomiasInactivas(datos: {
 /**
  * Alta de prenda: `Product(kind=PRENDA)` + ficha + estilos/medidas/
  * publicaciones + la fila de inventario de la sucursal elegida, todo en una
- * transacción. El código (`PK…`) lo genera el servidor con el lock del prefijo,
- * nunca lo manda el cliente. El ingreso deja su movimiento `ENTRY` y el
- * comprobante que consume el panel del alta masiva.
+ * transacción. El código (`RP…`/`RPI…`/`RPH…`) lo genera el servidor a partir del
+ * prefijo de SU categoría, bajo el lock de ese prefijo; nunca lo manda el
+ * cliente. El ingreso deja su movimiento `ENTRY` y el comprobante que consume
+ * el panel del alta masiva.
  */
 export async function createPrenda(data: unknown) {
   try {
@@ -88,19 +86,37 @@ export async function createPrenda(data: unknown) {
     });
     if (!branch) return { success: false as const, error: "Sucursal inválida o inactiva" };
 
+    // U8: el prefijo del código viene de la categoría elegida (RP/RPI/RPH…),
+    // inmune a la entrada del cliente. Se lee antes de la transacción: el
+    // renombrado nunca lo toca, así que no puede cambiar bajo el lock.
+    const categoria = await prisma.categoriaPrenda.findFirst({
+      where: { id: parsed.categoriaPrendaId, active: true },
+      select: { id: true, name: true, codePrefix: true },
+    });
+    if (!categoria) {
+      return { success: false as const, error: "Categoría de prenda inválida o inactiva" };
+    }
+    if (!categoria.codePrefix) {
+      return {
+        success: false as const,
+        error: `La categoría «${categoria.name}» no tiene prefijo de código`,
+      };
+    }
+    const prefijo = categoria.codePrefix;
+
     const invalida = await taxonomiasInactivas(parsed);
     if (invalida) return { success: false as const, error: invalida };
 
     const resultado = await prisma.$transaction(async (tx) => {
       // Mismo lock y misma clave que el alta de productos del mismo prefijo.
-      await tx.$executeRawUnsafe(`SELECT pg_advisory_xact_lock(${prefixLockKey(PRENDA_PREFIX)})`);
+      await tx.$executeRawUnsafe(`SELECT pg_advisory_xact_lock(${prefixLockKey(prefijo)})`);
 
       const existentes = await tx.product.findMany({
-        where: { codePrefix: PRENDA_PREFIX },
+        where: { codePrefix: prefijo },
         select: { code: true },
       });
       const code = getNextCode(
-        PRENDA_PREFIX,
+        prefijo,
         existentes.map((producto) => producto.code).filter((c): c is string => c !== null)
       );
 
@@ -110,7 +126,7 @@ export async function createPrenda(data: unknown) {
           description: parsed.descripcion || "-",
           price: parsed.precio,
           code,
-          codePrefix: PRENDA_PREFIX,
+          codePrefix: prefijo,
           kind: "PRENDA",
         },
         select: { id: true, code: true, name: true, price: true },

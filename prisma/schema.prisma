@@ -323,10 +323,13 @@ model PrendaDetalle {
 
 // Taxonomías creables: se desactivan, nunca se borran (hay prendas que las usan).
 model CategoriaPrenda {
-  id                Int             @id @default(autoincrement())
-  name              String          @unique
-  esUnicaPorDefecto Boolean         @default(true) // solo precarga el formulario
-  active            Boolean         @default(true)
+  id                Int      @id @default(autoincrement())
+  name              String   @unique
+  // Prefijo del código de las prendas de esta categoría (U8: RP/RPI/RPH).
+  // Sin prefijo no se puede dar de alta una prenda: el generador no tendría base.
+  codePrefix        String?  @unique
+  esUnicaPorDefecto Boolean  @default(true) // solo precarga el formulario
+  active            Boolean  @default(true)
   prendas           PrendaDetalle[]
 }
 

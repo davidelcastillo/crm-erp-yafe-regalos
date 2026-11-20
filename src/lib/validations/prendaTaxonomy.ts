@@ -11,6 +11,14 @@ export const createTaxonomySchema = z.object({ name: nameSchema });
 
 export const createCategoriaPrendaSchema = createTaxonomySchema.extend({
   esUnicaPorDefecto: z.boolean().optional(),
+  // Prefijo del código de las prendas de esta categoría (U8). Se normaliza a
+  // mayúsculas; 2-4 letras como exige el generador (`getNextCode`).
+  codePrefix: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .regex(/^[A-Z]{2,4}$/, "El prefijo debe tener entre 2 y 4 letras")
+    .optional(),
 });
 
 export const renameTaxonomySchema = z.object({
@@ -33,4 +41,5 @@ export type TaxonomyOption = { id: number; name: string };
 /** Categoría de prenda: además precarga el `esUnica` del formulario. */
 export type CategoriaPrendaOption = TaxonomyOption & {
   esUnicaPorDefecto: boolean;
+  codePrefix: string | null;
 };

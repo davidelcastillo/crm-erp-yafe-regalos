@@ -224,6 +224,7 @@ async function opciones<T extends TaxonomyOption>(
 export async function createCategoriaPrenda(data: {
   name: string;
   esUnicaPorDefecto?: boolean;
+  codePrefix?: string;
 }): Promise<ActionResult<CategoriaPrendaOption>> {
   return crear(
     delegateOf<CategoriaPrendaOption>('categoriaPrenda'),
@@ -262,6 +263,7 @@ export async function getCategoriaPrendaOptions(): Promise<
     id: true,
     name: true,
     esUnicaPorDefecto: true,
+    codePrefix: true,
   });
 }
 

@@ -4,7 +4,7 @@
  * Alta y edición de prenda (U3): `createPrenda` y `updatePrenda`.
  *
  * Lo que se fija acá: guardián admin primero, código generado con el lock del
- * prefijo `PK` (nunca lo manda el cliente), la ficha completa (`Product` kind
+ * prefijo de SU categoría (nunca lo manda el cliente), la ficha completa (`Product` kind
  * PRENDA + `PrendaDetalle` + estilos/medidas/publicaciones), la fila de
  * inventario con su movimiento `ENTRY` y su comprobante, `esUnica` con cantidad
  * 1, taxonomías inactivas rechazadas y una edición que reemplaza los hijos pero
@@ -26,6 +26,7 @@ jest.mock("@/lib/prisma", () => {
     deleteMany: jest.fn(),
   });
   const delegados = {
+    categoriaPrenda: { findFirst: jest.fn() },
     product: delegate(),
     prendaDetalle: delegate(),
     prendaEstilo: delegate(),
@@ -46,7 +47,6 @@ jest.mock("@/lib/prisma", () => {
       $executeRawUnsafe,
       $transaction,
       branch: { findFirst: jest.fn() },
-      categoriaPrenda: { findFirst: jest.fn() },
       condicionPrenda: { findFirst: jest.fn() },
       estiloPrenda: { findMany: jest.fn() },
       medidaTipo: { findMany: jest.fn() },
@@ -83,14 +83,18 @@ function prepararLecturas() {
     name: "Depósito",
     code: "DE",
   });
-  (prisma.categoriaPrenda.findFirst as jest.Mock).mockResolvedValue({ id: 1 });
+  (prisma.categoriaPrenda.findFirst as jest.Mock).mockResolvedValue({
+    id: 1,
+    name: "Second hand",
+    codePrefix: "RPH",
+  });
   (prisma.condicionPrenda.findFirst as jest.Mock).mockResolvedValue({ id: 2 });
   (prisma.estiloPrenda.findMany as jest.Mock).mockResolvedValue([{ id: 4 }, { id: 5 }]);
   (prisma.medidaTipo.findMany as jest.Mock).mockResolvedValue([{ id: 6 }]);
   (prisma.product.findMany as jest.Mock).mockResolvedValue([]);
   (prisma.product.create as jest.Mock).mockResolvedValue({
     id: 9,
-    code: "PK000",
+    code: "RPH000",
     name: "Campera de jean",
     price: 12000,
   });
@@ -181,17 +185,17 @@ describe("createPrenda: alta completa", () => {
     expect(result.success).toBe(true);
     if (!result.success) return;
 
-    // Lock y código: el prefijo es fijo y nunca lo manda el cliente.
+    // Lock y código: el prefijo viene de la categoría y nunca lo manda el cliente.
     const sql = (prisma.$executeRawUnsafe as jest.Mock).mock.calls.map((c) => String(c[0]));
-    expect(sql).toEqual([`SELECT pg_advisory_xact_lock(${prefixLockKey("PK")})`]);
+    expect(sql).toEqual([`SELECT pg_advisory_xact_lock(${prefixLockKey("RPH")})`]);
 
     const producto = (prisma.product.create as jest.Mock).mock.calls[0][0].data;
     expect(producto).toEqual({
       name: "Campera de jean",
       description: "Talle M, segunda mano",
       price: 12000,
-      code: "PK000",
-      codePrefix: "PK",
+      code: "RPH000",
+      codePrefix: "RPH",
       kind: "PRENDA",
     });
 
@@ -244,7 +248,7 @@ describe("createPrenda: alta completa", () => {
       reference: "ALTA DE PRENDA",
       date: expect.any(String),
       rows: [
-        { productId: 9, code: "PK000", name: "Campera de jean", price: 12000, quantity: 1, stock: 1 },
+        { productId: 9, code: "RPH000", name: "Campera de jean", price: 12000, quantity: 1, stock: 1 },
       ],
     });
 
@@ -423,6 +427,48 @@ describe("updatePrenda", () => {
       error: "Un estilo seleccionado no existe o está inactivo",
     });
     expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+});
+
+describe("createPrenda: código por categoría (U8)", () => {
+  it("usa el prefijo de SU categoría y sigue desde el máximo existente de ese prefijo", async () => {
+    (prisma.categoriaPrenda.findFirst as jest.Mock).mockResolvedValue({
+      id: 1,
+      name: "Second hand",
+      codePrefix: "RPH",
+    });
+    (prisma.product.findMany as jest.Mock).mockResolvedValue([{ code: "RPH007" }]);
+
+    const result = await createPrenda(alta);
+
+    expect(result.success).toBe(true);
+    const sql = (prisma.$executeRawUnsafe as jest.Mock).mock.calls.map((c) => String(c[0]));
+    expect(sql).toEqual([`SELECT pg_advisory_xact_lock(${prefixLockKey("RPH")})`]);
+    expect(prisma.product.findMany).toHaveBeenCalledWith({
+      where: { codePrefix: "RPH" },
+      select: { code: true },
+    });
+    const producto = (prisma.product.create as jest.Mock).mock.calls[0][0].data;
+    expect(producto.code).toBe("RPH008");
+    expect(producto.codePrefix).toBe("RPH");
+  });
+
+  it("una categoría sin prefijo de código rechaza el alta sin escribir nada", async () => {
+    (prisma.categoriaPrenda.findFirst as jest.Mock).mockResolvedValue({
+      id: 1,
+      name: "Vestidos",
+      codePrefix: null,
+    });
+
+    const result = await createPrenda(alta);
+
+    expect(result).toEqual({
+      success: false,
+      error: "La categoría «Vestidos» no tiene prefijo de código",
+    });
+    expect(prisma.$executeRawUnsafe).not.toHaveBeenCalled();
+    expect(prisma.product.create).not.toHaveBeenCalled();
+    expect(prisma.prendaDetalle.create).not.toHaveBeenCalled();
   });
 });
 

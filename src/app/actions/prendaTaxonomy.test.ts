@@ -291,9 +291,9 @@ describe.each(taxonomias)("taxonomía $key", (t) => {
 describe("taxonomías de prendas: detalles", () => {
   beforeEach(() => jest.clearAllMocks());
 
-  it("las opciones de categoría incluyen esUnicaPorDefecto", async () => {
+  it("las opciones de categoría incluyen esUnicaPorDefecto y su prefijo de código", async () => {
     mockDelegates.categoriaPrenda.findMany.mockResolvedValue([
-      { id: 1, name: "Second hand", esUnicaPorDefecto: true },
+      { id: 1, name: "Second hand", esUnicaPorDefecto: true, codePrefix: "RPH" },
     ]);
 
     const result = await getCategoriaPrendaOptions();
@@ -301,12 +301,39 @@ describe("taxonomías de prendas: detalles", () => {
 
     expect(mockDelegates.categoriaPrenda.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        select: { id: true, name: true, esUnicaPorDefecto: true },
+        select: { id: true, name: true, esUnicaPorDefecto: true, codePrefix: true },
       })
     );
     expect(result.data).toEqual([
-      { id: 1, name: "Second hand", esUnicaPorDefecto: true },
+      { id: 1, name: "Second hand", esUnicaPorDefecto: true, codePrefix: "RPH" },
     ]);
+  });
+
+  it("la categoría acepta un prefijo de código y lo normaliza a mayúsculas (U8)", async () => {
+    mockDelegates.categoriaPrenda.findFirst.mockResolvedValue(null);
+    mockDelegates.categoriaPrenda.create.mockResolvedValue({
+      id: 9,
+      name: "Vestidos",
+      esUnicaPorDefecto: true,
+      codePrefix: "VES",
+    });
+
+    const result = await createCategoriaPrenda({ name: "Vestidos", codePrefix: " ves " });
+
+    expect(result.success).toBe(true);
+    expect(mockDelegates.categoriaPrenda.create).toHaveBeenCalledWith({
+      data: { name: "Vestidos", codePrefix: "VES" },
+    });
+  });
+
+  it("un prefijo inválido se rechaza con mensaje claro y sin tocar Prisma", async () => {
+    const result = await createCategoriaPrenda({ name: "Vestidos", codePrefix: "V1" });
+
+    expect(result).toEqual({
+      success: false,
+      error: "El prefijo debe tener entre 2 y 4 letras",
+    });
+    expect(mockDelegates.categoriaPrenda.create).not.toHaveBeenCalled();
   });
 
   it("renombrar una fila inexistente devuelve 'No se encontró'", async () => {

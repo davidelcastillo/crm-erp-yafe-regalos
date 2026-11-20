@@ -222,7 +222,30 @@ export function PrendaForm({ prenda, branches = [], onClose, onSuccess }: Prenda
     });
     if (!modal.isConfirmed) return;
 
-    const resultado = await createCategoriaPrenda({ name: String(modal.value ?? "").trim() });
+    // U8: el prefijo es la base del código de las prendas de la categoría —
+    // sin él no se puede dar de alta ninguna prenda, así que se pide acá.
+    const modalPrefijo = await Swal.fire({
+      title: `Prefijo de «${String(modal.value ?? "").trim()}»`,
+      input: "text",
+      inputLabel: "Prefijo del código (2-4 letras, p. ej. RPH)",
+      inputAttributes: { maxlength: "4" },
+      showCancelButton: true,
+      confirmButtonText: "Crear",
+      cancelButtonText: "Cancelar",
+      confirmButtonColor: "#6d28d9",
+      cancelButtonColor: "#6a6a6a",
+      inputValidator: (value) => {
+        if (!value || !/^[A-Za-z]{2,4}$/.test(value.trim()))
+          return "El prefijo debe tener entre 2 y 4 letras";
+        return null;
+      },
+    });
+    if (!modalPrefijo.isConfirmed) return;
+
+    const resultado = await createCategoriaPrenda({
+      name: String(modal.value ?? "").trim(),
+      codePrefix: String(modalPrefijo.value ?? "").trim(),
+    });
     if (!resultado.success) {
       setError(resultado.error);
       return;
@@ -778,7 +801,7 @@ export function PrendaForm({ prenda, branches = [], onClose, onSuccess }: Prenda
                 ) : (
                   <div>
                     <span className={labelClass}>Código</span>
-                    <p className="text-sm text-ink-muted">Se genera solo (PK0143…).</p>
+                    <p className="text-sm text-ink-muted">Se genera solo según la categoría (p. ej. RPH000).</p>
                   </div>
                 )}
 
