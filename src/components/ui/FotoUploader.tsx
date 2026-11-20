@@ -43,7 +43,7 @@ export interface FotoUploaderProps {
 
 /** URL pública y estable de un tamaño de la foto (bucket público, ADR-08). */
 export const urlFoto = (path: string, tamano: TamanoFoto = "sm") =>
-  `${process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""}/storage/v1/object/public/${PRODUCT_IMAGES_BUCKET}/${nombreFoto(path, tamano)}`;
+  `${process.env.NEXT_PUBLIC_SUPABASE_STORAGE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""}/storage/v1/object/public/${PRODUCT_IMAGES_BUCKET}/${nombreFoto(path, tamano)}`;
 
 /** Rechaza antes de firmar: el peso y el tipo se validan en el cliente. */
 const validarArchivo = (archivo: File): string | null => {

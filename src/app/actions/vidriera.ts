@@ -43,9 +43,10 @@ export type VidrieraFicha = VidrieraItem & {
   talles: string[];
 };
 
-/** URL pública y estable del bucket (ADR-08). Mismo criterio que `urlFoto`. */
+/** URL pública y estable del bucket (ADR-08). Mismo criterio que `urlFoto`;
+ * lee la variable pública de storage cuando está definida (desarrollo local). */
 const urlFoto = (path: string, tamano: TamanoFoto) =>
-  `${process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""}/storage/v1/object/public/${PRODUCT_IMAGES_BUCKET}/${nombreFoto(path, tamano)}`;
+  `${process.env.NEXT_PUBLIC_SUPABASE_STORAGE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""}/storage/v1/object/public/${PRODUCT_IMAGES_BUCKET}/${nombreFoto(path, tamano)}`;
 
 const SELECT_LISTA = {
   id: true,
