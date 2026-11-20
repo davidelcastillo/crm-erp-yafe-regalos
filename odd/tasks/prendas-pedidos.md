@@ -58,9 +58,9 @@ Decisiones del humano, citadas textuales. Las citas largas están transcriptadas
 
 | ID | Tarea | Specs | Ruta principal | Estado | Commit |
 |---|---|---|---|---|---|
-| U1 | Esquema aditivo completo: `ProductKind`, `PrendaDetalle`, taxonomías creables (`CategoriaPrenda`, `EstiloPrenda`, `CondicionPrenda`, `MedidaTipo`+`PrendaMedida`, `CanalVenta`), `Customer.phone`, `Pedido`/`PedidoItem`/`PedidoPago`, `PrendaPublicacion`. `db push` a base local y suite sin regresión | S1, S2, S6 | `prisma/schema.prisma` | pendiente | — |
-| U2 | Taxonomías creables: acciones de crear/renombrar/desactivar + semillas (condición: Muy bueno/Bueno/Con detalles; medidas: axila/largo total/manga; canales: los 4) y UI mínima reusando el patrón de categorías | S1, S2 | `src/app/actions/prendaTaxonomy.ts`, `src/lib/validations/`, UI mínima | pendiente | — |
-| U3 | Alta y edición de prenda: `createPrenda`/`updatePrenda` (Zod, `requireAdmin`, transacción, código con lock, fila de inventario + movimiento ENTRY, `esUnica`) y el formulario (`/inventario` → «Nueva prenda», patrón del alta de producto) | S1, S4 | `src/app/actions/prenda.ts`, `src/app/prendas/` o modal en `/inventario` | pendiente | — |
+| U1 | Esquema aditivo completo: `ProductKind`, `PrendaDetalle`, taxonomías creables (`CategoriaPrenda`, `EstiloPrenda`, `CondicionPrenda`, `MedidaTipo`+`PrendaMedida`, `CanalVenta`), `Customer.phone`, `Pedido`/`PedidoItem`/`PedidoPago`, `PrendaPublicacion`. `db push` a base local y suite sin regresión | S1, S2, S6 | `prisma/schema.prisma` | hecho | `db70f0d` |
+| U2 | Taxonomías creables: acciones de crear/renombrar/desactivar + semillas (condición: Muy bueno/Bueno/Con detalles; medidas: axila/largo total/manga; canales: los 4) y UI mínima reusando el patrón de categorías | S1, S2 | `src/app/actions/prendaTaxonomy.ts`, `src/lib/validations/`, UI mínima | hecho (capa servidor; la UI inline quedó en U3 por reencuadre anotado en L5) | `545efa6` |
+| U3 | Alta y edición de prenda: `createPrenda`/`updatePrenda` (Zod, `requireAdmin`, transacción, código con lock, fila de inventario + movimiento ENTRY, `esUnica`) y el formulario (`/inventario` → «Nueva prenda», patrón del alta de producto) | S1, S4 | `src/app/actions/prenda.ts`, `src/app/inventario/components/PrendaForm.tsx` | hecho, verificado por el dueño («ya lo probe, anda de diez») | `a029f87` |
 | U4 | Pedidos — servidor: `createPedido` (una sucursal, ítems con precio del servidor, seña opcional, `venceEl`, lock de número V-0001, chequeo de disponible bajo lock), `registrarSena`, `cobrarPedido` (crea la `Sale` + `SaleItem` + EXIT + `saleId`, transición condicional), `moverPedido`, `actualizarEnvio`, `cancelarPedido` (motivo + destino de la seña). Zona de dinero: verificación independiente | S2, S3, S6 | `src/app/actions/pedido.ts`, `src/lib/validations/pedido.ts` | pendiente | — |
 | U5 | Kanban y pedidos — UI: sección dentro de `/ventas`, 4 columnas en PC con arrastre, lista + selector por estado en celular, paso de cobro al soltar en «Pagado», avisos de vencimiento, tab de canal. Sin Server Actions públicas nuevas para leer | S3 | `src/app/ventas/pedidos/` + componentes | pendiente | — |
 | U6 | Reserva derivada R1: `registerSale` y `moveStock` pasan a respetar lo reservado (`stock − reservado ≥ cantidad`), disponibilidad derivada de la prenda (Disponible/Reservada/Vendida), y el aviso en el alta/venta. Zona de dinero/stock: verificación independiente | S1, S2, S6 | `src/app/actions/sale.ts`, `inventory.ts`, `prenda.ts` | pendiente | — |
@@ -87,3 +87,36 @@ unidad. Los docs de fase (`docs/adr/*`, `polkalinas-html/`) se commitean con U1.
 - **L3.** «Go!» (2026-11-19, con el PR #13 mergeado): arranca la implementación en
   `feat/prendas-pedidos`. Fuera de alcance declarado arriba; la vidriera pública Polkalina's es la
   fase siguiente y reusa todo lo de acá.
+- **L4.** U1 commiteada en `db70f0d` (esquema + fixture de tipo + docs de fase: ADRs, mockups,
+  plan). Evidencia: `prisma validate` OK; `db push` local en sincronía (dos corridas, la segunda
+  "already in sync"); suite completa **115/115 y 945/945** sin regresión; `tsc` 0 tras completar
+  `kind: "PRODUCT"` en los dos mocks de `ProductForm.test.tsx` (única causa de los 2 errores
+  TS2322, probada por A/B por el worker: sin `kind` en el esquema, `tsc` en 0; completación de tipo
+  autorizada por el coordinador, sin tocar aserciones). RED declarada N/A: unidad de puro esquema
+  sin cambio de comportamiento. Dos ajustes del coordinador sobre el entregado del worker:
+  `PrendaDetalle.detalleCondicion String?` sumado (flaggeado por el worker como faltante del
+  diseño §1.1) y limpieza del `prisma generate` que dejaba DLL `.tmp` (causa: dev servers huérfanos
+  — el `job_stop` del harness mata el wrapper npm y no el árbol de `next dev`, que retiene el
+  puerto 3000 y la DLL; se mató el PID exacto que reportó Next y el generate completó). Deuda
+  cosmética: ninguna pendiente. Semillas de taxonomía NO van acá: van con U2.
+- **L5.** U2 commiteada en `545efa6` (acciones de las 5 taxonomías + validaciones + semillas +
+  npm script). Evidencia: RED correcta (módulo inexistente), GREEN **42/42**; semillas aplicadas a
+  la base local (18 filas: condición 3, medidas 3, canales 4, categorías 3, estilos 5) con
+  idempotencia probada (2ª corrida: 0 filas); guarda de host no-local verificada con un host
+  remoto de prueba; `tsc` 0 y `eslint` 0. Reencuadre del coordinador: la "UI mínima" de U2 se mudó
+  a U3 (los selectores con creación inline viven en el formulario, como hace `CategorySelector`).
+  Nota de unicidad: el `@unique` de Postgres distingue mayúsculas, la unicidad case-insensitive
+  vive en la app y la carrera de alta concurrente queda cubierta mapeando P2002 al mismo mensaje.
+  **Frontera de slices** (por el guard de presupuesto de entrega): cada unidad de la tabla es un
+  slice con su commit (U1 además llevó los docs de fase en el mismo commit, ~4.2k líneas de
+  documentación/mockups que no son código de producción; no se recortaron pruebas ni artefactos,
+  que es la guía de `AGENTS.md` §7).
+- **L6.** U3 commiteada en `a029f87` y verificada por el dueño en navegador («ya lo probe, anda de
+  diez»). Evidencia del worker: RED correcta por área; GREEN **52/52** en 4 suites (18 acciones +
+  8 form + 5 card + 21 page) y **3/3** contra base local, incluida atomicidad con fallo forzado
+  DESPUÉS del INSERT de Product (log de Prisma: INSERT ejecutado → error → conteos idénticos);
+  `tsc` 0; `eslint` 0 errores. Decisiones de mínima aceptadas: update con taxonomía desactivada
+  exige elegir una activa; sin reintento de código en colisión legada PK### (aborta limpio);
+  desactivar una prenda usa el toggle existente de la card. Entrada: opción «Prenda» en el menú de
+  alta de /inventario y Editar de la card abre PrendaForm para kind=PRENDA. Arranca U4 (dinero,
+  aviso §0.4 dado): pedidos-servidor con verificación independiente al cierre.
