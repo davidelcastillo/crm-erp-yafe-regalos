@@ -61,7 +61,7 @@ Decisiones del humano, citadas textuales. Las citas largas están transcriptadas
 | U1 | Esquema aditivo completo: `ProductKind`, `PrendaDetalle`, taxonomías creables (`CategoriaPrenda`, `EstiloPrenda`, `CondicionPrenda`, `MedidaTipo`+`PrendaMedida`, `CanalVenta`), `Customer.phone`, `Pedido`/`PedidoItem`/`PedidoPago`, `PrendaPublicacion`. `db push` a base local y suite sin regresión | S1, S2, S6 | `prisma/schema.prisma` | hecho | `db70f0d` |
 | U2 | Taxonomías creables: acciones de crear/renombrar/desactivar + semillas (condición: Muy bueno/Bueno/Con detalles; medidas: axila/largo total/manga; canales: los 4) y UI mínima reusando el patrón de categorías | S1, S2 | `src/app/actions/prendaTaxonomy.ts`, `src/lib/validations/`, UI mínima | hecho (capa servidor; la UI inline quedó en U3 por reencuadre anotado en L5) | `545efa6` |
 | U3 | Alta y edición de prenda: `createPrenda`/`updatePrenda` (Zod, `requireAdmin`, transacción, código con lock, fila de inventario + movimiento ENTRY, `esUnica`) y el formulario (`/inventario` → «Nueva prenda», patrón del alta de producto) | S1, S4 | `src/app/actions/prenda.ts`, `src/app/inventario/components/PrendaForm.tsx` | hecho, verificado por el dueño («ya lo probe, anda de diez») | `a029f87` |
-| U4 | Pedidos — servidor: `createPedido` (una sucursal, ítems con precio del servidor, seña opcional, `venceEl`, lock de número V-0001, chequeo de disponible bajo lock), `registrarSena`, `cobrarPedido` (crea la `Sale` + `SaleItem` + EXIT + `saleId`, transición condicional), `moverPedido`, `actualizarEnvio`, `cancelarPedido` (motivo + destino de la seña). Zona de dinero: verificación independiente | S2, S3, S6 | `src/app/actions/pedido.ts`, `src/lib/validations/pedido.ts` | pendiente | — |
+| U4 | Pedidos — servidor: `createPedido` (una sucursal, ítems con precio del servidor, seña opcional, `venceEl`, lock de número V-0001, chequeo de disponible bajo lock), `registrarSena`, `cobrarPedido` (crea la `Sale` + `SaleItem` + EXIT + `saleId`, transición condicional), `moverPedido`, `actualizarEnvio`, `cancelarPedido` (motivo en `notas`). Zona de dinero: verificación independiente READY TO COMMIT | S2, S3, S6 | `src/app/actions/pedido.ts`, `src/lib/sale-registration.ts` | hecho, verificador independiente + 3 flecos resueltos | `23370b0` |
 | U5 | Kanban y pedidos — UI: sección dentro de `/ventas`, 4 columnas en PC con arrastre, lista + selector por estado en celular, paso de cobro al soltar en «Pagado», avisos de vencimiento, tab de canal. Sin Server Actions públicas nuevas para leer | S3 | `src/app/ventas/pedidos/` + componentes | pendiente | — |
 | U6 | Reserva derivada R1: `registerSale` y `moveStock` pasan a respetar lo reservado (`stock − reservado ≥ cantidad`), disponibilidad derivada de la prenda (Disponible/Reservada/Vendida), y el aviso en el alta/venta. Zona de dinero/stock: verificación independiente | S1, S2, S6 | `src/app/actions/sale.ts`, `inventory.ts`, `prenda.ts` | pendiente | — |
 
@@ -120,3 +120,20 @@ unidad. Los docs de fase (`docs/adr/*`, `polkalinas-html/`) se commitean con U1.
   desactivar una prenda usa el toggle existente de la card. Entrada: opción «Prenda» en el menú de
   alta de /inventario y Editar de la card abre PrendaForm para kind=PRENDA. Arranca U4 (dinero,
   aviso §0.4 dado): pedidos-servidor con verificación independiente al cierre.
+- **L7.** U4 commiteada en `23370b0`. Unidad de DINERO: además del worker corrió
+  **verificación independiente** (`gentle-ai-verify`) con veredicto READY TO COMMIT. Evidencia:
+  refactor de `sale.ts` cero-cambio (diff vs origin/main = import + llamada al helper;
+  `sale.test.ts` sin editar y verde; equivalencia de subtotal Decimal probada con 6 pares
+  flotantes); orden requireAdmin→Zod→Prisma en las 9 acciones; cobrarPedido con transición
+  optimista, saldo del servidor, re-chequeo de stock bajo lock (excluyendo los ítems propios),
+  Sale vía `registrarVentaTx` y `saleId` en la misma transacción; atomicidad con fallo forzado
+  DESPUÉS del INSERT de la Sale (rollback verificado en base local); consultas con select
+  cerrado sin costo ni datos internos. Tres hallazgos del verificador, resueltos antes del
+  commit: `getPedido` sin Zod (ahora `getPedidoSchema`), pedido de total 0 sin señas
+  (paymentMethod ahora EFECTIVO, con test) y la transición «volver» PARA_ENVIAR→PAGADO del
+  diseño §2.4 que faltaba porque el brief del coordinador la omitió (implementada, con test;
+  a PAGADO se sigue entrando solo cobrando). Verde final: 59/59 mockeados + 2/2 base local,
+  tsc 0, lint 0. Desviaciones conscientes aceptadas: motivo de cancelación en `notas` (sin
+  columna propia), señas M1 sin asiento hasta cobrar, retiro pasa por Para enviar (decisión
+  del dueño que reemplaza el supuesto PAGADO→ENTREGADO del diseño), `getPedido` expone
+  phone/notas/performedBy solo a admin.
