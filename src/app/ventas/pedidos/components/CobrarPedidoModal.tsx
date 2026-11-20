@@ -1,19 +1,24 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { cobrarPedido, getPedido } from "@/app/actions/pedido";
+import { cobrarPedido, entregarPedido, getPedido } from "@/app/actions/pedido";
 
 /**
  * Paso de cobro de un pedido reservado (U5, S3): «arrastrar no alcanza para
  * pagar». Los números son los del servidor (`getPedido`): total, señas y saldo.
  * Del cliente solo sale el medio; el saldo lo calcula y lo vuelve a chequear la
  * acción al cobrar, junto con el stock.
+ *
+ * Con `entregar` es la entrega contra pago (U7, L8-2): mismo saldo y mismo
+ * medio, pero el pedido salta a ENTREGADO y la venta se registra en ese momento.
  */
 export interface CobrarPedidoModalProps {
   open: boolean;
   pedidoId: number | null;
   onClose: () => void;
   onCobrado: () => void;
+  /** Entrega contra pago: cobra y entrega en un solo paso. */
+  entregar?: boolean;
 }
 
 type PedidoParaCobrar = {
@@ -38,6 +43,7 @@ export const CobrarPedidoModal = ({
   pedidoId,
   onClose,
   onCobrado,
+  entregar = false,
 }: CobrarPedidoModalProps) => {
   const [pedido, setPedido] = useState<PedidoParaCobrar | null>(null);
   const [metodo, setMetodo] = useState("EFECTIVO");
@@ -77,7 +83,9 @@ export const CobrarPedidoModal = ({
     if (!pedido) return;
     setError(null);
     setPending(true);
-    const result = await cobrarPedido({ id: pedido.id, metodo });
+    const result = entregar
+      ? await entregarPedido({ id: pedido.id, metodo })
+      : await cobrarPedido({ id: pedido.id, metodo });
     setPending(false);
     if (!result.success) {
       setError(result.error ?? "Error al cobrar el pedido");
@@ -104,7 +112,7 @@ export const CobrarPedidoModal = ({
       <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-t-3xl bg-surface p-6 animate-slide-up md:rounded-2xl md:animate-scale-in">
         <div className="mb-4 flex items-center justify-between gap-3">
           <h2 id="cobrar-pedido-title" className="min-w-0 text-xl font-semibold text-ink">
-            Cobrar pedido
+            {entregar ? "Entregar y cobrar" : "Cobrar pedido"}
           </h2>
           <button
             type="button"
@@ -176,7 +184,7 @@ export const CobrarPedidoModal = ({
             disabled={pending || !pedido}
             className="btn btn-primary"
           >
-            {pending ? "Cobrando…" : "Cobrar"}
+            {pending ? "Cobrando…" : entregar ? "Cobrar y entregar" : "Cobrar"}
           </button>
         </div>
       </div>

@@ -10,6 +10,8 @@
  *   - `cobrarPedido`: saldo y medio calculados en el servidor, transición
  *     optimista, `PedidoPago` del saldo, `Sale` por el mismo helper que
  *     `registerSale` (I4/I10) y `saleId`/`pagadoAt` en la misma transacción;
+ *   - `entregarPedido`: entrega contra pago (L8-2), mismo núcleo de plata que
+ *     `cobrarPedido` y solo desde RESERVADO;
  *   - `moverPedido`: solo las tres transiciones sin plata, nada hacia PAGADO;
  *   - `cancelarPedido`: motivo obligatorio y solo desde RESERVADO;
  *   - las consultas del Kanban: forma cerrada de la tarjeta.
@@ -20,6 +22,7 @@ import {
   createPedido,
   registrarSena,
   cobrarPedido,
+  entregarPedido,
   moverPedido,
   actualizarEnvio,
   cancelarPedido,
@@ -594,6 +597,149 @@ describe("cobrarPedido", () => {
   });
 });
 
+/**
+ * «Entregar y cobrar» (L8-2). El dueño: «a veces los clientes pagan recién
+ * cuando retiran el pedido»: ENTREGADO exige `Sale` aunque el pedido nunca haya
+ * pasado por PAGADO. La plata es la misma que la del cobro (núcleo compartido),
+ * así que lo que se fija acá es que la transición y el cobro sean uno solo.
+ */
+describe("entregarPedido", () => {
+  it("entrega y cobra: una sola transacción, la venta del cobro y las tres marcas", async () => {
+    prepararCobro();
+
+    const result = await entregarPedido({ id: 7, metodo: "EFECTIVO" });
+
+    expect(result).toEqual({
+      success: true,
+      data: { id: 7, numero: "V-0002", saleId: 55, total: 12000, saldo: 7000 },
+    });
+
+    // La entrega se reclama con guarda optimista y sus dos fechas.
+    expect(prisma.pedido.updateMany).toHaveBeenCalledWith({
+      where: { id: 7, estado: "RESERVADO" },
+      data: {
+        estado: "ENTREGADO",
+        pagadoAt: expect.any(Date),
+        entregadoAt: expect.any(Date),
+        updatedBy: "test@feria.test",
+      },
+    });
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+
+    // El cobro es el mismo núcleo que `cobrarPedido`: sale la venta de siempre.
+    const [, venta] = mockVentaTx.mock.calls[0];
+    expect(venta).toMatchObject({
+      branchId: 3,
+      paymentMethod: "EFECTIVO",
+      performedBy: "test@feria.test",
+      customerId: 1,
+      reference: "PEDIDO-V-0002",
+    });
+    expect(String(venta.amountPaid)).toBe("12000");
+    expect(String(venta.pendingBalance)).toBe("0");
+    expect(String(venta.totalAmount)).toBe("12000");
+
+    // La seña previa se descuenta: solo el saldo se registra al entregar.
+    const pago = (prisma.pedidoPago.create as jest.Mock).mock.calls[0][0].data;
+    expect(pago).toMatchObject({ pedidoId: 7, metodo: "EFECTIVO" });
+    expect(String(pago.monto)).toBe("7000");
+
+    // Invariante del dueño: sin `saleId` no hay ENTREGADO. Se escribe antes del commit.
+    expect(prisma.pedido.update).toHaveBeenCalledWith({
+      where: { id: 7 },
+      data: { saleId: 55 },
+    });
+
+    expect(mockRevalidate).toHaveBeenCalledWith("/ventas");
+    expect(mockRevalidate).toHaveBeenCalledWith("/ventas/pedidos");
+    expect(mockRevalidate).toHaveBeenCalledWith("/inventario");
+  });
+
+  it("solo se entrega un pedido reservado", async () => {
+    const mensajes: Array<[string, string]> = [
+      ["PAGADO", "Solo se puede entregar un pedido reservado"],
+      ["PARA_ENVIAR", "Solo se puede entregar un pedido reservado"],
+      ["ENTREGADO", "Solo se puede entregar un pedido reservado"],
+      ["CANCELADO", "Solo se puede entregar un pedido reservado"],
+    ];
+
+    for (const [estado, mensaje] of mensajes) {
+      jest.clearAllMocks();
+      prepararCobro();
+      (prisma.pedido.updateMany as jest.Mock).mockResolvedValue({ count: 0 });
+      (prisma.pedido.findUnique as jest.Mock).mockResolvedValue({ estado });
+
+      expect(await entregarPedido({ id: 7, metodo: "EFECTIVO" })).toEqual({
+        success: false,
+        error: mensaje,
+      });
+      // Ni venta ni pago: la entrega rechazada no toca plata.
+      expect(mockVentaTx).not.toHaveBeenCalled();
+      expect(prisma.pedidoPago.create).not.toHaveBeenCalled();
+      expect(prisma.pedido.update).not.toHaveBeenCalled();
+    }
+  });
+
+  it("entrega en una sola pestaña (concurrencia optimista)", async () => {
+    prepararCobro();
+    (prisma.pedido.updateMany as jest.Mock).mockResolvedValue({ count: 0 });
+    (prisma.pedido.findUnique as jest.Mock).mockResolvedValue({ estado: "RESERVADO" });
+
+    expect(await entregarPedido({ id: 7, metodo: "EFECTIVO" })).toEqual({
+      success: false,
+      error: "El pedido cambió de estado; recargá",
+    });
+    expect(mockVentaTx).not.toHaveBeenCalled();
+  });
+
+  it("una seña con otro medio deja la venta como MIXTO", async () => {
+    prepararCobro([{ monto: dec("5000.00"), metodo: "TRANSFERENCIA" }]);
+
+    const result = await entregarPedido({ id: 7, metodo: "EFECTIVO" });
+
+    expect(result.success).toBe(true);
+    expect(mockVentaTx.mock.calls[0][1].paymentMethod).toBe("MIXTO");
+  });
+
+  it("un pedido de total 0 sin señas se entrega en efectivo (sin medio en juego)", async () => {
+    prepararCobro([]);
+    (prisma.pedido.findUnique as jest.Mock).mockResolvedValue({
+      numero: "V-0002",
+      total: dec("0.00"),
+      customerId: 1,
+      items: [{ productId: 10, branchId: 3, cantidad: 1, precio: dec("0.00") }],
+      pagos: [],
+      estado: "RESERVADO",
+      saleId: null,
+    });
+
+    const result = await entregarPedido({ id: 7, metodo: "EFECTIVO" });
+
+    expect(result.success).toBe(true);
+    expect(prisma.pedidoPago.create).not.toHaveBeenCalled();
+    expect(mockVentaTx.mock.calls[0][1].paymentMethod).toBe("EFECTIVO");
+  });
+
+  it("si el stock se movió, no entrega lo reservado (I2)", async () => {
+    prepararCobro();
+    (prisma.branchInventory.findMany as jest.Mock).mockResolvedValue([]);
+
+    const result = await entregarPedido({ id: 7, metodo: "EFECTIVO" });
+
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(result.error).toContain("Sin stock disponible");
+    expect(mockVentaTx).not.toHaveBeenCalled();
+  });
+
+  it("exige un medio de pago válido (sin MIXTO suelto)", async () => {
+    expect(await entregarPedido({ id: 7, metodo: "MIXTO" })).toMatchObject({
+      success: false,
+    });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+});
+
 describe("moverPedido", () => {
   beforeEach(() => {
     (prisma.pedido.updateMany as jest.Mock).mockResolvedValue({ count: 1 });
@@ -676,6 +822,7 @@ describe("moverPedido", () => {
       estado: "PARA_ENVIAR",
       ciudad: "Córdoba",
       envioMetodo: "CORREO",
+      saleId: 55,
     });
 
     expect(await moverPedido({ id: 7, desde: "PARA_ENVIAR", hacia: "ENTREGADO" })).toEqual({
@@ -715,6 +862,7 @@ describe("moverPedido", () => {
       estado: "PARA_ENVIAR",
       ciudad: "Córdoba",
       envioMetodo: "CORREO",
+      saleId: 55,
     });
 
     expect(await moverPedido({ id: 7, desde: "PARA_ENVIAR", hacia: "PAGADO" })).toEqual({
@@ -725,6 +873,23 @@ describe("moverPedido", () => {
       where: { id: 7, estado: "PARA_ENVIAR" },
       data: { estado: "PAGADO", updatedBy: "test@feria.test" },
     });
+  });
+
+  it("no entrega un pedido sin su venta registrada (invariante del dueño)", async () => {
+    (prisma.pedido.findUnique as jest.Mock).mockResolvedValue({
+      estado: "PARA_ENVIAR",
+      ciudad: "Córdoba",
+      envioMetodo: "CORREO",
+      saleId: null,
+    });
+
+    expect(
+      await moverPedido({ id: 7, desde: "PARA_ENVIAR", hacia: "ENTREGADO" })
+    ).toEqual({
+      success: false,
+      error: "El pedido no tiene su venta registrada; cobralo antes de entregarlo",
+    });
+    expect(prisma.pedido.updateMany).not.toHaveBeenCalled();
   });
 
   it("rechaza toda transición que no esté en la tabla (incluido entrar a PAGADO)", async () => {

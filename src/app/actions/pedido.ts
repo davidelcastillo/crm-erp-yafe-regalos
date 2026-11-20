@@ -16,6 +16,7 @@ import {
   cancelarPedidoSchema,
   cobrarPedidoSchema,
   createPedidoSchema,
+  entregarPedidoSchema,
   getContadoresPedidosSchema,
   getPedidoSchema,
   getPedidosPorEstadoSchema,
@@ -297,6 +298,118 @@ export async function registrarSena(data: unknown) {
 }
 
 /**
+ * Núcleo de plata del pedido: lo comparten `cobrarPedido` y `entregarPedido`.
+ *
+ * Espera la transición **ya reclamada**: el pedido dejó de ser RESERVADO, así
+ * que su propia cantidad ya no cuenta en la reserva derivada y el chequeo de
+ * stock de abajo mide solo lo que otros pedidos tienen tomado (I2). Calcula el
+ * saldo en el servidor (I5, I7), registra la `Sale` con el helper de las ventas
+ * (I4, I10) y deja el `PedidoPago` del saldo. Devuelve el `saleId` para que el
+ * llamador lo escriba en su transición, antes del commit.
+ */
+async function cobrarTx(
+  tx: Prisma.TransactionClient,
+  opciones: { id: number; metodo: PaymentMethod; actor: string }
+) {
+  const { id, metodo, actor } = opciones;
+
+  // 1. Lo que es plata se lee con la fila ya bloqueada (I5, I7).
+  const pedido = await tx.pedido.findUnique({
+    where: { id },
+    select: {
+      numero: true,
+      total: true,
+      customerId: true,
+      items: {
+        select: { productId: true, branchId: true, cantidad: true, precio: true },
+      },
+      pagos: { select: { monto: true, metodo: true } },
+    },
+  });
+  if (!pedido) throw new ErrorPedido("Pedido no encontrado");
+  if (pedido.items.length === 0) throw new ErrorPedido("El pedido no tiene productos");
+
+  // Una sola sucursal por pedido (S2): la Sale sale de la del pedido.
+  const branchId = pedido.items[0].branchId;
+  if (pedido.items.some((item) => item.branchId !== branchId)) {
+    throw new ErrorPedido("El pedido mezcla sucursales");
+  }
+
+  // 2. Stock de hoy: lo que reservan otros pedidos no se puede vender (I2).
+  const productoIds = [...new Set(pedido.items.map((item) => item.productId))].sort(
+    (a, b) => a - b
+  );
+  for (const productId of productoIds) {
+    await lockStock(tx, productId, branchId);
+  }
+  const inventario = await tx.branchInventory.findMany({
+    where: { branchId, productId: { in: productoIds } },
+    select: { productId: true, stock: true },
+  });
+  const productos = await tx.product.findMany({
+    where: { id: { in: productoIds } },
+    select: { id: true, name: true },
+  });
+  const stockPorProducto = new Map(inventario.map((fila) => [fila.productId, fila.stock]));
+  const reservado = await reservadoActivo(tx, branchId, productoIds);
+
+  for (const item of pedido.items) {
+    const disponible =
+      (stockPorProducto.get(item.productId) ?? 0) - (reservado.get(item.productId) ?? 0);
+    if (disponible < item.cantidad) {
+      const nombre = productos.find((producto) => producto.id === item.productId)?.name;
+      throw new ErrorPedido(
+        `Sin stock disponible para "${nombre ?? item.productId}": disponible ${disponible}, el pedido pide ${item.cantidad}. Revisá el stock de la sucursal.`
+      );
+    }
+  }
+
+  // 3. Saldo y medio: cálculo del servidor, sin monto del cliente.
+  const total = dec(pedido.total);
+  const saldo = total.minus(suma(pedido.pagos.map((pago) => pago.monto)));
+  const medios = new Set<string>(pedido.pagos.map((pago) => pago.metodo as string));
+  if (saldo.gt(0)) medios.add(metodo);
+  // Pedido de total 0 sin señas: sin medio en juego, la Sale sale en efectivo.
+  const paymentMethod =
+    medios.size === 0
+      ? PaymentMethod.EFECTIVO
+      : medios.size > 1
+        ? PaymentMethod.MIXTO
+        : ([...medios][0] as PaymentMethod);
+
+  // 4. La venta es la de siempre: mismo helper que `registerSale`.
+  const venta = await registrarVentaTx(tx, {
+    branchId,
+    items: pedido.items.map((item) => ({
+      productId: item.productId,
+      price: item.precio,
+      quantity: item.cantidad,
+    })),
+    paymentMethod,
+    performedBy: actor,
+    totalAmount: total,
+    amountPaid: total,
+    pendingBalance: 0,
+    customerId: pedido.customerId,
+    reference: `PEDIDO-${pedido.numero}`,
+  });
+
+  // 5. El saldo cobrado hoy y el vínculo con la Sale (I4).
+  if (saldo.gt(0)) {
+    await tx.pedidoPago.create({
+      data: {
+        pedidoId: id,
+        monto: saldo,
+        metodo,
+        performedBy: actor,
+      },
+    });
+  }
+
+  return { numero: pedido.numero, total, saldo, saleId: venta.sale.id };
+}
+
+/**
  * «Cobrada»: cobra el saldo y genera la `Sale` del pedido en una sola
  * transacción. El saldo y el medio se calculan acá (el cliente solo manda el
  * medio) y el stock se vuelve a validar hoy, bajo el lock de cada fila: un
@@ -322,109 +435,25 @@ export async function cobrarPedido(data: unknown) {
         throw new ErrorPedido(await estadoInvalido(tx, parsed.id, "cobro"));
       }
 
-      // 2. Lo que es plata se lee con la fila ya bloqueada (I5, I7).
-      const pedido = await tx.pedido.findUnique({
-        where: { id: parsed.id },
-        select: {
-          numero: true,
-          total: true,
-          customerId: true,
-          items: {
-            select: { productId: true, branchId: true, cantidad: true, precio: true },
-          },
-          pagos: { select: { monto: true, metodo: true } },
-        },
-      });
-      if (!pedido) throw new ErrorPedido("Pedido no encontrado");
-      if (pedido.items.length === 0) throw new ErrorPedido("El pedido no tiene productos");
-
-      // Una sola sucursal por pedido (S2): la Sale sale de la del pedido.
-      const branchId = pedido.items[0].branchId;
-      if (pedido.items.some((item) => item.branchId !== branchId)) {
-        throw new ErrorPedido("El pedido mezcla sucursales");
-      }
-
-      // 3. Stock de hoy: lo que reservan otros pedidos no se puede vender (I2).
-      const productoIds = [...new Set(pedido.items.map((item) => item.productId))].sort(
-        (a, b) => a - b
-      );
-      for (const productId of productoIds) {
-        await lockStock(tx, productId, branchId);
-      }
-      const inventario = await tx.branchInventory.findMany({
-        where: { branchId, productId: { in: productoIds } },
-        select: { productId: true, stock: true },
-      });
-      const productos = await tx.product.findMany({
-        where: { id: { in: productoIds } },
-        select: { id: true, name: true },
-      });
-      const stockPorProducto = new Map(inventario.map((fila) => [fila.productId, fila.stock]));
-      const reservado = await reservadoActivo(tx, branchId, productoIds);
-
-      for (const item of pedido.items) {
-        const disponible =
-          (stockPorProducto.get(item.productId) ?? 0) - (reservado.get(item.productId) ?? 0);
-        if (disponible < item.cantidad) {
-          const nombre = productos.find((producto) => producto.id === item.productId)?.name;
-          throw new ErrorPedido(
-            `Sin stock disponible para "${nombre ?? item.productId}": disponible ${disponible}, el pedido pide ${item.cantidad}. Revisá el stock de la sucursal.`
-          );
-        }
-      }
-
-      // 4. Saldo y medio: cálculo del servidor, sin monto del cliente.
-      const total = dec(pedido.total);
-      const saldo = total.minus(suma(pedido.pagos.map((pago) => pago.monto)));
-      const medios = new Set<string>(pedido.pagos.map((pago) => pago.metodo as string));
-      if (saldo.gt(0)) medios.add(parsed.metodo);
-      // Pedido de total 0 sin señas: sin medio en juego, la Sale sale en efectivo.
-      const paymentMethod =
-        medios.size === 0
-          ? PaymentMethod.EFECTIVO
-          : medios.size > 1
-            ? PaymentMethod.MIXTO
-            : ([...medios][0] as PaymentMethod);
-
-      // 5. La venta es la de siempre: mismo helper que `registerSale`.
-      const venta = await registrarVentaTx(tx, {
-        branchId,
-        items: pedido.items.map((item) => ({
-          productId: item.productId,
-          price: item.precio,
-          quantity: item.cantidad,
-        })),
-        paymentMethod,
-        performedBy: actor,
-        totalAmount: total,
-        amountPaid: total,
-        pendingBalance: 0,
-        customerId: pedido.customerId,
-        reference: `PEDIDO-${pedido.numero}`,
+      // 2. La plata, del núcleo compartido con la entrega.
+      const plata = await cobrarTx(tx, {
+        id: parsed.id,
+        metodo: parsed.metodo,
+        actor,
       });
 
-      // 6. El saldo cobrado hoy y el vínculo con la Sale (I4), en la misma transacción.
-      if (saldo.gt(0)) {
-        await tx.pedidoPago.create({
-          data: {
-            pedidoId: parsed.id,
-            monto: saldo,
-            metodo: parsed.metodo,
-            performedBy: actor,
-          },
-        });
-      }
+      // 3. El vínculo con la Sale (I4), en la misma transacción.
       await tx.pedido.update({
         where: { id: parsed.id },
-        data: { saleId: venta.sale.id },
+        data: { saleId: plata.saleId },
       });
 
       return {
         id: parsed.id,
-        numero: pedido.numero,
-        saleId: venta.sale.id,
-        total,
-        saldo,
+        numero: plata.numero,
+        saleId: plata.saleId,
+        total: plata.total,
+        saldo: plata.saldo,
       };
     });
 
@@ -445,13 +474,89 @@ export async function cobrarPedido(data: unknown) {
 }
 
 /**
+ * «Entregar y cobrar» (L8-2): el cliente paga al retirar. Es la otra puerta a
+ * PAGADO —directo a ENTREGADO— y la plata es exactamente la del cobro, porque
+ * las dos pasan por `cobrarTx`: la seña previa se descuenta y el saldo se
+ * registra en el momento de la entrega.
+ *
+ * Invariante del dueño: **no hay ENTREGADO sin `Sale`**. La entrega se reclama
+ * con guarda optimista (una sola pestaña), la `Sale` se crea en la misma
+ * transacción y el `saleId` se escribe antes del commit; si algo falla, el
+ * pedido sigue RESERVADO y el stock en el estante.
+ */
+export async function entregarPedido(data: unknown) {
+  try {
+    const auth = await requireAdmin();
+    if (!auth.ok) return { success: false as const, error: auth.error };
+
+    const parsed = entregarPedidoSchema.parse(data);
+    const actor = auth.email || "sistema";
+
+    const entrega = await prisma.$transaction(async (tx) => {
+      const ahora = new Date();
+
+      // 1. La reserva se libera al entregar: mismo orden que el cobro, y es lo
+      //    que deja al pedido fuera de la reserva derivada antes del chequeo de
+      //    stock del núcleo (I2).
+      const guarda = await tx.pedido.updateMany({
+        where: { id: parsed.id, estado: "RESERVADO" },
+        data: {
+          estado: "ENTREGADO",
+          pagadoAt: ahora,
+          entregadoAt: ahora,
+          updatedBy: actor,
+        },
+      });
+      if (guarda.count !== 1) {
+        throw new ErrorPedido(await estadoInvalido(tx, parsed.id, "entrega"));
+      }
+
+      // 2. La plata, del núcleo compartido con el cobro. Sin Sale no hay entrega.
+      const plata = await cobrarTx(tx, {
+        id: parsed.id,
+        metodo: parsed.metodo,
+        actor,
+      });
+
+      // 3. El vínculo con la Sale (I4), antes del commit.
+      await tx.pedido.update({
+        where: { id: parsed.id },
+        data: { saleId: plata.saleId },
+      });
+
+      return {
+        id: parsed.id,
+        numero: plata.numero,
+        saleId: plata.saleId,
+        total: plata.total,
+        saldo: plata.saldo,
+      };
+    });
+
+    revalidatePath("/ventas");
+    revalidatePath("/ventas/pedidos");
+    revalidatePath("/inventario");
+    return { success: true as const, data: parseObject(entrega) };
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return { success: false as const, error: zodMessage(error) };
+    }
+    if (error instanceof ErrorPedido) {
+      return { success: false as const, error: error.message };
+    }
+    console.error("Error al entregar el pedido:", error);
+    return { success: false as const, error: "Error al entregar el pedido" };
+  }
+}
+
+/**
  * Mensaje para una transición que no se pudo hacer: distingue «no existe» de
  * «está en otro estado» y deja el detalle de cada acción.
  */
 async function estadoInvalido(
   tx: Prisma.TransactionClient,
   id: number,
-  accion: "seña" | "cobro" | "cancelación"
+  accion: "seña" | "cobro" | "entrega" | "cancelación"
 ): Promise<string> {
   const actual = await tx.pedido.findUnique({ where: { id }, select: { estado: true } });
   if (!actual) return "Pedido no encontrado";
@@ -459,6 +564,7 @@ async function estadoInvalido(
 
   if (accion === "seña") return "Solo se puede registrar una seña en un pedido reservado";
   if (accion === "cobro") return "Solo se puede cobrar un pedido reservado";
+  if (accion === "entrega") return "Solo se puede entregar un pedido reservado";
   return "Solo se puede cancelar un pedido reservado";
 }
 
@@ -491,7 +597,7 @@ export async function moverPedido(data: unknown) {
 
     const pedido = await prisma.pedido.findUnique({
       where: { id: parsed.id },
-      select: { estado: true, ciudad: true, envioMetodo: true },
+      select: { estado: true, ciudad: true, envioMetodo: true, saleId: true },
     });
     if (!pedido) return { success: false as const, error: "Pedido no encontrado" };
     if (pedido.estado !== parsed.desde) {
@@ -516,6 +622,16 @@ export async function moverPedido(data: unknown) {
       datos.envioMetodo = metodo as MetodoEnvio;
       datos.envioEstado = "COORDINAR" as EstadoEnvio;
       datos.ciudad = ciudad ?? null;
+    }
+
+    // Invariante del dueño: nada llega a ENTREGADO sin su venta registrada. El
+    // flujo normal garantiza el saleId (PARA_ENVIAR solo se alcanza cobrando),
+    // pero una fila legada importada sin venta no debe poder entregarse igual.
+    if (parsed.hacia === "ENTREGADO" && !pedido.saleId) {
+      return {
+        success: false as const,
+        error: "El pedido no tiene su venta registrada; cobralo antes de entregarlo",
+      };
     }
 
     if (parsed.hacia === "ENTREGADO") datos.entregadoAt = new Date();

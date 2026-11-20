@@ -113,6 +113,7 @@ interface PedidoCardProps {
   estado: Estado;
   onDragStart: () => void;
   onCobrar: () => void;
+  onEntregar: () => void;
   onMover: (hacia: Estado) => void;
   onCambio: () => void;
 }
@@ -123,7 +124,15 @@ interface PedidoCardProps {
  * `flex` va con `min-w-0` y `truncate` (lección M1/M6: los nombres largos
  * rompían la tarjeta).
  */
-const PedidoCard = ({ pedido, estado, onDragStart, onCobrar, onMover, onCambio }: PedidoCardProps) => {
+const PedidoCard = ({
+  pedido,
+  estado,
+  onDragStart,
+  onCobrar,
+  onEntregar,
+  onMover,
+  onCambio,
+}: PedidoCardProps) => {
   const [panel, setPanel] = useState<"sena" | "envio" | "mover" | null>(null);
   const [montoSena, setMontoSena] = useState("");
   const [medioSena, setMedioSena] = useState("EFECTIVO");
@@ -293,6 +302,9 @@ const PedidoCard = ({ pedido, estado, onDragStart, onCobrar, onMover, onCambio }
             </button>
             <button type="button" onClick={onCobrar} className="btn btn-primary min-h-[44px] flex-1 px-3 text-sm">
               Cobrar
+            </button>
+            <button type="button" onClick={onEntregar} className={botonChico}>
+              Entregar
             </button>
             <button type="button" onClick={cancelar} className={botonChico}>
               Cancelar
@@ -464,6 +476,8 @@ export default function PedidosPage() {
   const [tab, setTab] = useState<Estado>("RESERVADO");
   const [formOpen, setFormOpen] = useState(false);
   const [cobroId, setCobroId] = useState<number | null>(null);
+  // Entrega contra pago (U7): el mismo modal de cobro, en modo entrega.
+  const [entregaId, setEntregaId] = useState<number | null>(null);
   const [envioPendiente, setEnvioPendiente] = useState<{
     id: number;
     desde: Estado;
@@ -731,6 +745,7 @@ export default function PedidosPage() {
                       arrastrada.current = { pedido, estado: columna.id };
                     }}
                     onCobrar={() => setCobroId(pedido.id)}
+                    onEntregar={() => setEntregaId(pedido.id)}
                     onMover={(hacia) => void mover(pedido, columna.id, hacia)}
                     onCambio={bump}
                   />
@@ -759,9 +774,13 @@ export default function PedidosPage() {
       />
 
       <CobrarPedidoModal
-        open={cobroId !== null}
-        pedidoId={cobroId}
-        onClose={() => setCobroId(null)}
+        open={cobroId !== null || entregaId !== null}
+        pedidoId={cobroId ?? entregaId}
+        entregar={entregaId !== null}
+        onClose={() => {
+          setCobroId(null);
+          setEntregaId(null);
+        }}
         onCobrado={bump}
       />
 

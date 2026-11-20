@@ -180,6 +180,16 @@ export async function adjustProductStock(data: unknown) {
         );
       }
 
+      // R1 (ADR §2.2): una baja de stock no puede llevarse unidades que un
+      // pedido RESERVADO tiene tomadas. Las subas no miran reservas.
+      if (change < 0) {
+        await verificarDisponible(tx, {
+          branchId,
+          items: [{ productId, cantidad: -change }],
+          accion: "el ajuste",
+        });
+      }
+
       const updated = await tx.branchInventory.upsert({
         where: {
           branchId_productId: { branchId, productId },
@@ -326,6 +336,15 @@ export async function assignStockToBranch(data: unknown) {
             quantity
           )}`
         );
+      }
+
+      // R1 (ADR §2.2): asignar una baja tampoco puede sacar lo reservado.
+      if (quantity < 0) {
+        await verificarDisponible(tx, {
+          branchId,
+          items: [{ productId, cantidad: -quantity }],
+          accion: "el ajuste",
+        });
       }
 
       // 2. Upsert BranchInventory
@@ -747,6 +766,17 @@ export async function adjustBranchStockBatch(data: unknown) {
       });
       if (!branch) {
         throw new Error("Sucursal inválida o inactiva");
+      }
+
+      // R1 (ADR §2.2): una SALIDA no puede llevarse unidades reservadas por un
+      // pedido. Va antes de la primera escritura, así el lote no queda a medias.
+      // La ENTRADA no mira reservas: nunca saca stock.
+      if (movementType === "EXIT") {
+        await verificarDisponible(tx, {
+          branchId,
+          items: items.map((item) => ({ productId: item.productId, cantidad: item.quantity })),
+          accion: "el ajuste",
+        });
       }
 
       for (const item of items) {

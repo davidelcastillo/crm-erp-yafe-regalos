@@ -9,6 +9,7 @@ import type {
   StockControlDecision,
   StockControlReceipt,
 } from "@/lib/stock-control-receipt";
+import { verificarDisponible } from "@/lib/reserva";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import {
@@ -325,6 +326,23 @@ export async function closeStockControl(data: unknown) {
     const closedAt = new Date();
 
     await prisma.$transaction(async (tx) => {
+      // R1 (ADR §2.2): una diferencia aceptada que BAJA el stock no puede llevarse
+      // unidades que un pedido RESERVADO tiene tomadas. Los sobrantes no miran
+      // reservas. Va antes de la primera escritura: si no alcanza, no cierra nada.
+      const bajas = accepted
+        .filter((item) => item.countedStock < item.systemStock)
+        .map((item) => ({
+          productId: item.productId,
+          cantidad: item.systemStock - item.countedStock,
+        }));
+      if (bajas.length > 0) {
+        await verificarDisponible(tx, {
+          branchId: control.branchId,
+          items: bajas,
+          accion: "el ajuste",
+        });
+      }
+
       // El `status` de arriba es una lectura previa: dos cierres simultáneos del
       // mismo control ajustarían el stock dos veces. El cierre se reclama con un
       // updateMany condicionado, así que el segundo no encuentra qué actualizar y
@@ -399,6 +417,10 @@ export async function closeStockControl(data: unknown) {
   } catch (error) {
     if (error instanceof AlreadyClosedError) return alreadyClosed;
     if (error instanceof z.ZodError) return zodFailure(error);
+    // El ajuste que no respeta lo reservado tiene que llegar al usuario tal cual.
+    if (error instanceof Error && error.message.includes("Stock insuficiente")) {
+      return { success: false as const, error: error.message };
+    }
     console.error("Error closing stock control:", error);
     return { success: false as const, error: "Error al cerrar el control de stock" };
   }

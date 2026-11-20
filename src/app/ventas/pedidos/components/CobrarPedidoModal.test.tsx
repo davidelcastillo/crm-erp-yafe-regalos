@@ -13,12 +13,14 @@ import { CobrarPedidoModal } from "./CobrarPedidoModal";
 jest.mock("@/app/actions/pedido", () => ({
   getPedido: jest.fn(),
   cobrarPedido: jest.fn(),
+  entregarPedido: jest.fn(),
 }));
 
-import { cobrarPedido, getPedido } from "@/app/actions/pedido";
+import { cobrarPedido, entregarPedido, getPedido } from "@/app/actions/pedido";
 
 const mockPedido = getPedido as jest.MockedFunction<typeof getPedido>;
 const mockCobrar = cobrarPedido as jest.MockedFunction<typeof cobrarPedido>;
+const mockEntregar = entregarPedido as jest.MockedFunction<typeof entregarPedido>;
 
 const pedido = {
   id: 7,
@@ -33,11 +35,11 @@ const pedido = {
   ciudad: "Córdoba",
 };
 
-const renderModal = () => {
+const renderModal = (entregar = false) => {
   const onCobrado = jest.fn();
   const onClose = jest.fn();
   render(
-    <CobrarPedidoModal open pedidoId={7} onClose={onClose} onCobrado={onCobrado} />
+    <CobrarPedidoModal open pedidoId={7} onClose={onClose} onCobrado={onCobrado} entregar={entregar} />
   );
   return { onCobrado, onClose };
 };
@@ -46,6 +48,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockPedido.mockResolvedValue({ success: true, data: pedido } as never);
   mockCobrar.mockResolvedValue({ success: true, data: { id: 7 } } as never);
+  mockEntregar.mockResolvedValue({ success: true, data: { id: 7 } } as never);
 });
 
 describe("CobrarPedidoModal", () => {
@@ -88,5 +91,39 @@ describe("CobrarPedidoModal", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       'Sin stock disponible para "Vestido lencero"'
     );
+  });
+});
+
+describe("CobrarPedidoModal en modo entrega (L8-2)", () => {
+  it("el botón dice «Cobrar y entregar» y llama a entregarPedido", async () => {
+    const { onCobrado, onClose } = renderModal(true);
+    await screen.findByText("V-0007");
+
+    // Mismos números: el saldo es el del servidor también al entregar.
+    expect(screen.getByText(/8\.500,00/)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Entregar y cobrar" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Cobrar" })).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Medio de pago"), {
+      target: { value: "TRANSFERENCIA" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Cobrar y entregar" }));
+
+    await waitFor(() =>
+      expect(mockEntregar).toHaveBeenCalledWith({ id: 7, metodo: "TRANSFERENCIA" })
+    );
+    expect(mockCobrar).not.toHaveBeenCalled();
+    await waitFor(() => expect(onCobrado).toHaveBeenCalled());
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it("en modo cobro no llama a entregarPedido", async () => {
+    renderModal();
+    await screen.findByText("V-0007");
+
+    fireEvent.click(screen.getByRole("button", { name: "Cobrar" }));
+
+    await waitFor(() => expect(mockCobrar).toHaveBeenCalledWith({ id: 7, metodo: "EFECTIVO" }));
+    expect(mockEntregar).not.toHaveBeenCalled();
   });
 });

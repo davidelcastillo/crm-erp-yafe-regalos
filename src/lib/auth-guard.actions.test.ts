@@ -27,6 +27,9 @@ import * as categoryActions from "@/app/actions/category";
 import * as customerActions from "@/app/actions/customer";
 import * as dashboardActions from "@/app/actions/dashboard";
 import * as inventoryActions from "@/app/actions/inventory";
+import * as pedidoActions from "@/app/actions/pedido";
+import * as prendaActions from "@/app/actions/prenda";
+import * as prendaTaxonomyActions from "@/app/actions/prendaTaxonomy";
 import * as productActions from "@/app/actions/product";
 import * as purchaseActions from "@/app/actions/purchase";
 import * as saleActions from "@/app/actions/sale";
@@ -53,6 +56,9 @@ const MODULES: Record<string, Record<string, unknown>> = {
   "customer.ts": customerActions as unknown as Record<string, unknown>,
   "dashboard.ts": dashboardActions as unknown as Record<string, unknown>,
   "inventory.ts": inventoryActions as unknown as Record<string, unknown>,
+  "pedido.ts": pedidoActions as unknown as Record<string, unknown>,
+  "prenda.ts": prendaActions as unknown as Record<string, unknown>,
+  "prendaTaxonomy.ts": prendaTaxonomyActions as unknown as Record<string, unknown>,
   "product.ts": productActions as unknown as Record<string, unknown>,
   "purchase.ts": purchaseActions as unknown as Record<string, unknown>,
   "sale.ts": saleActions as unknown as Record<string, unknown>,
@@ -81,7 +87,7 @@ describe("ninguna acción interna atiende sin sesión admin", () => {
     requireAdmin.mockResolvedValue({ ok: false, error: "No autorizado" });
   });
 
-  test("las 64 acciones exportadas devuelven «No autorizado»", async () => {
+  test("las 99 acciones exportadas devuelven «No autorizado»", async () => {
     const problems: string[] = [];
     let visited = 0;
 
@@ -107,6 +113,6 @@ describe("ninguna acción interna atiende sin sesión admin", () => {
     }
 
     expect(problems).toEqual([]);
-    expect(visited).toBeGreaterThanOrEqual(64);
+    expect(visited).toBe(99);
   });
 });

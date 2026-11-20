@@ -252,6 +252,104 @@ describe("pedidos (integración, base local)", () => {
     expect(await prisma.pedidoPago.count({ where: { pedidoId } })).toBe(2);
   });
 
+  /**
+   * Entrega contra pago (L8-2), punta a punta: el pedido nunca pasa por PAGADO.
+   * Lo que solo se puede ver acá es que la `Sale` se cree de verdad en el
+   * momento de entregar, con el stock descontado una sola vez y las señas
+   * previas contadas dentro del total.
+   */
+  it("entrega y cobra en un solo paso: Sale, stock y las dos marcas", async () => {
+    const producto = await prenda();
+
+    const alta = await pedidos.createPedido(
+      altaPedido(producto.id, { sena: { monto: 5000, metodo: "TRANSFERENCIA" } })
+    );
+    expect(alta.success).toBe(true);
+    if (!alta.success) return;
+    const pedidoId = alta.data.id as number;
+    idsPedidos.push(pedidoId);
+
+    const entrega = await pedidos.entregarPedido({ id: pedidoId, metodo: "EFECTIVO" });
+    expect(entrega.success).toBe(true);
+    if (!entrega.success) return;
+    const saleId = entrega.data.saleId as number;
+    idsVentas.push(saleId);
+    // El saldo es el del servidor: 12.000 menos la seña.
+    expect(Number(entrega.data.saldo)).toBe(7000);
+
+    const venta = await prisma.sale.findUnique({
+      where: { id: saleId },
+      select: {
+        branchId: true,
+        customerId: true,
+        totalAmount: true,
+        amountPaid: true,
+        pendingBalance: true,
+        paymentMethod: true,
+        items: { select: { productId: true, quantity: true, price: true, subtotal: true } },
+      },
+    });
+    expect(venta?.branchId).toBe(branchId);
+    expect(venta?.customerId).toBe(customerId);
+    // Seña por transferencia + saldo en efectivo en la entrega.
+    expect(venta?.paymentMethod).toBe("MIXTO");
+    expect(Number(venta?.totalAmount)).toBe(12000);
+    expect(Number(venta?.amountPaid)).toBe(12000);
+    expect(Number(venta?.pendingBalance)).toBe(0);
+    expect(venta?.items).toHaveLength(1);
+    expect(venta?.items[0]).toMatchObject({ productId: producto.id, quantity: 1 });
+    expect(Number(venta?.items[0].subtotal)).toBe(12000);
+
+    // Invariante del dueño: no hay ENTREGADO sin Sale, y las dos fechas quedan.
+    const entregado = await prisma.pedido.findUnique({
+      where: { id: pedidoId },
+      select: {
+        estado: true,
+        saleId: true,
+        pagadoAt: true,
+        entregadoAt: true,
+        pagos: { select: { monto: true, metodo: true } },
+      },
+    });
+    expect(entregado?.estado).toBe("ENTREGADO");
+    expect(entregado?.saleId).toBe(saleId);
+    expect(entregado?.pagadoAt).not.toBeNull();
+    expect(entregado?.entregadoAt).not.toBeNull();
+    expect(entregado?.pagos.map((p) => [Number(p.monto), p.metodo]).sort()).toEqual([
+      [5000, "TRANSFERENCIA"],
+      [7000, "EFECTIVO"],
+    ]);
+
+    // Stock descontado exactamente una vez, con su movimiento EXIT.
+    expect(
+      await prisma.branchInventory.findUnique({
+        where: { branchId_productId: { branchId, productId: producto.id } },
+        select: { stock: true },
+      })
+    ).toEqual({ stock: 0 });
+    expect(
+      await prisma.branchMovement.findMany({
+        where: { productId: producto.id, movementType: "EXIT" },
+        select: { quantity: true, reference: true, performedBy: true },
+      })
+    ).toEqual([
+      {
+        quantity: 1,
+        reference: `PEDIDO-${entrega.data.numero} SALE-${saleId}`,
+        performedBy: ACTOR,
+      },
+    ]);
+
+    // Segundo entregar: no hay otra venta ni otro pago.
+    const otraVez = await pedidos.entregarPedido({ id: pedidoId, metodo: "EFECTIVO" });
+    expect(otraVez).toEqual({
+      success: false,
+      error: "Solo se puede entregar un pedido reservado",
+    });
+    expect(await prisma.sale.count({ where: { id: saleId } })).toBe(1);
+    expect(await prisma.pedidoPago.count({ where: { pedidoId } })).toBe(2);
+  });
+
   it("una falla después de crear la Sale no deja nada a medias", async () => {
     // Precio al tope del DECIMAL(10,2): con un pago negativo inyectado, el saldo
     // ya no entra en PedidoPago y la transacción falla justo después de la Sale.

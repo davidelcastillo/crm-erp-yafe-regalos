@@ -16,6 +16,7 @@ jest.mock("@/app/actions/pedido", () => ({
   getPedido: jest.fn(),
   moverPedido: jest.fn(),
   cobrarPedido: jest.fn(),
+  entregarPedido: jest.fn(),
   registrarSena: jest.fn(),
   actualizarEnvio: jest.fn(),
   cancelarPedido: jest.fn(),
@@ -59,6 +60,7 @@ import {
   getContadoresPedidos,
   getPedido,
   getPedidosPorEstado,
+  entregarPedido,
   moverPedido,
 } from "@/app/actions/pedido";
 import { getCanalVentaOptions } from "@/app/actions/prendaTaxonomy";
@@ -74,6 +76,7 @@ const mockColumnas = getPedidosPorEstado as jest.MockedFunction<
 >;
 const mockPedido = getPedido as jest.MockedFunction<typeof getPedido>;
 const mockMover = moverPedido as jest.MockedFunction<typeof moverPedido>;
+const mockEntregar = entregarPedido as jest.MockedFunction<typeof entregarPedido>;
 const mockCanales = getCanalVentaOptions as jest.MockedFunction<
   typeof getCanalVentaOptions
 >;
@@ -282,5 +285,36 @@ describe("Pedidos: tablero", () => {
     expect(within(reservado).getAllByRole("button", { name: "+ Seña" }).length).toBeGreaterThan(0);
     expect(within(reservado).getAllByRole("button", { name: "Cobrar" }).length).toBeGreaterThan(0);
     expect(within(pagado).queryByRole("button", { name: "Cancelar" })).not.toBeInTheDocument();
+  });
+
+  it("entregar y cobrar existe solo en la reserva (L8-2)", async () => {
+    render(<PedidosPage />);
+    await boardListo();
+    const reservado = screen.getByRole("region", { name: "Reservado" });
+    const pagado = screen.getByRole("region", { name: "Pagado" });
+
+    expect(within(reservado).getAllByRole("button", { name: "Entregar" }).length).toBeGreaterThan(0);
+    // Un pedido ya cobrado se entrega moviéndolo: ahí no se vuelve a cobrar.
+    expect(within(pagado).queryByRole("button", { name: "Entregar" })).not.toBeInTheDocument();
+  });
+
+  it("«Entregar» abre el cobro en modo entrega y llama a entregarPedido", async () => {
+    mockEntregar.mockResolvedValue({ success: true, data: { id: 5 } } as never);
+    render(<PedidosPage />);
+    await boardListo();
+
+    const tarjeta = within(screen.getByRole("region", { name: "Reservado" })).getAllByRole(
+      "button",
+      { name: "Entregar" }
+    )[0];
+    fireEvent.click(tarjeta);
+
+    // Mismo modal, otro botón: «Cobrar y entregar».
+    const confirmar = await screen.findByRole("button", { name: "Cobrar y entregar" });
+    // Se habilita cuando el pedido (saldo del servidor) terminó de cargar.
+    await waitFor(() => expect(confirmar).toBeEnabled());
+    fireEvent.click(confirmar);
+
+    await waitFor(() => expect(mockEntregar).toHaveBeenCalledWith({ id: 5, metodo: "EFECTIVO" }));
   });
 });

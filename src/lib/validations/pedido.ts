@@ -89,6 +89,18 @@ export const cobrarPedidoSchema = z.object({
   metodo: z.nativeEnum(PaymentMethod, { message: "Medio de pago inválido" }),
 });
 
+/**
+ * Entrega contra pago (L8-2): mismo medio que el cobro, pero sin `MIXTO` suelto.
+ * El pedido llega en una sola moneda —las señas ya tienen la suya— y `MIXTO` lo
+ * decide el servidor sumando los medios en juego.
+ */
+export const entregarPedidoSchema = z.object({
+  id: idRequerido("ID inválido"),
+  metodo: z.enum([PaymentMethod.EFECTIVO, PaymentMethod.TRANSFERENCIA], {
+    message: "Medio de pago inválido",
+  }),
+});
+
 const ciudadSchema = z
   .string()
   .trim()
