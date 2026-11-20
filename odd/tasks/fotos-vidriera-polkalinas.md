@@ -71,8 +71,8 @@ recorte/edición de fotos, videos, fotos por variante (no hay variantes).
 | ID | Tarea | Specs | Ruta principal | Estado | Commit |
 |---|---|---|---|---|---|
 | T1 | Esquema `ProductImage` + lib de storage (firmar/confirmar/quitar, bucket local y remoto documentado) + actions de foto con `requireAdmin` y meta-test al día | S1, S4 | `prisma/schema.prisma`, `src/lib/storage.ts`, `src/app/actions/foto.ts` | hecho | `5a7d3f0` |
-| T2 | Dropzone en `PrendaForm` y `ProductForm`: hasta 4 fotos, portada, redimensionado en el navegador, alta y edición | S1 | `src/app/inventario/components/PrendaForm.tsx`, `src/app/productos/components/ProductForm.tsx` | pendiente | — |
-| T3 | «Publicar en: Web» para productos normales (alta/edición, misma tabla `PrendaPublicacion`) | S3 | `src/app/actions/product.ts`, `ProductForm` | pendiente | — |
+| T2 | Dropzone en `PrendaForm` y `ProductForm`: hasta 4 fotos, portada, redimensionado en el navegador, alta y edición | S1 | `src/app/inventario/components/PrendaForm.tsx`, `src/app/productos/components/ProductForm.tsx` | hecho | `1d98b27` |
+| T3 | «Publicar en: Web» para productos normales (alta/edición, misma tabla `PrendaPublicacion`) | S3 | `src/app/actions/product.ts`, `ProductForm` | hecho | `1d98b27` |
 | T4 | Vidriera `/polkalinas`: catálogo público (prendas+productos Web) con chips, tarjetas con foto y estado | S2, S4 | `src/app/polkalinas/page.tsx`, `src/proxy.ts` | pendiente | — |
 | T5 | Ficha pública `/polkalinas/[id]`: galería, estado, WhatsApp, datos públicos | S2 | `src/app/polkalinas/[id]/page.tsx` | pendiente | — |
 | T6 | Suite completa, lint, tsc, build, prueba visual del dueño, docs y cierre | S1–S4 | — | pendiente | — |
