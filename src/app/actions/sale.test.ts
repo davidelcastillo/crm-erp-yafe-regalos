@@ -15,6 +15,11 @@ const mockSaleFindMany = jest.fn();
 const mockSaleCount = jest.fn();
 const mockBranchInventoryUpdateMany = jest.fn();
 const mockCustomerUpdate = jest.fn();
+// Reserva derivada (R1): lo reservado se lee bajo el lock de la fila de stock.
+const mockExecuteRawUnsafe: jest.Mock = jest.fn(async () => undefined);
+const mockPedidoItemGroupBy: jest.Mock = jest.fn(async () => []);
+const mockTxBranchInventoryFindMany: jest.Mock = jest.fn(async () => []);
+const mockTxProductFindMany: jest.Mock = jest.fn(async () => []);
 
 jest.mock("@/lib/prisma", () => ({
   prisma: {
@@ -36,13 +41,19 @@ jest.mock("@/lib/prisma", () => ({
         },
         product: {
           update: (...args: unknown[]) => mockProductUpdate(...args),
+          findMany: (...args: unknown[]) => mockTxProductFindMany(...args),
         },
         branchInventory: {
           updateMany: (...args: unknown[]) => mockBranchInventoryUpdateMany(...args),
+          findMany: (...args: unknown[]) => mockTxBranchInventoryFindMany(...args),
+        },
+        pedidoItem: {
+          groupBy: (...args: unknown[]) => mockPedidoItemGroupBy(...args),
         },
         customer: {
           update: (...args: unknown[]) => mockCustomerUpdate(...args),
         },
+        $executeRawUnsafe: (...args: unknown[]) => mockExecuteRawUnsafe(...args),
       };
       return callback(tx);
     }),
@@ -437,5 +448,81 @@ describe("ventas: autorización admin", () => {
 
     expect(result).toEqual({ success: false, error: "No autorizado" });
     expect(mockBranchFindFirst).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * R1 (reserva derivada): la venta directa de mostrador no puede llevarse
+ * unidades que un pedido `RESERVADO` tiene tomadas, aunque el stock físico
+ * todavía las muestre en el estante.
+ */
+describe("registerSale respeta lo reservado (R1)", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockBranchFindFirst.mockResolvedValue({ id: 3 });
+    mockBranchInventoryUpdateMany.mockResolvedValue({ count: 1 });
+    mockSaleCreate.mockResolvedValue({ id: 7, date: new Date(), totalAmount: 0 });
+    mockSaleItemCreateMany.mockResolvedValue({ count: 1 });
+  });
+
+  it("rechaza la venta cuando lo reservado deja sin disponible y no escribe nada", async () => {
+    mockProductFindUnique.mockResolvedValue({ id: 10, name: "Campera" });
+    // Hay 2 en el estante, 1 reservada por un pedido: la venta pide las 2.
+    mockTxBranchInventoryFindMany.mockResolvedValue([{ productId: 10, stock: 2 }]);
+    mockPedidoItemGroupBy.mockResolvedValue([{ productId: 10, _sum: { cantidad: 1 } }]);
+    mockTxProductFindMany.mockResolvedValue([{ id: 10, name: "Campera" }]);
+
+    const result = await registerSale({
+      branchId: 3,
+      items: [{ productId: 10, price: 12000, quantity: 2 }],
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("Stock insuficiente");
+    expect(result.error).toContain("Campera");
+    expect(result.error).toContain("reservado 1 por pedidos");
+    expect(result.error).toContain("disponible 1");
+    expect(result.error).toContain("la venta pide 2");
+    // Nada escrito: ni descuento de stock, ni cabecera, ni ítems.
+    expect(mockBranchInventoryUpdateMany).not.toHaveBeenCalled();
+    expect(mockSaleCreate).not.toHaveBeenCalled();
+    expect(mockSaleItemCreateMany).not.toHaveBeenCalled();
+  });
+
+  it("vende lo que sobra después de la reserva", async () => {
+    mockProductFindUnique.mockResolvedValue({ id: 10, name: "Campera" });
+    mockTxBranchInventoryFindMany.mockResolvedValue([{ productId: 10, stock: 2 }]);
+    mockPedidoItemGroupBy.mockResolvedValue([{ productId: 10, _sum: { cantidad: 1 } }]);
+    mockTxProductFindMany.mockResolvedValue([{ id: 10, name: "Campera" }]);
+    mockSaleItemFindMany.mockResolvedValue([]);
+
+    const result = await registerSale({
+      branchId: 3,
+      items: [{ productId: 10, price: 12000, quantity: 1 }],
+    });
+
+    expect(result.success).toBe(true);
+    expect(mockBranchInventoryUpdateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ branchId: 3, productId: 10, stock: { gte: 1 } }),
+      })
+    );
+  });
+
+  it("sin reservas, el mensaje de stock insuficiente sigue siendo el de siempre", async () => {
+    mockProductFindUnique.mockResolvedValue({ id: 10, name: "Campera" });
+    mockTxBranchInventoryFindMany.mockResolvedValue([{ productId: 10, stock: 1 }]);
+    mockPedidoItemGroupBy.mockResolvedValue([]);
+    mockBranchInventoryUpdateMany.mockResolvedValue({ count: 0 });
+
+    const result = await registerSale({
+      branchId: 3,
+      items: [{ productId: 10, price: 12000, quantity: 5 }],
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe(
+      'Stock insuficiente para "Campera" en la sucursal seleccionada. Disponible: 0 o menos que solicitado.'
+    );
   });
 });

@@ -19,6 +19,8 @@ import {
   exportBranchProductsPdf,
   getProductsWithBranchStock,
   getBranchProductsForExport,
+  moveStockBetweenBranches,
+  moveStockBatchBetweenBranches,
 } from "@/app/actions/inventory";
 import {
   buildExportFileName,
@@ -33,6 +35,15 @@ const mockBranchInventoryFindMany = jest.fn();
 const mockBranchInventoryUpsert = jest.fn();
 const mockBranchFindUnique = jest.fn();
 const mockProductFindMany = jest.fn();
+// Traspaso entre sucursales y reserva derivada (R1): lo reservado se lee bajo
+// el lock de la fila de stock.
+const mockBranchFindFirst: jest.Mock = jest.fn();
+const mockTxProductFindUnique: jest.Mock = jest.fn();
+const mockTxProductFindMany: jest.Mock = jest.fn();
+const mockTxBranchInventoryFindMany: jest.Mock = jest.fn(async () => []);
+const mockBranchMovementCreate: jest.Mock = jest.fn();
+const mockPedidoItemGroupBy: jest.Mock = jest.fn(async () => []);
+const mockExecuteRawUnsafe: jest.Mock = jest.fn(async () => undefined);
 
 jest.mock("@/lib/prisma", () => ({
   prisma: {
@@ -49,11 +60,26 @@ jest.mock("@/lib/prisma", () => ({
     },
     $transaction: jest.fn(async (callback: (tx: unknown) => Promise<unknown>) => {
       const tx = {
+        branch: {
+          findFirst: (...args: unknown[]) => mockBranchFindFirst(...args),
+        },
+        product: {
+          findUnique: (...args: unknown[]) => mockTxProductFindUnique(...args),
+          findMany: (...args: unknown[]) => mockTxProductFindMany(...args),
+        },
         branchInventory: {
           findUnique: (...args: unknown[]) =>
             mockBranchInventoryFindUnique(...args),
+          findMany: (...args: unknown[]) => mockTxBranchInventoryFindMany(...args),
           upsert: (...args: unknown[]) => mockBranchInventoryUpsert(...args),
         },
+        branchMovement: {
+          create: (...args: unknown[]) => mockBranchMovementCreate(...args),
+        },
+        pedidoItem: {
+          groupBy: (...args: unknown[]) => mockPedidoItemGroupBy(...args),
+        },
+        $executeRawUnsafe: (...args: unknown[]) => mockExecuteRawUnsafe(...args),
       };
       return callback(tx);
     }),
@@ -584,5 +610,113 @@ describe("inventario: autorización admin", () => {
 
     expect(result).toEqual({ success: false, error: "No autorizado" });
     expect(mockBranchInventoryFindUnique).not.toHaveBeenCalled();
+  });
+});
+
+// ===========================================================================
+// R1: el traspaso no puede llevarse unidades reservadas de la sucursal origen
+// ===========================================================================
+describe("moveStockBetweenBranches respeta lo reservado (R1)", () => {
+  const movimiento = {
+    productId: 10,
+    sourceBranchId: 3,
+    destBranchId: 4,
+    quantity: 1,
+    performedBy: "test@feria.test",
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockBranchFindFirst.mockResolvedValue({ id: 3, name: "Depósito", code: "DEP" });
+    mockTxProductFindUnique.mockResolvedValue({ id: 10, active: true, name: "Campera" });
+    mockTxProductFindMany.mockResolvedValue([{ id: 10, name: "Campera" }]);
+    mockBranchMovementCreate.mockResolvedValue({});
+    mockBranchInventoryUpsert.mockResolvedValue({});
+  });
+
+  it("rechaza el traspaso de una unidad reservada y no mueve nada", async () => {
+    mockBranchInventoryFindUnique.mockResolvedValueOnce({ stock: 1 });
+    mockTxBranchInventoryFindMany.mockResolvedValue([{ productId: 10, stock: 1 }]);
+    mockPedidoItemGroupBy.mockResolvedValue([{ productId: 10, _sum: { cantidad: 1 } }]);
+
+    const result = await moveStockBetweenBranches(movimiento);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("Stock insuficiente en origen");
+    expect(result.error).toContain("Campera");
+    expect(result.error).toContain("reservado 1 por pedidos");
+    expect(result.error).toContain("el movimiento pide 1");
+    expect(mockBranchInventoryUpsert).not.toHaveBeenCalled();
+    expect(mockBranchMovementCreate).not.toHaveBeenCalled();
+  });
+
+  it("mueve cuando no hay reservas en origen", async () => {
+    mockBranchInventoryFindUnique
+      .mockResolvedValueOnce({ stock: 1 })
+      .mockResolvedValueOnce(null);
+    mockTxBranchInventoryFindMany.mockResolvedValue([{ productId: 10, stock: 1 }]);
+    mockPedidoItemGroupBy.mockResolvedValue([]);
+
+    const result = await moveStockBetweenBranches(movimiento);
+
+    expect(result.success).toBe(true);
+    expect(mockBranchInventoryUpsert).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("moveStockBatchBetweenBranches respeta lo reservado (R1)", () => {
+  const lote = {
+    sourceBranchId: 3,
+    destBranchId: 4,
+    items: [
+      { productId: 10, quantity: 1 },
+      { productId: 11, quantity: 1 },
+    ],
+    performedBy: "test@feria.test",
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockBranchFindFirst.mockResolvedValue({ id: 3, name: "Depósito", code: "DEP" });
+    mockTxProductFindMany.mockResolvedValue([
+      { id: 10, name: "Campera", code: "PK1", price: 1 },
+      { id: 11, name: "Pantalón", code: "PK2", price: 1 },
+    ]);
+    mockBranchMovementCreate.mockResolvedValue({});
+    mockBranchInventoryUpsert.mockResolvedValue({});
+  });
+
+  it("aborta el lote entero si una unidad está reservada (rollback total)", async () => {
+    mockBranchInventoryFindUnique
+      .mockResolvedValueOnce({ stock: 1 }) // origen 10
+      .mockResolvedValueOnce({ stock: 1 }); // origen 11
+    mockTxBranchInventoryFindMany.mockResolvedValue([
+      { productId: 10, stock: 1 },
+      { productId: 11, stock: 1 },
+    ]);
+    mockPedidoItemGroupBy.mockResolvedValue([{ productId: 11, _sum: { cantidad: 1 } }]);
+
+    const result = await moveStockBatchBetweenBranches(lote);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("Stock insuficiente en origen");
+    expect(result.error).toContain("Pantalón");
+    expect(result.error).toContain("reservado 1 por pedidos");
+    expect(mockBranchInventoryUpsert).not.toHaveBeenCalled();
+    expect(mockBranchMovementCreate).not.toHaveBeenCalled();
+  });
+
+  it("mueve el lote cuando nada está reservado", async () => {
+    mockBranchInventoryFindUnique.mockResolvedValue({ stock: 1 });
+    mockTxBranchInventoryFindMany.mockResolvedValue([
+      { productId: 10, stock: 1 },
+      { productId: 11, stock: 1 },
+    ]);
+    mockPedidoItemGroupBy.mockResolvedValue([]);
+
+    const result = await moveStockBatchBetweenBranches(lote);
+
+    expect(result.success).toBe(true);
+    expect(mockBranchInventoryUpsert).toHaveBeenCalledTimes(4);
   });
 });

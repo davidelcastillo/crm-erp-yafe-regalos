@@ -9,6 +9,7 @@ import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { prefixLockKey } from "@/lib/utils/product-code";
 import { registrarVentaTx } from "@/lib/sale-registration";
+import { bloquearStockInventario, reservadoPorProducto } from "@/lib/reserva";
 import { PaymentMethod } from "@/lib/utils/payment";
 import {
   actualizarEnvioSchema,
@@ -89,7 +90,7 @@ function siguienteNumero(numeros: string[]): string {
  * mecanismo que usan los códigos de producto.
  */
 async function lockStock(tx: Prisma.TransactionClient, productId: number, branchId: number) {
-  await tx.$executeRawUnsafe(`SELECT pg_advisory_xact_lock(${productId}, ${branchId})`);
+  await bloquearStockInventario(tx, productId, branchId);
 }
 
 /** Lo reservado por pedidos `RESERVADO`, por producto y sucursal (R1 derivada). */
@@ -98,12 +99,7 @@ async function reservadoActivo(
   branchId: number,
   productIds: number[]
 ): Promise<Map<number, number>> {
-  const filas = await tx.pedidoItem.groupBy({
-    by: ["productId"],
-    where: { branchId, productId: { in: productIds }, pedido: { estado: "RESERVADO" } },
-    _sum: { cantidad: true },
-  });
-  return new Map(filas.map((fila) => [fila.productId, fila._sum.cantidad ?? 0]));
+  return reservadoPorProducto(tx, { branchId, productIds });
 }
 
 /**

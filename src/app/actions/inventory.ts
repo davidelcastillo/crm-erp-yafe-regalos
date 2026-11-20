@@ -16,6 +16,7 @@ import {
 } from "@/lib/validations/branchMovement";
 import { exportInventorySchema } from "@/lib/validations/export";
 import { sortProducts } from "@/lib/product-order";
+import { verificarDisponible } from "@/lib/reserva";
 import {
   buildExportFileName,
   generateProductsPdf,
@@ -430,6 +431,14 @@ export async function moveStockBetweenBranches(data: unknown) {
         );
       }
 
+      // 3b. R1: una unidad reservada por un pedido no sale de su sucursal.
+      await verificarDisponible(tx, {
+        branchId: sourceBranchId,
+        items: [{ productId, cantidad: quantity }],
+        accion: "el movimiento",
+        lugar: " en origen",
+      });
+
       // 4. Stock destino (si no existe row aún, será 0 + quantity)
       const invDest = await tx.branchInventory.findUnique({
         where: {
@@ -580,6 +589,14 @@ export async function moveStockBatchBetweenBranches(data: unknown) {
             `Stock insuficiente en origen para "${nameByProductId.get(i.productId)}". Disponible: ${available}, Requerido: ${i.quantity}`
           );
         }
+      });
+
+      // 3b. R1: el lote entero se cae si alguna unidad está reservada.
+      await verificarDisponible(tx, {
+        branchId: sourceBranchId,
+        items: items.map((item) => ({ productId: item.productId, cantidad: item.quantity })),
+        accion: "el movimiento",
+        lugar: " en origen",
       });
 
       // 4. Leer stocks de destino (para calcular nuevos valores, sin escribir)

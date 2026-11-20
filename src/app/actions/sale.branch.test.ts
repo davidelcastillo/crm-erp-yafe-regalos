@@ -37,7 +37,16 @@ jest.mock("@/lib/prisma", () => ({
         },
         branchInventory: {
           updateMany: (...args: unknown[]) => mockBranchInventoryUpdateMany(...args),
+          // R1: la reserva derivada se lee bajo el lock de la fila de stock.
+          findMany: jest.fn(async () => []),
         },
+        product: {
+          findMany: jest.fn(async () => []),
+        },
+        pedidoItem: {
+          groupBy: jest.fn(async () => []),
+        },
+        $executeRawUnsafe: jest.fn(async () => undefined),
         customer: { update: (...args: unknown[]) => mockCustomerUpdate(...args) },
       };
       return callback(tx);

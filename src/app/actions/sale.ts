@@ -8,6 +8,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { PaymentMethod, computePayment } from "@/lib/utils/payment";
 import { registrarVentaTx } from "@/lib/sale-registration";
+import { verificarDisponible } from "@/lib/reserva";
 
 // Schema para un item de venta
 const saleItemSchema = z.object({
@@ -99,8 +100,21 @@ export async function registerSale(data: unknown) {
 
     // Paso: Transacción atómica. El cuerpo vive en `sale-registration` porque
     // `cobrarPedido` registra la misma venta desde su propia transacción.
-    const result = await prisma.$transaction(async (tx) =>
-      registrarVentaTx(tx, {
+    const result = await prisma.$transaction(async (tx) => {
+      // R1: el mostrador no puede llevarse unidades que un pedido RESERVADO
+      // tiene tomadas. Va acá y no en el helper de la venta porque el lock y el
+      // chequeo tienen que compartir transacción con el descuento, y porque el
+      // cobro de un pedido ya valida su propia reserva antes de llegar acá.
+      await verificarDisponible(tx, {
+        branchId: validatedData.branchId,
+        items: validatedData.items.map((item) => ({
+          productId: item.productId,
+          cantidad: item.quantity,
+        })),
+        accion: "la venta",
+      });
+
+      return registrarVentaTx(tx, {
         branchId: validatedData.branchId,
         items: validatedData.items,
         paymentMethod,
@@ -109,8 +123,8 @@ export async function registerSale(data: unknown) {
         pendingBalance,
         customerId: customerId || null,
         performedBy,
-      })
-    );
+      });
+    });
 
     // Revalidate cache for ventas, inventario, and clientes pages
     revalidatePath("/ventas");
