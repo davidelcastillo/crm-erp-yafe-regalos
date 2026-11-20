@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Polkalina's Sistema Web",
-  description: "Control de ingresos, egresos e inventario para feria conexx",
+  description: "Control de ingresos, egresos e inventario para Polkalina's",
 };
 
 export default function RootLayout({

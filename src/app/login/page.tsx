@@ -11,7 +11,7 @@ export default function LoginPage() {
         <div className="w-16 h-16 bg-surface/30 backdrop-blur-md rounded-2xl flex items-center justify-center mb-2 shadow-lg border border-white/50 relative overflow-hidden">
           <Image
             src="/logo.webp"
-            alt="Logo Feria Conexx"
+            alt="Logo Polkalina's"
             fill
             sizes="4rem"
             className="object-contain p-1" // contain + padding para que respire
@@ -19,7 +19,7 @@ export default function LoginPage() {
             unoptimized
           />
         </div>
-        <h1 className="text-white text-2xl font-bold tracking-wider">FERIA CONEXX</h1>
+        <h1 className="text-white text-2xl font-bold tracking-wider">Polkalinas Sistema Web</h1>
 
         {/* Separador de onda. Se rellena con el mismo tinte que el fondo de la
             página (`bg-surface-tint`), así se funde en claro y en oscuro: con un

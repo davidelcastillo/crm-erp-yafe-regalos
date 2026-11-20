@@ -76,6 +76,6 @@ export default async function BranchInventoryPage({
 }
 
 export const metadata = {
-  title: 'Inventario de Sucursal - Feria Conexx',
+  title: 'Inventario de Sucursal - Polkalina\'s Sistema Web',
   description: 'Vista de solo lectura del inventario de una sucursal específica',
 };

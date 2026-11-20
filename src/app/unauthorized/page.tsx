@@ -24,6 +24,6 @@ export default function UnauthorizedPage() {
 }
 
 export const metadata = {
-  title: 'No autorizado - Feria Conexx',
+  title: 'No autorizado - Polkalina\'s Sistema Web',
   description: 'No tienes permiso para acceder a esta página',
 };
