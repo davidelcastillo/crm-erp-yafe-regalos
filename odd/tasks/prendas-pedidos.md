@@ -162,3 +162,19 @@ unidad. Los docs de fase (`docs/adr/*`, `polkalinas-html/`) se commitean con U1.
      wizard de 2 o más pasos» y «retocar el front pero eso lo vemos luego, recordame que te
      explique cuando sea el momento como es que quiero el front» → U9, con el recordatorio
      registrado también en Engram.
+- **L9.** El dueño pegó la respuesta de Claude: `polkalinas-especificacion-visual.md`, movida a
+  `docs/adr/` y commiteada (`a48645d`). Calidad alta: contraste WCAG calculado par por par con
+  prohibiciones explícitas (frutilla/suave nunca sobre rosa; `#EADAD6` solo decorativo, controles
+  con `#8A6E68`), dos variantes con recetas de className exactas, theming de SweetAlert
+  (`lib/alerta.ts`, confirmar pasa a cacao, destructivo a frutilla oscura), next/font, y el orden
+  de aplicación con `/ventas` como piloto. TRES observaciones del coordinador para U9:
+  1. **Nombres de tokens**: la spec define nombres nuevos (`superficie`, `texto`, `acento`) pero
+     el repo ya tiene los suyos (`surface`, `ink`, `accent`…). Para la variante A (recolor), lo
+     correcto es REPUNTAR los tokens existentes a los nuevos valores en vez de renombrar clases
+     por todo el repo; los nombres nuevos se agregan solo donde hacen falta (frutilla, cacao,
+     columnas del Kanban).
+  2. **`piano.svg`**: la franja decorativa referencia un asset que no existe en el repo aún
+     (opcional, solo variante B); hay que exportarlo del kit de marca o dibujarlo.
+  3. **Modo oscuro**: la spec es solo-clara; el repo tiene un bloque dark parcial en `globals.css`
+     y `docs/Nuevas cosas.md` pide tema oscuro a elección del usuario. Decidir en U9 si el dark
+     se congela hasta después del pilot de recolor.
