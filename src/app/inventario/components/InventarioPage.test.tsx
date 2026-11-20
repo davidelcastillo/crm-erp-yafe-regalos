@@ -229,8 +229,8 @@ describe("InventarioPage — FAB crear producto (spec inventory-ui)", () => {
     fireEvent.click(await screen.findByRole("button", { name: /^prenda/i }));
 
     const dialogo = await screen.findByRole("dialog", { name: "Nueva prenda" });
-    expect(within(dialogo).getByLabelText(/^talle/i)).toBeInTheDocument();
-    expect(within(dialogo).getByLabelText(/categoría de prenda/i)).toBeInTheDocument();
+    // Wizard (pedido del dueño): primero la sucursal, la ficha va después.
+    expect(within(dialogo).getAllByText(/elegí la sucursal/i).length).toBeGreaterThan(0);
     // Y no se abre el alta de producto.
     expect(screen.queryByText("Nuevo Producto")).not.toBeInTheDocument();
   });

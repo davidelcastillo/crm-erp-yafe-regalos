@@ -65,6 +65,9 @@ export function PrendaForm({ prenda, branches = [], onClose, onSuccess }: Prenda
   /** Una vez que la persona toca la marca, la categoría deja de precargarla. */
   const [esUnicaTocada, setEsUnicaTocada] = useState(false);
   const [branchId, setBranchId] = useState<number | null>(null);
+  /** Wizard del alta (S3 pedido del dueño): 1 = sucursal, 2 = ficha. La edición no tiene pasos. */
+  const [paso, setPaso] = useState(1);
+  const enPasoSucursal = !isEdit && paso === 1;
   const [publicadaEn, setPublicadaEn] = useState<string[]>([]);
   const [code, setCode] = useState("");
 
@@ -457,7 +460,10 @@ export function PrendaForm({ prenda, branches = [], onClose, onSuccess }: Prenda
   const inputClass =
     "w-full px-3 py-3 min-h-[44px] rounded-xl border border-hairline bg-surface text-ink focus:border-accent focus:ring-2 focus:ring-accent/30 outline-none transition-all";
   const labelClass = "block text-sm font-medium text-ink mb-1";
+  /** Título de sección del paso 2: agrupa lo que va junto (pedido del dueño). */
+  const seccionClass = "pt-2 text-xs font-semibold uppercase tracking-wide text-ink-muted";
   const titulo = isEdit ? "Editar prenda" : "Nueva prenda";
+  const sucursalElegida = branches.find((b) => b.id === branchId)?.name;
 
   return createPortal(
     <div className="fixed inset-0 z-[60] flex items-end justify-center bg-scrim-strong backdrop-blur-sm">
@@ -473,8 +479,21 @@ export function PrendaForm({ prenda, branches = [], onClose, onSuccess }: Prenda
               {titulo}
             </h2>
             <p className="mt-1 text-sm text-ink-muted">
-              Ropa second hand o nueva: ficha, medidas y stock en una sucursal.
+              {enPasoSucursal
+                ? "Paso 1 de 2 · Elegí la sucursal"
+                : !isEdit
+                  ? `Paso 2 de 2 · ${sucursalElegida ?? "Sucursal"}`
+                  : "Ropa second hand o nueva: ficha, medidas y stock en una sucursal."}
             </p>
+            {!isEdit && !enPasoSucursal && (
+              <button
+                type="button"
+                onClick={() => setPaso(1)}
+                className="mt-1 text-sm text-accent underline-offset-2 hover:underline"
+              >
+                Cambiar sucursal
+              </button>
+            )}
           </div>
           <button
             type="button"
@@ -492,6 +511,26 @@ export function PrendaForm({ prenda, branches = [], onClose, onSuccess }: Prenda
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 pb-4">
             {cargandoPrenda ? (
               <p className="py-8 text-center text-sm text-ink-muted">Cargando prenda…</p>
+            ) : enPasoSucursal ? (
+              <div className="space-y-4">
+                {error && (
+                  <p role="alert" className="rounded-xl border border-error bg-error-surface p-3 text-sm text-error-ink">
+                    {error}
+                  </p>
+                )}
+                <BranchPicker
+                  branches={branches}
+                  value={branchId}
+                  onChange={setBranchId}
+                  label="Sucursal donde entra la prenda"
+                  columns={2}
+                />
+                {branchId === null && (
+                  <p className="text-center text-sm text-ink-muted">
+                    Elegí la sucursal para continuar.
+                  </p>
+                )}
+              </div>
             ) : (
               <>
                 {error && (
@@ -571,6 +610,7 @@ export function PrendaForm({ prenda, branches = [], onClose, onSuccess }: Prenda
 
                 {/* S1: filas «Talle + Cantidad»; una prenda única lleva un solo talle. */}
                 <div>
+                  <p className={seccionClass}>Talles y unidades</p>
                   <span className={labelClass}>Talles *</span>
                   <div className="space-y-2">
                     {talles.map((fila, indice) => (
@@ -629,7 +669,43 @@ export function PrendaForm({ prenda, branches = [], onClose, onSuccess }: Prenda
                   )}
                 </div>
 
+                <div className="flex items-center justify-between gap-3 rounded-xl bg-surface-soft p-4">
+                  <label htmlFor="prenda-es-unica" className="text-sm font-medium text-ink">
+                    Prenda única
+                  </label>
+                  <input
+                    id="prenda-es-unica"
+                    type="checkbox"
+                    checked={esUnica}
+                    onChange={(e) => {
+                      setEsUnica(e.target.checked);
+                      setEsUnicaTocada(true);
+                      // Una prenda única colapsa las filas a un solo talle (S1).
+                      if (e.target.checked) {
+                        setTalles((prev) => [
+                          { key: prev[0]?.key ?? 1, talle: prev[0]?.talle ?? "", cantidad: "1" },
+                        ]);
+                      }
+                    }}
+                    className="h-5 w-5 accent-accent"
+                  />
+                </div>
+
+                {/* El total de unidades se deriva de los talles (S1), nunca se escribe a mano. */}
+                {!esUnica && (
+                  <div>
+                    <span className={labelClass}>Total de unidades</span>
+                    <p
+                      data-testid="prenda-cantidad-total"
+                      className={`${inputClass} bg-surface-strong text-sm text-ink-muted`}
+                    >
+                      {cantidadTotal} {cantidadTotal === 1 ? "unidad" : "unidades"}
+                    </p>
+                  </div>
+                )}
+
                 <div>
+                  <p className={seccionClass}>Ficha de la prenda</p>
                   <label htmlFor="prenda-categoria" className={labelClass}>
                     Categoría de prenda *
                   </label>
@@ -832,41 +908,6 @@ export function PrendaForm({ prenda, branches = [], onClose, onSuccess }: Prenda
                   ))}
                 </div>
 
-                <div className="flex items-center justify-between gap-3 rounded-xl bg-surface-soft p-4">
-                  <label htmlFor="prenda-es-unica" className="text-sm font-medium text-ink">
-                    Prenda única
-                  </label>
-                  <input
-                    id="prenda-es-unica"
-                    type="checkbox"
-                    checked={esUnica}
-                    onChange={(e) => {
-                      setEsUnica(e.target.checked);
-                      setEsUnicaTocada(true);
-                      // Una prenda única colapsa las filas a un solo talle (S1).
-                      if (e.target.checked) {
-                        setTalles((prev) => [
-                          { key: prev[0]?.key ?? 1, talle: prev[0]?.talle ?? "", cantidad: "1" },
-                        ]);
-                      }
-                    }}
-                    className="h-5 w-5 accent-accent"
-                  />
-                </div>
-
-                {/* El total de unidades se deriva de los talles (S1), nunca se escribe a mano. */}
-                {!esUnica && (
-                  <div>
-                    <span className={labelClass}>Total de unidades</span>
-                    <p
-                      data-testid="prenda-cantidad-total"
-                      className={`${inputClass} bg-surface-strong text-sm text-ink-muted`}
-                    >
-                      {cantidadTotal} {cantidadTotal === 1 ? "unidad" : "unidades"}
-                    </p>
-                  </div>
-                )}
-
                 {isEdit ? (
                   <div>
                     <label htmlFor="prenda-codigo" className={labelClass}>
@@ -885,18 +926,6 @@ export function PrendaForm({ prenda, branches = [], onClose, onSuccess }: Prenda
                   <div>
                     <span className={labelClass}>Código</span>
                     <p className="text-sm text-ink-muted">Se genera solo según la categoría (p. ej. RPH000).</p>
-                  </div>
-                )}
-
-                {!isEdit && (
-                  <div>
-                    <span className={labelClass}>Sucursal *</span>
-                    <BranchPicker
-                      branches={branches}
-                      value={branchId}
-                      onChange={setBranchId}
-                      label="Sucursal"
-                    />
                   </div>
                 )}
 
@@ -929,9 +958,20 @@ export function PrendaForm({ prenda, branches = [], onClose, onSuccess }: Prenda
               <button type="button" onClick={onClose} disabled={guardando} className="btn btn-secondary">
                 Cancelar
               </button>
-              <button type="submit" disabled={guardando} className="btn btn-primary flex-1">
-                {guardando ? "Guardando…" : isEdit ? "Guardar prenda" : "Crear prenda"}
-              </button>
+              {enPasoSucursal ? (
+                <button
+                  type="button"
+                  onClick={() => setPaso(2)}
+                  disabled={branchId === null}
+                  className="btn btn-primary flex-1"
+                >
+                  Continuar
+                </button>
+              ) : (
+                <button type="submit" disabled={guardando} className="btn btn-primary flex-1">
+                  {guardando ? "Guardando…" : isEdit ? "Guardar prenda" : "Crear prenda"}
+                </button>
+              )}
             </div>
           </div>
         </form>

@@ -128,15 +128,25 @@ beforeEach(() => {
 const renderAlta = () =>
   render(<PrendaForm branches={branches} onClose={jest.fn()} onSuccess={jest.fn()} />);
 
-/** Espera a que las taxonomías estén cargadas (el select de categoría ya tiene opciones). */
+/** Espera a que las taxonomías estén cargadas (se piden al abrir el modal). */
 async function esperarOpciones() {
-  await waitFor(() =>
-    expect(getCategoriaPrendaOptions).toHaveBeenCalled()
-  );
+  await waitFor(() => expect(getCategoriaPrendaOptions).toHaveBeenCalled());
+}
+
+/** Espera a que la ficha del paso 2 esté en pantalla (select de categoría con opciones). */
+async function esperarFicha() {
   await screen.findByRole("option", { name: "Única" });
 }
 
+/** Paso 1 del wizard: elige la sucursal y continúa a la ficha. */
+function elegirSucursal() {
+  fireEvent.click(screen.getByRole("button", { name: /depósito/i }));
+  fireEvent.click(screen.getByRole("button", { name: /continuar/i }));
+}
+
 async function completarMinimos() {
+  elegirSucursal();
+  await esperarFicha();
   fireEvent.change(screen.getByLabelText(/^nombre/i), {
     target: { value: "Campera de jean" },
   });
@@ -145,13 +155,33 @@ async function completarMinimos() {
   fireEvent.change(screen.getByLabelText(/^talle/i), { target: { value: "M" } });
   fireEvent.change(screen.getByLabelText(/categoría de prenda/i), { target: { value: "1" } });
   fireEvent.change(screen.getByLabelText(/^condición/i), { target: { value: "2" } });
-  fireEvent.click(screen.getByRole("button", { name: /depósito/i }));
 }
 
 describe("PrendaForm: alta", () => {
+  it("es un wizard: primero la sucursal, después la ficha", async () => {
+    renderAlta();
+    await esperarOpciones();
+
+    // Paso 1: solo la sucursal, sin el botón de crear.
+    expect(screen.getByText(/paso 1 de 2/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /crear prenda/i })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /depósito/i }));
+    fireEvent.click(screen.getByRole("button", { name: /continuar/i }));
+
+    expect(screen.getByText(/paso 2 de 2/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /crear prenda/i })).toBeInTheDocument();
+
+    // Se puede volver a cambiar la sucursal desde el encabezado.
+    fireEvent.click(screen.getByRole("button", { name: /cambiar sucursal/i }));
+    expect(screen.getByText(/paso 1 de 2/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /crear prenda/i })).not.toBeInTheDocument();
+  });
+
   it("no envía sin los campos obligatorios y avisa qué falta", async () => {
     renderAlta();
     await esperarOpciones();
+    elegirSucursal();
 
     fireEvent.click(screen.getByRole("button", { name: /crear prenda/i }));
 
@@ -162,6 +192,8 @@ describe("PrendaForm: alta", () => {
   it("precarga «prenda única» desde la categoría y esconde la cantidad", async () => {
     renderAlta();
     await esperarOpciones();
+    elegirSucursal();
+    await esperarFicha();
 
     // La categoría con stock habilita la cantidad y apaga la marca.
     fireEvent.change(screen.getByLabelText(/categoría de prenda/i), { target: { value: "2" } });
@@ -177,6 +209,8 @@ describe("PrendaForm: alta", () => {
   it("muestra la ganancia estimada (precio − costo)", async () => {
     renderAlta();
     await esperarOpciones();
+    elegirSucursal();
+    await esperarFicha();
 
     fireEvent.change(screen.getByLabelText(/precio de venta/i), { target: { value: "12000" } });
     fireEvent.change(screen.getByLabelText(/^costo/i), { target: { value: "4000" } });
@@ -240,6 +274,8 @@ describe("PrendaForm: alta", () => {
     } as never);
 
     renderAlta();
+    await esperarOpciones();
+    elegirSucursal();
     await waitFor(() => expect(screen.getByText(/no hay categorías de prenda/i)).toBeInTheDocument());
 
     fireEvent.click(screen.getByRole("button", { name: /nueva categoría/i }));
@@ -292,6 +328,8 @@ describe("PrendaForm: filas de talle (S1)", () => {
     mockCreate.mockResolvedValue({ success: true, data: { product: {}, receipt: null } } as never);
     renderAlta();
     await esperarOpciones();
+    elegirSucursal();
+    await esperarFicha();
 
     // La categoría con stock apaga «prenda única» y habilita las filas.
     fireEvent.change(screen.getByLabelText(/categoría de prenda/i), { target: { value: "2" } });
@@ -314,7 +352,6 @@ describe("PrendaForm: filas de talle (S1)", () => {
     fireEvent.change(screen.getByLabelText(/precio de venta/i), { target: { value: "100" } });
     fireEvent.change(screen.getByLabelText(/^costo/i), { target: { value: "50" } });
     fireEvent.change(screen.getByLabelText(/^condición/i), { target: { value: "2" } });
-    fireEvent.click(screen.getByRole("button", { name: /depósito/i }));
     fireEvent.click(screen.getByRole("button", { name: /crear prenda/i }));
 
     await waitFor(() =>
@@ -332,6 +369,8 @@ describe("PrendaForm: filas de medidas", () => {
     mockCreate.mockResolvedValue({ success: true, data: { product: {}, receipt: null } } as never);
     renderAlta();
     await esperarOpciones();
+    elegirSucursal();
+    await esperarFicha();
 
     fireEvent.click(screen.getByRole("button", { name: /agregar medida/i }));
     fireEvent.change(screen.getByLabelText(/tipo de medida/i), { target: { value: "6" } });
@@ -343,7 +382,6 @@ describe("PrendaForm: filas de medidas", () => {
     fireEvent.change(screen.getByLabelText(/^talle/i), { target: { value: "S" } });
     fireEvent.change(screen.getByLabelText(/categoría de prenda/i), { target: { value: "1" } });
     fireEvent.change(screen.getByLabelText(/^condición/i), { target: { value: "2" } });
-    fireEvent.click(screen.getByRole("button", { name: /depósito/i }));
     fireEvent.click(screen.getByRole("button", { name: /crear prenda/i }));
 
     await waitFor(() =>
