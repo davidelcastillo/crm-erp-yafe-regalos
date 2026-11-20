@@ -1,5 +1,30 @@
 // src/lib/validations/product.ts
 import { z } from "zod";
+import { CANALES_PUBLICACION, type CanalPublicacion } from "@/lib/validations/prenda";
+
+/**
+ * «Publicar en» (T3 de `odd/tasks/fotos-vidriera-polkalinas.md`, S3): los
+ * mismos canales y el mismo filtro que la prenda. Vacío o desconocido se
+ * ignora; sin el campo la edición no toca las publicaciones existentes.
+ */
+const filtrarCanales = (canales: string[]): CanalPublicacion[] => [
+  ...new Set(
+    canales
+      .map((canal) => canal.trim())
+      .filter((canal): canal is CanalPublicacion =>
+        (CANALES_PUBLICACION as readonly string[]).includes(canal)
+      )
+  ),
+];
+
+/** Alta: sin canales queda vacío (publica en ninguno). */
+const publicadaEnAlta = z
+  .array(z.string())
+  .optional()
+  .transform((canales) => filtrarCanales(canales ?? []));
+
+/** Edición: sin el campo la edición no toca las publicaciones existentes. */
+const publicadaEnEdicion = z.array(z.string()).transform(filtrarCanales).optional();
 
 /**
  * Schema de creación de producto. Vive acá para que el alta masiva use la
@@ -32,6 +57,7 @@ export const createProductSchema = z
       .max(999, "La cantidad inicial no puede superar 999")
       .optional(),
     costoUnitario: z.number().min(0, "El costo no puede ser negativo").optional(),
+    publicadaEn: publicadaEnAlta,
   })
   .superRefine((data, ctx) => {
     if ((data.costoUnitario ?? 0) <= 0) return;
@@ -116,6 +142,8 @@ export const updateProductExtendedSchema = z.object({
   price: z.number().min(0, "El precio no puede ser negativo").optional(),
   categoryId: z.number().int().positive("Categoría inválida").nullable().optional(),
   active: z.boolean().optional(),
+  // Presente = reemplaza las publicaciones; ausente = no las toca.
+  publicadaEn: publicadaEnEdicion,
 });
 
 export type UpdateProductExtendedValues = z.infer<typeof updateProductExtendedSchema>;

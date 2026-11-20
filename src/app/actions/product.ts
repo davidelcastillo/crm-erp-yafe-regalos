@@ -106,6 +106,14 @@ export async function createProduct(data: unknown) {
             },
           });
 
+          // S3: «Publicar en» reutiliza `PrendaPublicacion`, la misma tabla
+          // que la prenda (sin migración).
+          if (validatedData.publicadaEn.length > 0) {
+            await tx.prendaPublicacion.createMany({
+              data: validatedData.publicadaEn.map((canal) => ({ productId: creado.id, canal })),
+            });
+          }
+
           // Sin sucursal ni cantidad el alta queda como antes.
           if (!branch || cantidadInicial < 1) return creado;
 
@@ -493,11 +501,20 @@ export async function getProductById(id: number) {
 
     const product = await prisma.product.findUnique({
       where: { id },
+      // La edición necesita los canales ya publicados (S3) para no borrarlos.
+      include: { publicaciones: { select: { canal: true } } },
     });
     if (!product) {
       return { success: false, error: "Producto no encontrado" };
     }
-    return { success: true, data: parseObject(product) };
+    const { publicaciones, ...ficha } = product;
+    return {
+      success: true,
+      data: parseObject({
+        ...ficha,
+        publicadaEn: publicaciones.map((publicacion) => publicacion.canal),
+      }),
+    };
   } catch (error) {
     console.error("Error fetching product:", error);
     return { success: false, error: "Error al obtener el producto" };
@@ -843,20 +860,40 @@ export async function updateProductExtended(data: unknown) {
 
     const validatedData = updateProductExtendedSchema.parse(data);
 
-    const product = await prisma.product.update({
-      where: { id: validatedData.id },
-      data: {
-        ...(validatedData.name && { name: validatedData.name }),
-        ...(validatedData.description !== undefined && {
-          description: validatedData.description,
-        }),
-        ...(validatedData.price !== undefined && { price: validatedData.price }),
-        ...(validatedData.categoryId !== undefined && {
-          categoryId: validatedData.categoryId,
-        }),
-        ...(validatedData.active !== undefined && { active: validatedData.active }),
-      },
-    });
+    const cambios = {
+      ...(validatedData.name && { name: validatedData.name }),
+      ...(validatedData.description !== undefined && {
+        description: validatedData.description,
+      }),
+      ...(validatedData.price !== undefined && { price: validatedData.price }),
+      ...(validatedData.categoryId !== undefined && {
+        categoryId: validatedData.categoryId,
+      }),
+      ...(validatedData.active !== undefined && { active: validatedData.active }),
+    };
+
+    // S3: «Publicar en» reemplaza las filas de `PrendaPublicacion` en la misma
+    // transacción que la ficha. Sin el campo, las publicaciones no se tocan.
+    const product =
+      validatedData.publicadaEn === undefined
+        ? await prisma.product.update({ where: { id: validatedData.id }, data: cambios })
+        : await prisma.$transaction(async (tx) => {
+            const actualizado = await tx.product.update({
+              where: { id: validatedData.id },
+              data: cambios,
+            });
+            await tx.prendaPublicacion.deleteMany({ where: { productId: validatedData.id } });
+            // `publicadaEn` no es undefined en esta rama; el chequeo es por el cierre.
+            if (validatedData.publicadaEn && validatedData.publicadaEn.length > 0) {
+              await tx.prendaPublicacion.createMany({
+                data: validatedData.publicadaEn.map((canal) => ({
+                  productId: validatedData.id,
+                  canal,
+                })),
+              });
+            }
+            return actualizado;
+          });
 
     revalidatePath("/productos");
     revalidatePath(`/productos/${validatedData.id}`);

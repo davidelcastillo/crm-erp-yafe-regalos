@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import Swal from "sweetalert2";
 import type { Product } from "@prisma/client";
 import { BranchPicker } from "@/components/ui/BranchPicker";
+import { FotoUploader, subirFotos } from "@/components/ui/FotoUploader";
 import { StockMovementReceiptPanel } from "@/app/inventario/components/StockMovementReceiptPanel";
 import type { StockMovementReceipt } from "@/lib/stock-movement-receipt";
 import { CANALES_PUBLICACION } from "@/lib/validations/prenda";
@@ -69,6 +70,8 @@ export function PrendaForm({ prenda, branches = [], onClose, onSuccess }: Prenda
   const [paso, setPaso] = useState(1);
   const enPasoSucursal = !isEdit && paso === 1;
   const [publicadaEn, setPublicadaEn] = useState<string[]>([]);
+  /** T2: fotos elegidas en el alta; se suben recién con la prenda creada (id). */
+  const [fotosPendientes, setFotosPendientes] = useState<File[]>([]);
   const [code, setCode] = useState("");
 
   const [categorias, setCategorias] = useState<CategoriaPrendaOption[]>([]);
@@ -427,12 +430,23 @@ export function PrendaForm({ prenda, branches = [], onClose, onSuccess }: Prenda
       setError(resultado.error);
       return;
     }
+    // T2: las fotos del alta se suben con la prenda ya creada. Una que falle
+    // se avisa y no bloquea al resto ni la creación.
+    const avisoFotos = await subirFotos(resultado.data.product.id, fotosPendientes);
+    if (avisoFotos) {
+      await Swal.fire({
+        title: "Fotos sin subir",
+        text: `${avisoFotos}. La prenda sí se creó, podés reintentar desde la edición.`,
+        icon: "warning",
+        confirmButtonColor: "var(--palette-brand-action)",
+        confirmButtonText: "Aceptar",
+      });
+    }
     // Con comprobante primero se descarga: el modal cierra al cerrar el panel.
     if (resultado.data.receipt) {
       setReceipt(resultado.data.receipt);
       return;
-    }
-    await Swal.fire({
+    }    await Swal.fire({
       title: "Prenda creada",
       text: "La prenda se creó correctamente",
       icon: "success",
@@ -947,6 +961,17 @@ export function PrendaForm({ prenda, branches = [], onClose, onSuccess }: Prenda
                       </label>
                     ))}
                   </div>
+                </div>
+
+                {/* T2: en la edición se administran las que ya tiene; en el alta
+                    quedan pendientes hasta que la prenda exista. */}
+                <div>
+                  <p className={seccionClass}>Fotos</p>
+                  <span className={labelClass}>Hasta 4 · la primera es la portada</span>
+                  <FotoUploader
+                    productId={isEdit ? prenda!.id : null}
+                    onPendientesChange={setFotosPendientes}
+                  />
                 </div>
               </>
             )}

@@ -7,9 +7,12 @@ import { Product } from "@prisma/client";
 import Swal from "sweetalert2";
 import { CategorySelector } from "@/components/ui/CategorySelector";
 import { BranchPicker } from "@/components/ui/BranchPicker";
+import { FotoUploader, subirFotos } from "@/components/ui/FotoUploader";
+import { CANALES_PUBLICACION } from "@/lib/validations/prenda";
 import { getBranchOptions } from "@/app/actions/branch";
 import {
   createProduct,
+  getProductById,
   updateProductExtended,
 } from "@/app/actions/product";
 
@@ -54,6 +57,41 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
   const [branchId, setBranchId] = useState<number | null>(null);
   const [cantidadInicial, setCantidadInicial] = useState("");
   const [costo, setCosto] = useState("");
+
+  /**
+   * T3: «Publicar en» para productos normales (misma tabla que la prenda).
+   * En la edición arranca en `null` hasta que llegan los canales guardados, así
+   * guardar sin haber cargado no borra publicaciones.
+   */
+  const [publicadaEn, setPublicadaEn] = useState<string[] | null>(isEdit ? null : []);
+  /** T2: fotos elegidas en el alta; se suben recién con el producto creado (id). */
+  const [fotosPendientes, setFotosPendientes] = useState<File[]>([]);
+
+  const toggleCanal = (canal: string) =>
+    setPublicadaEn((prev) =>
+      (prev ?? []).includes(canal)
+        ? (prev ?? []).filter((actual) => actual !== canal)
+        : [...(prev ?? []), canal]
+    );
+
+  // La edición lee los canales ya publicados antes de poder guardar.
+  useEffect(() => {
+    if (!product) return;
+    let cancelado = false;
+    (async () => {
+      try {
+        const resultado = await getProductById(product.id);
+        if (cancelado || !resultado.success) return;
+        setPublicadaEn((resultado.data as { publicadaEn?: string[] }).publicadaEn ?? []);
+      } catch (error) {
+        console.error("Error loading product publications:", error);
+        if (!cancelado) setPublicadaEn([]);
+      }
+    })();
+    return () => {
+      cancelado = true;
+    };
+  }, [product]);
 
   useEffect(() => {
     if (isEdit) return;
@@ -116,6 +154,8 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
           price: formData.price,
           categoryId: categoryId,
           active: isActive,
+          // Sin canales cargados todavía no se toca lo publicado.
+          ...(publicadaEn !== null ? { publicadaEn } : {}),
         }
       : {
           name: formData.name,
@@ -126,6 +166,7 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
           // explícito: el esquema la acepta nullable y el producto queda igual
           // que antes (categoryId=null).
           categoryId: categoryId,
+          publicadaEn: publicadaEn ?? [],
           // Stock inicial y costo solo con sucursal (T3). Sin ella el payload
           // queda idéntico al de antes.
           ...(branchId !== null
@@ -142,6 +183,21 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
       : await createProduct(payload);
 
     if (result.success) {
+      const createdProduct = result.data as Product;
+
+      // T2: las fotos del alta se suben con el producto ya creado. Una que
+      // falle se avisa y no bloquea al resto ni la creación.
+      const avisoFotos = isEdit ? null : await subirFotos(createdProduct.id, fotosPendientes);
+      if (avisoFotos) {
+        await Swal.fire({
+          title: "Fotos sin subir",
+          text: `${avisoFotos}. El producto sí se creó, podés reintentar desde la edición.`,
+          icon: "warning",
+          confirmButtonColor: "var(--palette-brand-action)",
+          confirmButtonText: "Aceptar",
+        });
+      }
+
       await Swal.fire({
         title: isEdit ? "Producto actualizado" : "Producto creado",
         text: isEdit
@@ -152,8 +208,6 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
         confirmButtonText: "Aceptar",
         customClass: { confirmButton: "rounded-xl px-6 py-3 font-medium" },
       });
-
-      const createdProduct = result.data as Product;
 
       if (onSuccess) {
         onSuccess(createdProduct);
@@ -372,6 +426,37 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
               selectedId={categoryId}
               onValueChange={setCategoryId}
               label=""
+            />
+          </div>
+
+          {/* T3: «Publicar en» — mismo patrón que la prenda. */}
+          <div>
+            <span className={labelClass}>Publicar en</span>
+            <div className="flex flex-wrap gap-2">
+              {CANALES_PUBLICACION.map((canal) => (
+                <label
+                  key={canal}
+                  className="inline-flex min-h-[44px] items-center gap-2 rounded-xl border border-hairline px-4 text-sm text-ink"
+                >
+                  <input
+                    type="checkbox"
+                    checked={(publicadaEn ?? []).includes(canal)}
+                    onChange={() => toggleCanal(canal)}
+                    className="h-5 w-5 accent-accent"
+                  />
+                  {canal}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* T2: en la edición se administran las que ya tiene; en el alta
+              quedan pendientes hasta que el producto exista. */}
+          <div>
+            <span className={labelClass}>Fotos</span>
+            <FotoUploader
+              productId={isEdit ? product!.id : null}
+              onPendientesChange={setFotosPendientes}
             />
           </div>
 

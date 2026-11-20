@@ -1,8 +1,8 @@
 /**
  * Integration test for createProduct Server Action
  */
-import { createProduct, createProductsBatch, getProducts, searchProducts } from "../actions/product";
-import { createProductsBatchSchema } from "@/lib/validations/product";
+import { createProduct, createProductsBatch, getProducts, searchProducts, updateProductExtended } from "../actions/product";
+import { createProductSchema, createProductsBatchSchema } from "@/lib/validations/product";
 import { prefixLockKey } from "@/lib/utils/product-code";
 import { revalidatePath } from "next/cache";
 
@@ -17,15 +17,23 @@ jest.mock("@/lib/prisma", () => {
   const mockInventoryCreateManyAndReturn = jest.fn();
   const mockMovementCreateMany = jest.fn();
   const mockExecuteRawUnsafe = jest.fn().mockResolvedValue(undefined);
+  const mockProductUpdate = jest.fn();
+  const mockPublicacionCreateMany = jest.fn();
+  const mockPublicacionDeleteMany = jest.fn();
   const mockTransaction = jest.fn(async (callback: (tx: unknown) => Promise<unknown>) => {
     const tx = {
       product: {
         findMany: mockFindMany,
         create: mockProductCreate,
+        update: mockProductUpdate,
         createManyAndReturn: mockCreateManyAndReturn,
       },
       branchInventory: { createManyAndReturn: mockInventoryCreateManyAndReturn },
       branchMovement: { createMany: mockMovementCreateMany },
+      prendaPublicacion: {
+        createMany: mockPublicacionCreateMany,
+        deleteMany: mockPublicacionDeleteMany,
+      },
       $executeRawUnsafe: mockExecuteRawUnsafe,
     };
     return callback(tx);
@@ -39,7 +47,7 @@ jest.mock("@/lib/prisma", () => {
         create: mockProductCreate,
         findMany: mockFindMany,
         findUnique: jest.fn(),
-        update: jest.fn(),
+        update: mockProductUpdate,
         delete: jest.fn(),
         createManyAndReturn: mockCreateManyAndReturn,
       },
@@ -50,6 +58,10 @@ jest.mock("@/lib/prisma", () => {
       branch: { findFirst: mockBranchFindFirst },
       branchInventory: { createManyAndReturn: mockInventoryCreateManyAndReturn },
       branchMovement: { createMany: mockMovementCreateMany },
+      prendaPublicacion: {
+        createMany: mockPublicacionCreateMany,
+        deleteMany: mockPublicacionDeleteMany,
+      },
     },
   };
 });
@@ -845,5 +857,89 @@ describe("clave del advisory lock", () => {
     expect(lote.success).toBe(true);
     const sqlLote = (prisma.$executeRawUnsafe as jest.Mock).mock.calls.map((c) => String(c[0]));
     expect(sqlLote).toEqual(sqlIndividual);
+  });
+});
+
+/**
+ * T3 de `odd/tasks/fotos-vidriera-polkalinas.md` (S3): el alta y la edición de
+ * un producto normal ganan «Publicar en» y escriben las filas en
+ * `PrendaPublicacion` dentro de las transacciones existentes, igual que la
+ * prenda. Sin canales no escriben nada.
+ */
+describe("productos: «Publicar en» (T3)", () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  const publicaciones = () =>
+    prisma.prendaPublicacion as unknown as {
+      createMany: jest.Mock;
+      deleteMany: jest.Mock;
+    };
+
+  it("el esquema descarta los canales desconocidos y los repetidos", () => {
+    const parsed = createProductSchema.parse({
+      name: "Con canal",
+      prefix: "CC",
+      price: 100,
+      publicadaEn: ["Web", "TikTok", " Web "],
+    });
+
+    expect(parsed.publicadaEn).toEqual(["Web"]);
+  });
+
+  it("el alta escribe una fila por canal dentro de la transacción", async () => {
+    (prisma.product.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.product.create as jest.Mock).mockResolvedValue({
+      id: 5,
+      name: "Con canal",
+      code: "CC000",
+    });
+
+    const result = await createProduct({
+      name: "Con canal",
+      prefix: "CC",
+      price: 100,
+      publicadaEn: ["Web", "Instagram"],
+    });
+
+    expect(result.success).toBe(true);
+    expect(prisma.$transaction).toHaveBeenCalled();
+    expect(publicaciones().createMany).toHaveBeenCalledWith({
+      data: [
+        { productId: 5, canal: "Web" },
+        { productId: 5, canal: "Instagram" },
+      ],
+    });
+  });
+
+  it("sin canales el alta no escribe publicaciones", async () => {
+    (prisma.product.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.product.create as jest.Mock).mockResolvedValue({ id: 6, name: "Sin canal" });
+
+    const result = await createProduct({ name: "Sin canal", prefix: "SC", price: 100 });
+
+    expect(result.success).toBe(true);
+    expect(publicaciones().createMany).not.toHaveBeenCalled();
+  });
+
+  it("la edición reemplaza las publicaciones en la misma transacción", async () => {
+    (prisma.product.update as jest.Mock).mockResolvedValue({ id: 5 });
+
+    const result = await updateProductExtended({ id: 5, publicadaEn: ["Web"] });
+
+    expect(result.success).toBe(true);
+    expect(prisma.$transaction).toHaveBeenCalled();
+    expect(publicaciones().deleteMany).toHaveBeenCalledWith({ where: { productId: 5 } });
+    expect(publicaciones().createMany).toHaveBeenCalledWith({
+      data: [{ productId: 5, canal: "Web" }],
+    });
+  });
+
+  it("la edición sin publicadaEn no toca las publicaciones", async () => {
+    (prisma.product.update as jest.Mock).mockResolvedValue({ id: 5 });
+
+    await updateProductExtended({ id: 5, name: "Renombrado" });
+
+    expect(publicaciones().deleteMany).not.toHaveBeenCalled();
+    expect(publicaciones().createMany).not.toHaveBeenCalled();
   });
 });

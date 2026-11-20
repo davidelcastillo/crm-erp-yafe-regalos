@@ -33,6 +33,20 @@ jest.mock("sweetalert2", () => ({
   fire: jest.fn(),
 }));
 
+// Fotos de la prenda (T2): el componente real queda, se observa el helper que
+// dispara la subida y se responde la carga de las fotos existentes.
+jest.mock("@/components/ui/FotoUploader", () => ({
+  ...jest.requireActual("@/components/ui/FotoUploader"),
+  subirFotos: jest.fn(async () => null),
+}));
+
+jest.mock("@/app/actions/foto", () => ({
+  firmarSubidaFoto: jest.fn(),
+  confirmarFoto: jest.fn(),
+  quitarFoto: jest.fn(),
+  getFotosProducto: jest.fn(async () => ({ success: true, data: [] })),
+}));
+
 import { createPrenda, getPrenda, updatePrenda } from "@/app/actions/prenda";
 import {
   createCategoriaPrenda,
@@ -42,6 +56,11 @@ import {
   getMedidaTipoOptions,
 } from "@/app/actions/prendaTaxonomy";
 import Swal from "sweetalert2";
+import { subirFotos } from "@/components/ui/FotoUploader";
+import { getFotosProducto } from "@/app/actions/foto";
+
+const mockSubirFotos = subirFotos as jest.MockedFunction<typeof subirFotos>;
+const mockGetFotos = getFotosProducto as jest.MockedFunction<typeof getFotosProducto>;
 
 const mockCreate = createPrenda as jest.MockedFunction<typeof createPrenda>;
 const mockUpdate = updatePrenda as jest.MockedFunction<typeof updatePrenda>;
@@ -122,6 +141,7 @@ beforeEach(() => {
     data: [{ id: 6, name: "Axila" }],
   });
   mockGet.mockResolvedValue({ success: true, data: prenda } as never);
+  mockGetFotos.mockResolvedValue({ success: true, data: [] } as never);
   mockSwal.mockResolvedValue({ isConfirmed: false });
 });
 
@@ -390,5 +410,60 @@ describe("PrendaForm: filas de medidas", () => {
       )
     );
     expect(within(screen.getByRole("dialog")).getByText("Medidas")).toBeInTheDocument();
+  });
+});
+
+/**
+ * T2 de `odd/tasks/fotos-vidriera-polkalinas.md`: la prenda gana la sección de
+ * fotos. En el alta las fotos se suben recién con la prenda creada (para tener
+ * el id); en la edición se cargan y se administran las existentes.
+ */
+describe("PrendaForm: fotos (T2)", () => {
+  it("muestra la sección de fotos en la ficha del alta", async () => {
+    renderAlta();
+    await esperarOpciones();
+    elegirSucursal();
+    await esperarFicha();
+
+    expect(screen.getByText("Fotos")).toBeInTheDocument();
+    expect(screen.getByLabelText(/agregar fotos/i)).toBeInTheDocument();
+  });
+
+  it("en el alta sube las fotos pendientes cuando la prenda ya existe", async () => {
+    mockCreate.mockResolvedValue({
+      success: true,
+      data: { product: { id: 9, code: "PK000", name: "Campera", price: 12000 } },
+    } as never);
+
+    renderAlta();
+    await esperarOpciones();
+    await completarMinimos();
+
+    const input = screen.getByLabelText(/agregar fotos/i) as HTMLInputElement;
+    Object.defineProperty(input, "files", {
+      value: [new File(["x"], "foto.jpg", { type: "image/jpeg" })],
+      configurable: true,
+    });
+    fireEvent.change(input);
+
+    fireEvent.click(screen.getByRole("button", { name: /crear prenda/i }));
+
+    await waitFor(() => expect(mockSubirFotos).toHaveBeenCalledWith(9, [expect.any(File)]));
+  });
+
+  it("en la edición carga las fotos existentes y marca la portada", async () => {
+    mockGetFotos.mockResolvedValue({
+      success: true,
+      data: [
+        { position: 0, path: "hash-portada", alt: null, bytes: 10 },
+        { position: 1, path: "hash-segunda", alt: null, bytes: 10 },
+      ],
+    } as never);
+
+    render(<PrendaForm prenda={producto} onClose={jest.fn()} onSuccess={jest.fn()} />);
+
+    expect(await screen.findByText("Portada")).toBeInTheDocument();
+    expect(mockGetFotos).toHaveBeenCalledWith({ productId: 9 });
+    expect(screen.getByRole("button", { name: /quitar foto 2/i })).toBeInTheDocument();
   });
 });

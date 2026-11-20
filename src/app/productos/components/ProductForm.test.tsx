@@ -6,10 +6,26 @@ import type { Product } from "@prisma/client";
 import { ProductForm } from "../components/ProductForm";
 
 // Mock the actions. We mock BOTH the HU2 `createProduct` and the extended
-// `updateProductExtended` so we can exercise both modes.
+// `updateProductExtended` so we can exercise both modes. `getProductById` es de
+// donde la edición saca los canales publicados (T3).
 jest.mock("../../actions/product", () => ({
   createProduct: jest.fn(),
   updateProductExtended: jest.fn(),
+  getProductById: jest.fn(),
+}));
+
+// Las fotos del alta se suben con el producto ya creado (T2): se conserva el
+// componente real y se observa el helper que dispara la subida.
+jest.mock("@/components/ui/FotoUploader", () => ({
+  ...jest.requireActual("@/components/ui/FotoUploader"),
+  subirFotos: jest.fn(async () => null),
+}));
+
+jest.mock("@/app/actions/foto", () => ({
+  firmarSubidaFoto: jest.fn(),
+  confirmarFoto: jest.fn(),
+  quitarFoto: jest.fn(),
+  getFotosProducto: jest.fn(async () => ({ success: true, data: [] })),
 }));
 
 // Mock CategorySelector to keep this suite focused on ProductForm behavior
@@ -50,8 +66,9 @@ jest.mock("sweetalert2", () => ({
   fire: jest.fn().mockResolvedValue({ isConfirmed: true }),
 }));
 
-import { createProduct, updateProductExtended } from "../../actions/product";
+import { createProduct, updateProductExtended, getProductById } from "../../actions/product";
 import { getBranchOptions } from "@/app/actions/branch";
+import { subirFotos } from "@/components/ui/FotoUploader";
 import { createProductSchema } from "@/lib/validations/product";
 import { useRouter } from "next/navigation";
 import Swal from "sweetalert2";
@@ -60,10 +77,13 @@ const mockCreateProduct = createProduct as jest.MockedFunction<typeof createProd
 const mockUpdateProductExtended = updateProductExtended as jest.MockedFunction<
   typeof updateProductExtended
 >;
+const mockGetProductById = getProductById as jest.MockedFunction<typeof getProductById>;
+const mockSubirFotos = subirFotos as jest.MockedFunction<typeof subirFotos>;
 
 describe("ProductForm Component", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockGetProductById.mockResolvedValue({ success: true, data: { publicadaEn: [] } } as never);
     mockCreateProduct.mockResolvedValue({
       success: true,
       data: {
@@ -152,6 +172,8 @@ describe("ProductForm Component", () => {
         // Sin categoría elegida el alta manda null explícito (H2): el esquema
         // la acepta como nullable, así que el payload sigue siendo válido.
         categoryId: null,
+        // Sin canales elegidos no publica en ninguno (T3).
+        publicadaEn: [],
       });
     });
   });
@@ -570,5 +592,109 @@ describe("ProductForm · alta con stock y costo (T3)", () => {
     expect(screen.queryByLabelText(/^costo/i)).not.toBeInTheDocument();
     // La edición no pide las sucursales.
     expect(mockGetBranchOptions).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * T2 y T3 de `odd/tasks/fotos-vidriera-polkalinas.md`: el producto gana la
+ * sección de fotos (misma que la prenda) y «Publicar en» (S3). Las fotos del
+ * alta se suben recién con el producto creado, para tener su id.
+ */
+describe("ProductForm · fotos y «Publicar en» (T2/T3)", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockGetProductById.mockResolvedValue({ success: true, data: { publicadaEn: [] } } as never);
+    mockCreateProduct.mockResolvedValue({ success: true, data: { id: 1 } } as never);
+    mockUpdateProductExtended.mockResolvedValue({ success: true, data: { id: 1 } } as never);
+  });
+
+  const llenarAlta = () => {
+    fireEvent.change(screen.getByLabelText(/nombre/i), { target: { value: "Jabón de Avena" } });
+    fireEvent.change(screen.getByLabelText(/prefijo.*2-4 letras/i), { target: { value: "AA" } });
+    fireEvent.change(screen.getByLabelText(/precio de venta/i), { target: { value: "1500" } });
+  };
+
+  const elegirFoto = (input: HTMLInputElement, files: File[]) => {
+    Object.defineProperty(input, "files", { value: files, configurable: true });
+    fireEvent.change(input);
+  };
+
+  it("muestra la sección de fotos en el alta", () => {
+    render(<ProductForm product={null} onClose={() => {}} />);
+
+    expect(screen.getByText("Fotos")).toBeInTheDocument();
+    expect(screen.getByLabelText(/agregar fotos/i)).toBeInTheDocument();
+  });
+
+  it("manda publicadaEn con los canales elegidos", async () => {
+    render(<ProductForm product={null} onClose={() => {}} />);
+    llenarAlta();
+    fireEvent.click(screen.getByLabelText("Web"));
+
+    fireEvent.click(screen.getByRole("button", { name: /crear producto/i }));
+
+    await waitFor(() => expect(mockCreateProduct).toHaveBeenCalled());
+    const payload = mockCreateProduct.mock.calls[0][0];
+    expect(payload).toEqual(expect.objectContaining({ publicadaEn: ["Web"] }));
+    expect(createProductSchema.safeParse(payload).success).toBe(true);
+  });
+
+  it("sin canales elegidos manda publicadaEn vacío", async () => {
+    render(<ProductForm product={null} onClose={() => {}} />);
+    llenarAlta();
+
+    fireEvent.click(screen.getByRole("button", { name: /crear producto/i }));
+
+    await waitFor(() => expect(mockCreateProduct).toHaveBeenCalled());
+    expect(mockCreateProduct.mock.calls[0][0]).toEqual(
+      expect.objectContaining({ publicadaEn: [] })
+    );
+  });
+
+  it("en la edición precarga los canales publicados y los guarda", async () => {
+    mockGetProductById.mockResolvedValue({
+      success: true,
+      data: { publicadaEn: ["Web"] },
+    } as never);
+
+    const product = {
+      id: 1,
+      name: "Producto Existente",
+      description: "-",
+      categoryId: null,
+      active: true,
+      price: 500,
+      code: "EX001",
+      codePrefix: "EX",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    } as unknown as Product;
+
+    render(<ProductForm product={product} onClose={() => {}} />);
+
+    expect(await screen.findByLabelText("Web")).toBeChecked();
+    expect(mockGetProductById).toHaveBeenCalledWith(1);
+
+    fireEvent.click(screen.getByRole("button", { name: /actualizar producto/i }));
+
+    await waitFor(() =>
+      expect(mockUpdateProductExtended).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 1, publicadaEn: ["Web"] })
+      )
+    );
+  });
+
+  it("en el alta sube las fotos pendientes después de crear el producto", async () => {
+    mockCreateProduct.mockResolvedValue({ success: true, data: { id: 12 } } as never);
+
+    render(<ProductForm product={null} onClose={() => {}} />);
+    llenarAlta();
+    elegirFoto(screen.getByLabelText(/agregar fotos/i) as HTMLInputElement, [
+      new File(["x"], "foto.jpg", { type: "image/jpeg" }),
+    ]);
+
+    fireEvent.click(screen.getByRole("button", { name: /crear producto/i }));
+
+    await waitFor(() => expect(mockSubirFotos).toHaveBeenCalledWith(12, [expect.any(File)]));
   });
 });
