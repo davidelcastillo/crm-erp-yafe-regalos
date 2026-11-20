@@ -64,6 +64,9 @@ Decisiones del humano, citadas textuales. Las citas largas están transcriptadas
 | U4 | Pedidos — servidor: `createPedido` (una sucursal, ítems con precio del servidor, seña opcional, `venceEl`, lock de número V-0001, chequeo de disponible bajo lock), `registrarSena`, `cobrarPedido` (crea la `Sale` + `SaleItem` + EXIT + `saleId`, transición condicional), `moverPedido`, `actualizarEnvio`, `cancelarPedido` (motivo en `notas`). Zona de dinero: verificación independiente READY TO COMMIT | S2, S3, S6 | `src/app/actions/pedido.ts`, `src/lib/sale-registration.ts` | hecho, verificador independiente + 3 flecos resueltos | `23370b0` |
 | U5 | Kanban y pedidos — UI: sección dentro de `/ventas`, 4 columnas en PC con arrastre, lista + selector por estado en celular, paso de cobro al soltar en «Pagado», avisos de vencimiento, tab de canal. Sin Server Actions públicas nuevas para leer | S3 | `src/app/ventas/pedidos/` + componentes | pendiente | — |
 | U6 | Reserva derivada R1: `registerSale` y `moveStock` pasan a respetar lo reservado (`stock − reservado ≥ cantidad`), disponibilidad derivada de la prenda (Disponible/Reservada/Vendida), y el aviso en el alta/venta. Zona de dinero/stock: verificación independiente | S1, S2, S6 | `src/app/actions/sale.ts`, `inventory.ts`, `prenda.ts` | pendiente | — |
+| U7 | Entrega contra pago: transición RESERVADO→ENTREGADO («entregar y cobrar») que registra el pago en el momento de la entrega (Sale obligatoria + señas previas al total), con su botón en la tarjeta. Zona de dinero: verificación independiente | S2 | `src/app/actions/pedido.ts`, `src/app/ventas/pedidos/` | pendiente | — |
+| U8 | Código de prenda por categoría: `CategoriaPrenda.codePrefix` (semillas RP/RPI/RPH), `createPrenda` usa el prefijo de SU categoría (reemplaza el PK fijo), el generador sigue desde el máximo existente (preparado para la migración de las ropas cargadas como productos). El dueño pasará el último código de producción | S1 | `prisma/schema.prisma`, `prendaTaxonomy.ts`, `prenda.ts` | pendiente | — |
+| U9 | Wizard de nuevo pedido (2+ pasos, como BulkProductForm) y retoque de front. PENDIENTE: el dueño quiere explicar personalmente cómo quiere el front cuando llegue el momento — RECORDARLO | S3 | `src/app/ventas/pedidos/components/PedidoForm.tsx` | pendiente | — |
 
 Orden: U1 → U2 → U3 → U4 → U5 → U6. U4 y U6 tocan plata y stock: aviso `AGENTS.md` §0.4 antes de
 cada una, verificador independiente (`gentle-ai-verify`) y tu verificación de front al cierre de cada
@@ -137,3 +140,25 @@ unidad. Los docs de fase (`docs/adr/*`, `polkalinas-html/`) se commitean con U1.
   columna propia), señas M1 sin asiento hasta cobrar, retiro pasa por Para enviar (decisión
   del dueño que reemplaza el supuesto PAGADO→ENTREGADO del diseño), `getPedido` expone
   phone/notas/performedBy solo a admin.
+- **L8.** Cuarta jornada de pedidos del dueño (2026-11-19, tras verificar U5: «las demás
+  cosas que me dijiste que pruebe andan todo», con el botón de cancelar pendiente de
+  aclarar — por diseño solo aparece en RESERVADO, Pagado es irreversible):
+  1. **Duda sucursales**: «tengo una prenda en una sucursal y cuando hago el pedido pongo
+     para retirarla en otra, ¿eso está bien?». Opinión del coordinador registrada: v1
+     mantiene el pedido de UNA sucursal (la del stock, tu decisión P5); retirar en otra se
+     resuelve traspasando la prenda antes (el `moveStock` ya existe y U6 lo hará respetar
+     reservas). PENDIENTE confirmación del dueño.
+  2. **Entrega contra pago** (nuevo requisito textual): «a veces los clientes pagan recién
+     cuando retiran el pedido de una sucursal, entonces un pedido podría estar en estado de
+     entrega y aún no estar pagado, al momento de estar entregado ahí sí se registra el pago
+     sí o sí si es que no se registró antes» → U7. Modifica la máquina: ENTREGADO exige Sale
+     aunque nunca haya pasado por Pagado.
+  3. **Código de prenda por categoría** (textual): «la ropa nueva sea RP, la ropa intervenida
+     RPI y la ropa second hand RPH»; «en producción ya tengo ropas cargadas como productos
+     normales, esas luego las migro, te tendría que decir cuál es el último código generado»
+     → U8, REEMPLAZA la decisión P8 (PK fijo). El generador por máximo existente absorbe la
+     migración sin sembrar contadores a mano.
+  4. **UX/UI** (textual): «estaría bueno que el cargar un nuevo pedido sea en pasos… un tipo
+     wizard de 2 o más pasos» y «retocar el front pero eso lo vemos luego, recordame que te
+     explique cuando sea el momento como es que quiero el front» → U9, con el recordatorio
+     registrado también en Engram.
