@@ -15,6 +15,7 @@ import { Spinner } from '@/components/ui/Spinner';
 import { CardSkeleton, Skeleton } from '@/components/ui/Skeleton';
 import { BranchSelector } from '@/components/ui/BranchSelector';
 import { useBranch } from '@/lib/context/BranchContext';
+import Link from 'next/link';
 import { useReloadKey } from '@/lib/hooks/useReloadKey';
 import { useEffect, useState } from 'react';
 import { motion, useReducedMotion, useScroll, useTransform } from 'motion/react';
@@ -188,13 +189,18 @@ export default function VentasPage() {
                 />
               }
               actions={
-                <button
-                  type="button"
-                  onClick={() => setCashStep('menu')}
-                  className="btn btn-primary"
-                >
-                  Caja
-                </button>
+                <>
+                  <Link href="/ventas/pedidos" className="btn btn-secondary">
+                    Pedidos
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => setCashStep('menu')}
+                    className="btn btn-primary"
+                  >
+                    Caja
+                  </button>
+                </>
               }
             />
           </motion.div>
@@ -203,6 +209,16 @@ export default function VentasPage() {
               fondo de marca a la vista. En desktop pasan a la barra. */}
           <div className="mt-4 px-3 md:hidden">
             <div className="flex gap-3">
+              <ActionCard
+                label="Pedidos"
+                hint="Reservas, cobros y envíos"
+                href="/ventas/pedidos"
+                icon={
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 3h12v18l-3-2-3 2-3-2-3 2V3z M9 8h6 M9 12h6" />
+                  </svg>
+                }
+              />
               <ActionCard
                 label="Caja"
                 hint="Movimientos y cierre"

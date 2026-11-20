@@ -10,6 +10,7 @@ import { z } from "zod";
 const createCustomerSchema = z.object({
   name: z.string().min(1, "El nombre es requerido").max(255),
   surname: z.string().min(1, "El apellido es requerido").max(255),
+  phone: z.string().trim().max(30, "Máximo 30 caracteres").optional(),
 });
 
 // Schema para actualizar cliente
@@ -41,6 +42,7 @@ export async function createCustomer(data: unknown) {
       data: {
         name: validatedData.name,
         surname: validatedData.surname,
+        ...(validatedData.phone ? { phone: validatedData.phone } : {}),
         totalBalance: 0,
       },
     });

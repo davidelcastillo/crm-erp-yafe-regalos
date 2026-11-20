@@ -147,7 +147,7 @@ unidad. Los docs de fase (`docs/adr/*`, `polkalinas-html/`) se commitean con U1.
      para retirarla en otra, ¿eso está bien?». Opinión del coordinador registrada: v1
      mantiene el pedido de UNA sucursal (la del stock, tu decisión P5); retirar en otra se
      resuelve traspasando la prenda antes (el `moveStock` ya existe y U6 lo hará respetar
-     reservas). PENDIENTE confirmación del dueño.
+     reservas). CONFIRMADO por el dueño («Sí, me sirve así»: una sucursal por pedido, retiro cruzado = traspaso previo).
   2. **Entrega contra pago** (nuevo requisito textual): «a veces los clientes pagan recién
      cuando retiran el pedido de una sucursal, entonces un pedido podría estar en estado de
      entrega y aún no estar pagado, al momento de estar entregado ahí sí se registra el pago
