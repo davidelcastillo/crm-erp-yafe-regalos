@@ -7,6 +7,7 @@ import { parseArray, parseObject } from "@/lib/parse-prisma";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { PaymentMethod, computePayment } from "@/lib/utils/payment";
+import { registrarVentaTx } from "@/lib/sale-registration";
 
 // Schema para un item de venta
 const saleItemSchema = z.object({
@@ -96,95 +97,20 @@ export async function registerSale(data: unknown) {
       pendingBalance = Math.max(0, totalAmount - amountPaid);
     }
 
-    // Paso: Transacción atómica con decremento condicional de stock
-    const result = await prisma.$transaction(async (tx) => {
-      // 0. Validar y descontar stock ANTES de crear la cabecera (fail fast).
-      //    El updateMany condicional evita TOCTOU: solo descuenta si hay stock suficiente.
-      for (const item of validatedData.items) {
-        const updateResult = await tx.branchInventory.updateMany({
-          where: {
-            branchId: validatedData.branchId,
-            productId: item.productId,
-            stock: { gte: item.quantity }, // only if sufficient stock
-          },
-          data: {
-            stock: { decrement: item.quantity },
-          },
-        });
-
-        if (updateResult.count === 0) {
-          // Either no inventory row or stock < quantity
-          const product = await prisma.product.findUnique({
-            where: { id: item.productId },
-            select: { name: true },
-          });
-          throw new Error(
-            `Stock insuficiente para "${product?.name ?? item.productId}" en la sucursal seleccionada. Disponible: 0 o menos que solicitado.`
-          );
-        }
-      }
-
-      // 1. Crear el registro de venta (cabecera) con branchId
-      const sale = await tx.sale.create({
-        data: {
-          totalAmount,
-          amountPaid,
-          pendingBalance,
-          paymentMethod,
-          customerId: customerId || null,
-          branchId: validatedData.branchId,
-        },
-      });
-
-      // 1.5. Si hay cliente y pending balance, incrementar su deuda
-      if (customerId && pendingBalance > 0) {
-        await tx.customer.update({
-          where: { id: customerId },
-          data: {
-            totalBalance: {
-              increment: pendingBalance,
-            },
-          },
-        });
-      }
-
-      // 2. Crear los items de venta
-      const itemsData = validatedData.items.map((item) => ({
-        saleId: sale.id,
-        productId: item.productId,
-        price: item.price,
-        quantity: item.quantity,
-        subtotal: item.price * item.quantity,
-      }));
-
-      await tx.saleItem.createMany({
-        data: itemsData,
-      });
-
-      // 2.5. Libro de la sucursal: la venta saca stock de esa sucursal. Antes solo
-      //      bajaba BranchInventory, así que el historial del producto y la
-      //      auditoría de stock no veían la venta (hallazgo de T10.1).
-      if (performedBy) {
-        await tx.branchMovement.createMany({
-          data: validatedData.items.map((item) => ({
-            productId: item.productId,
-            branchId: validatedData.branchId,
-            movementType: "EXIT",
-            quantity: item.quantity,
-            reference: `SALE-${sale.id}`,
-            performedBy,
-          })),
-        });
-      }
-
-      // 3. Obtener los items creados para retornar
-      const createdItems = await tx.saleItem.findMany({
-        where: { saleId: sale.id },
-        include: { product: true },
-      });
-
-      return { sale, items: createdItems, totalAmount };
-    });
+    // Paso: Transacción atómica. El cuerpo vive en `sale-registration` porque
+    // `cobrarPedido` registra la misma venta desde su propia transacción.
+    const result = await prisma.$transaction(async (tx) =>
+      registrarVentaTx(tx, {
+        branchId: validatedData.branchId,
+        items: validatedData.items,
+        paymentMethod,
+        totalAmount,
+        amountPaid,
+        pendingBalance,
+        customerId: customerId || null,
+        performedBy,
+      })
+    );
 
     // Revalidate cache for ventas, inventario, and clientes pages
     revalidatePath("/ventas");
