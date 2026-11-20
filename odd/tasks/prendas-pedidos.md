@@ -65,7 +65,7 @@ Decisiones del humano, citadas textuales. Las citas largas están transcriptadas
 | U5 | Kanban y pedidos — UI: sección dentro de `/ventas`, 4 columnas en PC con arrastre, lista + selector por estado en celular, paso de cobro al soltar en «Pagado», avisos de vencimiento, tab de canal. Sin Server Actions públicas nuevas para leer | S3 | `src/app/ventas/pedidos/` + componentes | pendiente | — |
 | U6 | Reserva derivada R1: `registerSale` y `moveStock` pasan a respetar lo reservado (`stock − reservado ≥ cantidad`), disponibilidad derivada de la prenda (Disponible/Reservada/Vendida), y el aviso en el alta/venta. Zona de dinero/stock: verificación independiente | S1, S2, S6 | `src/app/actions/sale.ts`, `inventory.ts`, `prenda.ts` | pendiente | — |
 | U7 | Entrega contra pago: transición RESERVADO→ENTREGADO («entregar y cobrar») que registra el pago en el momento de la entrega (Sale obligatoria + señas previas al total), con su botón en la tarjeta. Zona de dinero: verificación independiente | S2 | `src/app/actions/pedido.ts`, `src/app/ventas/pedidos/` | pendiente | — |
-| U8 | Código de prenda por categoría: `CategoriaPrenda.codePrefix` (semillas RP/RPI/RPH), `createPrenda` usa el prefijo de SU categoría (reemplaza el PK fijo), el generador sigue desde el máximo existente (preparado para la migración de las ropas cargadas como productos). El dueño pasará el último código de producción | S1 | `prisma/schema.prisma`, `prendaTaxonomy.ts`, `prenda.ts` | pendiente | — |
+| U8 | Código de prenda por categoría: `CategoriaPrenda.codePrefix` (semillas RP/RPI/RPH), `createPrenda` usa el prefijo de SU categoría (reemplaza el PK fijo), el generador sigue desde el máximo existente (preparado para la migración de las ropas cargadas como productos). El dueño pasará el último código de producción | S1 | `prisma/schema.prisma`, `prendaTaxonomy.ts`, `prenda.ts` | hecho | `85ce7c1` |
 | U9 | Wizard de nuevo pedido (2+ pasos, como BulkProductForm) y retoque de front. PENDIENTE: el dueño quiere explicar personalmente cómo quiere el front cuando llegue el momento — RECORDARLO | S3 | `src/app/ventas/pedidos/components/PedidoForm.tsx` | pendiente | — |
 
 Orden: U1 → U2 → U3 → U4 → U5 → U6. U4 y U6 tocan plata y stock: aviso `AGENTS.md` §0.4 antes de
@@ -207,3 +207,36 @@ unidad. Los docs de fase (`docs/adr/*`, `polkalinas-html/`) se commitean con U1.
   invariante del dueño) con test propio (51 en pedido.test). Totales: 128/128 + guardia 72/72,
   3/3 base local end-to-end (reservar → entregar → Sale/stock/EXIT únicos), tsc 0, lint 0.
   Verificado en navegador por el dueño («okey») y sesión cerrada al final del día 2026-11-19/20.
+- **L12.** U8 commiteada (`85ce7c1`). Código por categoría: `CategoriaPrenda.codePrefix` nuevo
+  (semillas RP=«Nuevo», RPI=«Intervenido», RPH=«Second hand» en `scripts/seed-prenda-taxonomies.mjs`,
+  que además rellena idempotentemente el prefijo de filas existentes), `createPrenda` genera el
+  código con el prefijo de SU categoría bajo el lock de ese prefijo y sigue la secuencia desde el
+  máximo existente (absorbe la futura migración de las ropas cargadas como productos, sin
+  contadores a mano); sin prefijo, el alta rechaza con «La categoría «X» no tiene prefijo de
+  código» antes de abrir la transacción (el renombrado nunca toca el prefijo, así que leerlo
+  pre-transacción es seguro). La creación de categoría pide el prefijo en un segundo paso del
+  prompt (2-4 letras, normalizado a mayúsculas por Zod). RED: 2 fallos nuevos observados
+  (prefijo de categoría y rechazo sin prefijo) → GREEN 20/20 en prenda.test + 2 nuevos en
+  prendaTaxonomy.test + pin de PrendaForm (dos prompts). Checks: suite completa
+  **1119/1119** con base local, tsc 0, lint 0 errores/36 avisos previos. Prueba visual del dueño
+  pendiente: crear categoría con prefijo, alta de prenda con código RP…/RPI…/RPH… y el texto
+  nuevo del formulario.
+- **L13.** Incidente del entorno (2026-11-20, registrado en Engram #1551): un `npx prisma db push
+  --accept-data-loss` corrido directo en vez del wrapper `scripts/local-db.mjs` sincronizó
+  **producción** con el esquema de la rama (agregó las tablas/enums de prendas con `codePrefix`;
+  dropeó `Product.stock` legada, 435 valores). Causa raíz: el datasource define
+  `directUrl = env("DIRECT_URL")` y el push conecta por ahí; pisar solo `DATABASE_URL` (o fijar
+  `DATABASE_URL_TEST`, que Prisma no lee) no alcanza. Verificado solo-lectura: la app desplegada
+  (`main`) no referencia ni la columna dropeada ni las agregadas — no rompe. El dueño decidió
+  **dejar producción como está** (sin PITR); la huella queda como adelanto del esquema que la
+  rama llevará igualmente. El push LOCAL correcto pisa las dos variables; base local sincronizada
+  y sembrada (RPH/RPI/RP completados en las tres categorías).
+- **L14.** Deuda preexistente saldada al cerrar U8 (la suite completa no podía quedar roja):
+  (a) `auth-guard.coverage.test.ts` **ya estaba roja en HEAD 9743e0a** (verificado con `git
+  stash`): `prendaTaxonomy.ts` centraliza el guardián en helpers genéricos y el barrido no veía
+  la delegación — además su regex no matcheaba helpers con genéricos (`crear<T>`). La red ahora
+  acepta delegación a helpers del mismo archivo **verificando el guardián dentro del helper y su
+  orden**; una acción que haga trabajo directo (Zod/Prisma) sin guardián sigue en roja. (b) El
+  conteo de fichas del test de rollback de `prenda.local-db` era global y competía con las suites
+  paralelas que crean prendas (carrera observada dos corridas seguidas): acotado al `categoriaId`
+  de la propia suite. Ambos cambios son test-only.
