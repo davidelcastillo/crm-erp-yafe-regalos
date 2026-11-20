@@ -19,15 +19,17 @@ describe("BottomNav", () => {
     (usePathname as jest.Mock).mockReturnValue("/dashboard");
     render(React.createElement(BottomNav));
 
-    // 5 destinos: el máximo de STYLE.md. «Clientes» salió de la barra (S6):
-    // ahora se entra solo por el botón de /sucursales.
+    // 6 destinos (pedido del dueño 2026-11-20: «Pedidos» en la barra para
+    // entrar rápido). «Clientes» salió de la barra (S6): se entra desde
+    // /sucursales.
     const navLinks = screen.getAllByRole("link");
-    expect(navLinks).toHaveLength(5);
+    expect(navLinks).toHaveLength(6);
     expect(navLinks.map((l) => l.textContent)).toEqual(
       expect.arrayContaining([
         "Dashboard",
         "Compras",
         "Ventas",
+        "Pedidos",
         "Inventario",
         "Sucursales",
       ])

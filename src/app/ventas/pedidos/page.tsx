@@ -67,12 +67,12 @@ const TRANSICIONES: Record<Estado, Estado[]> = {
 
 /** Tinte por columna del Kanban: los cuatro de la marca (spec §1.2 y mockup
  * ventas.html): arena para Reservado, verde para Pagado, rosa para enviar y
- * neutro para Entregado. */
+ * neutro para Entregado. Tokens en `globals.css`, sin colores literales. */
 const TINTE: Record<Estado, string> = {
-  RESERVADO: "bg-[#F3E3D3]",
-  PAGADO: "bg-[#E3EFE3]",
-  PARA_ENVIAR: "bg-[#F2C4CC]",
-  ENTREGADO: "bg-[#ECE6E4]",
+  RESERVADO: "bg-col-reservado",
+  PAGADO: "bg-col-pagado",
+  PARA_ENVIAR: "bg-col-enviar",
+  ENTREGADO: "bg-col-entregado",
 };
 
 const ETIQUETA_METODO: Record<string, string> = {

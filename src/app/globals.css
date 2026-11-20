@@ -89,6 +89,11 @@
   /* Velo cálido de la marca */
   --scrim: rgb(42 24 23 / 0.35);
   --scrim-strong: rgb(42 24 23 / 0.6);
+  /* Tintes por columna del Kanban de pedidos (spec §1.2 y mockup ventas.html). */
+  --col-reservado: #f3e3d3;
+  --col-pagado: #e3efe3;
+  --col-enviar: #f2c4cc;
+  --col-entregado: #ece6e4;
 
   /* ==========================================================================
      MOVIMIENTO (S6)
@@ -202,6 +207,10 @@
   --color-hairline-strong: var(--hairline-strong);
   --color-scrim: var(--scrim);
   --color-scrim-strong: var(--scrim-strong);
+  --color-col-reservado: var(--col-reservado);
+  --color-col-pagado: var(--col-pagado);
+  --color-col-enviar: var(--col-enviar);
+  --color-col-entregado: var(--col-entregado);
 
   /* Curvas de movimiento: habilitan `ease-standard`, `ease-enter`, `ease-exit`. */
   --ease-standard: var(--motion-ease-standard);
