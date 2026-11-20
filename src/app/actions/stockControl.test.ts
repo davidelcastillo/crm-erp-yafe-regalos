@@ -19,6 +19,12 @@ import {
 // ---------------------------------------------------------------------------
 const mockBranchFindUnique = jest.fn();
 const mockBranchInventoryFindMany = jest.fn();
+// Ajustes del cierre bajo reserva derivada (R1): lo reservado se lee bajo el lock
+// de la fila de stock, dentro de la transacción.
+const mockTxBranchInventoryFindMany: jest.Mock = jest.fn(async () => []);
+const mockTxProductFindMany: jest.Mock = jest.fn(async () => []);
+const mockPedidoItemGroupBy: jest.Mock = jest.fn(async () => []);
+const mockExecuteRawUnsafe: jest.Mock = jest.fn(async () => undefined);
 const mockBranchInventoryUpsert = jest.fn();
 const mockBranchMovementCreate = jest.fn();
 const mockStockControlFindFirst = jest.fn();
@@ -33,7 +39,10 @@ const mockTransaction = jest.fn(
     void opciones;
     const callback = arg as (tx: unknown) => Promise<unknown>;
     const tx = {
-      branchInventory: { upsert: (...args: unknown[]) => mockBranchInventoryUpsert(...args) },
+      branchInventory: { upsert: (...args: unknown[]) => mockBranchInventoryUpsert(...args), findMany: (...args: unknown[]) => mockTxBranchInventoryFindMany(...args) },
+      product: { findMany: (...args: unknown[]) => mockTxProductFindMany(...args) },
+      pedidoItem: { groupBy: (...args: unknown[]) => mockPedidoItemGroupBy(...args) },
+      $executeRawUnsafe: (...args: unknown[]) => mockExecuteRawUnsafe(...args),
       branchMovement: { create: (...args: unknown[]) => mockBranchMovementCreate(...args) },
       stockControl: {
         updateMany: (...args: unknown[]) => mockStockControlUpdateMany(...args),
@@ -407,6 +416,14 @@ const controlConDiferencias = () => ({
 });
 
 describe("closeStockControl", () => {
+  // Cada test declara sus reservas: el cierre consulta la reserva derivada solo
+  // cuando una diferencia aceptada baja el stock (R1).
+  beforeEach(() => {
+    mockPedidoItemGroupBy.mockResolvedValue([]);
+    mockTxBranchInventoryFindMany.mockResolvedValue([]);
+    mockTxProductFindMany.mockResolvedValue([]);
+  });
+
   it("exige motivo cuando hay diferencias aceptadas y no toca Prisma", async () => {
     mockStockControlFindUnique.mockResolvedValue(controlConDiferencias());
 
@@ -460,6 +477,69 @@ describe("closeStockControl", () => {
         reason: "Rotura en depósito",
       },
     });
+  });
+
+  it("no ajusta una baja que se llevaría unidades reservadas (R1)", async () => {
+    mockStockControlFindUnique.mockResolvedValue(controlConDiferencias());
+    // Arroz: 10 en el sistema, 7 contados y 9 reservados por pedidos. Bajar a 7
+    // dejaría el pedido sin su unidad, así que el cierre entero se cae.
+    mockTxBranchInventoryFindMany.mockResolvedValue([{ productId: 11, stock: 10 }]);
+    mockTxProductFindMany.mockResolvedValue([{ id: 11, name: "Arroz" }]);
+    mockPedidoItemGroupBy.mockResolvedValue([{ productId: 11, _sum: { cantidad: 9 } }]);
+
+    const result = await closeStockControl({
+      controlId: 7,
+      reason: "Rotura en depósito",
+    });
+
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(result.error).toContain("reservado 9 por pedidos");
+    expect(result.error).toContain("el ajuste pide 3");
+    expect(mockBranchInventoryUpsert).not.toHaveBeenCalled();
+    expect(mockBranchMovementCreate).not.toHaveBeenCalled();
+    expect(mockStockControlUpdateMany).not.toHaveBeenCalled();
+  });
+
+  it("un sobrante aceptado no mira reservas", async () => {
+    mockStockControlFindUnique.mockResolvedValue({
+      id: 8,
+      branchId: 2,
+      status: "DRAFT",
+      reason: null,
+      branch: { name: "Centro", code: "CEN" },
+      items: [
+        {
+          productId: 11,
+          systemStock: 2,
+          countedStock: 6,
+          decision: "ACCEPTED",
+          product: { code: "AAA001", name: "Arroz" },
+        },
+      ],
+    });
+
+    const result = await closeStockControl({ controlId: 8, reason: "Apareció mercadería" });
+
+    expect(result.success).toBe(true);
+    // Ajustar hacia arriba no puede sacarle la unidad a ningún pedido.
+    expect(mockPedidoItemGroupBy).not.toHaveBeenCalled();
+    expect(mockBranchInventoryUpsert).toHaveBeenCalledTimes(1);
+  });
+
+  it("una baja aceptada entra si el stock alcanza para los pedidos (R1)", async () => {
+    mockStockControlFindUnique.mockResolvedValue(controlConDiferencias());
+    // Arroz: 10 en el sistema, 7 contados y 2 reservados. Bajar a 7 deja 7 ≥ 2.
+    mockTxBranchInventoryFindMany.mockResolvedValue([{ productId: 11, stock: 10 }]);
+    mockTxProductFindMany.mockResolvedValue([{ id: 11, name: "Arroz" }]);
+    mockPedidoItemGroupBy.mockResolvedValue([{ productId: 11, _sum: { cantidad: 2 } }]);
+
+    const result = await closeStockControl({ controlId: 7, reason: "Rotura en depósito" });
+
+    expect(result.success).toBe(true);
+    // Solo el ítem aceptado que baja se consulta; la pendiente y la diferencia 0 no.
+    expect(mockPedidoItemGroupBy).toHaveBeenCalledTimes(1);
+    expect(mockBranchInventoryUpsert).toHaveBeenCalledTimes(1);
   });
 
   it("no ajusta nada si otro proceso cerró el control primero", async () => {

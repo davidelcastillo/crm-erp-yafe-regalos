@@ -16,6 +16,7 @@ import {
 } from "@/lib/validations/branchMovement";
 import { exportInventorySchema } from "@/lib/validations/export";
 import { sortProducts } from "@/lib/product-order";
+import { verificarDisponible } from "@/lib/reserva";
 import {
   buildExportFileName,
   generateProductsPdf,
@@ -179,6 +180,16 @@ export async function adjustProductStock(data: unknown) {
         );
       }
 
+      // R1 (ADR §2.2): una baja de stock no puede llevarse unidades que un
+      // pedido RESERVADO tiene tomadas. Las subas no miran reservas.
+      if (change < 0) {
+        await verificarDisponible(tx, {
+          branchId,
+          items: [{ productId, cantidad: -change }],
+          accion: "el ajuste",
+        });
+      }
+
       const updated = await tx.branchInventory.upsert({
         where: {
           branchId_productId: { branchId, productId },
@@ -327,6 +338,15 @@ export async function assignStockToBranch(data: unknown) {
         );
       }
 
+      // R1 (ADR §2.2): asignar una baja tampoco puede sacar lo reservado.
+      if (quantity < 0) {
+        await verificarDisponible(tx, {
+          branchId,
+          items: [{ productId, cantidad: -quantity }],
+          accion: "el ajuste",
+        });
+      }
+
       // 2. Upsert BranchInventory
       const updated = await tx.branchInventory.upsert({
         where: { branchId_productId: { branchId, productId } },
@@ -429,6 +449,14 @@ export async function moveStockBetweenBranches(data: unknown) {
           `Stock insuficiente en origen. Disponible: ${sourceStock}, Requerido: ${quantity}`
         );
       }
+
+      // 3b. R1: una unidad reservada por un pedido no sale de su sucursal.
+      await verificarDisponible(tx, {
+        branchId: sourceBranchId,
+        items: [{ productId, cantidad: quantity }],
+        accion: "el movimiento",
+        lugar: " en origen",
+      });
 
       // 4. Stock destino (si no existe row aún, será 0 + quantity)
       const invDest = await tx.branchInventory.findUnique({
@@ -582,6 +610,14 @@ export async function moveStockBatchBetweenBranches(data: unknown) {
         }
       });
 
+      // 3b. R1: el lote entero se cae si alguna unidad está reservada.
+      await verificarDisponible(tx, {
+        branchId: sourceBranchId,
+        items: items.map((item) => ({ productId: item.productId, cantidad: item.quantity })),
+        accion: "el movimiento",
+        lugar: " en origen",
+      });
+
       // 4. Leer stocks de destino (para calcular nuevos valores, sin escribir)
       const destRows = await Promise.all(
         items.map((i) =>
@@ -730,6 +766,17 @@ export async function adjustBranchStockBatch(data: unknown) {
       });
       if (!branch) {
         throw new Error("Sucursal inválida o inactiva");
+      }
+
+      // R1 (ADR §2.2): una SALIDA no puede llevarse unidades reservadas por un
+      // pedido. Va antes de la primera escritura, así el lote no queda a medias.
+      // La ENTRADA no mira reservas: nunca saca stock.
+      if (movementType === "EXIT") {
+        await verificarDisponible(tx, {
+          branchId,
+          items: items.map((item) => ({ productId: item.productId, cantidad: item.quantity })),
+          accion: "el ajuste",
+        });
       }
 
       for (const item of items) {

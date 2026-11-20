@@ -113,7 +113,7 @@ export const CashCloseModal = ({
         title: "Caja cerrada",
         text: `Se guardó el corte de ${resumen?.branchName ?? "la sucursal"} por ${plata(resumen?.total ?? 0)}`,
         icon: "success",
-        confirmButtonColor: "#6d28d9",
+        confirmButtonColor: "var(--palette-brand-action)",
       });
       reset();
       onConfirm();

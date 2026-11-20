@@ -23,6 +23,18 @@ const SaleIcon = ({ active }: { active: boolean }) => (
   </svg>
 );
 
+/** Comprobante con líneas: el mismo ícono de «Pedidos» del ActionCard de /ventas. */
+const PedidoIcon = ({ active }: { active: boolean }) => (
+  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M6 3h12v18l-3-2-3 2-3-2-3 2V3z M9 8h6 M9 12h6"
+    />
+  </svg>
+);
+
 const InventoryIcon = ({ active }: { active: boolean }) => (
   <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-2a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
@@ -38,12 +50,14 @@ const SucursalIcon = ({ active }: { active: boolean }) => (
    </svg>
 );
 
-// Cinco destinos (el máximo de STYLE.md). «Clientes» no está: se entra desde
-// el botón del encabezado de /sucursales (S6).
+// Seis destinos (pedido del dueño 2026-11-20: «Pedidos» en la barra para
+// entrar rápido). STYLE.md declaraba cinco como máximo; se actualiza a seis.
+// «Clientes» no está: se entra desde el botón del encabezado de /sucursales (S6).
 const navItems = [
    { href: "/dashboard", label: "Dashboard", icon: DashboardIcon },
    { href: "/compras", label: "Compras", icon: PurchaseIcon },
    { href: "/ventas", label: "Ventas", icon: SaleIcon },
+   { href: "/ventas/pedidos", label: "Pedidos", icon: PedidoIcon },
    { href: "/inventario", label: "Inventario", icon: InventoryIcon },
    { href: "/sucursales", label: "Sucursales", icon: SucursalIcon },
 ];
@@ -64,7 +78,15 @@ export default function BottomNav() {
       <nav className="glass-nav fixed bottom-0 left-0 right-0 border-t border-white/80 shadow-[0_-2px_10px_rgba(0,0,0,0.05)] z-50">
         <div className="flex justify-around items-center h-16 max-w-lg mx-auto">
            {navItems.map((item) => {
-             const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
+             // Ruta más específica primero: en /ventas/pedidos gana «Pedidos»
+            // y no se marcan los dos.
+            const coincide = (ruta: string) =>
+              pathname === ruta || pathname.startsWith(`${ruta}/`);
+            const isActive =
+              coincide(item.href) &&
+              !navItems.some(
+                (otro) => otro.href.length > item.href.length && coincide(otro.href)
+              );
              const Icon = item.icon;
              // El activo se marca con el circulo de marca detras del icono (texto oscuro sobre el degradé claro).
              const linkClassName = `flex flex-col items-center justify-center flex-1 h-full transition-all duration-200 ease-in-out ${isActive ? "text-ink" : "text-ink-muted hover:text-ink-body"}`;

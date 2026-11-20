@@ -162,8 +162,8 @@ export const MoveStockModal = ({
       html: `<p>${summaryText}</p>`,
       icon: "warning",
       showCancelButton: true,
-      confirmButtonColor: "#6d28d9",
-      cancelButtonColor: "#6a6a6a",
+      confirmButtonColor: "var(--palette-brand-action)",
+      cancelButtonColor: "var(--palette-secondary-gray)",
       confirmButtonText: "Sí, mover",
       cancelButtonText: "Cancelar",
     });
@@ -190,7 +190,7 @@ export const MoveStockModal = ({
           title: "Error",
           text: res.error || "Error al mover stock",
           icon: "error",
-          confirmButtonColor: "#dc2626",
+          confirmButtonColor: "var(--danger)",
         });
       }
     } catch (err) {

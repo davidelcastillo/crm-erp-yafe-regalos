@@ -18,6 +18,7 @@ const letra = (n: number) => String.fromCharCode(65 + (n % 26));
 const PREFIJO_NUEVO = `${letra(sufijo)}${letra(Math.floor(sufijo / 26))}N`;
 const PREFIJO_AGOTADO = `${letra(sufijo)}${letra(Math.floor(sufijo / 26))}X`;
 const PREFIJO_CATEGORIA = `${letra(sufijo)}${letra(Math.floor(sufijo / 26))}C`;
+const PREFIJO_COMPRA = `${letra(sufijo)}${letra(Math.floor(sufijo / 26))}P`;
 const NOMBRE_CATEGORIA = `QA categoría individual ${sufijo}`;
 
 type Cliente = (typeof import("@/lib/prisma"))["prisma"];
@@ -36,7 +37,7 @@ describe("createProduct (integración, base local)", () => {
     acciones = await import("@/app/actions/product");
 
     await prisma.product.deleteMany({
-      where: { codePrefix: { in: [PREFIJO_NUEVO, PREFIJO_AGOTADO, PREFIJO_CATEGORIA] } },
+      where: { codePrefix: { in: [PREFIJO_NUEVO, PREFIJO_AGOTADO, PREFIJO_CATEGORIA, PREFIJO_COMPRA] } },
     });
 
     const categoria = await prisma.category.create({ data: { name: NOMBRE_CATEGORIA } });
@@ -45,10 +46,71 @@ describe("createProduct (integración, base local)", () => {
 
   afterAll(async () => {
     await prisma.product.deleteMany({
-      where: { codePrefix: { in: [PREFIJO_NUEVO, PREFIJO_AGOTADO, PREFIJO_CATEGORIA] } },
+      where: { codePrefix: { in: [PREFIJO_NUEVO, PREFIJO_AGOTADO, PREFIJO_CATEGORIA, PREFIJO_COMPRA] } },
     });
     await prisma.category.deleteMany({ where: { name: NOMBRE_CATEGORIA } });
     await prisma.$disconnect();
+  });
+
+  it("con sucursal, cantidad y costo deja el stock, su ingreso y la compra del alta (S2/S3)", async () => {
+    const sucursal = await prisma.branch.create({
+      data: {
+        name: `QA compra alta ${sufijo}`,
+        code: `QB${sufijo}`,
+        authUserId: `qa-compra-${sufijo}`,
+      },
+    });
+
+    try {
+      const resultado = await acciones.createProduct({
+        name: `QA alta individual ${sufijo} con compra`,
+        prefix: PREFIJO_COMPRA,
+        price: 10,
+        branchId: sucursal.id,
+        cantidadInicial: 3,
+        costoUnitario: 4.5,
+      });
+      expect(resultado.success).toBe(true);
+      if (!resultado.success) return;
+      const producto = await prisma.product.findFirstOrThrow({
+        where: { codePrefix: PREFIJO_COMPRA },
+        select: { id: true },
+      });
+
+      // Stock e ingreso.
+      expect(
+        await prisma.branchInventory.findUnique({
+          where: { branchId_productId: { branchId: sucursal.id, productId: producto.id } },
+          select: { stock: true },
+        })
+      ).toEqual({ stock: 3 });
+      expect(
+        await prisma.branchMovement.findFirst({
+          where: { productId: producto.id, branchId: sucursal.id },
+          select: { movementType: true, quantity: true, reference: true },
+        })
+      ).toMatchObject({ movementType: "ENTRY", quantity: 3, reference: "ALTA DE PRODUCTO" });
+
+      // S2: una compra del alta, con el costo unitario y la cantidad ingresada.
+      const compras = await prisma.purchase.findMany({
+        where: { branchId: sucursal.id },
+        select: {
+          totalAmount: true,
+          items: { select: { productId: true, price: true, quantity: true, subtotal: true } },
+        },
+      });
+      expect(compras).toHaveLength(1);
+      expect(Number(compras[0].totalAmount)).toBe(13.5);
+      expect(compras[0].items).toHaveLength(1);
+      expect(compras[0].items[0].productId).toBe(producto.id);
+      expect(Number(compras[0].items[0].price)).toBe(4.5);
+      expect(compras[0].items[0].quantity).toBe(3);
+      expect(Number(compras[0].items[0].subtotal)).toBe(13.5);
+    } finally {
+      // La compra retiene la sucursal por el FK: se borra antes.
+      await prisma.purchase.deleteMany({ where: { branchId: sucursal.id } });
+      await prisma.branch.deleteMany({ where: { id: sucursal.id } });
+    }
   });
 
   it("crea el código siguiente del prefijo", async () => {

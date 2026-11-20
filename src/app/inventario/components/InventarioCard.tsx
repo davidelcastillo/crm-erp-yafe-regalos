@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Product } from "@prisma/client";
 import { updateProduct, deleteProduct, toggleProductActive, updateProductExtended } from "@/app/actions/product";
 import { sumStock, type StockSource } from "@/lib/inventory-stock";
+import { PrendaForm } from "./PrendaForm";
 import Swal from "sweetalert2";
 
 interface InventarioCardProps {
@@ -36,6 +37,8 @@ function getStockStatus(stock: number): {
 
 export function InventarioCard({ product, dataProductId, isHighlighted, onViewMovements, categories = [] }: InventarioCardProps) {
   const [isEditing, setIsEditing] = useState(false);
+  // Una prenda no se edita con el formulario de producto: tiene su ficha (U3).
+  const [isEditingPrenda, setIsEditingPrenda] = useState(false);
   // Sum stock across all branch rows: correct for "Todas" and for a single branch.
   const displayStock = sumStock(product as unknown as StockSource);
   const [localName, setLocalName] = useState(product.name);
@@ -47,6 +50,10 @@ export function InventarioCard({ product, dataProductId, isHighlighted, onViewMo
   const status = getStockStatus(displayStock);
 
   const handleEdit = () => {
+    if (product.kind === "PRENDA") {
+      setIsEditingPrenda(true);
+      return;
+    }
     setIsEditing(true);
   };
 
@@ -153,6 +160,16 @@ export function InventarioCard({ product, dataProductId, isHighlighted, onViewMo
       onViewMovements(product);
     }
   };
+
+  if (isEditingPrenda) {
+    return (
+      <PrendaForm
+        prenda={product}
+        onClose={() => setIsEditingPrenda(false)}
+        onSuccess={() => window.location.reload()}
+      />
+    );
+  }
 
    if (isEditing) {
      // Edit mode - show form

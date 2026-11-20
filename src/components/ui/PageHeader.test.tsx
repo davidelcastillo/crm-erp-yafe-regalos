@@ -107,14 +107,14 @@ describe("PageHeader", () => {
     );
   });
 
-  it("el interruptor de tema vive en la píldora del encabezado, no dentro del menú ☰", () => {
+  it("el interruptor de tema está retirado: el tema se congela en claro", () => {
     renderHeader();
 
-    // El tema lo elige el usuario: si quedara detrás del menú, en el celular no
-    // se alcanzaría sin abrirlo. Debe estar a la vista en los dos layouts.
-    const toggle = screen.getByRole("button", { name: /^Activar tema (oscuro|claro)$/ });
-    expect(toggle).toBeInTheDocument();
-    expect(toggle.closest("[role='dialog']")).toBeNull();
+    // Pedido del dueño (2026-11-20): el modo oscuro quedó con la paleta
+    // anterior, así que el toggle no se renderiza hasta que se rediseñe.
+    expect(
+      screen.queryByRole("button", { name: /^Activar tema (oscuro|claro)$/ })
+    ).not.toBeInTheDocument();
   });
 
   it("una fila del menú se cierra al tocarla y dispara su acción", () => {

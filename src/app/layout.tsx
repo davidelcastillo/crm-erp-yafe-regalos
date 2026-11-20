@@ -1,14 +1,10 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist_Mono } from "next/font/google";
+import { fraunces, workSans } from "./fonts";
 import "./globals.css";
 import BottomNav from "../components/BottomNav";
 import { BranchProviderWrapper } from "@/lib/context/BranchProviderWrapper";
 import { THEME_BOOTSTRAP_SCRIPT } from "@/lib/theme";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
@@ -16,8 +12,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Feria Conexx",
-  description: "Control de ingresos, egresos e inventario para feria conexx",
+  title: "Polkalina's Sistema Web",
+  description: "Control de ingresos, egresos e inventario para Polkalina's",
 };
 
 export default function RootLayout({
@@ -37,7 +33,7 @@ export default function RootLayout({
       /* El script de arranque escribe `data-theme` antes de que React hidrate:
          sin esto, React avisa que el atributo del servidor no coincide. */
       suppressHydrationWarning
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${workSans.variable} ${fraunces.variable} ${geistMono.variable} h-full antialiased`}
     >
       {/* El tema se aplica antes del primer pintado: leerlo desde un efecto de React
           mostraría la página en claro y después saltaría a oscuro. */}

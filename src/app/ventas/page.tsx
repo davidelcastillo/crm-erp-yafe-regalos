@@ -15,6 +15,7 @@ import { Spinner } from '@/components/ui/Spinner';
 import { CardSkeleton, Skeleton } from '@/components/ui/Skeleton';
 import { BranchSelector } from '@/components/ui/BranchSelector';
 import { useBranch } from '@/lib/context/BranchContext';
+import Link from 'next/link';
 import { useReloadKey } from '@/lib/hooks/useReloadKey';
 import { useEffect, useState } from 'react';
 import { motion, useReducedMotion, useScroll, useTransform } from 'motion/react';
@@ -188,13 +189,15 @@ export default function VentasPage() {
                 />
               }
               actions={
-                <button
-                  type="button"
-                  onClick={() => setCashStep('menu')}
-                  className="btn btn-primary"
-                >
-                  Caja
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setCashStep('menu')}
+                    className="btn btn-primary"
+                  >
+                    Caja
+                  </button>
+                </>
               }
             />
           </motion.div>
@@ -203,6 +206,7 @@ export default function VentasPage() {
               fondo de marca a la vista. En desktop pasan a la barra. */}
           <div className="mt-4 px-3 md:hidden">
             <div className="flex gap-3">
+              {/* Pedidos vive en el BottomNav (pedido del dueño): sin atajo acá. */}
               <ActionCard
                 label="Caja"
                 hint="Movimientos y cierre"

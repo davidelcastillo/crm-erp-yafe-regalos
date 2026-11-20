@@ -23,9 +23,11 @@ type Fila = {
   categoryId: number | null;
   /** Stock inicial en la sucursal del lote; vacío es 0 (T5). */
   initialStock: string;
+  /** Costo que salió cada unidad (T4); vacío es 0 y no entra en la compra. */
+  costo: string;
 };
 /** `row` es un mensaje que no pertenece a un campo puntual: se muestra en la card. */
-type Campo = "name" | "prefix" | "price" | "categoryId" | "initialStock" | "row";
+type Campo = "name" | "prefix" | "price" | "categoryId" | "initialStock" | "costo" | "row";
 type FilaError = { field: Campo; message: string };
 /** Paso 1: sucursal del stock inicial. Paso 2: las filas de productos (S17). */
 type Paso = "sucursal" | "productos";
@@ -51,7 +53,8 @@ function erroresPorFila(
       item.field === "prefix" ||
       item.field === "price" ||
       item.field === "categoryId" ||
-      item.field === "initialStock"
+      item.field === "initialStock" ||
+      item.field === "costo"
         ? item.field
         : "row";
     (mapa[fila.id] ??= []).push({ field, message: item.message });
@@ -64,7 +67,7 @@ function erroresPorFila(
  *
  * Alta masiva de productos (S1): muchas filas en un mismo modal y un solo
  * envío «todo o nada» (S7). Por fila: nombre, prefijo, precio, categoría (S4)
- * y, si se elige una sucursal, stock inicial (T5).
+ * y, si se elige una sucursal, stock inicial (T5) y costo (T4).
  *
  * La sucursal es global para todo el lote (D8) y opcional: sin sucursal el
  * modal crea solo productos, como antes. Con sucursal, la acción deja el stock
@@ -88,7 +91,7 @@ function erroresPorFila(
  */
 export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFormProps) {
   const [filas, setFilas] = useState<Fila[]>([
-    { id: "1", name: "", prefix: "", price: "", categoryId: null, initialStock: "" },
+    { id: "1", name: "", prefix: "", price: "", categoryId: null, initialStock: "", costo: "" },
   ]);
   const [paso, setPaso] = useState<Paso>("sucursal");
   const [branchId, setBranchId] = useState<number | null>(null);
@@ -98,13 +101,16 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
   const [errorCategorias, setErrorCategorias] = useState(false);
   const [errores, setErrores] = useState<Record<string, FilaError[]>>({});
 
-  // Sin sucursal no existen los campos de stock: limpiar sus errores evita que
-  // el resumen intente enfocar un campo que ya no está en pantalla.
+  // Sin sucursal no existen los campos de stock ni de costo: limpiar sus
+  // errores evita que el resumen intente enfocar un campo que ya no está.
   useEffect(() => {
     if (branchId !== null) return;
     setErrores((prev) => {
       const limpio = Object.entries(prev)
-        .map(([id, lista]) => [id, lista.filter((e) => e.field !== "initialStock")] as const)
+        .map(
+          ([id, lista]) =>
+            [id, lista.filter((e) => e.field !== "initialStock" && e.field !== "costo")] as const
+        )
         .filter(([, lista]) => lista.length > 0);
       return Object.fromEntries(limpio);
     });
@@ -171,6 +177,7 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
       price: "",
       categoryId: null,
       initialStock: "",
+      costo: "",
     };
     idParaEnfocar.current = nueva.id;
     setFilas((prev) => [...prev, nueva]);
@@ -180,15 +187,19 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
     if (filas.length <= 1) return; // la última fila no se puede quitar
 
     const conDatos =
-      fila.name.trim() || fila.prefix.trim() || fila.price.trim() || fila.initialStock.trim();
+      fila.name.trim() ||
+      fila.prefix.trim() ||
+      fila.price.trim() ||
+      fila.initialStock.trim() ||
+      fila.costo.trim();
     if (conDatos) {
       const confirmacion = await Swal.fire({
         title: "¿Quitar esta fila?",
         text: "Se pierden los datos cargados en la fila.",
         icon: "warning",
         showCancelButton: true,
-        confirmButtonColor: "#6d28d9",
-        cancelButtonColor: "#6a6a6a",
+        confirmButtonColor: "var(--palette-brand-action)",
+        cancelButtonColor: "var(--palette-secondary-gray)",
         confirmButtonText: "Sí, quitar",
         cancelButtonText: "Cancelar",
       });
@@ -224,7 +235,12 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
 
   const cerrar = async () => {
     const conDatos = filas.some(
-      (f) => f.name.trim() || f.prefix.trim() || f.price.trim() || f.initialStock.trim()
+      (f) =>
+        f.name.trim() ||
+        f.prefix.trim() ||
+        f.price.trim() ||
+        f.initialStock.trim() ||
+        f.costo.trim()
     );
     if (!conDatos) {
       onClose();
@@ -235,8 +251,8 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
       text: "Se pierden las filas cargadas.",
       icon: "warning",
       showCancelButton: true,
-      confirmButtonColor: "#6d28d9",
-      cancelButtonColor: "#6a6a6a",
+      confirmButtonColor: "var(--palette-brand-action)",
+      cancelButtonColor: "var(--palette-secondary-gray)",
       confirmButtonText: "Sí, descartar",
       cancelButtonText: "Cancelar",
     });
@@ -271,6 +287,8 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
         ...(branchId !== null
           ? { initialStock: f.initialStock.trim() === "" ? 0 : Number(f.initialStock) }
           : {}),
+        // El costo vacío no viaja (T4): la fila sin costo no entra en la compra.
+        ...(branchId !== null && f.costo.trim() !== "" ? { costo: Number(f.costo) } : {}),
       })),
     });
     if (!parsed.success) {
@@ -285,7 +303,7 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
           title: "Error",
           text: parsed.error.issues.map((e) => e.message).join(", "),
           icon: "error",
-          confirmButtonColor: "#dc2626",
+          confirmButtonColor: "var(--danger)",
           confirmButtonText: "Aceptar",
         });
         return;
@@ -312,7 +330,7 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
         title: "Productos creados",
         text: `${cantidad} ${cantidad === 1 ? "producto creado" : "productos creados"} correctamente`,
         icon: "success",
-        confirmButtonColor: "#6d28d9",
+        confirmButtonColor: "var(--palette-brand-action)",
         confirmButtonText: "Aceptar",
       });
       onSuccess?.();
@@ -331,7 +349,7 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
       title: "Error",
       text: resultado.error || "Error al crear los productos",
       icon: "error",
-      confirmButtonColor: "#dc2626",
+      confirmButtonColor: "var(--danger)",
       confirmButtonText: "Aceptar",
     });
   };
@@ -610,6 +628,36 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
                             {mensajeDe("initialStock") && (
                               <p id={`${base}-initialStock-error`} className="mt-1 text-sm text-error-ink">
                                 {mensajeDe("initialStock")}
+                              </p>
+                            )}
+                          </div>
+                        )}
+
+                        {/* T4: el costo de la fila entra en la compra del lote. */}
+                        {branchId !== null && (
+                          <div>
+                            <label htmlFor={`${base}-costo`} className={labelClass}>
+                              Costo
+                            </label>
+                            <input
+                              id={`${base}-costo`}
+                              data-bulk-field="costo"
+                              type="number"
+                              inputMode="decimal"
+                              step="0.01"
+                              min="0"
+                              value={fila.costo}
+                              onChange={(e) => actualizarFila(fila.id, "costo", e.target.value)}
+                              onKeyDown={alPresionarEnter}
+                              enterKeyHint="next"
+                              placeholder="0.00"
+                              aria-invalid={mensajeDe("costo") ? "true" : undefined}
+                              aria-describedby={descritoPor("costo")}
+                              className={inputClass}
+                            />
+                            {mensajeDe("costo") && (
+                              <p id={`${base}-costo-error`} className="mt-1 text-sm text-error-ink">
+                                {mensajeDe("costo")}
                               </p>
                             )}
                           </div>

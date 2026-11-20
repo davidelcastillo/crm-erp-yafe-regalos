@@ -10,6 +10,7 @@
     "test": "jest",
     "test:local-db": "node scripts/local-db.mjs test",
     "db:local:push": "node scripts/local-db.mjs push",
+    "seed:prenda-taxonomies": "node scripts/seed-prenda-taxonomies.mjs",
     "postinstall": "prisma generate"
   },
   "dependencies": {

@@ -145,7 +145,7 @@ export function BranchManager({ branches }: { branches: Branch[] }) {
             </div>
           `,
           icon: "success",
-          confirmButtonColor: "#6d28d9",
+          confirmButtonColor: "var(--palette-brand-action)",
           confirmButtonText: "Entendido",
         });
         const refreshed = await getBranches();
@@ -433,8 +433,8 @@ export function BranchManager({ branches }: { branches: Branch[] }) {
                           text: "¿Estás seguro de que deseas eliminar esta sucursal? Esta acción no se puede deshacer.",
                           icon: "warning",
                           showCancelButton: true,
-                          confirmButtonColor: "#6d28d9",
-                          cancelButtonColor: "#6a6a6a",
+                          confirmButtonColor: "var(--palette-brand-action)",
+                          cancelButtonColor: "var(--palette-secondary-gray)",
                           confirmButtonText: "Sí, eliminar",
                           cancelButtonText: "Cancelar",
                         }).then((result) => {

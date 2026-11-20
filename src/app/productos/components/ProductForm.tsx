@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { Product } from "@prisma/client";
 import Swal from "sweetalert2";
 import { CategorySelector } from "@/components/ui/CategorySelector";
+import { BranchPicker } from "@/components/ui/BranchPicker";
+import { getBranchOptions } from "@/app/actions/branch";
 import {
   createProduct,
   updateProductExtended,
@@ -44,6 +46,32 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
   );
   const [isActive, setIsActive] = useState<boolean>(product?.active ?? true);
 
+  /**
+   * T3: el alta puede dejar el stock en una sucursal y, con costo, registrar la
+   * compra del alta. Sin sucursal elegida el alta queda como antes.
+   */
+  const [branches, setBranches] = useState<Array<{ id: number; name: string }>>([]);
+  const [branchId, setBranchId] = useState<number | null>(null);
+  const [cantidadInicial, setCantidadInicial] = useState("");
+  const [costo, setCosto] = useState("");
+
+  useEffect(() => {
+    if (isEdit) return;
+    let cancelado = false;
+    (async () => {
+      try {
+        const resultado = await getBranchOptions();
+        if (!cancelado && resultado.success && resultado.data) setBranches(resultado.data);
+      } catch (error) {
+        // Sin sucursales el alta sigue funcionando sin stock, como antes.
+        console.error("Error loading branch options:", error);
+      }
+    })();
+    return () => {
+      cancelado = true;
+    };
+  }, [isEdit]);
+
   const [formData, setFormData] = useState({
     name: product?.name || "",
     description: product?.description || "",
@@ -66,8 +94,8 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
           "El producto dejará de aparecer en los selectores de compras, ventas y movimientos, pero conservará su stock e historial.",
         icon: "warning",
         showCancelButton: true,
-        confirmButtonColor: "#6d28d9",
-        cancelButtonColor: "#6a6a6a",
+        confirmButtonColor: "var(--palette-brand-action)",
+        cancelButtonColor: "var(--palette-secondary-gray)",
         confirmButtonText: "Sí, desactivar",
         cancelButtonText: "Cancelar",
       });
@@ -98,6 +126,15 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
           // explícito: el esquema la acepta nullable y el producto queda igual
           // que antes (categoryId=null).
           categoryId: categoryId,
+          // Stock inicial y costo solo con sucursal (T3). Sin ella el payload
+          // queda idéntico al de antes.
+          ...(branchId !== null
+            ? {
+                branchId,
+                cantidadInicial: Number(cantidadInicial) || 0,
+                costoUnitario: Number(costo) || 0,
+              }
+            : {}),
         };
 
     const result = isEdit
@@ -111,7 +148,7 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
           ? "El producto se ha actualizado correctamente"
           : "El producto se ha creado correctamente",
         icon: "success",
-        confirmButtonColor: "#6d28d9",
+        confirmButtonColor: "var(--palette-brand-action)",
         confirmButtonText: "Aceptar",
         customClass: { confirmButton: "rounded-xl px-6 py-3 font-medium" },
       });
@@ -130,7 +167,7 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
         title: "Error",
         text: result.error || "Error al guardar el producto",
         icon: "error",
-        confirmButtonColor: "#dc2626",
+        confirmButtonColor: "var(--danger)",
         confirmButtonText: "Aceptar",
       });
     }
@@ -268,6 +305,64 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
                 />
               </div>
             </>
+          )}
+
+          {/* T3: sucursal, cantidad inicial y costo del alta. */}
+          {!isEdit && (
+            <div>
+              <span className={labelClass}>Sucursal</span>
+              <BranchPicker
+                branches={branches}
+                value={branchId}
+                onChange={setBranchId}
+                label="Sucursal"
+                emptyLabel="No hay sucursales activas: el producto se crea sin stock"
+              />
+              <p className="text-xs text-ink-muted mt-1">
+                Sin sucursal: el producto se crea sin stock.
+              </p>
+            </div>
+          )}
+
+          {!isEdit && branchId !== null && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label htmlFor="product-cantidad-inicial" className={labelClass}>
+                  Cantidad inicial
+                </label>
+                <input
+                  id="product-cantidad-inicial"
+                  type="number"
+                  inputMode="numeric"
+                  step="1"
+                  min="0"
+                  max="999"
+                  value={cantidadInicial}
+                  onChange={(e) => setCantidadInicial(e.target.value)}
+                  className={inputClass}
+                  placeholder="0"
+                />
+              </div>
+              <div>
+                <label htmlFor="product-costo" className={labelClass}>
+                  Costo
+                </label>
+                <input
+                  id="product-costo"
+                  type="number"
+                  inputMode="decimal"
+                  step="0.01"
+                  min="0"
+                  value={costo}
+                  onChange={(e) => setCosto(e.target.value)}
+                  className={inputClass}
+                  placeholder="0.00"
+                />
+                <p className="text-xs text-ink-muted mt-1">
+                  Con costo y cantidad se registra la compra en Compras.
+                </p>
+              </div>
+            </div>
           )}
 
           {/* Category Selector */}

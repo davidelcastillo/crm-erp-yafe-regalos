@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clientas y reportes · Polkalina's · Sistema interno</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,400;1,9..144,600&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--crema:#FFF6F0;--rosa:#F2C4CC;--frutilla:#C8323C;--cacao:#4A2C2A;--gris:#D8D2D0;--blanco:#FFFFFF;--suave:#76574F;--borde:#EADAD6;
+--ok-bg:#E3EFE3;--ok:#2F5B33;--warn-bg:#FBE7C8;--warn:#7A4A06;--bad-bg:#F6D5D7;--bad:#8E1F28;--serif:'Fraunces',serif;--sans:'Work Sans',sans-serif}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--crema);color:var(--cacao);font-family:var(--sans);font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased}
+a{color:inherit}
+img{max-width:100%;display:block}
+button,input,select,textarea{font:inherit;color:inherit}
+h1,h2,h3{margin:0;font-weight:400}
+.serif{font-family:var(--serif)}
+.it{font-family:var(--serif);font-style:italic}
+.rojo{color:var(--frutilla)}
+.muted{color:var(--suave)}
+.visually-hidden{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:12px 22px;border-radius:999px;border:2px solid var(--cacao);background:transparent;color:var(--cacao);font-weight:600;font-size:15px;text-decoration:none;cursor:pointer;white-space:nowrap}
+.btn-primary{background:var(--cacao);color:var(--crema)}
+.btn-rojo{background:var(--frutilla);border-color:var(--frutilla);color:var(--crema)}
+.btn-sm{min-height:40px;padding:8px 14px;font-size:14px}
+.btn-block{width:100%}
+.btn:hover{filter:brightness(1.08)}
+.btn:focus-visible,.icon-btn:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--frutilla);outline-offset:2px}
+.icon-btn{width:44px;height:44px;display:inline-flex;align-items:center;justify-content:center;border:none;background:transparent;border-radius:999px;cursor:pointer;position:relative;flex-shrink:0}
+.icon-btn.bordered{border:1.5px solid var(--borde);background:var(--blanco)}
+.badge{position:absolute;top:4px;right:2px;min-width:18px;height:18px;padding:0 4px;border-radius:999px;background:var(--frutilla);color:var(--crema);font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:var(--blanco);border:1px solid var(--borde);font-size:13px;font-weight:600;white-space:nowrap;text-decoration:none}
+.chip.activo{background:var(--cacao);border-color:var(--cacao);color:var(--crema)}
+.estado{display:inline-flex;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap}
+.estado.ok{background:var(--ok-bg);color:var(--ok)}.estado.warn{background:var(--warn-bg);color:var(--warn)}.estado.bad{background:var(--bad-bg);color:var(--bad)}.estado.neutro{background:#ECE6E4;color:#5E4E4B}
+.ph{background:var(--gris);display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--cacao);text-align:center}
+.ph.rosa{background:var(--rosa)}
+.piano{position:relative;display:flex;height:34px;border-top:1.5px solid var(--cacao);border-bottom:1.5px solid var(--cacao);background:var(--blanco)}
+.piano span{flex:1;border-right:1.5px solid var(--cacao)}
+.piano span:last-of-type{border-right:none}
+.piano i{position:absolute;top:0;width:4.2%;height:60%;background:var(--cacao)}
+.piano.crema{background:var(--crema)}
+.logo{display:inline-flex;align-items:center;gap:8px;text-decoration:none}
+.logo b{font-family:var(--serif);font-style:italic;font-weight:400;font-size:30px;line-height:1}
+.only-mobile{display:none!important}
+@media (max-width:760px){.only-mobile{display:revert!important}.only-desktop{display:none!important}}
+
+.app{display:grid;grid-template-columns:248px minmax(0,1fr);min-height:100vh}
+.sidebar{background:var(--cacao);color:var(--crema);padding:22px 14px;display:flex;flex-direction:column;gap:24px;position:sticky;top:0;height:100vh}
+.marca{display:flex;align-items:center;gap:10px;padding:0 6px}
+.marca b{display:block;font-family:var(--serif);font-style:italic;font-weight:400;font-size:22px;line-height:1}
+.marca small{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--rosa)}
+.side-nav{display:flex;flex-direction:column;gap:4px}
+.side-nav a{display:flex;align-items:center;gap:12px;min-height:44px;padding:0 14px;border-radius:12px;text-decoration:none;font-size:15px;font-weight:500}
+.side-nav a:hover{background:#5B3A37}
+.side-nav a[aria-current=page]{background:var(--rosa);color:var(--cacao);font-weight:600}
+.usuario{margin-top:auto;display:flex;align-items:center;gap:10px;padding:12px;border-radius:14px;background:#5B3A37}
+.avatar{width:38px;height:38px;border-radius:50%;background:var(--rosa);color:var(--cacao);display:flex;align-items:center;justify-content:center;font-weight:600;flex-shrink:0}
+.usuario div{flex:1;min-width:0}.usuario strong{display:block;font-size:14px}.usuario div span{font-size:12px;color:var(--rosa)}
+.usuario .icon-btn{color:var(--crema)}
+.main{padding:26px 32px 40px;display:flex;flex-direction:column;gap:22px;min-width:0}
+.main-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:16px}
+.main-head h1{font-family:var(--serif);font-size:34px}
+.main-head p{margin:4px 0 0;font-size:14px;color:var(--suave)}
+.head-actions{display:flex;align-items:center;gap:10px}
+.buscador{display:flex;align-items:center;gap:8px;min-height:44px;padding:0 14px;border:1.5px solid var(--borde);border-radius:999px;background:var(--blanco);width:280px;color:var(--suave)}
+.buscador input{border:none;outline:none;flex:1;min-width:0;background:transparent;font-size:14px;color:var(--cacao)}
+.mob-head{display:none}
+.tabbar{display:none}
+.fab{display:none}
+.ejemplo{align-self:flex-start;display:inline-flex;padding:4px 10px;border-radius:999px;background:var(--warn-bg);color:var(--warn);font-size:12px;font-weight:600}
+.panel{background:var(--blanco);border:1px solid var(--borde);border-radius:18px;padding:20px;min-width:0}
+.panel-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:12px}
+.panel-head h2{font-size:17px;font-weight:600}
+.panel-head a{font-size:14px;font-weight:600}
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:20px}
+.kpi{padding:16px}
+.kpi span{display:block;font-size:13px;color:var(--suave)}
+.kpi strong{display:block;font-size:30px;font-weight:600;padding:6px 0 2px}
+.kpi strong.rojo{color:var(--frutilla)}
+.kpi small{font-size:12px;color:var(--suave)}
+.dos{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}
+.barra{display:flex;flex-direction:column;gap:6px}
+.barra div:first-child{display:flex;justify-content:space-between;font-size:14px}
+.pista{height:12px;border-radius:99px;background:#F3E9E4}
+.pista i{display:block;height:100%;border-radius:99px;background:var(--cacao)}
+.lista-item{display:flex;align-items:center;gap:12px;padding:12px 0;border-top:1px solid var(--borde)}
+.lista-item .mini{width:44px;height:54px;border-radius:8px;flex-shrink:0}
+.lista-item .txt{flex:1;min-width:0}
+.lista-item strong{display:block;font-size:15px}
+.lista-item small{font-size:13px;color:var(--suave)}
+.canal{display:inline-flex;padding:4px 10px;border-radius:999px;background:#F7EFEA;font-size:12px;font-weight:600;white-space:nowrap}
+.tabs{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none}
+.tab{min-height:40px;padding:0 14px;border-radius:999px;border:1.5px solid var(--borde);background:var(--blanco);font-weight:600;font-size:14px;white-space:nowrap;cursor:pointer}
+.tab[aria-pressed=true]{background:var(--cacao);border-color:var(--cacao);color:var(--crema)}
+.filtros-sis{display:flex;flex-wrap:wrap;gap:12px;padding-bottom:14px}
+.filtros-sis label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--suave)}
+.filtros-sis select{min-height:40px;border:1.5px solid var(--borde);border-radius:10px;padding:0 10px;background:var(--blanco);font-size:14px;color:var(--cacao)}
+.tabla-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+th{text-align:left;padding:12px 10px;font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--suave);border-bottom:1px solid var(--borde);white-space:nowrap}
+td{padding:10px;border-bottom:1px solid var(--borde);font-size:14px;vertical-align:middle}
+.num{text-align:right}
+.celda-prenda{display:flex;align-items:center;gap:10px}
+.celda-prenda .mini{width:40px;height:50px;border-radius:8px;flex-shrink:0}
+.paginacion{display:flex;justify-content:space-between;align-items:center;padding-top:14px;font-size:14px;color:var(--suave)}
+.tarjetas{display:flex;flex-direction:column;gap:10px}
+.tarjeta{display:flex;gap:12px;align-items:center;padding:12px;background:var(--blanco);border:1px solid var(--borde);border-radius:16px}
+.tarjeta .mini{width:64px;height:80px;border-radius:10px;flex-shrink:0}
+.tarjeta .txt{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+.tarjeta strong{font-size:15px;line-height:1.25}
+.tarjeta .fila-t{display:flex;justify-content:space-between;align-items:center;gap:8px}
+/* formulario */
+.form-layout{display:flex;gap:22px;align-items:flex-start}
+.form-side{width:360px;flex-shrink:0;display:flex;flex-direction:column;gap:20px}
+.form-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:20px}
+.campos{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.campo-s{display:flex;flex-direction:column;gap:6px;font-size:14px;font-weight:600}
+.campo-s input,.campo-s select,.campo-s textarea{min-height:44px;border:1.5px solid var(--borde);border-radius:12px;padding:0 12px;font-weight:400;font-size:15px;background:var(--blanco);width:100%}
+.campo-s textarea{padding:10px 12px;min-height:88px;resize:vertical}
+.campo-s small{font-weight:400;font-size:12px;color:var(--suave)}
+.drop{border:2px dashed var(--suave);border-radius:16px;background:var(--blanco);min-height:200px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:20px;text-align:center}
+.fotos{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px}
+.fotos div{aspect-ratio:4/5;border-radius:10px}
+.fotos .portada{border:2px solid var(--cacao)}
+.fotos .vacia{border:1.5px dashed var(--borde);background:transparent}
+.pills{display:flex;flex-wrap:wrap;gap:8px}
+.pill{min-height:40px;padding:0 14px;border-radius:999px;border:1.5px solid var(--borde);background:var(--blanco);font-weight:600;font-size:14px;cursor:pointer}
+.pill[aria-pressed=true]{background:var(--rosa);border-color:var(--cacao)}
+.ganancia{display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:12px;background:var(--ok-bg);color:var(--ok);font-size:14px;font-weight:600}
+.etiqueta-prev{width:110px;height:180px;flex-shrink:0;background:var(--crema);border:1px solid var(--suave);display:flex;flex-direction:column;align-items:center;padding:10px 8px;gap:6px;font-size:11px;text-align:center;line-height:1.4}
+.etiqueta-prev .agujero{width:10px;height:10px;border-radius:50%;background:var(--rosa);border:1.5px solid var(--cacao)}
+.etiqueta-prev b.n{font-family:var(--serif);font-style:italic;font-weight:400;font-size:15px}
+.acciones-form{display:flex;justify-content:flex-end;gap:10px}
+/* ventas */
+.kanban{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;align-items:start}
+.columna{border-radius:18px;padding:12px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.columna h2{font-size:15px;font-weight:600;display:flex;justify-content:space-between;padding:2px 4px}
+.venta{background:var(--blanco);border:1px solid var(--borde);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:8px;cursor:grab}
+.venta .top{display:flex;justify-content:space-between;align-items:center;gap:6px;font-size:12px;color:var(--suave)}
+.venta .pie{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--suave)}
+.venta .pie b{font-size:15px;color:var(--cacao)}
+.segmentos{display:none;gap:4px;padding:4px;border-radius:12px;background:#F1E6E1}
+.segmentos button{flex:1;min-height:40px;border-radius:10px;border:none;background:transparent;font-weight:600;font-size:13px;cursor:pointer}
+.segmentos button[aria-selected=true]{background:var(--blanco);box-shadow:0 1px 3px rgba(74,44,42,.15)}
+/* reportes */
+.grafico{display:flex;align-items:flex-end;gap:18px;height:180px;padding-top:10px}
+.grafico div{flex:1;display:flex;flex-direction:column;align-items:center;gap:8px;height:100%;justify-content:flex-end}
+.grafico i{display:block;width:100%;max-width:64px;border-radius:10px 10px 4px 4px;background:var(--cacao)}
+.grafico i.top{background:var(--frutilla)}
+.grafico span{font-size:12px;color:var(--suave)}
+@media (max-width:900px){
+ .app{display:block;padding-bottom:84px}
+ .sidebar,.main-head{display:none}
+ .mob-head{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--cacao);color:var(--crema);padding:12px 16px;position:sticky;top:0;z-index:20}
+ .mob-head b{display:block;font-family:var(--serif);font-style:italic;font-weight:400;font-size:20px;line-height:1}
+ .mob-head small{font-size:12px;color:var(--rosa)}
+ .mob-head .icon-btn{color:var(--crema)}
+ .main{padding:16px 16px 24px;gap:14px}
+ .tabbar{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--blanco);border-top:1px solid var(--borde);padding:4px 6px calc(8px + env(safe-area-inset-bottom))}
+ .tabbar a{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:56px;text-decoration:none;font-size:11px;font-weight:600;color:var(--suave)}
+ .tabbar a[aria-current=page]{color:var(--frutilla)}
+ .fab{display:inline-flex;position:fixed;right:16px;bottom:84px;z-index:31;align-items:center;gap:8px;min-height:52px;padding:0 20px;border-radius:999px;border:none;background:var(--frutilla);color:var(--crema);font-weight:600;font-size:15px;box-shadow:0 6px 16px rgba(74,44,42,.25);text-decoration:none}
+ .kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+ .kpi strong{font-size:24px}
+ .dos{grid-template-columns:1fr;gap:12px}
+ .panel{padding:16px}
+ .form-layout{flex-direction:column}
+ .form-side{width:100%}
+ .campos{grid-template-columns:1fr}
+ .acciones-form{flex-direction:column-reverse}
+ .acciones-form .btn{width:100%}
+ .kanban{grid-template-columns:1fr}
+ .kanban .columna{display:none;padding:0;background:transparent!important}
+ .kanban .columna.visible{display:flex}
+ .kanban .columna h2{display:none}
+ .segmentos{display:flex}
+}
+@media (max-width:900px){.only-desktop{display:none!important}.only-mobile{display:revert!important}}
+</style>
+</head>
+<body>
+<div class="app">
+<aside class="sidebar">
+<div class="marca"><svg width="34" height="34" viewBox="0 0 100 100" aria-hidden="true"><path d="M50 94 C30 86 14 64 16 46 C18 32 32 28 50 33 C68 28 82 32 84 46 C86 64 70 86 50 94 Z" fill="#C8323C"></path><path d="M50 36 C44 30 34 30 28 33 C34 26 42 24 47 26 C46 20 48 14 50 10 C52 14 54 20 53 26 C58 24 66 26 72 33 C66 30 56 30 50 36 Z" fill="#F2C4CC"></path><circle cx="38" cy="54" r="6" fill="#FFF6F0"></circle><circle cx="62" cy="54" r="6" fill="#FFF6F0"></circle><circle cx="50" cy="74" r="6" fill="#FFF6F0"></circle></svg><div><b>Polkalina's</b><small>Sistema interno</small></div></div>
+<nav class="side-nav" aria-label="Secciones"><a href="panel.html"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z"/></svg>Panel</a><a href="prendas.html"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12V4h8l10 10-8 8L3 12z M7.5 7.5h.01"/></svg>Prendas</a><a href="ventas.html"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3z M9 8h6 M9 12h6"/></svg>Ventas</a><a href="reportes.html" aria-current=page><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11a4 4 0 1 0 0-8a4 4 0 1 0 0 8z M2 21c0-4 3-6 7-6s7 2 7 6 M17 11a3 3 0 1 0 0-6 M22 21c0-3-2-5-5-5"/></svg>Clientas y reportes</a></nav>
+<div class="usuario"><span class="avatar">D</span><div><strong>[Nombre]</strong><span>Dueña · acceso total</span></div><button class="icon-btn" type="button" aria-label="Cerrar sesión"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 4H4v16h6 M15 8l4 4-4 4 M19 12H9"/></svg></button></div>
+</aside>
+<header class="mob-head">
+<div style="display:flex;align-items:center;gap:10px"><svg width="28" height="28" viewBox="0 0 100 100" aria-hidden="true"><path d="M50 94 C30 86 14 64 16 46 C18 32 32 28 50 33 C68 28 82 32 84 46 C86 64 70 86 50 94 Z" fill="#C8323C"></path><path d="M50 36 C44 30 34 30 28 33 C34 26 42 24 47 26 C46 20 48 14 50 10 C52 14 54 20 53 26 C58 24 66 26 72 33 C66 30 56 30 50 36 Z" fill="#F2C4CC"></path><circle cx="38" cy="54" r="6" fill="#FFF6F0"></circle><circle cx="62" cy="54" r="6" fill="#FFF6F0"></circle><circle cx="50" cy="74" r="6" fill="#FFF6F0"></circle></svg><div><b>Reportes</b><small>[Nombre] · Dueña</small></div></div>
+<div style="display:flex"><button class="icon-btn" type="button" aria-label="Buscar"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 4a7 7 0 1 0 0 14a7 7 0 1 0 0-14z M20 20l-3.5-3.5"/></svg></button><button class="icon-btn" type="button" aria-label="Avisos"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4l2-2z M10 20a2 2 0 0 0 4 0"/></svg></button></div>
+</header>
+<main class="main">
+<div class="main-head">
+<div><h1>Clientas y reportes</h1><p>Solo la dueña ve costos y ganancias</p></div>
+<div class="head-actions"><label class="buscador"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 4a7 7 0 1 0 0 14a7 7 0 1 0 0-14z M20 20l-3.5-3.5"/></svg><span class="visually-hidden">Buscar</span><input type="search" placeholder="Buscar prenda, código o clienta"></label><button class="icon-btn bordered" type="button" aria-label="Avisos"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4l2-2z M10 20a2 2 0 0 0 4 0"/></svg></button></div>
+</div>
+<div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px"><div class="tabs" data-grupo="uno"><button class="tab" type="button" aria-pressed="true">Este mes</button><button class="tab" type="button" aria-pressed="false">Mes anterior</button><button class="tab" type="button" aria-pressed="false">Últimos 3 meses</button></div><span class="ejemplo">Datos de ejemplo</span></div>
+<div class="kpis"><div class="panel kpi"><span>Ingresos</span><strong>$ 845.000</strong><small>62 ventas</small></div><div class="panel kpi"><span>Costo de mercadería</span><strong>$ 298.000</strong><small>lo que pagaste</small></div><div class="panel kpi"><span>Ganancia</span><strong class=rojo>$ 547.000</strong><small>margen 65 %</small></div><div class="panel kpi"><span>Ticket promedio</span><strong>$ 13.600</strong><small>por venta</small></div></div>
+<div class="dos"><section class="panel"><div class="panel-head"><h2>Ventas por semana</h2></div><div class="grafico" role="img" aria-label="Ventas por semana: la semana 4 fue la más alta"><div><i class="" style="height:62%"></i><span>Sem 1</span></div><div><i class="" style="height:80%"></i><span>Sem 2</span></div><div><i class="" style="height:48%"></i><span>Sem 3</span></div><div><i class="top" style="height:100%"></i><span>Sem 4</span></div></div></section><section class="panel"><div class="panel-head"><h2>Por categoría</h2></div><div style="display:flex;flex-direction:column;gap:14px"><div class="barra"><div><span>Second hand</span><b>$ 410.000</b></div><div class="pista" style="height:10px"><i style="width:100%"></i></div></div><div class="barra"><div><span>Intervenido</span><b>$ 238.000</b></div><div class="pista" style="height:10px"><i style="width:58%"></i></div></div><div class="barra"><div><span>Cositas</span><b>$ 132.000</b></div><div class="pista" style="height:10px"><i style="width:32%"></i></div></div><div class="barra"><div><span>Accesorios</span><b>$ 65.000</b></div><div class="pista" style="height:10px"><i style="width:16%"></i></div></div></div></section></div>
+<div class="dos"><section class="panel"><div class="panel-head"><h2>Clientas que más compran</h2><a href="#">Ver todas</a></div><div class="tabla-wrap"><table><thead><tr><th scope="col">Clienta</th><th scope="col" class="num">Compras</th><th scope="col" class="num">Total</th><th scope="col">Última</th></tr></thead><tbody><tr><td><b>Mica R.</b><br><small class="muted">@mica.r</small></td><td class="num">6</td><td class="num"><b>$ 98.500</b></td><td class="muted">hace 3 días</td></tr><tr><td><b>Juli M.</b><br><small class="muted">@julim</small></td><td class="num">4</td><td class="num"><b>$ 71.000</b></td><td class="muted">ayer</td></tr><tr><td><b>Sofi L.</b><br><small class="muted">@sofi.lun</small></td><td class="num">3</td><td class="num"><b>$ 44.000</b></td><td class="muted">hoy</td></tr><tr><td><b>Cami G.</b><br><small class="muted">—</small></td><td class="num">3</td><td class="num"><b>$ 31.500</b></td><td class="muted">hace 1 semana</td></tr></tbody></table></div></section><section class="panel"><div class="panel-head"><h2>Equipo y permisos</h2><a href="#">Invitar</a></div><div class="lista-item"><span class="avatar" style="background:var(--rosa)">D</span><div class="txt"><strong>[Nombre]</strong><small>Todo, incluidos costos, ganancias y usuarios</small></div><span class="canal">Dueña</span></div><div class="lista-item"><span class="avatar" style="background:var(--gris)">A</span><div class="txt"><strong>[Ayudante 1]</strong><small>Cargar prendas, ventas y stock · sin costos ni reportes</small></div><span class="canal">Vendedora</span></div><div class="lista-item"><span class="avatar" style="background:var(--gris)">B</span><div class="txt"><strong>[Ayudante 2]</strong><small>Cargar prendas, ventas y stock · sin costos ni reportes</small></div><span class="canal">Vendedora</span></div></section></div>
+</main>
+</div>
+
+<nav class="tabbar" aria-label="Secciones"><a href="panel.html"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z"/></svg>Panel</a><a href="prendas.html"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12V4h8l10 10-8 8L3 12z M7.5 7.5h.01"/></svg>Prendas</a><a href="ventas.html"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3z M9 8h6 M9 12h6"/></svg>Ventas</a><a href="reportes.html" aria-current=page><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11a4 4 0 1 0 0-8a4 4 0 1 0 0 8z M2 21c0-4 3-6 7-6s7 2 7 6 M17 11a3 3 0 1 0 0-6 M22 21c0-3-2-5-5-5"/></svg>Reportes</a></nav>
+<script>
+document.querySelectorAll('[aria-pressed]').forEach(b=>b.addEventListener('click',()=>{const g=b.closest('[data-grupo]');if(g&&g.dataset.grupo==='uno'){g.querySelectorAll('[aria-pressed]').forEach(x=>x.setAttribute('aria-pressed','false'));b.setAttribute('aria-pressed','true');}else{b.setAttribute('aria-pressed',b.getAttribute('aria-pressed')==='true'?'false':'true');}}));
+
+</script>
+</body>
+</html>

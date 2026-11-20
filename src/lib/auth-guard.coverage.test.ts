@@ -41,6 +41,28 @@ const actionChunks = (source: string): { name: string; body: string }[] => {
   }));
 };
 
+/** Helpers privados del mismo archivo (`async function …`), por nombre.
+ * Acepta genéricos (`crear<T>(…)`) entre el nombre y la firma. */
+const helperChunks = (source: string): Map<string, string> => {
+  const heads = [...source.matchAll(/async function (\w+)(?:<[^>]*>)?\s*\(/g)];
+  return new Map(
+    heads.map((head, index) => [
+      head[1],
+      source.slice(head.index, heads[index + 1]?.index ?? source.length),
+    ])
+  );
+};
+
+/** `true` si el guardián aparece antes del primer Zod y del primer Prisma. */
+const guardaAntesDeTodo = (body: string): boolean => {
+  const guard = body.indexOf("requireAdmin(");
+  return (
+    guard !== -1 &&
+    guard <= indexOf(body, /\.parse\(/) &&
+    guard <= indexOf(body, /prisma\./)
+  );
+};
+
 const indexOf = (body: string, pattern: RegExp): number => {
   const found = body.search(pattern);
   return found === -1 ? Number.POSITIVE_INFINITY : found;
@@ -65,18 +87,30 @@ describe("autorización admin en las Server Actions internas", () => {
 
     for (const file of sourceFiles().filter((name) => !isExcluded(name))) {
       const base = path.basename(file);
-      const chunks = actionChunks(fs.readFileSync(file, "utf8"));
+      const source = fs.readFileSync(file, "utf8");
+      // Helpers del mismo archivo: una acción puede delegar todo su trabajo en uno
+      // de ellos (p. ej. `prendaTaxonomy.ts`); el guardián vive en el helper y el
+      // requisito se verifica sobre su cuerpo.
+      const chunks = actionChunks(source);
+      const helpers = helperChunks(source);
 
       if (chunks.length === 0) problems.push(`${base}: sin acciones exportadas`);
 
       for (const { name, body } of chunks) {
-        const guard = body.indexOf("requireAdmin(");
+        if (guardaAntesDeTodo(body)) continue;
 
-        if (guard === -1) problems.push(`${base}:${name} sin guardián`);
-        else if (guard > indexOf(body, /\.parse\(/)) {
-          problems.push(`${base}:${name} guardián después de la validación Zod`);
-        } else if (guard > indexOf(body, /prisma\./)) {
-          problems.push(`${base}:${name} guardián después de Prisma`);
+        // Sin guardián propio: se acepta solo si la acción no hace trabajo
+        // directo (Zod/Prisma) y delega en un helper guardado del mismo archivo.
+        const haceTrabajoDirecto =
+          indexOf(body, /\.parse\(/) !== Number.POSITIVE_INFINITY ||
+          indexOf(body, /prisma\./) !== Number.POSITIVE_INFINITY;
+        const delegaGuardado = [...helpers.entries()].some(
+          ([helper, helperBody]) =>
+            new RegExp(`\\b${helper}\\(`).test(body) && guardaAntesDeTodo(helperBody)
+        );
+
+        if (haceTrabajoDirecto || !delegaGuardado) {
+          problems.push(`${base}:${name} sin guardián`);
         }
       }
     }

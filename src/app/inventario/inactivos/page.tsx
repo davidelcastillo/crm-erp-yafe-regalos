@@ -47,7 +47,7 @@ export default function InactivosPage() {
       text: 'El producto volverá a estar disponible en los selectores de compras y ventas.',
       icon: 'question',
       showCancelButton: true,
-      confirmButtonColor: "#6d28d9",
+      confirmButtonColor: "var(--palette-brand-action)",
       cancelButtonColor: '#6a6a6a',
       confirmButtonText: 'Sí, reactivar',
     });
@@ -59,7 +59,7 @@ export default function InactivosPage() {
         title: 'Producto reactivado',
         text: 'El producto ha sido reactivado correctamente.',
         icon: 'success',
-        confirmButtonColor: "#6d28d9",
+        confirmButtonColor: "var(--palette-brand-action)",
       });
       await loadProducts();
     } else {

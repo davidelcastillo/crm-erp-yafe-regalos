@@ -1,0 +1,52 @@
+%% Mapa de capas del catálogo externo — ver docs/adr/catalogo-externo.md
+%% Pegar en https://mermaid.live
+
+mindmap
+  root((Catalogo publico))
+    Existencias
+      BranchInventory
+      stock real por sucursal
+      es un hecho no una decision
+      nunca decide visibilidad
+    Publicacion
+      CatalogItem
+      visible publica y despublica
+      featured destacados
+      sortOrder
+      CatalogItemBranch
+      allow list de sucursales
+      sin fila no se nombra
+      sucursal nueva no aparece sola
+    Presentacion
+      ProductImage
+      hasta 4 por producto
+      foto grande y miniatura
+      etiqueta de sucursal
+      disponible o consultar
+      precio si cantidades no
+    Exposicion
+      ADR-13 decidido vista catalog_public
+      grant solo a la vista nunca a las tablas
+      A tablas abiertas descartada
+      C consulta server only alternativa
+      RLS no verificado en produccion
+      la clave anonima es publica
+      decision pendiente grant a anon
+      la pagina lee desde el servidor
+      la vista es el contrato de columnas
+    Entrega
+      ISR con revalidateTag
+      miniaturas en la grilla
+      nombres con hash e inmutables
+    Limites del plan free
+      1 GB de archivos
+      10 GB de transferencia
+      500 MB de base
+      mil cien productos con 4 fotos
+      pausa tras una semana inactiva
+    Futuro ecommerce
+      identificador estable en la URL
+      precio como numero
+      fotos por producto
+      capa de consulta reutilizable
+      no carrito ni pagos todavia
