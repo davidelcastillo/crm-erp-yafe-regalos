@@ -30,8 +30,32 @@ jest.mock("@/app/actions/inventory", () => ({
   adjustProductStock: jest.fn(),
 }));
 
+// Una prenda se edita con su propia ficha (U3): `PrendaForm` vive en la card.
+jest.mock("@/app/actions/prenda", () => ({
+  createPrenda: jest.fn(),
+  updatePrenda: jest.fn(),
+  getPrenda: jest.fn(),
+}));
+
+jest.mock("@/app/actions/prendaTaxonomy", () => ({
+  getCategoriaPrendaOptions: jest.fn(),
+  createCategoriaPrenda: jest.fn(),
+  getCondicionPrendaOptions: jest.fn(),
+  createCondicionPrenda: jest.fn(),
+  getEstiloPrendaOptions: jest.fn(),
+  createEstiloPrenda: jest.fn(),
+  getMedidaTipoOptions: jest.fn(),
+}));
+
 import { updateProductExtended } from "@/app/actions/product";
 import { adjustProductStock } from "@/app/actions/inventory";
+import { getPrenda } from "@/app/actions/prenda";
+import {
+  getCategoriaPrendaOptions,
+  getCondicionPrendaOptions,
+  getEstiloPrendaOptions,
+  getMedidaTipoOptions,
+} from "@/app/actions/prendaTaxonomy";
 
 const mockActualizar = updateProductExtended as jest.MockedFunction<
   typeof updateProductExtended
@@ -62,6 +86,30 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockActualizar.mockResolvedValue({ success: true } as never);
   mockAjustarStock.mockResolvedValue({ success: true } as never);
+  (getPrenda as jest.Mock).mockResolvedValue({
+    success: true,
+    data: {
+      id: 7,
+      code: "PK000",
+      nombre: "Campera de jean",
+      descripcion: "",
+      precio: 12000,
+      categoriaPrendaId: 1,
+      condicionId: 2,
+      talle: "M",
+      detalleCondicion: "",
+      detalleIntervencion: "",
+      costo: 4000,
+      esUnica: true,
+      estilos: [],
+      medidas: [],
+      publicadaEn: [],
+    },
+  });
+  (getCategoriaPrendaOptions as jest.Mock).mockResolvedValue({ success: true, data: [] });
+  (getCondicionPrendaOptions as jest.Mock).mockResolvedValue({ success: true, data: [] });
+  (getEstiloPrendaOptions as jest.Mock).mockResolvedValue({ success: true, data: [] });
+  (getMedidaTipoOptions as jest.Mock).mockResolvedValue({ success: true, data: [] });
 });
 
 describe("InventarioCard — el stock no se edita a mano (S20)", () => {
@@ -106,5 +154,30 @@ describe("InventarioCard — el nombre largo no rompe la card", () => {
     const titulo = screen.getByRole("heading", { name: "Jabón de Avena" });
     expect(titulo.className).toContain("min-w-0");
     expect(titulo.className).toContain("break-words");
+  });
+});
+
+describe("InventarioCard — la prenda se edita con su ficha (U3)", () => {
+  const prenda = { ...producto, kind: "PRENDA", name: "Campera de jean", code: "PK000" } as Product;
+
+  it("«Editar» abre PrendaForm en modo edición, no el formulario de producto", async () => {
+    render(<InventarioCard product={prenda} categories={[]} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Editar" }));
+
+    const dialogo = await screen.findByRole("dialog", { name: "Editar prenda" });
+    expect(dialogo).toBeInTheDocument();
+    expect(getPrenda).toHaveBeenCalledWith(7);
+    // El modo edición propio de la card (producto normal) no se abrió.
+    expect(screen.queryByRole("button", { name: "Guardar" })).not.toBeInTheDocument();
+  });
+
+  it("un producto normal sigue abriendo el modo edición de la card", () => {
+    renderCard();
+
+    entrarAEditar();
+
+    expect(screen.getByRole("button", { name: "Guardar" })).toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "Editar prenda" })).not.toBeInTheDocument();
   });
 });

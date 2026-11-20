@@ -53,6 +53,23 @@ jest.mock("@/app/actions/product", () => ({
   getProductMovements: jest.fn(),
 }));
 
+// El alta de prenda (U3) vive en el mismo menú de alta que los productos.
+jest.mock("@/app/actions/prenda", () => ({
+  createPrenda: jest.fn(),
+  updatePrenda: jest.fn(),
+  getPrenda: jest.fn(),
+}));
+
+jest.mock("@/app/actions/prendaTaxonomy", () => ({
+  getCategoriaPrendaOptions: jest.fn(),
+  createCategoriaPrenda: jest.fn(),
+  getCondicionPrendaOptions: jest.fn(),
+  createCondicionPrenda: jest.fn(),
+  getEstiloPrendaOptions: jest.fn(),
+  createEstiloPrenda: jest.fn(),
+  getMedidaTipoOptions: jest.fn(),
+}));
+
 jest.mock("sweetalert2", () => ({
   fire: jest.fn().mockResolvedValue({ isConfirmed: true }),
 }));
@@ -96,6 +113,12 @@ import {
   createProduct,
   updateProductExtended,
 } from "@/app/actions/product";
+import {
+  getCategoriaPrendaOptions,
+  getCondicionPrendaOptions,
+  getEstiloPrendaOptions,
+  getMedidaTipoOptions,
+} from "@/app/actions/prendaTaxonomy";
 import Swal from "sweetalert2";
 
 const mockGetProductsWithBranchStock =
@@ -166,6 +189,10 @@ beforeEach(() => {
   mockCreateProduct.mockResolvedValue({ success: true, data: createdProduct } as never);
   mockUpdateProductExtended.mockResolvedValue({ success: true } as never);
   mockSwalFire.mockResolvedValue({ isConfirmed: true });
+  (getCategoriaPrendaOptions as jest.Mock).mockResolvedValue({ success: true, data: [] });
+  (getCondicionPrendaOptions as jest.Mock).mockResolvedValue({ success: true, data: [] });
+  (getEstiloPrendaOptions as jest.Mock).mockResolvedValue({ success: true, data: [] });
+  (getMedidaTipoOptions as jest.Mock).mockResolvedValue({ success: true, data: [] });
 });
 
 /** Renderiza la página y espera a que termine el loading inicial (FAB visible). */
@@ -193,6 +220,19 @@ describe("InventarioPage — FAB crear producto (spec inventory-ui)", () => {
 
     expect(await screen.findByText("Nuevo Producto")).toBeInTheDocument();
     expect(screen.getByLabelText(/nombre/i)).toBeInTheDocument();
+  });
+
+  it("'Prenda' abre el formulario de prenda (U3)", async () => {
+    await renderPage();
+
+    fireEvent.click(screen.getByLabelText("Agregar producto"));
+    fireEvent.click(await screen.findByRole("button", { name: /^prenda/i }));
+
+    const dialogo = await screen.findByRole("dialog", { name: "Nueva prenda" });
+    expect(within(dialogo).getByLabelText(/^talle/i)).toBeInTheDocument();
+    expect(within(dialogo).getByLabelText(/categoría de prenda/i)).toBeInTheDocument();
+    // Y no se abre el alta de producto.
+    expect(screen.queryByText("Nuevo Producto")).not.toBeInTheDocument();
   });
 
   it("'Varios productos' abre el alta masiva y no el ProductForm de alta", async () => {

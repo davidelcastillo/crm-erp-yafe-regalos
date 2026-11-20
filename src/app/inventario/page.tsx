@@ -20,6 +20,7 @@ import { CardSkeleton, Skeleton } from "@/components/ui/Skeleton";
 import { AddProductButton } from "../productos/components/AddProductButton";
 import { ProductForm } from "../productos/components/ProductForm";
 import { BulkProductForm } from "../productos/components/BulkProductForm";
+import { PrendaForm } from "./components/PrendaForm";
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, useCallback, useMemo } from 'react';
@@ -46,13 +47,14 @@ const OPCIONES_STOCK: MenuOption[] = [
   { id: 'control', label: 'Control de stock', hint: 'Contar y ajustar contra el sistema' },
 ];
 
-/** Paso previo del alta (S5): un producto o varios en un mismo modal. */
-type AltaStep = 'menu' | 'unico' | 'masivo';
+/** Paso previo del alta (S5): un producto, varios o una prenda en el mismo modal. */
+type AltaStep = 'menu' | 'unico' | 'masivo' | 'prenda';
 
 /** Opciones del paso 1 del alta; los ids son los modales de abajo. */
 const OPCIONES_ALTA: MenuOption[] = [
   { id: 'unico', label: 'Un producto', hint: 'Alta de a uno, con descripción' },
   { id: 'masivo', label: 'Varios productos', hint: 'Hasta 50 en una sola carga' },
+  { id: 'prenda', label: 'Prenda', hint: 'Ropa second hand o nueva' },
 ];
 
 /** Opciones del paso 1 de impresión; los ids son los modales de abajo. */
@@ -509,6 +511,13 @@ export default function InventarioPage() {
         )}
         {altaStep === 'masivo' && (
           <BulkProductForm
+            branches={branches}
+            onSuccess={handleProductCreated}
+            onClose={() => setAltaStep(null)}
+          />
+        )}
+        {altaStep === 'prenda' && (
+          <PrendaForm
             branches={branches}
             onSuccess={handleProductCreated}
             onClose={() => setAltaStep(null)}
