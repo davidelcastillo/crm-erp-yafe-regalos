@@ -54,7 +54,7 @@ export default function LoginForm() {
 
   return (
     <div className="flex-1 w-full max-w-md mx-auto px-6 pt-8 pb-6 flex flex-col z-10 relative">
-        <h2 className="text-3xl font-bold text-ink text-center mb-8">Bienvenida Estefi!</h2>
+        <h2 className="font-display text-[28px] leading-tight text-ink text-center mb-8">Bienvenida Estefi!</h2>
         <form className="space-y-6" onSubmit={handleSubmit}>
           <div className="flex flex-col gap-4 mb-6">
             {/* Input Username (Translúcido) */}
@@ -107,7 +107,7 @@ export default function LoginForm() {
               <input
                 type="checkbox"
                 name="remember-me"
-                className="accent-pink-500 w-4 h-4 cursor-pointer"
+                className="accent-accent w-4 h-4 cursor-pointer"
               />
               Recordarme
             </label>
@@ -126,7 +126,7 @@ export default function LoginForm() {
           <button 
           type="submit"
           disabled={pending}
-          className="w-full py-4 rounded-full border-2 border-accent text-accent font-bold text-lg hover:bg-accent hover:text-white active:scale-[0.98] active:bg-accent active:text-white transition-all mb-6 shadow-sm touch-manipulation">
+          className="w-full py-4 rounded-full bg-ink text-background font-semibold text-lg hover:bg-ink/85 active:scale-[0.98] transition-all mb-6 shadow-sm touch-manipulation">
             {pending ? 'Iniciando sesión...' : 'Iniciar sesión'}
           </button>
           
