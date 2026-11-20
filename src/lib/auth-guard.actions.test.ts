@@ -47,8 +47,9 @@ const ACTIONS_DIRS = [
   path.join(ROOT, "src", "actions"),
 ];
 
-/** Excluidos a propósito (S6): catálogo público de solo lectura y login/logout. */
-const EXCLUDED = ["inventory.external.ts", "auth.ts"];
+/** Excluidos a propósito (S6): catálogo público de solo lectura, vidriera pública
+ * y login/logout. */
+const EXCLUDED = ["inventory.external.ts", "vidriera.ts", "auth.ts"];
 
 const MODULES: Record<string, Record<string, unknown>> = {
   "branch.ts": branchActions as unknown as Record<string, unknown>,
