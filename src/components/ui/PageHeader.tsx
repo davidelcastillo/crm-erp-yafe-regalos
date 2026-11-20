@@ -121,7 +121,7 @@ export const PageHeader = ({ title, actions, right, menuItems = [] }: PageHeader
           <div className="relative w-64 h-full glass-strong border-r border-white/50 shadow-2xl flex flex-col pt-6 px-4 animate-fade-in-right">
             <div className="flex items-start justify-between mb-6">
               <h2 className="text-xl font-bold bg-clip-text text-transparent brand-gradient-strong">
-                Feria Conexx - App
+                Polkalinas - Sistema Web
               </h2>
               <button
                 type="button"
