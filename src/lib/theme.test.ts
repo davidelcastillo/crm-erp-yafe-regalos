@@ -1,14 +1,13 @@
 /**
- * Tema oscuro a elección del usuario (S12). El módulo es puro a propósito: la
- * decisión de qué tema mostrar se puede probar sin tocar el DOM, y el script de
- * arranque se fija como texto para que no se pueda olvidar la clave de guardado
- * ni el atributo que leen los estilos.
+ * Tema: congelado en claro (pedido del dueño 2026-11-20; el oscuro quedó con
+ * la paleta anterior). El módulo sigue siendo puro: la decisión de qué tema
+ * mostrar se prueba sin tocar el DOM, y el script de arranque se fija como
+ * texto para que no se pueda olvidar el atributo que leen los estilos.
  */
 import {
   resolveTheme,
   revealRadius,
   THEME_BOOTSTRAP_SCRIPT,
-  THEME_STORAGE_KEY,
   withThemeTransition,
 } from "./theme";
 
@@ -28,11 +27,12 @@ describe("resolveTheme", () => {
 });
 
 describe("THEME_BOOTSTRAP_SCRIPT", () => {
-  it("lee la clave guardada y escribe el atributo del tema antes del primer pintado", () => {
-    expect(THEME_BOOTSTRAP_SCRIPT).toContain(THEME_STORAGE_KEY);
-    expect(THEME_BOOTSTRAP_SCRIPT).toContain("localStorage");
-    expect(THEME_BOOTSTRAP_SCRIPT).toContain("prefers-color-scheme: dark");
-    expect(THEME_BOOTSTRAP_SCRIPT).toContain("data-theme");
+  it("congela el tema en claro antes del primer pintado (pedido del dueño)", () => {
+    // El modo oscuro quedó con la paleta anterior: ni la preferencia guardada
+    // ni la del sistema lo activan hasta que se rediseñe.
+    expect(THEME_BOOTSTRAP_SCRIPT).toContain('setAttribute("data-theme","light")');
+    expect(THEME_BOOTSTRAP_SCRIPT).not.toContain("localStorage");
+    expect(THEME_BOOTSTRAP_SCRIPT).not.toContain("prefers-color-scheme");
   });
 });
 

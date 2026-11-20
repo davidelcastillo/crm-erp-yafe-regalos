@@ -6,6 +6,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { logout } from "@/actions/auth";
 import { ThemeToggle } from "./ThemeToggle";
+void ThemeToggle; // retirado del header (tema congelado en claro); se conserva exportado para su test.
 
 /**
  * Encabezado de página del rebranding: una sola fila en mobile (botón ☰, título
@@ -80,9 +81,9 @@ export const PageHeader = ({ title, actions, right, menuItems = [] }: PageHeader
             </svg>
           </button>
 
-          {/* El tema lo elige el usuario, así que se alcanza sin abrir el menú ☰:
-              va en la píldora, a la vista en celular y en escritorio. */}
-          <ThemeToggle />
+          {/* Tema congelado en claro (pedido del dueño 2026-11-20): el modo
+              oscuro quedó con la paleta anterior, así que el interruptor se
+              retira hasta que el oscuro se rediseñe. */}
 
           <h1 className="flex-1 text-2xl font-bold text-ink">{title}</h1>
 

@@ -23,9 +23,10 @@ export const resolveTheme = (stored: string | null, prefersDark: boolean): Theme
    guardado que no sea "light" ni "dark" (basura en localStorage) se ignora y
    cae en la preferencia del sistema, igual que `resolveTheme`. */
 export const THEME_BOOTSTRAP_SCRIPT =
-  `(function(){try{var s=localStorage.getItem(${JSON.stringify(THEME_STORAGE_KEY)});` +
-  `var d=s==="dark"||(s!=="light"&&window.matchMedia("(prefers-color-scheme: dark)").matches);` +
-  `document.documentElement.setAttribute("data-theme",d?"dark":"light")}catch(e){}})();`;
+  /* Tema congelado en claro (pedido del dueño 2026-11-20): el modo oscuro
+   * quedó con la paleta anterior hasta el piloto de Polkalina's, así que ni el
+   * tema guardado ni la preferencia del sistema lo activan. */
+  `(function(){try{document.documentElement.setAttribute("data-theme","light")}catch(e){}})();`;
 
 /** Duración del cambio de tema. Tiene que coincidir con el CSS (`globals.css`). */
 export const THEME_TRANSITION_MS = 2200;

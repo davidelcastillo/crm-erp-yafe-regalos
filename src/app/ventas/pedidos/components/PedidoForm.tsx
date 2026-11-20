@@ -242,8 +242,12 @@ export const PedidoForm = ({ open, onClose, onCreated, products }: PedidoFormPro
     onClose();
   };
 
-  /** Avanza un paso validando solo lo de ese paso; lo demás se revisa al crear. */
-  const continuar = () => {
+  /** Avanza un paso validando solo lo de ese paso; lo demás se revisa al crear.
+   * `preventDefault`: sin esto, el re-render puede convertir ESTE botón en
+   * `type="submit"` antes de que el navegador procese la acción por defecto
+   * del clic, y el Continuar del paso 2 crearía el pedido solo. */
+  const continuar = (event: React.MouseEvent) => {
+    event.preventDefault();
     setError(null);
     if (paso === 1) {
       if (!canalId) return setError("Elegí el canal de venta");
@@ -566,11 +570,11 @@ export const PedidoForm = ({ open, onClose, onCreated, products }: PedidoFormPro
               </button>
             )}
             {paso < 3 ? (
-              <button type="button" onClick={continuar} className="btn btn-primary">
+              <button key="continuar" type="button" onClick={continuar} className="btn btn-primary">
                 Continuar
               </button>
             ) : (
-              <button type="submit" disabled={pending} className="btn btn-primary">
+              <button key="crear" type="submit" disabled={pending} className="btn btn-primary">
                 {pending ? "Creando…" : "Crear pedido"}
               </button>
             )}

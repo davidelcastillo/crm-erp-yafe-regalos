@@ -133,6 +133,17 @@ describe("PedidoForm: alta de pedido", () => {
     expect(screen.getByLabelText("Clienta")).toHaveValue("1");
   });
 
+  it("llegar al paso 3 no crea el pedido: el clic de Continuar no debe submitir", async () => {
+    renderForm();
+    await formListo();
+
+    avanzarPaso1();
+    avanzarPaso2();
+
+    expect(screen.getByText(/paso 3 de 3/i)).toBeInTheDocument();
+    expect(mockCrearPedido).not.toHaveBeenCalled();
+  });
+
   it("continuar sin clienta avisa qué falta y no avanza", async () => {
     renderForm();
     await formListo();

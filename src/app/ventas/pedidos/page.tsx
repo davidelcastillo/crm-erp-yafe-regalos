@@ -65,11 +65,14 @@ const TRANSICIONES: Record<Estado, Estado[]> = {
   ENTREGADO: ["PARA_ENVIAR"],
 };
 
+/** Tinte por columna del Kanban: los cuatro de la marca (spec §1.2 y mockup
+ * ventas.html): arena para Reservado, verde para Pagado, rosa para enviar y
+ * neutro para Entregado. */
 const TINTE: Record<Estado, string> = {
-  RESERVADO: "bg-brand-rosa/10",
-  PAGADO: "bg-positive/10",
-  PARA_ENVIAR: "bg-accent/10",
-  ENTREGADO: "bg-surface-strong",
+  RESERVADO: "bg-[#F3E3D3]",
+  PAGADO: "bg-[#E3EFE3]",
+  PARA_ENVIAR: "bg-[#F2C4CC]",
+  ENTREGADO: "bg-[#ECE6E4]",
 };
 
 const ETIQUETA_METODO: Record<string, string> = {
@@ -666,30 +669,31 @@ export default function PedidosPage() {
 
   return (
     <div className="min-h-screen bg-surface pb-20">
-      <PageHeader
-        title="Pedidos"
-        actions={
-          <button type="button" onClick={() => setFormOpen(true)} className="btn btn-primary">
-            Nuevo pedido
-          </button>
-        }
-      />
+      {/* El degradé de marca como capa de fondo del encabezado, como en /ventas. */}
+      <div className="relative isolate pb-16">
+        <div className="brand-gradient pointer-events-none absolute inset-0" aria-hidden="true" />
+        <PageHeader
+          title="Pedidos"
+          actions={
+            <button type="button" onClick={() => setFormOpen(true)} className="btn btn-primary">
+              Nuevo pedido
+            </button>
+          }
+        />
 
-      <main className="px-3 pt-4">
-        <div className="md:hidden">
-          <button
-            type="button"
-            onClick={() => setFormOpen(true)}
-            className="btn btn-primary w-full"
-          >
+        {/* Acciones de la página sobre la banda, como en /ventas. */}
+        <div className="mt-4 px-3 md:hidden">
+          <button type="button" onClick={() => setFormOpen(true)} className="btn btn-primary w-full">
             Nuevo pedido
           </button>
         </div>
 
-        <div className="mt-3 flex flex-wrap items-center gap-2">
+        <div className="mt-3 flex flex-wrap items-center gap-2 px-3">
           <FilterSelect label="Canal" value={canal} options={opcionesCanal} onChange={setCanal} />
         </div>
+      </div>
 
+      <main className="px-3 pt-4">
         {/* Celular: un selector por estado y una sola columna a la vista. */}
         <div
           role="tablist"
