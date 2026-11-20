@@ -85,7 +85,7 @@ export const PageHeader = ({ title, actions, right, menuItems = [] }: PageHeader
               oscuro quedó con la paleta anterior, así que el interruptor se
               retira hasta que el oscuro se rediseñe. */}
 
-          <h1 className="flex-1 text-2xl font-bold text-ink">{title}</h1>
+          <h1 className="flex-1 font-display text-[26px] leading-tight text-ink md:text-[34px]">{title}</h1>
 
           {right && <div className="w-full md:w-auto">{right}</div>}
 

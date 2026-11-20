@@ -161,8 +161,11 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --color-sans: var(--font-geist-sans);
-  --color-mono: var(--font-geist-mono);
+  /* Tipografías Polkalina's (spec §11): Work Sans para todo el cuerpo y los
+     datos; Fraunces regular solo para títulos (font-display). */
+  --font-sans: var(--font-work-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-fraunces), ui-serif, Georgia, serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
   
   /* Custom palette */
   --color-white: var(--palette-white);
@@ -572,6 +575,11 @@
 :root .swal2-popup {
   background-color: var(--surface);
   color: var(--ink);
+}
+
+/* Títulos de alerta en Fraunces, como los de página (spec §11.1). */
+:root .swal2-title {
+  font-family: var(--font-fraunces), Georgia, serif;
 }
 
 /* `.swal2-styled` sólo la tienen los botones que pinta SweetAlert: con
