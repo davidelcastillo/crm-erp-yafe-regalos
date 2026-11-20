@@ -87,7 +87,7 @@ export function AddPurchaseButton({ products: initialProducts, onSuccess }: AddP
         title: "Error",
         text: "Por favor agregá al menos un producto",
         icon: "error",
-        confirmButtonColor: "#dc2626",
+        confirmButtonColor: "var(--danger)",
       });
       return;
     }
@@ -113,7 +113,7 @@ export function AddPurchaseButton({ products: initialProducts, onSuccess }: AddP
         title: "Compra registrada",
         text: `${totalItems} unidades agregadas al inventario`,
         icon: "success",
-        confirmButtonColor: "#6d28d9",
+        confirmButtonColor: "var(--palette-brand-action)",
         confirmButtonText: "Aceptar",
       });
       router.refresh();
@@ -125,7 +125,7 @@ export function AddPurchaseButton({ products: initialProducts, onSuccess }: AddP
         title: "Error",
         text: result.error || "Error al registrar la compra",
         icon: "error",
-        confirmButtonColor: "#dc2626",
+        confirmButtonColor: "var(--danger)",
       });
     }
     setLoading(false);
@@ -217,7 +217,7 @@ export function AddPurchaseButton({ products: initialProducts, onSuccess }: AddP
                                 text: 'Esta acción no se puede deshacer',
                                 icon: 'warning',
                                 showCancelButton: true,
-                                confirmButtonColor: "#6d28d9",
+                                confirmButtonColor: "var(--palette-brand-action)",
                                 cancelButtonColor: '#6a6a6a',
                                 confirmButtonText: 'Sí, eliminar',
                                 cancelButtonText: 'Cancelar',

@@ -134,14 +134,14 @@ export function ExportWizard({ open, onClose, branches }: ExportWizardProps) {
         title: "PDF generado",
         text: "El inventario se exportó correctamente",
         icon: "success",
-        confirmButtonColor: "#6d28d9",
+        confirmButtonColor: "var(--palette-brand-action)",
       });
     } else {
       await Swal.fire({
         title: "Error",
         text: result.error || "Error al generar el PDF",
         icon: "error",
-        confirmButtonColor: "#dc2626",
+        confirmButtonColor: "var(--danger)",
       });
     }
     setGenerating(false);

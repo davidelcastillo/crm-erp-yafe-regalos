@@ -185,7 +185,7 @@ export function AddSaleButton({ products, onSuccess }: AddSaleButtonProps) {
          title: "Sucursal requerida",
          text: "Seleccioná una sucursal antes de registrar una venta",
          icon: "warning",
-         confirmButtonColor: "#6d28d9",
+         confirmButtonColor: "var(--palette-brand-action)",
        });
        return;
      }
@@ -196,7 +196,7 @@ export function AddSaleButton({ products, onSuccess }: AddSaleButtonProps) {
          title: "Error",
          text: "Por favor agregá al menos un producto",
          icon: "error",
-         confirmButtonColor: "#dc2626",
+         confirmButtonColor: "var(--danger)",
        });
        return;
      }
@@ -210,7 +210,7 @@ export function AddSaleButton({ products, onSuccess }: AddSaleButtonProps) {
            title: "Error",
            text: "se requiere una cantidad en efectivo o transferencia mayor a 0",
            icon: "error",
-           confirmButtonColor: "#dc2626",
+           confirmButtonColor: "var(--danger)",
          });
          return;
        }
@@ -245,7 +245,7 @@ export function AddSaleButton({ products, onSuccess }: AddSaleButtonProps) {
          title: "Venta registrada",
          text: totalItems + " unidades vendidas por $" + calculateTotal().toFixed(2),
          icon: "success",
-         confirmButtonColor: "#6d28d9",
+         confirmButtonColor: "var(--palette-brand-action)",
          confirmButtonText: "Aceptar",
        });
         router.refresh();
@@ -260,7 +260,7 @@ export function AddSaleButton({ products, onSuccess }: AddSaleButtonProps) {
          title: "Error",
          text: result.error || "Error al registrar la venta",
          icon: "error",
-         confirmButtonColor: "#dc2626",
+         confirmButtonColor: "var(--danger)",
        });
      }
      setLoading(false);

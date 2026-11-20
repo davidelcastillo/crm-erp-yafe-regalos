@@ -57,17 +57,30 @@ const renderForm = () => {
   return { ...utils, onCreated, onClose };
 };
 
-/** Espera a que clientas y canales estén cargados, y devuelve el `<form>`. */
+/** Espera a que canales (y clientas) estén cargados y devuelve el `<form>`. */
 const formListo = async () => {
   await waitFor(() =>
-    expect(screen.getByRole("option", { name: "Juli M." })).toBeInTheDocument()
+    expect(screen.getByRole("option", { name: "WhatsApp" })).toBeInTheDocument()
   );
   return document.querySelector("form") as HTMLFormElement;
 };
 
-const elegirClienteYCanal = () => {
-  fireEvent.change(screen.getByLabelText("Clienta"), { target: { value: "1" } });
+/** Paso 1 → 2: elige el canal (la sucursal viene preselectiva) y continúa. */
+const avanzarPaso1 = () => {
   fireEvent.change(screen.getByLabelText("Canal de venta"), { target: { value: "2" } });
+  fireEvent.click(screen.getByRole("button", { name: /continuar/i }));
+};
+
+/** Paso 2 → 3: elige la clienta, agrega el Vestido lencero y continúa. */
+const avanzarPaso2 = () => {
+  fireEvent.change(screen.getByLabelText("Clienta"), { target: { value: "1" } });
+  agregarProducto("Vestido", "Vestido lencero");
+  fireEvent.click(screen.getByRole("button", { name: /continuar/i }));
+};
+
+const hastaPaso3 = () => {
+  avanzarPaso1();
+  avanzarPaso2();
 };
 
 const agregarProducto = (busqueda: string, nombre: string) => {
@@ -94,20 +107,48 @@ beforeEach(() => {
 });
 
 describe("PedidoForm: alta de pedido", () => {
-  it("no manda nada sin clienta y avisa qué falta", async () => {
+  it("es un wizard de 3 pasos con resumen antes de crear", async () => {
     renderForm();
-    const form = await formListo();
+    await formListo();
 
-    fireEvent.submit(form);
+    // Paso 1: canal y sucursal; sin botón de crear.
+    expect(screen.getByText(/paso 1 de 3/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /crear pedido/i })).not.toBeInTheDocument();
+    avanzarPaso1();
+    expect(screen.getByText(/paso 2 de 3/i)).toBeInTheDocument();
+
+    // Paso 2: clienta y productos.
+    avanzarPaso2();
+    expect(screen.getByText(/paso 3 de 3/i)).toBeInTheDocument();
+
+    // Paso 3: resumen de lo cargado antes de comprometer stock y caja.
+    expect(screen.getByText(/Juli/)).toBeInTheDocument();
+    expect(screen.getByText(/whatsapp/i)).toBeInTheDocument();
+    expect(screen.getByText(/Vestido lencero/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /crear pedido/i })).toBeInTheDocument();
+
+    // Se puede volver sin perder lo cargado.
+    fireEvent.click(screen.getByRole("button", { name: /volver/i }));
+    expect(screen.getByText(/paso 2 de 3/i)).toBeInTheDocument();
+    expect(screen.getByLabelText("Clienta")).toHaveValue("1");
+  });
+
+  it("continuar sin clienta avisa qué falta y no avanza", async () => {
+    renderForm();
+    await formListo();
+    avanzarPaso1();
+
+    fireEvent.click(screen.getByRole("button", { name: /continuar/i }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Elegí una clienta");
+    expect(screen.getByText(/paso 2 de 3/i)).toBeInTheDocument();
     expect(mockCrearPedido).not.toHaveBeenCalled();
   });
 
   it("muestra el total del pedido antes de crearlo", async () => {
     renderForm();
     await formListo();
-    elegirClienteYCanal();
+    avanzarPaso1();
     agregarProducto("Vestido", "Vestido lencero");
 
     fireEvent.change(screen.getByLabelText("Cantidad de Vestido lencero"), {
@@ -120,11 +161,13 @@ describe("PedidoForm: alta de pedido", () => {
   it("llama a createPedido con lo que pide el servidor y sin precio", async () => {
     const { onCreated } = renderForm();
     const form = await formListo();
-    elegirClienteYCanal();
+    avanzarPaso1();
+    fireEvent.change(screen.getByLabelText("Clienta"), { target: { value: "1" } });
     agregarProducto("Vestido", "Vestido lencero");
     fireEvent.change(screen.getByLabelText("Cantidad de Vestido lencero"), {
       target: { value: "2" },
     });
+    fireEvent.click(screen.getByRole("button", { name: /continuar/i }));
 
     fireEvent.submit(form);
 
@@ -141,8 +184,10 @@ describe("PedidoForm: alta de pedido", () => {
   it("la seña es opcional y viaja con su medio cuando se carga", async () => {
     renderForm();
     const form = await formListo();
-    elegirClienteYCanal();
+    avanzarPaso1();
+    fireEvent.change(screen.getByLabelText("Clienta"), { target: { value: "1" } });
     agregarProducto("Pollerita", "Pollerita");
+    fireEvent.click(screen.getByRole("button", { name: /continuar/i }));
 
     fireEvent.change(screen.getByLabelText("Seña (opcional)"), {
       target: { value: "200" },
@@ -165,8 +210,7 @@ describe("PedidoForm: alta de pedido", () => {
     } as never);
     renderForm();
     const form = await formListo();
-    elegirClienteYCanal();
-    agregarProducto("Vestido", "Vestido lencero");
+    hastaPaso3();
 
     fireEvent.submit(form);
 
@@ -182,6 +226,8 @@ describe("PedidoForm: alta de pedido", () => {
       data: { id: 42, name: "Mica", surname: "R." },
     } as never);
     renderForm();
+    await formListo();
+    avanzarPaso1();
 
     fireEvent.click(await screen.findByRole("button", { name: "Nueva clienta" }));
     fireEvent.change(screen.getByLabelText("Nombre"), { target: { value: "Mica" } });

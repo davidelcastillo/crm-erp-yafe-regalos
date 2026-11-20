@@ -133,8 +133,8 @@ export function CategorySelector({
       showCancelButton: true,
       confirmButtonText: "Crear",
       cancelButtonText: "Cancelar",
-      confirmButtonColor: "#6d28d9",
-      cancelButtonColor: "#6a6a6a",
+      confirmButtonColor: "var(--palette-brand-action)",
+      cancelButtonColor: "var(--palette-secondary-gray)",
       inputValidator: (value) => {
         if (!value || !value.trim()) return "El nombre es requerido";
         if (value.length > 100) return "Máximo 100 caracteres";
@@ -163,7 +163,7 @@ export function CategorySelector({
           title: "Categoría creada",
           text: `Se creó "${created.name}"`,
           icon: "success" as const,
-          confirmButtonColor: "#6d28d9",
+          confirmButtonColor: "var(--palette-brand-action)",
           confirmButtonText: "Aceptar",
         });
       } else {
@@ -171,7 +171,7 @@ export function CategorySelector({
           title: "Error",
           text: result.error ?? "No se pudo crear la categoría",
           icon: "error" as const,
-          confirmButtonColor: "#dc2626",
+          confirmButtonColor: "var(--danger)",
           confirmButtonText: "Aceptar",
         });
       }

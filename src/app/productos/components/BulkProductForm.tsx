@@ -198,8 +198,8 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
         text: "Se pierden los datos cargados en la fila.",
         icon: "warning",
         showCancelButton: true,
-        confirmButtonColor: "#6d28d9",
-        cancelButtonColor: "#6a6a6a",
+        confirmButtonColor: "var(--palette-brand-action)",
+        cancelButtonColor: "var(--palette-secondary-gray)",
         confirmButtonText: "Sí, quitar",
         cancelButtonText: "Cancelar",
       });
@@ -251,8 +251,8 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
       text: "Se pierden las filas cargadas.",
       icon: "warning",
       showCancelButton: true,
-      confirmButtonColor: "#6d28d9",
-      cancelButtonColor: "#6a6a6a",
+      confirmButtonColor: "var(--palette-brand-action)",
+      cancelButtonColor: "var(--palette-secondary-gray)",
       confirmButtonText: "Sí, descartar",
       cancelButtonText: "Cancelar",
     });
@@ -303,7 +303,7 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
           title: "Error",
           text: parsed.error.issues.map((e) => e.message).join(", "),
           icon: "error",
-          confirmButtonColor: "#dc2626",
+          confirmButtonColor: "var(--danger)",
           confirmButtonText: "Aceptar",
         });
         return;
@@ -330,7 +330,7 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
         title: "Productos creados",
         text: `${cantidad} ${cantidad === 1 ? "producto creado" : "productos creados"} correctamente`,
         icon: "success",
-        confirmButtonColor: "#6d28d9",
+        confirmButtonColor: "var(--palette-brand-action)",
         confirmButtonText: "Aceptar",
       });
       onSuccess?.();
@@ -349,7 +349,7 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
       title: "Error",
       text: resultado.error || "Error al crear los productos",
       icon: "error",
-      confirmButtonColor: "#dc2626",
+      confirmButtonColor: "var(--danger)",
       confirmButtonText: "Aceptar",
     });
   };

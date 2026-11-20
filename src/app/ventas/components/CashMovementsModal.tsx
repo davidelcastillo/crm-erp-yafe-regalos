@@ -151,7 +151,7 @@ export const CashMovementsModal = ({
         title: tipo === "INGRESO" ? "Ingreso registrado" : "Egreso registrado",
         text: `${plata(monto)} en la caja de la sucursal`,
         icon: "success",
-        confirmButtonColor: "#6d28d9",
+        confirmButtonColor: "var(--palette-brand-action)",
       });
       setAmount("");
       setDetalle("");

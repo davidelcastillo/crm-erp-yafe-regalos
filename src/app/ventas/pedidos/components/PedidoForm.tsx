@@ -68,6 +68,9 @@ export const PedidoForm = ({ open, onClose, onCreated, products }: PedidoFormPro
   const [venceEl, setVenceEl] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  /** Wizard de 3 pasos (U9, decisión del dueño): 1 = dónde y por dónde,
+   * 2 = clienta y productos, 3 = seña, vencimiento y resumen. */
+  const [paso, setPaso] = useState(1);
   // Alta de clienta sin salir del pedido (evita cargarla antes en otro lado).
   const [nuevaClienta, setNuevaClienta] = useState(false);
   const [nombreNueva, setNombreNueva] = useState("");
@@ -118,6 +121,8 @@ export const PedidoForm = ({ open, onClose, onCreated, products }: PedidoFormPro
     (suma, linea) => suma + linea.precio * (parseInt(linea.cantidad, 10) || 0),
     0
   );
+  const clienteElegida = clientes.find((c) => String(c.id) === customerId);
+  const canalElegido = canales.find((c) => String(c.id) === canalId);
 
   const agregarProducto = (producto: ProductSearchResult) => {
     setError(null);
@@ -190,6 +195,7 @@ export const PedidoForm = ({ open, onClose, onCreated, products }: PedidoFormPro
     setNuevaClienta(false);
     setNombreNueva("");
     setApellidoNueva("");
+    setPaso(1);
   };
 
   const handleClose = () => {
@@ -200,6 +206,7 @@ export const PedidoForm = ({ open, onClose, onCreated, products }: PedidoFormPro
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setError(null);
+    if (paso !== 3) return;
 
     if (!customerId) return setError("Elegí una clienta");
     if (!canalId) return setError("Elegí el canal de venta");
@@ -235,6 +242,23 @@ export const PedidoForm = ({ open, onClose, onCreated, products }: PedidoFormPro
     onClose();
   };
 
+  /** Avanza un paso validando solo lo de ese paso; lo demás se revisa al crear. */
+  const continuar = () => {
+    setError(null);
+    if (paso === 1) {
+      if (!canalId) return setError("Elegí el canal de venta");
+      if (sucursalId === null) return setError("Elegí la sucursal");
+    }
+    if (paso === 2) {
+      if (!customerId) return setError("Elegí una clienta");
+      const items = lineas
+        .map((linea) => parseInt(linea.cantidad, 10))
+        .filter((cantidad) => Number.isInteger(cantidad) && cantidad > 0);
+      if (items.length === 0) return setError("Agregá al menos un producto");
+    }
+    setPaso((actual) => Math.min(actual + 1, 3));
+  };
+
   if (!open) return null;
 
   return (
@@ -249,9 +273,18 @@ export const PedidoForm = ({ open, onClose, onCreated, products }: PedidoFormPro
         onClick={(event) => event.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between gap-3">
-          <h2 id="pedido-form-title" className="min-w-0 text-xl font-semibold text-ink">
-            Nuevo pedido
-          </h2>
+          <div className="min-w-0">
+            <h2 id="pedido-form-title" className="text-xl font-semibold text-ink">
+              Nuevo pedido
+            </h2>
+            <p className="mt-1 text-sm text-ink-muted">
+              {paso === 1
+                ? "Paso 1 de 3 · Dónde y por dónde"
+                : paso === 2
+                  ? "Paso 2 de 3 · Clienta y productos"
+                  : "Paso 3 de 3 · Seña, vencimiento y resumen"}
+            </p>
+          </div>
           <button
             type="button"
             onClick={handleClose}
@@ -265,6 +298,9 @@ export const PedidoForm = ({ open, onClose, onCreated, products }: PedidoFormPro
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Paso 2: clienta y productos. */}
+          {paso === 2 && (
+          <>
           <div>
             <label className="block text-sm font-semibold text-ink" htmlFor="pedido-clienta">
               Clienta
@@ -336,25 +372,6 @@ export const PedidoForm = ({ open, onClose, onCreated, products }: PedidoFormPro
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-ink" htmlFor="pedido-canal">
-              Canal de venta
-            </label>
-            <select
-              id="pedido-canal"
-              value={canalId}
-              onChange={(event) => setCanalId(event.target.value)}
-              className={campo}
-            >
-              <option value="">Elegí el canal…</option>
-              {canales.map((canal) => (
-                <option key={canal.id} value={canal.id}>
-                  {canal.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
             <span className="block text-sm font-semibold text-ink">Productos</span>
             <div className="mt-1">
               <ProductSearch mode="inline" products={catalogo} onSelect={agregarProducto} />
@@ -407,6 +424,30 @@ export const PedidoForm = ({ open, onClose, onCreated, products }: PedidoFormPro
               Total: {plata(total)}
             </p>
           </div>
+          </>
+          )}
+
+          {/* Paso 1: dónde y por dónde. */}
+          {paso === 1 && (
+          <>
+          <div>
+            <label className="block text-sm font-semibold text-ink" htmlFor="pedido-canal">
+              Canal de venta
+            </label>
+            <select
+              id="pedido-canal"
+              value={canalId}
+              onChange={(event) => setCanalId(event.target.value)}
+              className={campo}
+            >
+              <option value="">Elegí el canal…</option>
+              {canales.map((canal) => (
+                <option key={canal.id} value={canal.id}>
+                  {canal.name}
+                </option>
+              ))}
+            </select>
+          </div>
 
           <div>
             <span className="block text-sm font-semibold text-ink">Sucursal</span>
@@ -418,6 +459,44 @@ export const PedidoForm = ({ open, onClose, onCreated, products }: PedidoFormPro
                 label="Sucursal del pedido"
               />
             </div>
+          </div>
+          </>
+          )}
+
+          {/* Paso 3: seña, vencimiento y resumen antes de comprometer stock y caja. */}
+          {paso === 3 && (
+          <>
+          <div className="rounded-xl border border-hairline bg-surface-soft p-4">
+            <p className="text-sm font-semibold text-ink">Resumen del pedido</p>
+            <dl className="mt-2 space-y-1 text-sm">
+              <div className="flex justify-between gap-3">
+                <dt className="text-ink-muted">Clienta</dt>
+                <dd className="min-w-0 truncate font-medium text-ink">
+                  {clienteElegida ? ETIQUETA_CLIENTE(clienteElegida) : "—"}
+                </dd>
+              </div>
+              <div className="flex justify-between gap-3">
+                <dt className="text-ink-muted">Canal</dt>
+                <dd className="font-medium text-ink">{canalElegido?.name ?? "—"}</dd>
+              </div>
+              <div className="flex justify-between gap-3">
+                <dt className="text-ink-muted">Sucursal</dt>
+                <dd className="font-medium text-ink">
+                  {branches.find((b) => b.id === sucursalId)?.name ?? "—"}
+                </dd>
+              </div>
+            </dl>
+            <ul className="mt-2 space-y-1 text-sm">
+              {lineas.map((linea) => (
+                <li key={linea.productId} className="flex justify-between gap-3">
+                  <span className="min-w-0 truncate text-ink">{linea.nombre}</span>
+                  <span className="tabular-nums text-ink-muted">
+                    ×{parseInt(linea.cantidad, 10)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-2 text-right text-sm font-semibold text-ink">Total: {plata(total)}</p>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -467,6 +546,8 @@ export const PedidoForm = ({ open, onClose, onCreated, products }: PedidoFormPro
               className={campo}
             />
           </div>
+          </>
+          )}
 
           {error && (
             <p role="alert" className="rounded-xl bg-error-surface px-3 py-2 text-sm text-error-ink">
@@ -475,12 +556,24 @@ export const PedidoForm = ({ open, onClose, onCreated, products }: PedidoFormPro
           )}
 
           <div className="flex flex-col-reverse gap-2 md:flex-row md:justify-end">
-            <button type="button" onClick={handleClose} className="btn btn-ghost">
-              Cancelar
-            </button>
-            <button type="submit" disabled={pending} className="btn btn-primary">
-              {pending ? "Creando…" : "Crear pedido"}
-            </button>
+            {paso > 1 ? (
+              <button type="button" onClick={() => setPaso((actual) => Math.max(actual - 1, 1))} className="btn btn-ghost">
+                Volver
+              </button>
+            ) : (
+              <button type="button" onClick={handleClose} className="btn btn-ghost">
+                Cancelar
+              </button>
+            )}
+            {paso < 3 ? (
+              <button type="button" onClick={continuar} className="btn btn-primary">
+                Continuar
+              </button>
+            ) : (
+              <button type="submit" disabled={pending} className="btn btn-primary">
+                {pending ? "Creando…" : "Crear pedido"}
+              </button>
+            )}
           </div>
         </form>
       </div>

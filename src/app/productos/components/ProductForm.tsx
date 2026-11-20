@@ -94,8 +94,8 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
           "El producto dejará de aparecer en los selectores de compras, ventas y movimientos, pero conservará su stock e historial.",
         icon: "warning",
         showCancelButton: true,
-        confirmButtonColor: "#6d28d9",
-        cancelButtonColor: "#6a6a6a",
+        confirmButtonColor: "var(--palette-brand-action)",
+        cancelButtonColor: "var(--palette-secondary-gray)",
         confirmButtonText: "Sí, desactivar",
         cancelButtonText: "Cancelar",
       });
@@ -148,7 +148,7 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
           ? "El producto se ha actualizado correctamente"
           : "El producto se ha creado correctamente",
         icon: "success",
-        confirmButtonColor: "#6d28d9",
+        confirmButtonColor: "var(--palette-brand-action)",
         confirmButtonText: "Aceptar",
         customClass: { confirmButton: "rounded-xl px-6 py-3 font-medium" },
       });
@@ -167,7 +167,7 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
         title: "Error",
         text: result.error || "Error al guardar el producto",
         icon: "error",
-        confirmButtonColor: "#dc2626",
+        confirmButtonColor: "var(--danger)",
         confirmButtonText: "Aceptar",
       });
     }

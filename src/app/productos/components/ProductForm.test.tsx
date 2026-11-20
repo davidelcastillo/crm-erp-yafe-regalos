@@ -439,7 +439,7 @@ describe("ProductForm Component", () => {
           title: "¿Desactivar producto?",
           showCancelButton: true,
           // Swal pinta su botón con texto blanco: #be185d es el único rosa de marca que llega a 4.5:1.
-          confirmButtonColor: "#6d28d9",
+          confirmButtonColor: "var(--palette-brand-action)",
           confirmButtonText: "Sí, desactivar",
         })
       );

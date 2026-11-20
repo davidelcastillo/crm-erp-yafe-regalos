@@ -215,8 +215,8 @@ const PedidoCard = ({
       showCancelButton: true,
       confirmButtonText: "Cancelar pedido",
       cancelButtonText: "Volver",
-      confirmButtonColor: "#dc2626",
-      cancelButtonColor: "#6a6a6a",
+      confirmButtonColor: "var(--danger)",
+      cancelButtonColor: "var(--palette-secondary-gray)",
       inputValidator: (value) =>
         !value || !value.trim() ? "El motivo es obligatorio" : null,
     });
@@ -228,7 +228,7 @@ const PedidoCard = ({
         title: "No se pudo cancelar",
         text: result.error ?? "Error al cancelar el pedido",
         icon: "error",
-        confirmButtonColor: "#dc2626",
+        confirmButtonColor: "var(--danger)",
       });
       return;
     }
@@ -629,7 +629,7 @@ export default function PedidosPage() {
         title: "No se pudo mover",
         text: mensaje,
         icon: "warning",
-        confirmButtonColor: "#6d28d9",
+        confirmButtonColor: "var(--palette-brand-action)",
       });
     },
     [bump]
@@ -652,7 +652,7 @@ export default function PedidosPage() {
           (columna) => columna.id === origen.estado
         )?.label} a ${COLUMNAS.find((columna) => columna.id === hacia)?.label}.`,
         icon: "info",
-        confirmButtonColor: "#6d28d9",
+        confirmButtonColor: "var(--palette-brand-action)",
       });
       return;
     }

@@ -1,39 +1,36 @@
 @import "tailwindcss";
 
 :root {
-  /* Airbnb-inspired palette */
+  /* Paleta Polkalina's (variante A · recolor: misma estructura, colores de la
+     marca — docs/adr/polkalinas-especificacion-visual.md §1.2). Modo oscuro:
+     congelado hasta el piloto, sigue con su bloque propio. */
   --palette-white: #ffffff;
-  --palette-near-black: #222222;
-  --palette-secondary-gray: #6a6a6a;
-  --palette-focused-gray: #3f3f3f;
-  --palette-border-gray: #c1c1c1;
-  --palette-light-surface: #f2f2f2;
+  --palette-near-black: #4a2c2a; /* cacao: texto principal */
+  --palette-secondary-gray: #76574f; /* suave: texto secundario */
+  --palette-focused-gray: #4a2c2a;
+  --palette-border-gray: #8a6e68; /* borde de controles (≥ 3:1) */
+  --palette-light-surface: #fff6f0; /* crema: paneles suaves */
   
-  /* Brand accent */
-  --palette-rausch-red: #ff385c;
-  --palette-deep-rausch: #e00b41;
+  /* Marca */
+  --palette-rausch-red: #c8323c;
+  --palette-deep-rausch: #a8262f;
 
-  /* Rebranding: degradé celeste -> rosa (superficies y botones) y violeta -> rosa
-     fuerte (decorativo). El degradé claro lleva TEXTO OSCURO: blanco sobre el
-     celeste no llega a 4.5:1 (regla y números en STYLE.md). */
-  --palette-brand-celeste: #bfdbfe;
-  --palette-brand-rosa: #f472b6;
-  --palette-brand-violeta: #a855f7;
-  --palette-brand-rosa-fuerte: #ec4899;
-  /* Rosa de TEXTO: es el único rosa de la marca que llega a 4.5:1 sobre fondo
-     blanco o sobre el tinte rosa al 10 % (AA para texto chico). Para texto sobre
-     superficies claras, este y no `rosa-fuerte`. */
-  --palette-brand-rosa-texto: #be185d;
-  /* Color de los botones de acción: violeta profundo, 7.1:1 con texto blanco
-     (el doble del mínimo AA). Es el tercer color de la marca y se ve igual en
-     celular y en escritorio. */
-  --palette-brand-action: #6d28d9;
+  /* Degradé del encabezado: el claro va de crema a rosa; el oscuro de marca
+     usa cacao/vino en `brand-gradient-strong` y los mockups (variante B). */
+  --palette-brand-celeste: #fff6f0;
+  --palette-brand-rosa: #f2c4cc;
+  --palette-brand-violeta: #c8323c;
+  --palette-brand-rosa-fuerte: #c8323c; /* frutilla: acento */
+  /* Frutilla como texto: AA sobre crema/blanco desde 14 px (spec regla 2) */
+  --palette-brand-rosa-texto: #c8323c;
+  /* Botón primario y confirmación de SweetAlert: cacao (spec §2.2) */
+  --palette-brand-action: #4a2c2a;
   
   /* Shadows */
   --shadow-card: rgba(0,0,0,0.02) 0px 0px 0px 1px, rgba(0,0,0,0.04) 0px 2px 6px, rgba(0,0,0,0.1) 0px 4px 8px;
   --shadow-hover: rgba(0,0,0,0.08) 0px 4px 12px;
   
-  --background: var(--palette-white);
+  --background: #fff6f0; /* crema: fondo de la app (spec superficie) */
   --foreground: var(--palette-near-black);
 
   /* ==========================================================================
@@ -50,15 +47,15 @@
   --surface-sunken: #f8f8f8;
   --ink: var(--palette-near-black);
   --ink-muted: var(--palette-secondary-gray);
-  --ink-soft: #929292;
-  --hairline: rgb(0 0 0 / 0.1);
-  --hairline-soft: rgb(0 0 0 / 0.05);
+  --ink-soft: #9c857b; /* suave claro: texto terciario de la paleta Polkalina's */
+  --hairline: #eadad6; /* borde decorativo de paneles (spec regla 3) */
+  --hairline-soft: rgb(74 44 42 / 0.08);
   /* Cuerpo de texto: el gris de `#3f3f3f`, que es el que usa la prosa larga. */
   --ink-body: var(--palette-focused-gray);
   /* Tinte rosa de las páginas con degradé (el login): es el `accent` al 10 %
      sobre la superficie. Existe como token para que la onda del SVG pueda
      rellenarse con el mismo color en los dos temas. */
-  --surface-tint: #fdf2f8;
+  --surface-tint: #f9e7ea; /* tinte rosa tenue de las páginas con degradé */
 
   /* ==========================================================================
      COLORES DE ESTADO Y DE MARCA
@@ -70,26 +67,28 @@
      Tailwind no genera clases dinámicas.
      ========================================================================== */
   --accent: var(--palette-brand-rosa-fuerte);
-  --positive: #15803d;
-  --negative: #b91c1c;
-  --warning: #b45309;
-  --danger: #dc2626;
-  --error: #c13515;
-  --error-surface: #ffe4ea;
-  --error-ink: #8f0020;
-  --info: #3b82f6;
-  /* Tonos "vivos" de estado: son los de los badges con texto blanco y los puntos
-     indicadores. NO se usan para texto sobre fondo claro (no llegan a 4.5:1, ver
-     la regla en STYLE.md); para eso están `positive`, `negative` y `warning`. */
-  --positive-strong: #22c55e;
-  --negative-strong: #ef4444;
-  --warning-strong: #f59e0b;
-  /* Borde suave de marca: la pista del `Spinner` y el borde de foco suave. */
-  --accent-soft: #fbcfe8;
+  /* Estados Polkalina's (spec §1.2: texto sobre fondo pastel, todos ≥ 6:1) */
+  --positive: #2f5b33;
+  --negative: #8e1f28;
+  --warning: #7a4a06;
+  --danger: #a8262f; /* frutilla oscura: lo destructivo, spec §2.1 */
+  --error: #8e1f28;
+  --error-surface: #f6d5d7;
+  --error-ink: #8e1f28;
+  --info: #5e4e4b; /* neutro: la marca no define un azul informativo */
+  /* Tonos "vivos" de estado: los de los badges con texto blanco y los puntos
+     indicadores. NO se usan para texto sobre fondo claro; para eso están
+     `positive`, `negative` y `warning`. */
+  --positive-strong: #5e8c6a;
+  --negative-strong: #a8262f;
+  --warning-strong: #a86e2a;
+  /* Rosa de marca: la pista del `Spinner` y el borde de foco suave. */
+  --accent-soft: #f2c4cc;
   /* Borde de un control apagado (lo que no está marcado en un interruptor). */
-  --hairline-strong: #dddddd;
-  --scrim: rgb(0 0 0 / 0.3);
-  --scrim-strong: rgb(0 0 0 / 0.6);
+  --hairline-strong: #d8d2d0;
+  /* Velo cálido de la marca */
+  --scrim: rgb(42 24 23 / 0.35);
+  --scrim-strong: rgb(42 24 23 / 0.6);
 
   /* ==========================================================================
      MOVIMIENTO (S6)
@@ -261,12 +260,13 @@
 @layer components {
 
 /* Marca: dos degradés con usos distintos (reglas de contraste en STYLE.md).
-   - `brand-gradient` (claro): encabezados y botones de acción, con texto oscuro.
-   - `brand-gradient-strong`: decorativo o texto grande en negrita. */
+   - `brand-gradient` (claro, TEXTO OSCURO): encabezados de las páginas.
+     Polkalina's variante A: crema → rosa, texto cacao (8:1 sobre rosa).
+   - `brand-gradient-strong`: texto grande recortado del PageHeader. */
 .brand-gradient {
   background-image: linear-gradient(
     to right,
-    var(--palette-brand-celeste),
+    var(--surface-tint),
     var(--palette-brand-rosa)
   );
 }
@@ -275,7 +275,7 @@
   background-image: linear-gradient(
     to right,
     var(--palette-brand-violeta),
-    var(--palette-brand-rosa-fuerte)
+    var(--palette-deep-rausch)
   );
 }
 

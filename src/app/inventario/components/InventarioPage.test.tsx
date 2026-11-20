@@ -401,7 +401,7 @@ describe("InventarioPage — FAB crear producto (spec inventory-ui)", () => {
           title: "Categoría creada",
           text: 'Se creó "Alimentos"',
           icon: "success",
-          confirmButtonColor: "#6d28d9",
+          confirmButtonColor: "var(--palette-brand-action)",
         })
       );
     });

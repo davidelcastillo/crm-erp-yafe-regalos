@@ -199,8 +199,8 @@ export function PrendaForm({ prenda, branches = [], onClose, onSuccess }: Prenda
       showCancelButton: true,
       confirmButtonText: "Crear",
       cancelButtonText: "Cancelar",
-      confirmButtonColor: "#6d28d9",
-      cancelButtonColor: "#6a6a6a",
+      confirmButtonColor: "var(--palette-brand-action)",
+      cancelButtonColor: "var(--palette-secondary-gray)",
       inputValidator: (value) => {
         if (!value || !value.trim()) return "El nombre es requerido";
         if (value.length > 100) return "Máximo 100 caracteres";
@@ -227,8 +227,8 @@ export function PrendaForm({ prenda, branches = [], onClose, onSuccess }: Prenda
       showCancelButton: true,
       confirmButtonText: "Crear",
       cancelButtonText: "Cancelar",
-      confirmButtonColor: "#6d28d9",
-      cancelButtonColor: "#6a6a6a",
+      confirmButtonColor: "var(--palette-brand-action)",
+      cancelButtonColor: "var(--palette-secondary-gray)",
       inputValidator: (value) => {
         if (!value || !value.trim()) return "El nombre es requerido";
         if (value.length > 100) return "Máximo 100 caracteres";
@@ -247,8 +247,8 @@ export function PrendaForm({ prenda, branches = [], onClose, onSuccess }: Prenda
       showCancelButton: true,
       confirmButtonText: "Crear",
       cancelButtonText: "Cancelar",
-      confirmButtonColor: "#6d28d9",
-      cancelButtonColor: "#6a6a6a",
+      confirmButtonColor: "var(--palette-brand-action)",
+      cancelButtonColor: "var(--palette-secondary-gray)",
       inputValidator: (value) => {
         if (!value || !/^[A-Za-z]{2,4}$/.test(value.trim()))
           return "El prefijo debe tener entre 2 y 4 letras";
@@ -409,7 +409,7 @@ export function PrendaForm({ prenda, branches = [], onClose, onSuccess }: Prenda
         title: "Prenda actualizada",
         text: "La prenda se actualizó correctamente",
         icon: "success",
-        confirmButtonColor: "#6d28d9",
+        confirmButtonColor: "var(--palette-brand-action)",
         confirmButtonText: "Aceptar",
       });
       onSuccess?.();
@@ -436,7 +436,7 @@ export function PrendaForm({ prenda, branches = [], onClose, onSuccess }: Prenda
       title: "Prenda creada",
       text: "La prenda se creó correctamente",
       icon: "success",
-      confirmButtonColor: "#6d28d9",
+      confirmButtonColor: "var(--palette-brand-action)",
       confirmButtonText: "Aceptar",
     });
     onSuccess?.();
