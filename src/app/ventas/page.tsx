@@ -190,9 +190,6 @@ export default function VentasPage() {
               }
               actions={
                 <>
-                  <Link href="/ventas/pedidos" className="btn btn-secondary">
-                    Pedidos
-                  </Link>
                   <button
                     type="button"
                     onClick={() => setCashStep('menu')}
@@ -209,16 +206,7 @@ export default function VentasPage() {
               fondo de marca a la vista. En desktop pasan a la barra. */}
           <div className="mt-4 px-3 md:hidden">
             <div className="flex gap-3">
-              <ActionCard
-                label="Pedidos"
-                hint="Reservas, cobros y envíos"
-                href="/ventas/pedidos"
-                icon={
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 3h12v18l-3-2-3 2-3-2-3 2V3z M9 8h6 M9 12h6" />
-                  </svg>
-                }
-              />
+              {/* Pedidos vive en el BottomNav (pedido del dueño): sin atajo acá. */}
               <ActionCard
                 label="Caja"
                 hint="Movimientos y cierre"
