@@ -12,7 +12,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Feria Conexx",
+  title: "Polkalina's Sistema Web",
   description: "Control de ingresos, egresos e inventario para feria conexx",
 };
 
