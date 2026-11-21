@@ -35,7 +35,7 @@ export default async function FichaVidrieraPage({
   ].filter((detalle): detalle is string => Boolean(detalle));
 
   return (
-    <main className="min-h-screen bg-background pb-16">
+    <main className="min-h-screen bg-background pb-10">
       <header className="flex items-center gap-3 px-4 pt-6 pb-4">
         <Link
           href="/polkalinas"

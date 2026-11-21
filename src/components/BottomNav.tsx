@@ -67,6 +67,7 @@ export default function BottomNav() {
 
   if (
     pathname.startsWith("/sucursal/") ||
+    pathname.startsWith("/polkalinas") ||
     pathname === "/login" ||
     pathname === "/unauthorized"
   ) {

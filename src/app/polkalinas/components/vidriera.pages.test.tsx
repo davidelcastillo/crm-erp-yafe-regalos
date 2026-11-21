@@ -11,6 +11,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 
 import FichaPage from "@/app/polkalinas/[id]/page";
 import PolkalinasPage from "@/app/polkalinas/page";
+import { EstadoVidrieraBadge } from "@/app/polkalinas/components/EstadoVidrieraBadge";
 import { linkConsulta } from "@/app/polkalinas/components/whatsapp";
 import type { VidrieraFicha, VidrieraItem } from "@/app/actions/vidriera";
 
@@ -50,6 +51,16 @@ const ITEMS: VidrieraItem[] = [
     estado: "AGOTADO",
     portada: null,
     categoria: null,
+  },
+  {
+    id: 4,
+    code: "PK-2",
+    name: "Pollera escocesa",
+    price: 20000,
+    kind: "PRENDA",
+    estado: "VENDIDA",
+    portada: "https://storage.test/product-images/hash-pollera_sm.webp",
+    categoria: "Polleras",
   },
 ];
 
@@ -117,12 +128,43 @@ describe("catálogo /polkalinas", () => {
     expect(getVidriera).toHaveBeenCalledWith({ categoriaId: undefined, q: "campera" });
   });
 
+  it("la categoría va como etiqueta sobre la foto, solo si el ítem tiene categoría", async () => {
+    render(await PolkalinasPage({ searchParams: Promise.resolve({}) }));
+
+    // La etiqueta vive dentro de la caja de la foto, no en la meta de abajo.
+    expect(screen.getByAltText("Campera de jean").parentElement).toHaveTextContent("Camperas");
+    expect(screen.getByText("Sin foto").parentElement).not.toHaveTextContent("Polleras");
+  });
+
+  it("atenúa la foto cuando la prenda está vendida", async () => {
+    render(await PolkalinasPage({ searchParams: Promise.resolve({}) }));
+
+    expect(screen.getByAltText("Pollera escocesa").className).toContain("opacity-60");
+    expect(screen.getByAltText("Campera de jean").className).not.toContain("opacity-60");
+  });
+
   it("sin ítems publicados muestra el aviso en lugar de una grilla vacía", async () => {
     getVidriera.mockResolvedValue({ success: true, data: { items: [], categorias: [] } });
 
     render(await PolkalinasPage({ searchParams: Promise.resolve({}) }));
 
     expect(screen.getByText(/no hay prendas ni productos publicados/i)).toBeInTheDocument();
+  });
+});
+
+describe("EstadoVidrieraBadge", () => {
+  it.each([
+    ["DISPONIBLE", "Disponible", "bg-surface"],
+    ["RESERVADA", "Reservada · consultá", "bg-col-reservado"],
+    ["VENDIDA", "Vendida", "bg-ink"],
+    ["AGOTADO", "Agotado", "bg-error-surface"],
+  ] as const)("el estado %s se lee con su texto y su fondo del tema", (estado, texto, fondo) => {
+    const { container } = render(<EstadoVidrieraBadge estado={estado} />);
+
+    expect(screen.getByText(texto)).toBeInTheDocument();
+    expect(container.firstElementChild).toHaveClass(fondo);
+    // Vendida suma el candado: no depende solo del color.
+    expect(container.querySelector("svg") !== null).toBe(estado === "VENDIDA");
   });
 });
 
@@ -134,7 +176,7 @@ describe("ficha /polkalinas/[id]", () => {
       screen.getByRole("heading", { level: 1, name: "Campera de jean" })
     ).toBeInTheDocument();
     expect(screen.getByText("$ 45.000,00")).toBeInTheDocument();
-    expect(screen.getByText("Reservada")).toBeInTheDocument();
+    expect(screen.getByText("Reservada · consultá")).toBeInTheDocument();
     expect(screen.getByText("Muy bueno")).toBeInTheDocument();
     expect(screen.getByText("Talles: M, S")).toBeInTheDocument();
     expect(screen.getByAltText("Campera de frente")).toHaveAttribute(

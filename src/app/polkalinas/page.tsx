@@ -36,7 +36,7 @@ export default async function PolkalinasPage({
   const { items, categorias } = resultado.data;
 
   return (
-    <main className="min-h-screen bg-background pb-16">
+    <main className="min-h-screen bg-background pb-10">
       <header className="px-4 pt-6">
         <p className="text-xs font-semibold uppercase tracking-[.14em] text-ink-muted">
           Vidriera
@@ -100,14 +100,21 @@ export default async function PolkalinasPage({
                     <img
                       src={item.portada}
                       alt={item.name}
-                      className="size-full object-cover"
+                      className={`size-full object-cover ${
+                        item.estado === "VENDIDA" ? "opacity-60" : ""
+                      }`}
                     />
                   ) : (
                     <span className="grid size-full place-items-center px-2 text-center text-[13px] text-ink-muted">
                       Sin foto
                     </span>
                   )}
-                  <span className="absolute inset-x-2.5 bottom-2.5">
+                  {item.categoria && (
+                    <span className="absolute left-2.5 top-2.5 rounded-full bg-surface px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[.08em] text-ink-soft">
+                      {item.categoria}
+                    </span>
+                  )}
+                  <span className="absolute inset-x-2.5 bottom-2.5 flex">
                     <EstadoVidrieraBadge estado={item.estado} />
                   </span>
                 </div>
