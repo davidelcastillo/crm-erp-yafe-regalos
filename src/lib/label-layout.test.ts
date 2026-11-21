@@ -146,11 +146,13 @@ describe('label-layout.ts — posiciones', () => {
 });
 
 describe('label-layout.ts — medidas y colores de la plantilla (§S3)', () => {
-  test('usa los colores exactos medidos', () => {
-    expect(LABEL_BACKGROUND_COLOR).toBe('#fcd2d3');
-    expect(BOX_COLOR).toBe('#ffeff3');
-    expect(TEXT_COLOR).toBe('#6b2b43');
-    expect(CUT_MARK_COLOR).toBe('#000000');
+  test('usa la paleta de la marca Polkalina\'s', () => {
+    // Crema de fondo, rosa de las cajas y cacao del texto: los mismos tokens de
+    // la app (`globals.css`), no la paleta rosa/vino anterior.
+    expect(LABEL_BACKGROUND_COLOR).toBe('#FFF6F0');
+    expect(BOX_COLOR).toBe('#F2C4CC');
+    expect(TEXT_COLOR).toBe('#4A2C2A');
+    expect(CUT_MARK_COLOR).toBe('#4A2C2A');
   });
 
   test('respeta la geometría de cajas y las marcas de corte', () => {
@@ -166,11 +168,11 @@ describe('label-layout.ts — medidas y colores de la plantilla (§S3)', () => {
     expect(CODE_BOX_HEIGHT_MM).toBe(6.9);
     expect(CODE_BOX_RADIUS_MM).toBe(2.7);
     expect(CODE_MAX_WIDTH_RATIO).toBe(0.9);
-    // Texto: el tono de marca es de la plantilla; código e importe van aparte
-    // (L12: el usuario pidió el código más oscuro y el precio en negro).
-    expect(TEXT_COLOR).toBe('#6b2b43');
-    expect(CODE_TEXT_COLOR).toBe('#222222');
-    expect(PRICE_TEXT_COLOR).toBe('#000000');
+    // Texto: `$`, código e importe van todos en cacao (L12 sigue cumplido:
+    // el código y el precio se leen de lejos, ahora con el tono de la marca).
+    expect(TEXT_COLOR).toBe('#4A2C2A');
+    expect(CODE_TEXT_COLOR).toBe('#4A2C2A');
+    expect(PRICE_TEXT_COLOR).toBe('#4A2C2A');
 
     // Caja del precio: alto 44,5 % y arranca a 9 mm del borde superior, o sea
     // 1,1 mm después del pie de la caja del código (top medido en la plantilla).
@@ -187,7 +189,7 @@ describe('label-layout.ts — medidas y colores de la plantilla (§S3)', () => {
 
   test('deja el $, el handle y su lugar en la etiqueta', () => {
     expect(DOLLAR_INSET_MM).toBe(1.7);
-    expect(HANDLE_TEXT).toBe('@feria_conexx');
+    expect(HANDLE_TEXT).toBe("Polkalina's");
     expect(HANDLE_TOP_MM).toBe(PRICE_BOX_TOP_MM + PRICE_BOX_HEIGHT_MM);
     expect(HANDLE_MAX_WIDTH_RATIO).toBe(0.88);
   });

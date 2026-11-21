@@ -34,6 +34,11 @@ jest.mock("sweetalert2", () => ({
   fire: jest.fn(),
 }));
 
+// Etiquetas de prenda: la acción arma el PDF en el servidor (pdf-lib).
+jest.mock("@/actions/label-print", () => ({
+  generatePrendaLabels: jest.fn(),
+}));
+
 // Fotos de la prenda (T2): el componente real queda, se observa el helper que
 // dispara la subida y se responde la carga de las fotos existentes.
 jest.mock("@/components/ui/FotoUploader", () => ({
@@ -49,6 +54,7 @@ jest.mock("@/app/actions/foto", () => ({
 }));
 
 import { createPrenda, destacarPrenda, getPrenda, updatePrenda } from "@/app/actions/prenda";
+import { generatePrendaLabels } from "@/actions/label-print";
 import {
   createCategoriaPrenda,
   getCategoriaPrendaOptions,
@@ -71,6 +77,9 @@ const mockCrearCategoria = createCategoriaPrenda as jest.MockedFunction<
   typeof createCategoriaPrenda
 >;
 const mockSwal = Swal.fire as unknown as jest.Mock;
+const mockGeneratePrendaLabels = generatePrendaLabels as jest.MockedFunction<
+  typeof generatePrendaLabels
+>;
 
 const branches = [{ id: 1, name: "Depósito" }];
 
@@ -553,5 +562,90 @@ describe("PrendaForm: destacado de la portada", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(/no se pudo destacar/i);
     expect(mockUpdate).toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Etiquetas de prenda (pedido del dueño): el botón de la edición pregunta el
+ * tamaño y descarga una etiqueta por unidad de cada talle de la prenda.
+ */
+describe("PrendaForm: etiquetas de prenda", () => {
+  it("pregunta el tamaño y llama la acción con el elegido y los talles de la prenda", async () => {
+    URL.createObjectURL = jest.fn(() => "blob:test");
+    URL.revokeObjectURL = jest.fn();
+    const originalClick = HTMLAnchorElement.prototype.click;
+    HTMLAnchorElement.prototype.click = jest.fn();
+
+    try {
+      mockGet.mockResolvedValue({
+        success: true,
+        data: {
+          ...prenda,
+          esUnica: false,
+          talles: [
+            { talle: "S", cantidad: 2 },
+            { talle: "M", cantidad: 1 },
+          ],
+        },
+      } as never);
+      mockSwal.mockResolvedValueOnce({ isConfirmed: true, value: "mediana" });
+      mockGeneratePrendaLabels.mockResolvedValue({
+        success: true,
+        data: { pdfBase64: "JVBERi0xLjQ=", filename: "etiquetas-prenda-RPH014-mediana.pdf" },
+      } as never);
+
+      render(<PrendaForm prenda={producto} onClose={jest.fn()} onSuccess={jest.fn()} />);
+      await screen.findByDisplayValue("Campera de jean");
+
+      fireEvent.click(screen.getByRole("button", { name: /imprimir etiquetas/i }));
+
+      await waitFor(() =>
+        expect(mockSwal).toHaveBeenCalledWith(
+          expect.objectContaining({
+            input: "radio",
+            confirmButtonColor: "var(--palette-brand-action)",
+          })
+        )
+      );
+      await waitFor(() =>
+        expect(mockGeneratePrendaLabels).toHaveBeenCalledWith({
+          tamano: "mediana",
+          selections: [
+            { productId: 9, talle: "S", quantity: 2 },
+            { productId: 9, talle: "M", quantity: 1 },
+          ],
+        })
+      );
+    } finally {
+      HTMLAnchorElement.prototype.click = originalClick;
+    }
+  });
+
+  it("si se cancela el tamaño no genera nada", async () => {
+    mockSwal.mockResolvedValueOnce({ isConfirmed: false });
+
+    render(<PrendaForm prenda={producto} onClose={jest.fn()} onSuccess={jest.fn()} />);
+    await screen.findByDisplayValue("Campera de jean");
+
+    fireEvent.click(screen.getByRole("button", { name: /imprimir etiquetas/i }));
+
+    await waitFor(() => expect(mockSwal).toHaveBeenCalled());
+    expect(mockGeneratePrendaLabels).not.toHaveBeenCalled();
+  });
+
+  it("si la generación falla, el error queda visible y la prenda se puede seguir guardando", async () => {
+    mockSwal.mockResolvedValueOnce({ isConfirmed: true, value: "grande" });
+    mockGeneratePrendaLabels.mockResolvedValue({
+      success: false,
+      error: "El talle «XL» no pertenece a la prenda RPH014",
+    } as never);
+
+    render(<PrendaForm prenda={producto} onClose={jest.fn()} onSuccess={jest.fn()} />);
+    await screen.findByDisplayValue("Campera de jean");
+
+    fireEvent.click(screen.getByRole("button", { name: /imprimir etiquetas/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/no pertenece a la prenda/i);
+    expect(screen.getByRole("button", { name: /guardar prenda/i })).toBeEnabled();
   });
 });

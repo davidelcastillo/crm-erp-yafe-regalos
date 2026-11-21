@@ -14,6 +14,7 @@ import type {
   TaxonomyOption,
 } from "@/lib/validations/prendaTaxonomy";
 import { createPrenda, destacarPrenda, getPrenda, updatePrenda } from "@/app/actions/prenda";
+import { generatePrendaLabels } from "@/actions/label-print";
 import {
   createCategoriaPrenda,
   createCondicionPrenda,
@@ -85,6 +86,8 @@ export function PrendaForm({ prenda, branches = [], onClose, onSuccess }: Prenda
   const [cargandoOpciones, setCargandoOpciones] = useState(true);
   const [cargandoPrenda, setCargandoPrenda] = useState(isEdit);
   const [guardando, setGuardando] = useState(false);
+  /** Etiquetas de prenda: la acción arma el PDF en el servidor. */
+  const [imprimiendoEtiquetas, setImprimiendoEtiquetas] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<StockMovementReceipt | null>(null);
 
@@ -388,6 +391,77 @@ export function PrendaForm({ prenda, branches = [], onClose, onSuccess }: Prenda
     esUnica,
     publicadaEn,
   });
+
+  /** Descarga el PDF que devuelve la acción (mismo patrón que ExportWizard). */
+  const descargarPdf = (pdfBase64: string, filename: string) => {
+    const byteCharacters = atob(pdfBase64);
+    const byteNumbers = new Array(byteCharacters.length);
+    for (let i = 0; i < byteCharacters.length; i++) {
+      byteNumbers[i] = byteCharacters.charCodeAt(i);
+    }
+    const blob = new Blob([new Uint8Array(byteNumbers)], { type: "application/pdf" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  /**
+   * Etiquetas de prenda (modelo del dueño): pregunta el tamaño y descarga una
+   * etiqueta por unidad de cada talle de la prenda. No toca el guardado.
+   */
+  const imprimirEtiquetas = async () => {
+    if (!isEdit || imprimiendoEtiquetas) return;
+
+    const elegido = await Swal.fire({
+      title: "Tamaño de la etiqueta",
+      text: "Una etiqueta por unidad de cada talle.",
+      input: "radio",
+      inputOptions: { grande: "Grande 50 × 80 mm", mediana: "Mediana 35 × 58 mm" },
+      inputValue: "grande",
+      showCancelButton: true,
+      confirmButtonText: "Imprimir",
+      cancelButtonText: "Cancelar",
+      confirmButtonColor: "var(--palette-brand-action)",
+      cancelButtonColor: "var(--palette-secondary-gray)",
+    });
+    if (!elegido.isConfirmed) return;
+
+    const selections = talles
+      .map((fila) => ({
+        productId: prenda!.id,
+        talle: fila.talle.trim(),
+        quantity: esUnica ? 1 : Number(fila.cantidad),
+      }))
+      .filter((fila) => fila.talle !== "" && Number.isInteger(fila.quantity) && fila.quantity >= 1);
+    if (selections.length === 0) {
+      setError("Cargá al menos un talle para imprimir sus etiquetas");
+      return;
+    }
+
+    setError(null);
+    setImprimiendoEtiquetas(true);
+    try {
+      const resultado = await generatePrendaLabels({
+        selections,
+        tamano: elegido.value === "mediana" ? "mediana" : "grande",
+      });
+      if (!resultado.success) {
+        setError(resultado.error);
+        return;
+      }
+      descargarPdf(resultado.data.pdfBase64, resultado.data.filename);
+    } catch (err) {
+      console.error("Error printing prenda labels:", err);
+      setError("No se pudieron generar las etiquetas");
+    } finally {
+      setImprimiendoEtiquetas(false);
+    }
+  };
 
   const handleSubmit = async (evento: React.FormEvent) => {
     evento.preventDefault();
@@ -975,6 +1049,23 @@ export function PrendaForm({ prenda, branches = [], onClose, onSuccess }: Prenda
                   <div>
                     <span className={labelClass}>Código</span>
                     <p className="text-sm text-ink-muted">Se genera solo según la categoría (p. ej. RPH000).</p>
+                  </div>
+                )}
+
+                {isEdit && (
+                  <div>
+                    <p className={seccionClass}>Etiquetas</p>
+                    <button
+                      type="button"
+                      onClick={imprimirEtiquetas}
+                      disabled={imprimiendoEtiquetas}
+                      className="btn btn-secondary w-full"
+                    >
+                      {imprimiendoEtiquetas ? "Generando etiquetas…" : "Imprimir etiquetas"}
+                    </button>
+                    <p className="mt-1 text-xs text-ink-muted">
+                      Una etiqueta por unidad de cada talle, para cortar y colgar.
+                    </p>
                   </div>
                 )}
 

@@ -15,6 +15,7 @@ import {
 } from 'pdf-lib';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
+import { drawBrandLogo } from '@/lib/utils/pdf-logo';
 import { SHRIKHAND_TTF_BASE64 } from '@/lib/fonts/shrikhand';
 import { generateStockMovementPdf } from '@/lib/utils/stock-movement-pdf';
 import {
@@ -55,6 +56,25 @@ import {
   formatPrice,
   type LabelSlot,
 } from '@/lib/label-layout';
+import {
+  PRENDA_BRAND_TEXT,
+  PRENDA_CODE_PREFIX,
+  PRENDA_HOLE_FILL_COLOR,
+  PRENDA_LABEL_BACKGROUND_COLOR,
+  PRENDA_LABEL_BORDER_COLOR,
+  PRENDA_LABEL_LAYOUTS,
+  PRENDA_SHEET_HEIGHT_MM,
+  PRENDA_SHEET_WIDTH_MM,
+  PRENDA_TALLE_PREFIX,
+  PRENDA_TEXT_COLOR,
+  PRENDA_UNICA_COLOR,
+  PRENDA_UNICA_TEXT,
+  calculatePrendaLabelSlots,
+  calculatePrendaSheetCount,
+  type PrendaLabelLayout,
+  type PrendaLabelSize,
+  type PrendaLabelSlot,
+} from '@/lib/label-prenda-layout';
 
 export type LabelSelection = {
   productId: number;
@@ -417,6 +437,308 @@ export async function generateProductLabels(data: unknown): Promise<GenerateLabe
       };
     }
     console.error('Error generating product labels:', error);
+    return { success: false, error: 'Error al generar las etiquetas' };
+  }
+}
+
+// --- Etiquetas de prenda: dos tamaños, una etiqueta por talle (modelo del dueño) ---
+
+export type PrendaLabelSelection = {
+  productId: number;
+  talle: string;
+  quantity: number;
+};
+
+export type GeneratePrendaLabelsResult =
+  | { success: true; data: { pdfBase64: string; filename: string } }
+  | { success: false; error: string };
+
+const generatePrendaLabelsSchema = z.object({
+  selections: z
+    .array(
+      z.object({
+        productId: z.number().int().positive('Prenda inválida'),
+        talle: z.string().trim().min(1, 'Falta el talle'),
+        quantity: z
+          .number()
+          .int()
+          .min(1, 'La cantidad mínima es 1')
+          .max(999, 'La cantidad máxima es 999'),
+      })
+    )
+    .min(1, 'Seleccioná al menos un talle'),
+  tamano: z.enum(['grande', 'mediana']),
+});
+
+/** Lo único que dibuja una etiqueta de prenda. */
+type PrendaLabelContent = {
+  code: string;
+  talle: string;
+  price: number;
+  esUnica: boolean;
+};
+
+/** mm desde el borde superior de la hoja A4 vertical al borde inferior de pdf-lib. */
+const prendaYFromTop = (topMm: number) => mm(PRENDA_SHEET_HEIGHT_MM - topMm);
+
+/**
+ * Texto centrado en la etiqueta, con su **borde superior** en `topMm`: así la
+ * geometría del layout se lee de arriba abajo, igual que el modelo.
+ */
+const drawPrendaCenteredText = (
+  page: PDFPage,
+  {
+    centerXMm,
+    topMm,
+    text,
+    font,
+    sizePt,
+    maxWidthPt,
+    fill,
+  }: {
+    centerXMm: number;
+    topMm: number;
+    text: string;
+    font: PDFFont;
+    sizePt: number;
+    maxWidthPt: number;
+    fill: ReturnType<typeof rgb>;
+  }
+) => {
+  const size = fitFontSize(font, text, maxWidthPt, sizePt);
+  const width = font.widthOfTextAtSize(text, size);
+  const ascent = font.heightAtSize(size, { descender: false });
+  page.drawText(text, {
+    x: mm(centerXMm) - width / 2,
+    y: prendaYFromTop(topMm) - ascent,
+    size,
+    font,
+    color: fill,
+  });
+};
+
+/**
+ * Una etiqueta de prenda: borde cacao redondeado sobre fondo crema, agujero,
+ * frutilla, «Polkalina's», Código / Talle / $ y «ÚNICA» al pie si la prenda es
+ * única.
+ */
+const drawPrendaLabel = (
+  page: PDFPage,
+  layout: PrendaLabelLayout,
+  slot: PrendaLabelSlot,
+  content: PrendaLabelContent,
+  fonts: { display: PDFFont; regular: PDFFont; bold: PDFFont }
+) => {
+  const x = mm(slot.x);
+  const bottom = prendaYFromTop(slot.y + layout.heightMm);
+  const widthPt = mm(layout.widthMm);
+  const heightPt = mm(layout.heightMm);
+
+  // Borde cacao: un rectángulo redondeado cacao y el fondo crema encima.
+  drawRoundedRect(page, {
+    x,
+    y: bottom,
+    width: widthPt,
+    height: heightPt,
+    radius: mm(layout.cornerRadiusMm),
+    fill: color(PRENDA_LABEL_BORDER_COLOR),
+  });
+  const border = mm(layout.borderWidthMm);
+  drawRoundedRect(page, {
+    x: x + border,
+    y: bottom + border,
+    width: widthPt - 2 * border,
+    height: heightPt - 2 * border,
+    radius: mm(layout.cornerRadiusMm) - border,
+    fill: color(PRENDA_LABEL_BACKGROUND_COLOR),
+  });
+
+  const centerXMm = slot.x + layout.widthMm / 2;
+  const ink = color(PRENDA_TEXT_COLOR);
+  const maxWidthPt = mm(layout.widthMm - 2 * layout.contentPaddingMm);
+
+  const text = (topMm: number, value: string, font: PDFFont, sizePt: number) =>
+    drawPrendaCenteredText(page, {
+      centerXMm,
+      topMm,
+      text: value,
+      font,
+      sizePt,
+      maxWidthPt,
+      fill: ink,
+    });
+
+  // Agujero troquelado, arriba y centrado.
+  page.drawCircle({
+    x: mm(centerXMm),
+    y: prendaYFromTop(slot.y + layout.holeCenterTopMm),
+    size: mm(layout.holeRadiusMm),
+    color: color(PRENDA_HOLE_FILL_COLOR),
+    borderColor: color(PRENDA_LABEL_BORDER_COLOR),
+    borderWidth: mm(0.3),
+  });
+
+  drawBrandLogo(page, {
+    x: mm(centerXMm - layout.logoSizeMm / 2),
+    y: prendaYFromTop(slot.y + layout.logoTopMm),
+    size: mm(layout.logoSizeMm),
+  });
+
+  drawPrendaCenteredText(page, {
+    centerXMm,
+    topMm: slot.y + layout.brandTopMm,
+    text: PRENDA_BRAND_TEXT,
+    font: fonts.display,
+    sizePt: layout.brandFontSizePt,
+    maxWidthPt: mm(layout.brandMaxWidthMm),
+    fill: ink,
+  });
+
+  text(slot.y + layout.codeTopMm, PRENDA_CODE_PREFIX + content.code, fonts.regular, layout.lineFontSizePt);
+  text(slot.y + layout.talleTopMm, PRENDA_TALLE_PREFIX + content.talle, fonts.regular, layout.lineFontSizePt);
+  text(
+    slot.y + layout.priceTopMm,
+    `${CURRENCY_SYMBOL} ${formatPrice(content.price)}`,
+    fonts.bold,
+    layout.priceFontSizePt
+  );
+
+  if (content.esUnica) {
+    drawPrendaCenteredText(page, {
+      centerXMm,
+      topMm: slot.y + layout.unicaTopMm,
+      text: PRENDA_UNICA_TEXT,
+      font: fonts.bold,
+      sizePt: layout.unicaFontSizePt,
+      maxWidthPt,
+      fill: color(PRENDA_UNICA_COLOR),
+    });
+  }
+};
+
+/** Hojas A4 verticales con una etiqueta de prenda por unidad pedida. */
+const renderPrendaLabelsPdf = async (
+  labels: PrendaLabelContent[],
+  tamano: PrendaLabelSize
+): Promise<Uint8Array> => {
+  const pdfDoc = await PDFDocument.create();
+  pdfDoc.registerFontkit(fontkit);
+  const fonts = {
+    display: await pdfDoc.embedFont(Buffer.from(SHRIKHAND_TTF_BASE64, 'base64')),
+    regular: await pdfDoc.embedFont(StandardFonts.Helvetica),
+    bold: await pdfDoc.embedFont(StandardFonts.HelveticaBold),
+  };
+
+  const layout = PRENDA_LABEL_LAYOUTS[tamano];
+  const pages = Array.from(
+    { length: calculatePrendaSheetCount(tamano, labels.length) },
+    () => pdfDoc.addPage([mm(PRENDA_SHEET_WIDTH_MM), mm(PRENDA_SHEET_HEIGHT_MM)])
+  );
+
+  for (const slot of calculatePrendaLabelSlots(tamano, labels.length)) {
+    drawPrendaLabel(pages[slot.page], layout, slot, labels[slot.index], fonts);
+  }
+
+  return pdfDoc.save();
+};
+
+/** `etiquetas-prenda-<código o «varias»>-<tamaño>-<AAAAMMDD>.pdf` */
+const buildPrendaLabelsFileName = (code: string, tamano: PrendaLabelSize, date: Date) => {
+  const yyyy = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `etiquetas-prenda-${code}-${tamano}-${yyyy}${month}${day}.pdf`;
+};
+
+/**
+ * Re-lee las prendas del servidor y arma una etiqueta por unidad pedida. Un
+ * talle que no pertenece a la prenda se rechaza: la selección viene del cliente.
+ */
+const resolvePrendaLabels = async (
+  selections: PrendaLabelSelection[]
+): Promise<Resolved<{ code: string; labels: PrendaLabelContent[] }>> => {
+  const productIds = [...new Set(selections.map((selection) => selection.productId))];
+  const prendas = await prisma.product.findMany({
+    where: { id: { in: productIds }, kind: 'PRENDA' },
+    select: {
+      id: true,
+      code: true,
+      price: true,
+      prenda: { select: { esUnica: true, talles: { select: { talle: true } } } },
+    },
+  });
+
+  const byId = new Map(prendas.map((prenda) => [prenda.id, prenda]));
+  const labels: PrendaLabelContent[] = [];
+
+  for (const selection of selections) {
+    const prenda = byId.get(selection.productId);
+    if (!prenda?.prenda) {
+      return { ok: false, error: 'Prenda no encontrada' };
+    }
+    if (!prenda.prenda.talles.some((fila) => fila.talle === selection.talle)) {
+      return {
+        ok: false,
+        error: `El talle «${selection.talle}» no pertenece a la prenda ${prenda.code}`,
+      };
+    }
+
+    const content = {
+      code: prenda.code,
+      talle: selection.talle,
+      price: Number(prenda.price),
+      esUnica: prenda.prenda.esUnica,
+    };
+    for (let unit = 0; unit < selection.quantity; unit++) {
+      labels.push(content);
+    }
+  }
+
+  return {
+    ok: true,
+    data: {
+      code: productIds.length === 1 ? byId.get(productIds[0])!.code : 'varias',
+      labels,
+    },
+  };
+};
+
+/**
+ * Etiquetas de prenda para imprimir: hoja A4 vertical con la misma etiqueta
+ * repetida, en el tamaño elegido (grande 50 × 80 mm o mediana 35 × 58 mm).
+ *
+ * Una etiqueta por unidad de cada talle, con los datos re-leídos de la base; un
+ * talle que no es de la prenda se rechaza.
+ */
+export async function generatePrendaLabels(
+  data: unknown
+): Promise<GeneratePrendaLabelsResult> {
+  try {
+    const auth = await requireAdmin();
+    if (!auth.ok) return { success: false as const, error: auth.error };
+
+    const { selections, tamano } = generatePrendaLabelsSchema.parse(data);
+
+    const resolved = await resolvePrendaLabels(selections);
+    if (!resolved.ok) return { success: false, error: resolved.error };
+
+    const pdfBytes = await renderPrendaLabelsPdf(resolved.data.labels, tamano);
+
+    return {
+      success: true,
+      data: {
+        pdfBase64: Buffer.from(pdfBytes).toString('base64'),
+        filename: buildPrendaLabelsFileName(resolved.data.code, tamano, new Date()),
+      },
+    };
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return {
+        success: false,
+        error: error.issues.map((issue) => issue.message).join(', '),
+      };
+    }
+    console.error('Error generating prenda labels:', error);
     return { success: false, error: 'Error al generar las etiquetas' };
   }
 }

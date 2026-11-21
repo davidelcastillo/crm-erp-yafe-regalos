@@ -16,7 +16,7 @@ const NAV = [
   ["Nuevo", "/polkalinas/catalogo?categoria=nuevo"],
   ["Second hand", "/polkalinas/catalogo?categoria=second-hand"],
   ["Intervenido", "/polkalinas/catalogo?categoria=intervenido"],
-  ["Cositas", "/polkalinas/catalogo?categoria=cositas"],
+  ["Cositas", "/polkalinas/cositas"],
   ["Cómo comprar", "/polkalinas/ayuda/como-comprar"],
 ];
 
