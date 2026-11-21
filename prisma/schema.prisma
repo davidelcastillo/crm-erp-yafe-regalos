@@ -20,6 +20,9 @@ model Product {
   categoryId        Int?
   category          Category?           @relation(fields: [categoryId], references: [id])
   active            Boolean             @default(true)
+  // Destacado en la portada de la tienda: uno solo a la vez y solo si está
+  // publicado en Web (lo garantizan la acción y la home; la base no lo impone).
+  destacado         Boolean             @default(false)
   // Aditivo: una prenda es un Product con ficha PrendaDetalle (variante C).
   kind              ProductKind         @default(PRODUCT)
   prenda            PrendaDetalle?
