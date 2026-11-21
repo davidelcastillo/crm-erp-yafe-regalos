@@ -218,7 +218,15 @@ describe("InventarioPage — FAB crear producto (spec inventory-ui)", () => {
     fireEvent.click(screen.getByLabelText("Agregar producto"));
     fireEvent.click(await screen.findByRole("button", { name: /un producto/i }));
 
+    // Wizard: el paso 1 elige la sucursal (o «Sin sucursal») antes de la ficha.
     expect(await screen.findByText("Nuevo Producto")).toBeInTheDocument();
+    expect(screen.getByText(/paso 1 de 2/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /sin sucursal/i })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /sin sucursal/i }));
+    fireEvent.click(screen.getByRole("button", { name: /continuar/i }));
+
+    expect(screen.getByText(/paso 2 de 2/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/nombre/i)).toBeInTheDocument();
   });
 
@@ -280,9 +288,12 @@ describe("InventarioPage — FAB crear producto (spec inventory-ui)", () => {
       });
     });
 
-    // Abrir el FAB, elegir «Un producto» (paso previo, S5) y crear "Jabón de Avena".
+    // Abrir el FAB, elegir «Un producto» (paso previo, S5), pasar el wizard de
+    // sucursal (sin sucursal: el stock no es lo que se prueba acá) y crear "Jabón de Avena".
     fireEvent.click(screen.getByLabelText("Agregar producto"));
     fireEvent.click(await screen.findByRole("button", { name: /un producto/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /sin sucursal/i }));
+    fireEvent.click(screen.getByRole("button", { name: /continuar/i }));
     fireEvent.change(await screen.findByLabelText(/nombre/i), {
       target: { value: "Jabón de Avena" },
     });
