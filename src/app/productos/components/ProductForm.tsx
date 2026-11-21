@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Product } from "@prisma/client";
 import Swal from "sweetalert2";
@@ -245,8 +246,8 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
     "w-full px-4 py-3 rounded-xl border border-hairline focus:border-accent focus:ring-2 focus:ring-accent/30 outline-none transition-all";
   const labelClass = "block text-sm font-medium text-ink mb-2";
 
-  return (
-    <div className="fixed inset-0 bg-scrim-strong backdrop-blur-sm z-[60] flex items-end justify-center">
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-scrim-strong p-3 backdrop-blur-sm md:p-6">
       <div
         role="dialog"
         aria-modal="true"
@@ -577,6 +578,7 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

@@ -510,7 +510,7 @@ export function PrendaForm({ prenda, branches = [], onClose, onSuccess }: Prenda
   const sucursalElegida = branches.find((b) => b.id === branchId)?.name;
 
   return createPortal(
-    <div className="fixed inset-0 z-[60] flex items-end justify-center bg-scrim-strong backdrop-blur-sm">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 md:p-6 bg-scrim-strong backdrop-blur-sm">
       <div
         role="dialog"
         aria-modal="true"
