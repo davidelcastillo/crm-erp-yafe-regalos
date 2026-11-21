@@ -17,6 +17,7 @@ jest.mock("@/app/actions/prenda", () => ({
   createPrenda: jest.fn(),
   updatePrenda: jest.fn(),
   getPrenda: jest.fn(),
+  destacarPrenda: jest.fn(),
 }));
 
 jest.mock("@/app/actions/prendaTaxonomy", () => ({
@@ -47,7 +48,7 @@ jest.mock("@/app/actions/foto", () => ({
   getFotosProducto: jest.fn(async () => ({ success: true, data: [] })),
 }));
 
-import { createPrenda, getPrenda, updatePrenda } from "@/app/actions/prenda";
+import { createPrenda, destacarPrenda, getPrenda, updatePrenda } from "@/app/actions/prenda";
 import {
   createCategoriaPrenda,
   getCategoriaPrendaOptions,
@@ -65,6 +66,7 @@ const mockGetFotos = getFotosProducto as jest.MockedFunction<typeof getFotosProd
 const mockCreate = createPrenda as jest.MockedFunction<typeof createPrenda>;
 const mockUpdate = updatePrenda as jest.MockedFunction<typeof updatePrenda>;
 const mockGet = getPrenda as jest.MockedFunction<typeof getPrenda>;
+const mockDestacar = destacarPrenda as jest.MockedFunction<typeof destacarPrenda>;
 const mockCrearCategoria = createCategoriaPrenda as jest.MockedFunction<
   typeof createCategoriaPrenda
 >;
@@ -114,6 +116,7 @@ const prenda = {
   estilos: [4],
   medidas: [],
   publicadaEn: ["Web"],
+  destacado: false,
 };
 
 beforeEach(() => {
@@ -142,6 +145,10 @@ beforeEach(() => {
   });
   mockGet.mockResolvedValue({ success: true, data: prenda } as never);
   mockGetFotos.mockResolvedValue({ success: true, data: [] } as never);
+  mockDestacar.mockResolvedValue({
+    success: true,
+    data: { productId: 9, destacado: true },
+  } as never);
   mockSwal.mockResolvedValue({ isConfirmed: false });
 });
 
@@ -465,5 +472,86 @@ describe("PrendaForm: fotos (T2)", () => {
     expect(await screen.findByText("Portada")).toBeInTheDocument();
     expect(mockGetFotos).toHaveBeenCalledWith({ productId: 9 });
     expect(screen.getByRole("button", { name: /quitar foto 2/i })).toBeInTheDocument();
+  });
+});
+
+/**
+ * Destacado de la portada (pedido del dueño): solo se puede elegir en una
+ * prenda ya publicada en Web y se guarda aparte del formulario.
+ */
+describe("PrendaForm: destacado de la portada", () => {
+  it("en el alta el control está deshabilitado: se elige después de publicar", async () => {
+    renderAlta();
+    await esperarOpciones();
+    elegirSucursal();
+    await esperarFicha();
+
+    const control = screen.getByLabelText(/destacar en la portada/i);
+    expect(control).toBeDisabled();
+    expect(control).not.toBeChecked();
+    expect(screen.getByText(/se elige después de publicar/i)).toBeInTheDocument();
+  });
+
+  it("en la edición de una prenda sin Web está deshabilitado y avisa", async () => {
+    mockGet.mockResolvedValue({
+      success: true,
+      data: { ...prenda, publicadaEn: ["Instagram"] },
+    } as never);
+
+    render(<PrendaForm prenda={producto} onClose={jest.fn()} onSuccess={jest.fn()} />);
+
+    const control = await screen.findByLabelText(/destacar en la portada/i);
+    expect(control).toBeDisabled();
+    expect(screen.getByText(/publicá en web para destacarla/i)).toBeInTheDocument();
+  });
+
+  it("en la edición de una prenda publicada se habilita y guarda el cambio", async () => {
+    mockUpdate.mockResolvedValue({ success: true, data: { id: 9 } } as never);
+
+    render(<PrendaForm prenda={producto} onClose={jest.fn()} onSuccess={jest.fn()} />);
+
+    const control = await screen.findByLabelText(/destacar en la portada/i);
+    expect(control).toBeEnabled();
+    expect(control).not.toBeChecked();
+
+    fireEvent.click(control);
+    expect(control).toBeChecked();
+
+    fireEvent.click(screen.getByRole("button", { name: /guardar prenda/i }));
+
+    await waitFor(() =>
+      expect(mockDestacar).toHaveBeenCalledWith({ productId: 9, destacado: true })
+    );
+    // El guardado normal sigue ocurriendo: el destacado va aparte.
+    expect(mockUpdate).toHaveBeenCalled();
+  });
+
+  it("sin cambios en el destacado no llama la acción", async () => {
+    mockUpdate.mockResolvedValue({ success: true, data: { id: 9 } } as never);
+
+    render(<PrendaForm prenda={producto} onClose={jest.fn()} onSuccess={jest.fn()} />);
+    await screen.findByLabelText(/destacar en la portada/i);
+
+    fireEvent.click(screen.getByRole("button", { name: /guardar prenda/i }));
+
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalled());
+    expect(mockDestacar).not.toHaveBeenCalled();
+  });
+
+  it("si el destacado falla, la prenda ya quedó guardada y se muestra el error", async () => {
+    mockUpdate.mockResolvedValue({ success: true, data: { id: 9 } } as never);
+    mockDestacar.mockResolvedValue({
+      success: false,
+      error: "Solo se puede destacar una prenda activa y publicada en Web",
+    } as never);
+    const onClose = jest.fn();
+
+    render(<PrendaForm prenda={producto} onClose={onClose} onSuccess={jest.fn()} />);
+    fireEvent.click(await screen.findByLabelText(/destacar en la portada/i));
+    fireEvent.click(screen.getByRole("button", { name: /guardar prenda/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/no se pudo destacar/i);
+    expect(mockUpdate).toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
   });
 });

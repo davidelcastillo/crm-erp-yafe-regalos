@@ -116,6 +116,6 @@ describe("ninguna acción interna atiende sin sesión admin", () => {
     }
 
     expect(problems).toEqual([]);
-    expect(visited).toBe(103);
+    expect(visited).toBe(104);
   });
 });

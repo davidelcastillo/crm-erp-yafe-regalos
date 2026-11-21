@@ -13,7 +13,7 @@ import type {
   CategoriaPrendaOption,
   TaxonomyOption,
 } from "@/lib/validations/prendaTaxonomy";
-import { createPrenda, getPrenda, updatePrenda } from "@/app/actions/prenda";
+import { createPrenda, destacarPrenda, getPrenda, updatePrenda } from "@/app/actions/prenda";
 import {
   createCategoriaPrenda,
   createCondicionPrenda,
@@ -70,6 +70,10 @@ export function PrendaForm({ prenda, branches = [], onClose, onSuccess }: Prenda
   const [paso, setPaso] = useState(1);
   const enPasoSucursal = !isEdit && paso === 1;
   const [publicadaEn, setPublicadaEn] = useState<string[]>([]);
+  /** Destacado de la portada: solo en edición y solo si está publicada en Web. */
+  const [destacado, setDestacado] = useState(false);
+  /** Valor con el que abrió la ficha: la acción se llama solo si cambió. */
+  const [destacadoOriginal, setDestacadoOriginal] = useState(false);
   /** T2: fotos elegidas en el alta; se suben recién con la prenda creada (id). */
   const [fotosPendientes, setFotosPendientes] = useState<File[]>([]);
   const [code, setCode] = useState("");
@@ -160,6 +164,8 @@ export function PrendaForm({ prenda, branches = [], onClose, onSuccess }: Prenda
       setEsUnica(ficha.esUnica);
       setEsUnicaTocada(true);
       setPublicadaEn(ficha.publicadaEn);
+      setDestacado(ficha.destacado);
+      setDestacadoOriginal(ficha.destacado);
       setCode(ficha.code);
       } catch (err) {
         console.error("Error loading prenda:", err);
@@ -185,6 +191,14 @@ export function PrendaForm({ prenda, branches = [], onClose, onSuccess }: Prenda
     currency: "ARS",
     maximumFractionDigits: 0,
   }).format(precioNumero - costoNumero);
+
+  /** El destacado exige producto publicado en Web; en el alta todavía no existe. */
+  const puedeDestacar = isEdit && publicadaEn.includes("Web");
+  const ayudaDestacado = !isEdit
+    ? "Se elige después de publicar"
+    : puedeDestacar
+      ? "Reemplaza al destacado anterior de la portada."
+      : "Publicá en Web para destacarla";
 
   /** La categoría precarga «única» mientras nadie haya tocado la marca. */
   const cambiarCategoria = (id: number | null) => {
@@ -414,6 +428,15 @@ export function PrendaForm({ prenda, branches = [], onClose, onSuccess }: Prenda
       if (!resultado.success) {
         setError(resultado.error);
         return;
+      }
+      // El destacado se guarda aparte: si falla, la prenda ya quedó guardada.
+      if (puedeDestacar && destacado !== destacadoOriginal) {
+        const marcado = await destacarPrenda({ productId: prenda!.id, destacado });
+        if (!marcado.success) {
+          setError(`La prenda se guardó, pero no se pudo destacar: ${marcado.error}`);
+          return;
+        }
+        setDestacadoOriginal(destacado);
       }
       await Swal.fire({
         title: "Prenda actualizada",
@@ -968,6 +991,27 @@ export function PrendaForm({ prenda, branches = [], onClose, onSuccess }: Prenda
                       </label>
                     ))}
                   </div>
+                </div>
+
+                {/* Portada de la tienda: uno solo a la vez y solo si está en Web. */}
+                <div className="flex items-center justify-between gap-3 rounded-xl bg-surface-soft p-4">
+                  <div className="min-w-0">
+                    <label htmlFor="prenda-destacado" className="text-sm font-medium text-ink">
+                      Destacar en la portada
+                    </label>
+                    <p id="prenda-destacado-ayuda" className="text-xs text-ink-muted">
+                      {ayudaDestacado}
+                    </p>
+                  </div>
+                  <input
+                    id="prenda-destacado"
+                    type="checkbox"
+                    checked={puedeDestacar && destacado}
+                    onChange={(e) => setDestacado(e.target.checked)}
+                    disabled={!puedeDestacar}
+                    aria-describedby="prenda-destacado-ayuda"
+                    className="h-5 w-5 accent-accent"
+                  />
                 </div>
 
                 {/* T2: en la edición se administran las que ya tiene; en el alta

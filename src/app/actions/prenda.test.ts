@@ -10,7 +10,7 @@
  * 1, taxonomías inactivas rechazadas y una edición que reemplaza los hijos pero
  * nunca toca stock.
  */
-import { createPrenda, updatePrenda, getPrenda } from "./prenda";
+import { createPrenda, updatePrenda, getPrenda, destacarPrenda } from "./prenda";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth-guard";
 import { prefixLockKey } from "@/lib/utils/product-code";
@@ -20,8 +20,10 @@ jest.mock("@/lib/prisma", () => {
   const delegate = () => ({
     findMany: jest.fn(),
     findUnique: jest.fn(),
+    findFirst: jest.fn(),
     create: jest.fn(),
     update: jest.fn(),
+    updateMany: jest.fn(),
     createMany: jest.fn(),
     deleteMany: jest.fn(),
   });
@@ -551,6 +553,7 @@ describe("getPrenda", () => {
       name: "Campera de jean",
       description: "Talle M",
       price: 12000,
+      destacado: true,
       kind: "PRENDA",
       prenda: {
         esUnica: true,
@@ -586,8 +589,12 @@ describe("getPrenda", () => {
         estilos: [4],
         medidas: [{ medidaTipoId: 6, valorCm: 48.5 }],
         publicadaEn: ["Web"],
+        destacado: true,
       },
     });
+    // El destacado se lee del producto, no de la ficha de prenda.
+    const select = (prisma.product.findUnique as jest.Mock).mock.calls[0][0].select;
+    expect(select.destacado).toBe(true);
   });
 
   it("un producto normal no se lee como prenda", async () => {
@@ -598,5 +605,104 @@ describe("getPrenda", () => {
     });
 
     expect(await getPrenda(9)).toEqual({ success: false, error: "Prenda no encontrada" });
+  });
+});
+
+/**
+ * Destacado de la portada (pedido del dueño): uno solo a la vez, y solo si el
+ * producto está activo y publicado en Web.
+ */
+describe("destacarPrenda", () => {
+  /** Producto activo y publicado en Web: la única lectura previa que habilita. */
+  const publicable = { id: 10 };
+
+  it("rechaza sin sesión admin antes de validar y no toca Prisma", async () => {
+    mockRequireAdmin.mockResolvedValueOnce({ ok: false, error: "No autorizado" });
+
+    expect(await destacarPrenda({})).toEqual({ success: false, error: "No autorizado" });
+    expect(prisma.product.findFirst).not.toHaveBeenCalled();
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("un payload inválido devuelve el mensaje de Zod y no escribe", async () => {
+    const result = await destacarPrenda({ productId: 0, destacado: true });
+
+    expect(result).toEqual({ success: false, error: "Producto inválido" });
+    expect(prisma.product.findFirst).not.toHaveBeenCalled();
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("rechaza destacar una prenda que no está publicada en Web y no escribe", async () => {
+    (prisma.product.findFirst as jest.Mock).mockResolvedValue(null);
+
+    const result = await destacarPrenda({ productId: publicable.id, destacado: true });
+
+    expect(result).toEqual({
+      success: false,
+      error: "Solo se puede destacar una prenda activa y publicada en Web",
+    });
+    // La condición se filtra en la consulta: activo + publicación Web.
+    expect(prisma.product.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: publicable.id,
+        active: true,
+        publicaciones: { some: { canal: "Web" } },
+      },
+      select: { id: true },
+    });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(prisma.product.updateMany).not.toHaveBeenCalled();
+    expect(prisma.product.update).not.toHaveBeenCalled();
+  });
+
+  it("destacar desmarca al anterior en la misma transacción", async () => {
+    (prisma.product.findFirst as jest.Mock).mockResolvedValue(publicable);
+
+    const result = await destacarPrenda({ productId: publicable.id, destacado: true });
+
+    expect(result).toEqual({
+      success: true,
+      data: { productId: publicable.id, destacado: true },
+    });
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    // Primero el barrido de todos los destacados, después la marca de este:
+    // así nunca quedan dos a la vez.
+    expect((prisma.product.updateMany as jest.Mock).mock.calls[0][0]).toEqual({
+      where: { destacado: true },
+      data: { destacado: false },
+    });
+    expect((prisma.product.update as jest.Mock).mock.calls[0][0]).toEqual({
+      where: { id: publicable.id },
+      data: { destacado: true },
+    });
+    expect(
+      (prisma.product.updateMany as jest.Mock).mock.invocationCallOrder[0]
+    ).toBeLessThan((prisma.product.update as jest.Mock).mock.invocationCallOrder[0]);
+  });
+
+  it("desmarcar deja la portada sin destacado, sin mirar la publicación", async () => {
+    const result = await destacarPrenda({ productId: publicable.id, destacado: false });
+
+    expect(result).toEqual({
+      success: true,
+      data: { productId: publicable.id, destacado: false },
+    });
+    expect(prisma.product.findFirst).not.toHaveBeenCalled();
+    expect((prisma.product.updateMany as jest.Mock).mock.calls[0][0]).toEqual({
+      where: { destacado: true },
+      data: { destacado: false },
+    });
+    expect(prisma.product.update).not.toHaveBeenCalled();
+  });
+
+  it("un error de la transacción no devuelve éxito", async () => {
+    (prisma.product.findFirst as jest.Mock).mockResolvedValue(publicable);
+    (prisma.$transaction as jest.Mock).mockRejectedValueOnce(new Error("boom"));
+    const consoleError = jest.spyOn(console, "error").mockImplementation(() => {});
+
+    const result = await destacarPrenda({ productId: publicable.id, destacado: true });
+
+    consoleError.mockRestore();
+    expect(result).toEqual({ success: false, error: "Error al destacar la prenda" });
   });
 });

@@ -43,6 +43,11 @@ export type VidrieraItem = {
   talles?: string[];
   /** Estilos de la prenda; alimenta el filtro «Estilo» del catálogo. */
   estilos?: string[];
+  /** Destacado de la portada (`Product.destacado`): lo elige el dueño desde la
+   * ficha de la prenda. La home muestra el primero que venga en `true`.
+   * Opcional en el tipo por lo mismo que `categoriaId`: no rompe los fixtures
+   * de las páginas en rediseño; la action lo manda siempre. */
+  destacado?: boolean;
 };
 
 export type VidrieraFicha = VidrieraItem & {
@@ -70,6 +75,8 @@ const SELECT_LISTA = {
   name: true,
   price: true,
   kind: true,
+  // Destacado de la portada de la tienda: dato público del ítem.
+  destacado: true,
   // Categoría del producto normal (`Category`): la prenda trae la suya.
   category: { select: { id: true, name: true } },
   images: { orderBy: { position: "asc" }, select: { path: true, alt: true } },
@@ -104,6 +111,7 @@ type FilaPublica = {
   name: string;
   price: unknown;
   kind: "PRENDA" | "PRODUCT";
+  destacado: boolean;
   images: { path: string; alt: string | null }[];
   /** Solo lo pide `SELECT_FICHA`. */
   description?: string | null;
@@ -158,6 +166,7 @@ const aPublico = (
     talles: fila.prenda?.talles?.map((filaTalle) => filaTalle.talle) ?? [],
     // Estilos de la prenda (filtro del catálogo).
     estilos: fila.prenda?.estilos?.map((filaEstilo) => filaEstilo.estilo.name) ?? [],
+    destacado: fila.destacado,
   };
 };
 

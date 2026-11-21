@@ -48,6 +48,8 @@ type Fila = {
   price: number;
   kind: "PRENDA" | "PRODUCT";
   active: boolean;
+  /** Destacado de la portada (`Product.destacado`): dato público del ítem. */
+  destacado: boolean;
   /** Categoría propia del producto normal (las prendas usan la de prenda). */
   category: { id: number; name: string } | null;
   /** Canales de `PrendaPublicacion`: la vidriera solo muestra «Web». */
@@ -70,6 +72,7 @@ const CAMPERA: Fila = {
   price: 45000,
   kind: "PRENDA",
   active: true,
+  destacado: false,
   category: null,
   canales: ["Web"],
   images: [
@@ -92,6 +95,7 @@ const REMERA: Fila = {
   price: 12000,
   kind: "PRENDA",
   active: true,
+  destacado: false,
   category: null,
   // Publicada en Instagram, no en la web: no va a la vidriera.
   canales: ["Instagram"],
@@ -111,6 +115,7 @@ const PERFUME: Fila = {
   price: 30000,
   kind: "PRODUCT",
   active: true,
+  destacado: false,
   category: { id: 9, name: "Perfumes" },
   canales: ["Web"],
   images: [{ path: "hash-perfume", alt: null }],
@@ -258,6 +263,8 @@ describe("getVidriera — qué se publica (S2)", () => {
       name: true,
       price: true,
       kind: true,
+      // Destacado de la portada: público y opt-in (uno solo a la vez).
+      destacado: true,
       // Categoría propia del producto normal (`Category`): dato público del ítem.
       category: { select: { id: true, name: true } },
       images: {
@@ -295,7 +302,21 @@ describe("getVidriera — qué se publica (S2)", () => {
       categoriaId: 7,
       talles: ["M", "S"],
       estilos: [],
+      destacado: false,
     });
+  });
+
+  it("expone el destacado de la portada de cada ítem", async () => {
+    CAMPERA.destacado = true;
+    try {
+      const resultado = await getVidriera();
+      if (!resultado.success) throw new Error("la vidriera tendría que responder");
+
+      expect(resultado.data.items.find((item) => item.code === "PK-1")?.destacado).toBe(true);
+      expect(resultado.data.items.find((item) => item.code === "AR-1")?.destacado).toBe(false);
+    } finally {
+      CAMPERA.destacado = false;
+    }
   });
 
   it("un producto normal llega con su categoría de producto", async () => {
@@ -447,6 +468,7 @@ describe("getVidrieraItem — ficha pública (T5)", () => {
       detalleCondicion: "Con marcas en el ruedo",
       talles: ["M", "S"],
       estilos: [],
+      destacado: false,
       fotos: [
         {
           url: expect.stringMatching(/\/product-images\/1\/hash-portada_lg\.webp$/),
@@ -510,6 +532,7 @@ describe("getVidrieraItem — ficha pública (T5)", () => {
       detalleCondicion: null,
       talles: [],
       estilos: [],
+      destacado: false,
       fotos: [
         {
           url: expect.stringMatching(/\/product-images\/3\/hash-perfume_lg\.webp$/),
