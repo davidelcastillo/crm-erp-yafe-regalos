@@ -7,7 +7,7 @@
  * Las acciones de lectura se mockean: la consulta y el contrato de datos
  * públicos se prueban en `src/app/actions/vidriera.test.ts`.
  */
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 
 import FichaPage from "@/app/polkalinas/[id]/page";
 import CatalogoPage from "@/app/polkalinas/catalogo/page";
@@ -95,10 +95,11 @@ describe("home /polkalinas", () => {
       "href",
       "/polkalinas/catalogo"
     );
-    expect(screen.getByRole("link", { name: /cómo comprar/i })).toHaveAttribute(
-      "href",
-      "#comprar"
-    );
+    // El header y el footer también tienen «Cómo comprar»: el del hero es el
+    // único con el ancla de la propia página.
+    expect(
+      within(screen.getByRole("main")).getByRole("link", { name: /cómo comprar/i })
+    ).toHaveAttribute("href", "#comprar");
   });
 
   it("muestra la pieza destacada del hero con su nombre y su precio", async () => {
@@ -140,11 +141,14 @@ describe("home /polkalinas", () => {
   it("las categorías llevan al catálogo filtrado y «Cositas» a los productos", async () => {
     render(await HomePage());
 
-    expect(screen.getByRole("link", { name: /^Camperas/i })).toHaveAttribute(
+    // El nav de la tienda también tiene «Cositas»: la tarjeta está en el main.
+    const main = within(screen.getByRole("main"));
+
+    expect(main.getByRole("link", { name: /^Camperas/i })).toHaveAttribute(
       "href",
       "/polkalinas/catalogo?categoria=7"
     );
-    expect(screen.getByRole("link", { name: /^Cositas/i })).toHaveAttribute(
+    expect(main.getByRole("link", { name: /^Cositas/i })).toHaveAttribute(
       "href",
       "/polkalinas/catalogo?tipo=cositas"
     );
@@ -158,7 +162,9 @@ describe("home /polkalinas", () => {
 
     render(await HomePage());
 
-    expect(screen.queryByRole("link", { name: /^Cositas/i })).not.toBeInTheDocument();
+    expect(
+      within(screen.getByRole("main")).queryByRole("link", { name: /^Cositas/i })
+    ).not.toBeInTheDocument();
   });
 });
 
@@ -233,9 +239,14 @@ describe("catálogo /polkalinas/catalogo", () => {
     );
 
     expect(screen.getByRole("heading", { level: 1 }).className).toContain("font-display");
-    // La franja piano del footer son teclas blancas y negras, no una imagen.
-    expect(container.querySelectorAll('[data-testid="franja-piano"] span')).toHaveLength(14);
-    expect(container.querySelectorAll('[data-testid="franja-piano"] i')).toHaveLength(10);
+    // Las franjas piano son teclas blancas y negras, no una imagen: una bajo el
+    // header y otra arriba del footer, como el mockup.
+    const franjas = container.querySelectorAll('[data-testid="franja-piano"]');
+    expect(franjas).toHaveLength(2);
+    franjas.forEach((franja) => {
+      expect(franja.querySelectorAll("span")).toHaveLength(14);
+      expect(franja.querySelectorAll("i")).toHaveLength(10);
+    });
   });
 
   it("deja el precio al final de la tarjeta, debajo del nombre y la meta", async () => {
@@ -257,7 +268,9 @@ describe("catálogo /polkalinas/catalogo", () => {
     expect(screen.getByRole("link", { name: /Perfume floral/ })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /Campera de jean/ })).not.toBeInTheDocument();
 
-    const cositas = screen.getByRole("link", { name: "Cositas" });
+    // El nav de la tienda también tiene «Cositas»: el chip está en su propio nav.
+    const chips = screen.getByRole("navigation", { name: "Categorías" });
+    const cositas = within(chips).getByRole("link", { name: "Cositas" });
     expect(cositas).toHaveAttribute("aria-current", "page");
     expect(cositas).toHaveAttribute("href", "/polkalinas/catalogo?tipo=cositas");
     expect(getVidriera).toHaveBeenCalledWith({ categoriaId: undefined, q: undefined });
@@ -270,9 +283,10 @@ describe("catálogo /polkalinas/catalogo", () => {
       "href",
       "/polkalinas"
     );
+    // El nav del header arranca en «Nuevo», el catálogo filtrado por categoría.
     expect(
-      screen.getByRole("navigation", { name: /tienda/i }).querySelector("a")
-    ).toHaveAttribute("href", "/polkalinas/catalogo");
+      within(screen.getByRole("navigation", { name: /tienda/i })).getAllByRole("link")[0]
+    ).toHaveAttribute("href", "/polkalinas/catalogo?categoria=nuevo");
   });
 
   it("busca por texto desde el formulario", async () => {
@@ -353,7 +367,8 @@ describe("ficha /polkalinas/[id]", () => {
   it("cierra con la franja piano, como el catálogo", async () => {
     const { container } = render(await FichaPage({ params: Promise.resolve({ id: "1" }) }));
 
-    expect(container.querySelectorAll('[data-testid="franja-piano"]')).toHaveLength(1);
+    // Header y footer: el piano es el mismo en las dos puntas de la página.
+    expect(container.querySelectorAll('[data-testid="franja-piano"]')).toHaveLength(2);
   });
 
   it("el botón de WhatsApp lleva el número del dueño y el mensaje con nombre y código", async () => {
