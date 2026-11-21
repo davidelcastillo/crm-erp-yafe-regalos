@@ -106,7 +106,10 @@ export default async function FichaVidrieraPage({
               $ {formatPrice(item.price)}
             </p>
 
-            {item.talles.length > 0 ? (
+            {/* Una pieza vendida no se puede comprar: en su lugar, el estado ya
+              lo comunica el badge. Lo mismo si está agotada. */}
+            {item.estado === "VENDIDA" || item.estado === "AGOTADO" ? null : item.talles
+                .length > 0 ? (
               <SelectorTalle nombre={item.name} codigo={item.code} talles={item.talles} />
             ) : (
               <BotonWhatsApp nombre={item.name} codigo={item.code} />
