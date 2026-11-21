@@ -8,8 +8,6 @@ export const AYUDA = [
   { etiqueta: "Cómo comprar", href: "/polkalinas/ayuda/como-comprar" },
   { etiqueta: "Envíos y retiros", href: "/polkalinas/ayuda/envios-y-retiros" },
   { etiqueta: "Medios de pago", href: "/polkalinas/ayuda/medios-de-pago" },
-  { etiqueta: "Guía de talles", href: "/polkalinas/ayuda/guia-de-talles" },
-  { etiqueta: "Cambios", href: "/polkalinas/ayuda/cambios" },
 ];
 
 export function IndiceAyuda() {

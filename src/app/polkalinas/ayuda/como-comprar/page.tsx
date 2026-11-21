@@ -5,9 +5,9 @@ import { LinkWhatsApp, PaginaAyuda, Seccion } from "../../components/ayuda/Pagin
  * sin fecha de drop ni stock inventado. Se coordina todo por WhatsApp.
  */
 const PASOS = [
-  { titulo: "Elegí", texto: "Mirá el catálogo y quedate con la prenda o la cosita que te guste." },
+  { titulo: "Elegí", texto: "Mirá el catálogo y quedate con la prenda o el producto que más te guste." },
   { titulo: "Escribinos", texto: "Se abre WhatsApp con tu consulta ya escrita." },
-  { titulo: "Pagá", texto: "Transferencia, Mercado Pago o efectivo en el local." },
+  { titulo: "Pagá", texto: "Transferencia o efectivo en el local." },
   { titulo: "Recibí", texto: "Retiro en Salta o envío a todo el país." },
 ];
 
@@ -16,7 +16,7 @@ export default function ComoComprarPage() {
     <PaginaAyuda titulo="Cómo comprar">
       <p>
         Comprar en {"Polkalina's"} es simple: elegís, nos escribís por WhatsApp y coordinamos el
-        pago y la entrega. Cada prenda es única, así que si te gusta algo, mejor no dormir.
+        pago y la entrega. Cada prenda es única, así que si te gusta algo, escribinos.
       </p>
 
       <Seccion titulo="Los pasos">
@@ -41,7 +41,7 @@ export default function ComoComprarPage() {
           ciudad o cómo reservarla.
         </p>
         {/* TODO: el dueño todavía no pasó el horario de atención por WhatsApp. */}
-        <p className="text-ink-muted">Respondemos dentro del horario [HORARIO].</p>
+        <p className="text-ink-muted">Respondemos dentro del horario de atención comercial.</p>
         <LinkWhatsApp />
       </Seccion>
     </PaginaAyuda>

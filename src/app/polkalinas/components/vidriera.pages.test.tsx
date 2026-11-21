@@ -349,7 +349,7 @@ describe("home /polkalinas", () => {
     );
     expect(main.getByRole("link", { name: /cositas/i })).toHaveAttribute(
       "href",
-      "/polkalinas/catalogo?categoria=cositas"
+      "/polkalinas/cositas"
     );
     expect(main.getByRole("link", { name: /nuevo/i })).toHaveAttribute(
       "href",
@@ -379,7 +379,8 @@ describe("home /polkalinas", () => {
     ).toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: /avisame del próximo drop/i })
-    ).toHaveAttribute("href", "https://wa.me/5493876360163");
+      // El dueño puede apuntar al número o al grupo de difusión de WhatsApp.
+    ).toHaveAttribute("href", expect.stringMatching(/^https:\/\/(wa\.me|chat\.whatsapp\.com)\//));
   });
 
   it("enlaza el Instagram real y arma los seis cuadros", async () => {

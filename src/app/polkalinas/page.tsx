@@ -22,7 +22,7 @@ export const dynamic = "force-dynamic";
 const PASOS = [
   { titulo: "Elegí", texto: "Mirá el catálogo y quedate con la prenda que te guste." },
   { titulo: "Escribinos", texto: "Se abre WhatsApp con tu consulta ya escrita." },
-  { titulo: "Pagá", texto: "Transferencia, Mercado Pago o efectivo en el local." },
+  { titulo: "Pagá", texto: "Transferencia o efectivo en el local." },
   { titulo: "Recibí", texto: "Retiro en Salta o envío a todo el país." },
 ];
 

@@ -18,7 +18,7 @@ export function ProximoDrop({ fotos }: { fotos: string[] }) {
       <div className="mx-auto flex w-full max-w-[1240px] flex-col items-stretch gap-6 px-4 py-12 md:flex-row md:items-center md:px-10">
         <div className="flex flex-1 flex-col items-start gap-3.5 rounded-[22px] bg-background p-7">
           <p className="text-[13px] font-semibold tracking-[.18em] text-accent uppercase">
-            Próximo drop
+            Grupo de WhatsApp
           </p>
           <h2
             id="proximo-drop"
@@ -27,37 +27,16 @@ export function ProximoDrop({ fotos }: { fotos: string[] }) {
             Las prendas únicas <span className="italic">vuelan.</span>
           </h2>
           <p className="max-w-[46ch] text-[15px] text-ink">
-            Sumate a la lista de difusión y te avisamos por WhatsApp antes que nadie.
+            Sumate al grupo de WhatsApp y te avisamos antes que nadie.
           </p>
           <a
-            href={`https://wa.me/${WHATSAPP_VIDRIERA}`}
+            href={`https://chat.whatsapp.com/D5Rv0Ym9tve4stjBVRT3y7?s=cl&p=a&mlu=4&ilr=4&utm_source=ig&utm_medium=social&utm_content=link_in_bio&fbclid=PAZXh0bgNhZW0CMTEAcGRvZgJzcnRjBmFwcF9pZA85MzY2MTk3NDMzOTI0NTkAAae9pONWG9P3yOqXfS7eNUryVpSnE6AyFVu4PO0FZKZ95eOvuoyAuldfjYwR6g_aem_kKxdV_0yRiQMfhIsRvzlZg`}
             target="_blank"
             rel="noreferrer"
             className="inline-flex min-h-11 items-center justify-center rounded-full border-2 border-ink bg-ink px-6 text-[15px] font-semibold text-background hover:bg-accent hover:border-accent focus-visible:ring-2 focus-visible:ring-ink focus-visible:outline-hidden"
           >
             Avisame del próximo drop
           </a>
-        </div>
-
-        <div className="grid flex-1 grid-cols-3 gap-2.5 self-stretch">
-          {[0, 1, 2].map((indice) =>
-            fotos[indice] ? (
-              /* eslint-disable-next-line @next/next/no-img-element */
-              <img
-                key={indice}
-                src={fotos[indice]}
-                alt=""
-                className="aspect-[3/4] w-full rounded-[14px] object-cover"
-              />
-            ) : (
-              <div
-                key={indice}
-                aria-hidden="true"
-                style={LUNARES("crema")}
-                className="aspect-[3/4] w-full rounded-[14px] bg-background"
-              />
-            )
-          )}
         </div>
       </div>
     </section>

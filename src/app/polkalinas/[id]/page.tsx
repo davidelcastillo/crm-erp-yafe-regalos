@@ -32,7 +32,7 @@ const INFORMACION = [
   // TODO: el dueño todavía no pasó la dirección ni el horario del punto físico.
   {
     titulo: "Retiro en Salta",
-    texto: "En el punto físico: [DIRECCIÓN] · [HORARIO]",
+    texto: "En el punto físico: Punto de retiro: Punto Rosa · BALCARCE 39 - GALERIA AUGUSTO - Salta, Argentina · LUNES A VIERNES DE 9.30 A 21.00 HS",
     icono: "M12 21s-7-6-7-11a7 7 0 0 1 14 0c0 5-7 11-7 11z M12 7a3 3 0 1 0 0 6a3 3 0 1 0 0-6z",
   },
   {

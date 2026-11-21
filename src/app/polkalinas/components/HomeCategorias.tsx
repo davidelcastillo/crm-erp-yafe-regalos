@@ -47,7 +47,11 @@ export function HomeCategorias() {
         {CATEGORIAS.map((categoria) => (
           <li key={categoria.slug} className="min-w-0">
             <Link
-              href={`/polkalinas/catalogo?categoria=${categoria.slug}`}
+              href={
+                categoria.slug === "cositas"
+                  ? "/polkalinas/cositas"
+                  : `/polkalinas/catalogo?categoria=${categoria.slug}`
+              }
               className={`flex min-h-[160px] flex-col justify-between gap-3 rounded-[18px] border p-5 ${categoria.clases}`}
             >
               <Marca size={40} corona={categoria.corona} wordmark={false} />

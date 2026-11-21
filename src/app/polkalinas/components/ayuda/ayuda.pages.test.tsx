@@ -5,18 +5,14 @@
 import { render, screen, within } from "@testing-library/react";
 
 import AyudaLayout from "@/app/polkalinas/ayuda/layout";
-import Cambios from "@/app/polkalinas/ayuda/cambios/page";
 import ComoComprar from "@/app/polkalinas/ayuda/como-comprar/page";
 import EnviosYRetiros from "@/app/polkalinas/ayuda/envios-y-retiros/page";
-import GuiaDeTalles from "@/app/polkalinas/ayuda/guia-de-talles/page";
 import MediosDePago from "@/app/polkalinas/ayuda/medios-de-pago/page";
 
 const PAGINAS = [
   ["/polkalinas/ayuda/como-comprar", "Cómo comprar", ComoComprar],
   ["/polkalinas/ayuda/envios-y-retiros", "Envíos y retiros", EnviosYRetiros],
   ["/polkalinas/ayuda/medios-de-pago", "Medios de pago", MediosDePago],
-  ["/polkalinas/ayuda/guia-de-talles", "Guía de talles", GuiaDeTalles],
-  ["/polkalinas/ayuda/cambios", "Cambios", Cambios],
 ] as const;
 
 const AYUDA = PAGINAS.map(([ruta]) => ruta);

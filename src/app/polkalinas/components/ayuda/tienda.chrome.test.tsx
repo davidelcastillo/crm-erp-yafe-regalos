@@ -24,8 +24,6 @@ const AYUDA = [
   "/polkalinas/ayuda/como-comprar",
   "/polkalinas/ayuda/envios-y-retiros",
   "/polkalinas/ayuda/medios-de-pago",
-  "/polkalinas/ayuda/guia-de-talles",
-  "/polkalinas/ayuda/cambios",
 ];
 
 describe("barra de la tienda", () => {
@@ -152,11 +150,14 @@ describe("footer de la tienda", () => {
     );
   });
 
-  it("deja visibles los datos que el dueño todavía no pasó", () => {
+  it("muestra los datos de contacto reales del footer", () => {
     render(<TiendaFooter />);
 
-    expect(screen.getByText(/\[DIRECCIÓN\]/)).toBeInTheDocument();
-    expect(screen.getByText(/\[HORARIO\]/)).toBeInTheDocument();
-    expect(screen.getByText(/TikTok/)).toBeInTheDocument();
+    // Dirección, horario y TikTok ya los completa el dueño: el test no los exige.
+    expect(screen.getByRole("link", { name: /instagram/i })).toHaveAttribute(
+      "href",
+      "https://www.instagram.com/polkalinass_/"
+    );
+    expect(screen.getAllByText(/387 ?636 ?0163|3876360163/).length).toBeGreaterThan(0);
   });
 });

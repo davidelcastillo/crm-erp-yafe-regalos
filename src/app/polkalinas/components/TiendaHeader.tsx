@@ -20,7 +20,7 @@ const NAV = [
   { etiqueta: "Nuevo", href: "/polkalinas/catalogo?categoria=nuevo" },
   { etiqueta: "Second hand", href: "/polkalinas/catalogo?categoria=second-hand" },
   { etiqueta: "Intervenido", href: "/polkalinas/catalogo?categoria=intervenido" },
-  { etiqueta: "Cositas", href: "/polkalinas/catalogo?categoria=cositas" },
+  { etiqueta: "Cositas", href: "/polkalinas/cositas" },
   { etiqueta: "Cómo comprar", href: "/polkalinas/ayuda/como-comprar" },
 ];
 
@@ -30,11 +30,12 @@ const AYUDA = [
   { etiqueta: "Cómo comprar", href: "/polkalinas/ayuda/como-comprar" },
   { etiqueta: "Envíos y retiros", href: "/polkalinas/ayuda/envios-y-retiros" },
   { etiqueta: "Medios de pago", href: "/polkalinas/ayuda/medios-de-pago" },
-  { etiqueta: "Guía de talles", href: "/polkalinas/ayuda/guia-de-talles" },
-  { etiqueta: "Cambios", href: "/polkalinas/ayuda/cambios" },
 ];
 
 const INSTAGRAM = "https://www.instagram.com/polkalinass_/";
+
+const DIRECCION_DEL_PUNTO_FISICO = "https://maps.app.goo.gl/m1yT6F6qZHr4PT9N8";
+const TIKTOK = "https://www.tiktok.com/@polkalinas?_r=1&_t=ZS-9BbE4SdzB7X";
 
 const ICONO = "size-[22px]";
 const BOTON_ICONO =
@@ -309,13 +310,26 @@ export function TiendaFooter() {
             Instagram @polkalinass_
           </a>
           {/* TODO: el dueño todavía no pasó el usuario de TikTok. */}
-          <span className="block py-1 text-[15px] text-accent-soft">TikTok @[USUARIO]</span>
+          <a
+            href={TIKTOK}
+            target="_blank"
+            rel="noreferrer"
+            className="block py-1 text-[15px] text-background hover:text-accent-soft"
+          >
+            TikTok @polkalinas
+          </a>
           {/* TODO: el dueño todavía no pasó la dirección del punto físico. */}
-          <span className="block py-1 text-[15px] text-accent-soft">
-            Punto físico: [DIRECCIÓN]
-          </span>
+          <a
+            href={DIRECCION_DEL_PUNTO_FISICO}
+            target="_blank"
+            rel="noreferrer"
+            className="block py-1 text-[15px] text-background hover:text-accent-soft"
+          >
+            Punto físico: Punto Rosa · BALCARCE 39 - GALERIA AUGUSTO - Salta, Argentina
+          </a>
           {/* TODO: el dueño todavía no pasó los horarios de atención. */}
-          <span className="block py-1 text-[15px] text-accent-soft">Horario: [HORARIO]</span>
+          <span className="block py-1 text-[15px] text-accent-soft">Horario: LUNES A VIERNES DE 9.30 A 21.00 HS
+SABADOS DE 9.30 A 13 Y DE 17 A 21 HS.</span>
         </div>
       </div>
 
