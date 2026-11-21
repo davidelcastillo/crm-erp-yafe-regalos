@@ -21,9 +21,12 @@ const LUNARES = [
 export function Marca({
   size = 39,
   corona = "cacao",
+  wordmark = true,
 }: {
   size?: number;
   corona?: keyof typeof CORONA;
+  /** `false` para la frutilla sola (tarjetas de categoría del mockup). */
+  wordmark?: boolean;
 }) {
   return (
     <span className="inline-flex items-center gap-2">
@@ -41,9 +44,11 @@ export function Marca({
         ))}
       </svg>
       {/* El wordmark del mockup mide ~0,77 del SVG (39/30, 44/34, 31/24). */}
-      <b className="font-display leading-none italic" style={{ fontSize: Math.round(size * 0.77) }}>
-        {"Polkalina's"}
-      </b>
+      {wordmark && (
+        <b className="font-display leading-none italic" style={{ fontSize: Math.round(size * 0.77) }}>
+          {"Polkalina's"}
+        </b>
+      )}
     </span>
   );
 }

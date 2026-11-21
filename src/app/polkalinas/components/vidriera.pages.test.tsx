@@ -13,6 +13,7 @@ import FichaPage from "@/app/polkalinas/[id]/page";
 import CatalogoPage from "@/app/polkalinas/catalogo/page";
 import HomePage from "@/app/polkalinas/page";
 import { EstadoVidrieraBadge } from "@/app/polkalinas/components/EstadoVidrieraBadge";
+import { ProductoCard } from "@/app/polkalinas/components/ProductoCard";
 import { linkConsulta } from "@/app/polkalinas/components/whatsapp";
 import type { VidrieraFicha, VidrieraItem } from "@/app/actions/vidriera";
 
@@ -86,28 +87,100 @@ beforeEach(() => {
   getVidrieraItem.mockResolvedValue({ success: true, data: FICHA });
 });
 
+describe("ProductoCard", () => {
+  it("muestra el talle en lugar del código", () => {
+    render(<ProductoCard item={{ ...ITEMS[0], talles: ["M"] }} />);
+
+    expect(screen.getByText("Talle M · única")).toBeInTheDocument();
+    expect(screen.queryByText(/PK-1/)).not.toBeInTheDocument();
+  });
+
+  it("con varios talles los lista juntos", () => {
+    render(<ProductoCard item={{ ...ITEMS[0], talles: ["S", "M", "L"] }} />);
+
+    expect(screen.getByText("Talles S, M, L")).toBeInTheDocument();
+  });
+
+  it("un producto normal muestra su categoría como meta", () => {
+    render(<ProductoCard item={{ ...ITEMS[1], categoria: "Perfumes" }} />);
+
+    expect(screen.getByText("Perfumes", { selector: "p" })).toBeInTheDocument();
+  });
+
+  it("lleva el nombre en Fraunces, la etiqueta sobre la foto y el precio al final", () => {
+    const { container } = render(<ProductoCard item={ITEMS[0]} />);
+
+    expect(screen.getByText("Campera de jean").className).toContain("font-display");
+    // La etiqueta vive dentro del hueco de la foto (arriba a la izquierda).
+    expect(screen.getByText("Camperas", { selector: "span" })).toHaveClass(
+      "absolute",
+      "bg-background"
+    );
+    const precio = container.querySelector("p:last-child");
+    expect(precio).toHaveTextContent("$ 45.000,00");
+  });
+
+  it("atinúa toda la tarjeta cuando la prenda está vendida", () => {
+    render(<ProductoCard item={ITEMS[2]} />);
+
+    expect(screen.getByRole("link", { name: /pollera escocesa/i }).className).toContain("opacity-55");
+    expect(screen.getByRole("link", { name: /pollera escocesa/i }).className.split(" ")).not.toContain(
+      "opacity-60"
+    );
+  });
+
+  it("sin foto el hueco son lunares, nunca el cuadro gris", () => {
+    render(<ProductoCard item={ITEMS[1]} />);
+
+    const foto = screen.getByTestId("prod-foto");
+    expect(foto.style.backgroundImage).toContain("radial-gradient");
+    expect(foto.className).not.toContain("bg-surface-strong");
+  });
+});
+
 describe("home /polkalinas", () => {
   it("abre con el hero del mockup en Fraunces y los dos CTA", async () => {
     render(await HomePage());
 
-    expect(screen.getByRole("heading", { level: 1 }).className).toContain("font-display");
+    const h1 = screen.getByRole("heading", { level: 1 });
+    expect(h1.className).toContain("font-display");
+    expect(h1).toHaveTextContent("Segundas oportunidades para prendas hermosas.");
+    // La parte destacada del mockup va en itálica.
+    expect(within(h1).getByText("oportunidades")).toHaveClass("italic");
+
     expect(screen.getByRole("link", { name: /ver catálogo/i })).toHaveAttribute(
       "href",
       "/polkalinas/catalogo"
     );
-    // El header y el footer también tienen «Cómo comprar»: el del hero es el
-    // único con el ancla de la propia página.
+    // El header y el footer también tienen «Cómo comprar»: el del hero es el del main.
     expect(
       within(screen.getByRole("main")).getByRole("link", { name: /cómo comprar/i })
-    ).toHaveAttribute("href", "#comprar");
+    ).toHaveAttribute("href", "/polkalinas/ayuda/como-comprar");
   });
 
-  it("muestra la pieza destacada del hero con su nombre y su precio", async () => {
+  it("cuelga la etiqueta de la primera pieza publicada, con su agujero y su precio", async () => {
     render(await HomePage());
 
     // El colgante del mockup: la foto del hero es decorativa, el dato es texto.
-    expect(screen.getByText("Pieza única")).toBeInTheDocument();
-    expect(screen.getByText(/Campera de jean · \$ 45\.000,00/)).toBeInTheDocument();
+    const colgante = screen.getByRole("link", { name: /pieza única/i });
+    expect(colgante).toHaveAttribute("href", "/polkalinas/1");
+    expect(colgante).toHaveTextContent("Pieza única");
+    expect(colgante).toHaveTextContent("$ 45.000,00");
+    // El agujero redondo: rosa con borde cacao.
+    expect(colgante.firstElementChild).toHaveClass("rounded-full", "border-ink", "bg-accent-soft");
+  });
+
+  it("son lunares, no un cuadro gris, cuando la pieza del hero no tiene foto", async () => {
+    getVidriera.mockResolvedValue({
+      success: true,
+      data: { items: [{ ...ITEMS[0], portada: null }], categorias: [] },
+    });
+
+    render(await HomePage());
+
+    const hero = screen.getByTestId("hero-foto");
+    expect(hero.style.backgroundImage).toContain("radial-gradient");
+    expect(hero.className).not.toContain("bg-surface-strong");
   });
 
   it("arma «Recién llegado» con 8 destacados y el «Ver todo» al catálogo", async () => {
@@ -138,33 +211,52 @@ describe("home /polkalinas", () => {
     );
   });
 
-  it("las categorías llevan al catálogo filtrado y «Cositas» a los productos", async () => {
+  it("ofrece las cuatro categorías del mockup, cada una con su link al catálogo", async () => {
     render(await HomePage());
 
-    // El nav de la tienda también tiene «Cositas»: la tarjeta está en el main.
+    // El nav de la tienda también lista categorías: las tarjetas están en el main.
     const main = within(screen.getByRole("main"));
+    expect(main.getByRole("heading", { name: "Categorías" })).toBeInTheDocument();
 
-    expect(main.getByRole("link", { name: /^Camperas/i })).toHaveAttribute(
+    expect(main.getByRole("link", { name: /second hand/i })).toHaveAttribute(
       "href",
-      "/polkalinas/catalogo?categoria=7"
+      "/polkalinas/catalogo?categoria=second-hand"
     );
-    expect(main.getByRole("link", { name: /^Cositas/i })).toHaveAttribute(
+    expect(main.getByRole("link", { name: /intervenido/i })).toHaveAttribute(
       "href",
-      "/polkalinas/catalogo?tipo=cositas"
+      "/polkalinas/catalogo?categoria=intervenido"
     );
+    expect(main.getByRole("link", { name: /cositas/i })).toHaveAttribute(
+      "href",
+      "/polkalinas/catalogo?categoria=cositas"
+    );
+    expect(main.getByRole("link", { name: /nuevo/i })).toHaveAttribute(
+      "href",
+      "/polkalinas/catalogo?categoria=nuevo"
+    );
+    // La cuarta tarjeta del mockup (Accesorios) no existe en la tienda.
+    expect(main.queryByRole("link", { name: /accesorios/i })).not.toBeInTheDocument();
   });
 
-  it("sin productos publicados no ofrece la tarjeta «Cositas»", async () => {
-    getVidriera.mockResolvedValue({
-      success: true,
-      data: { items: [ITEMS[0], ITEMS[2]], categorias: [{ id: 7, name: "Camperas" }] },
-    });
-
+  it("invita al próximo drop con el WhatsApp del dueño", async () => {
     render(await HomePage());
 
     expect(
-      within(screen.getByRole("main")).queryByRole("link", { name: /^Cositas/i })
-    ).not.toBeInTheDocument();
+      screen.getByRole("heading", { name: /las prendas únicas vuelan/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: /avisame del próximo drop/i })
+    ).toHaveAttribute("href", "https://wa.me/5493876360163");
+  });
+
+  it("enlaza el Instagram real y arma los seis cuadros", async () => {
+    render(await HomePage());
+
+    // El footer también enlaza el perfil: la sección está en el main.
+    expect(
+      within(screen.getByRole("main")).getByRole("link", { name: /@polkalinass_/ })
+    ).toHaveAttribute("href", "https://www.instagram.com/polkalinass_/");
+    expect(screen.getAllByTestId("ig-cuadro")).toHaveLength(6);
   });
 });
 

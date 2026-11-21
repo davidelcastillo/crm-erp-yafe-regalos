@@ -39,6 +39,8 @@ export type VidrieraItem = {
   /** Id de `categoria` (prenda o `Category` del producto). Opcional en el tipo
    * para no romper los fixtures de las páginas en rediseño; la action lo manda. */
   categoriaId?: number | null;
+  /** Talles disponibles de una prenda (vacío en productos normales). */
+  talles?: string[];
 };
 
 export type VidrieraFicha = VidrieraItem & {
@@ -71,6 +73,8 @@ const SELECT_LISTA = {
     select: {
       categoria: { select: { id: true, name: true } },
       condicion: { select: { name: true } },
+      // Las cards muestran el talle en lugar del código (pedido del dueño).
+      talles: { select: { talle: true, cantidad: true }, orderBy: { talle: "asc" } },
     },
   },
 } as const;
@@ -138,6 +142,8 @@ const aPublico = (
   estado: estadoDe(fila, stock, reservado, vendido),
   portada: fila.images[0] ? urlFoto(fila.id, fila.images[0].path, "sm") : null,
   categoria: fila.prenda?.categoria?.name ?? null,
+  // Talles disponibles (solo prendas): la card los muestra en lugar del código.
+  talles: fila.prenda?.talles?.map((filaTalle) => filaTalle.talle) ?? [],
 });
 
 /** Sucursales donde el ítem tiene stock > 0: disponibilidad pública, sin el número. */

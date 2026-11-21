@@ -266,6 +266,8 @@ describe("getVidriera — qué se publica (S2)", () => {
         select: {
           categoria: { select: { id: true, name: true } },
           condicion: { select: { name: true } },
+          // Talles para mostrarlos en la card (dato público de la prenda).
+          talles: { select: { talle: true, cantidad: true }, orderBy: { talle: "asc" } },
         },
       },
     });
@@ -286,6 +288,7 @@ describe("getVidriera — qué se publica (S2)", () => {
       estado: "DISPONIBLE",
       portada: expect.stringMatching(/\/product-images\/1\/hash-portada_sm\.webp$/),
       categoria: "Camperas",
+      talles: ["M", "S"],
     });
   });
 
