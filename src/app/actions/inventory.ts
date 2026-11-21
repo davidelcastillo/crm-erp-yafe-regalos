@@ -283,6 +283,14 @@ export async function getProductsWithBranchStock(filters?: unknown) {
       orderBy: { name: "asc" },
       include: {
         category: { select: { id: true, name: true } },
+        // Categoría de la prenda: el filtro de tipo de /inventario la necesita
+        // para acotar sin otra consulta (dato interno, no del catálogo público).
+        prenda: {
+          select: {
+            categoriaId: true,
+            categoria: { select: { id: true, name: true } },
+          },
+        },
         inventory: {
           orderBy: { branchId: "asc" },
           include: {

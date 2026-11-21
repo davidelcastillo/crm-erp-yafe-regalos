@@ -611,3 +611,161 @@ describe("Inventario: buscador en su propia tarjeta (S16)", () => {
     expect(buscador.closest('[class*="rounded-t-"]')).toBeNull();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Filtro por tipo de ítem (pedido del dueño: «filtrar las prendas, las que
+// tengan el código tipo RP…»). El tipo se lee de `Product.kind`, no del código.
+// ---------------------------------------------------------------------------
+const prendaRemera = {
+  ...createdProduct,
+  id: 10,
+  name: "Remera Vintage",
+  code: "RP000",
+  codePrefix: "RP",
+  categoryId: null,
+  kind: "PRENDA",
+  prenda: { categoriaId: 5, categoria: { id: 5, name: "Remeras" } },
+} as unknown as Product;
+
+const prendaPantalon = {
+  ...createdProduct,
+  id: 11,
+  name: "Pantalón Cargo",
+  code: "RPI000",
+  codePrefix: "RPI",
+  categoryId: null,
+  kind: "PRENDA",
+  prenda: { categoriaId: 6, categoria: { id: 6, name: "Pantalones" } },
+} as unknown as Product;
+
+const categoriasPrenda = [
+  { id: 5, name: "Remeras", esUnicaPorDefecto: true, codePrefix: "RP" },
+  { id: 6, name: "Pantalones", esUnicaPorDefecto: false, codePrefix: "RPI" },
+];
+
+/** Abre el filtro «Tipo» y elige una de sus tres opciones. */
+async function elegirTipo(label: "Todos" | "Prendas" | "Productos") {
+  fireEvent.click(screen.getByRole("button", { name: "Tipo" }));
+  fireEvent.click(await screen.findByRole("button", { name: label }));
+}
+
+describe("InventarioPage — filtro por tipo de ítem (Prendas / Productos)", () => {
+  beforeEach(() => {
+    mockGetProductsWithBranchStock.mockResolvedValue({
+      success: true,
+      data: [createdProduct, prendaRemera, prendaPantalon],
+    } as never);
+    (getCategoriaPrendaOptions as jest.Mock).mockResolvedValue({
+      success: true,
+      data: categoriasPrenda,
+    });
+  });
+
+  it("«Prendas» deja solo los ítems con kind PRENDA", async () => {
+    await renderPage();
+
+    await elegirTipo("Prendas");
+
+    await waitFor(() => {
+      expect(screen.queryByText("Jabón de Avena")).not.toBeInTheDocument();
+    });
+    expect(screen.getByText("Remera Vintage")).toBeInTheDocument();
+    expect(screen.getByText("Pantalón Cargo")).toBeInTheDocument();
+  });
+
+  it("«Productos» deja solo los ítems que no son prenda", async () => {
+    await renderPage();
+
+    await elegirTipo("Productos");
+
+    await waitFor(() => {
+      expect(screen.queryByText("Remera Vintage")).not.toBeInTheDocument();
+    });
+    expect(screen.queryByText("Pantalón Cargo")).not.toBeInTheDocument();
+    expect(screen.getByText("Jabón de Avena")).toBeInTheDocument();
+  });
+
+  it("«Todos» no filtra por tipo", async () => {
+    await renderPage();
+    await elegirTipo("Prendas");
+    await elegirTipo("Todos");
+
+    await waitFor(() => {
+      expect(screen.getByText("Jabón de Avena")).toBeInTheDocument();
+    });
+    expect(screen.getByText("Remera Vintage")).toBeInTheDocument();
+    expect(screen.getByText("Pantalón Cargo")).toBeInTheDocument();
+  });
+
+  it("con «Prendas» el selector de categoría lista las categorías de prenda y acota", async () => {
+    await renderPage();
+
+    await elegirTipo("Prendas");
+    fireEvent.click(screen.getByRole("button", { name: "Categoría" }));
+
+    // La lista de categorías es la de prenda, no la de producto.
+    expect(await screen.findByRole("button", { name: "Remeras" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Pantalones" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Limpieza" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Remeras" }));
+
+    await waitFor(() => {
+      expect(screen.queryByText("Pantalón Cargo")).not.toBeInTheDocument();
+    });
+    expect(screen.getByText("Remera Vintage")).toBeInTheDocument();
+  });
+
+  it("se combina con la sucursal y con la búsqueda", async () => {
+    await renderPage();
+
+    // Sucursal: «Principal» (el filtro de servidor sigue viajando).
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /todas las sucursales/i })).toBeEnabled();
+    });
+    fireEvent.click(screen.getByRole("button", { name: /todas las sucursales/i }));
+    fireEvent.click(await screen.findByRole("option", { name: "Principal" }));
+    await waitFor(() => {
+      expect(mockGetProductsWithBranchStock).toHaveBeenLastCalledWith({
+        branchId: 1,
+        activeOnly: true,
+      });
+    });
+
+    // Tipo + búsqueda: queda solo la prenda que coincide con el término.
+    await elegirTipo("Prendas");
+    fireEvent.change(screen.getByLabelText(/buscar producto/i), {
+      target: { value: "pantalón" },
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByText("Remera Vintage")).not.toBeInTheDocument();
+    });
+    expect(screen.getByText("Pantalón Cargo")).toBeInTheDocument();
+    expect(mockGetProductsWithBranchStock).toHaveBeenLastCalledWith({
+      branchId: 1,
+      activeOnly: true,
+    });
+  });
+
+  it("sin prendas en el catálogo no rompe y oculta el selector de categorías", async () => {
+    mockGetProductsWithBranchStock.mockResolvedValue({
+      success: true,
+      data: [createdProduct],
+    } as never);
+    (getCategoriaPrendaOptions as jest.Mock).mockResolvedValue({
+      success: true,
+      data: [],
+    });
+
+    await renderPage();
+    await elegirTipo("Prendas");
+
+    expect(screen.queryByText("Jabón de Avena")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Categoría" })).not.toBeInTheDocument();
+
+    // Y se puede volver a la vista completa sin recargar.
+    await elegirTipo("Todos");
+    expect(screen.getByText("Jabón de Avena")).toBeInTheDocument();
+  });
+});
