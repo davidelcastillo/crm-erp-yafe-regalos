@@ -15,10 +15,11 @@ export const purchaseSplitItemSchema = z.object({
 /**
  * Compra con distribución multi-sucursal.
  *
- * Restricción del schema real: `Purchase.branchId` es NOT NULL, por lo que
- * la cabecera toma el `branchId` de la PRIMERA línea. El resto de las líneas
+ * La cabecera toma el `branchId` de la PRIMERA línea. El resto de las líneas
  * incrementan `BranchInventory` en la sucursal correspondiente y generan
  * movimientos `ENTRY` por línea para reflejar la distribución (audit).
+ * (`Purchase.branchId` es opcional desde la compra del alta sin sucursal, pero
+ * este flujo siempre manda una.)
  */
 export const createPurchaseWithBranchSplitSchema = z.object({
   items: z.array(purchaseSplitItemSchema).min(1, "Se requiere al menos un item"),

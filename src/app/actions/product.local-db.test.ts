@@ -19,6 +19,7 @@ const PREFIJO_NUEVO = `${letra(sufijo)}${letra(Math.floor(sufijo / 26))}N`;
 const PREFIJO_AGOTADO = `${letra(sufijo)}${letra(Math.floor(sufijo / 26))}X`;
 const PREFIJO_CATEGORIA = `${letra(sufijo)}${letra(Math.floor(sufijo / 26))}C`;
 const PREFIJO_COMPRA = `${letra(sufijo)}${letra(Math.floor(sufijo / 26))}P`;
+const PREFIJO_SIN_SUCURSAL = `${letra(sufijo)}${letra(Math.floor(sufijo / 26))}S`;
 const NOMBRE_CATEGORIA = `QA categoría individual ${sufijo}`;
 
 type Cliente = (typeof import("@/lib/prisma"))["prisma"];
@@ -37,7 +38,7 @@ describe("createProduct (integración, base local)", () => {
     acciones = await import("@/app/actions/product");
 
     await prisma.product.deleteMany({
-      where: { codePrefix: { in: [PREFIJO_NUEVO, PREFIJO_AGOTADO, PREFIJO_CATEGORIA, PREFIJO_COMPRA] } },
+      where: { codePrefix: { in: [PREFIJO_NUEVO, PREFIJO_AGOTADO, PREFIJO_CATEGORIA, PREFIJO_COMPRA, PREFIJO_SIN_SUCURSAL] } },
     });
 
     const categoria = await prisma.category.create({ data: { name: NOMBRE_CATEGORIA } });
@@ -46,7 +47,7 @@ describe("createProduct (integración, base local)", () => {
 
   afterAll(async () => {
     await prisma.product.deleteMany({
-      where: { codePrefix: { in: [PREFIJO_NUEVO, PREFIJO_AGOTADO, PREFIJO_CATEGORIA, PREFIJO_COMPRA] } },
+      where: { codePrefix: { in: [PREFIJO_NUEVO, PREFIJO_AGOTADO, PREFIJO_CATEGORIA, PREFIJO_COMPRA, PREFIJO_SIN_SUCURSAL] } },
     });
     await prisma.category.deleteMany({ where: { name: NOMBRE_CATEGORIA } });
     await prisma.$disconnect();
@@ -110,6 +111,53 @@ describe("createProduct (integración, base local)", () => {
       // La compra retiene la sucursal por el FK: se borra antes.
       await prisma.purchase.deleteMany({ where: { branchId: sucursal.id } });
       await prisma.branch.deleteMany({ where: { id: sucursal.id } });
+    }
+  });
+
+  it("sin sucursal y con costo registra la compra sin sucursal y no crea stock (S3)", async () => {
+    const resultado = await acciones.createProduct({
+      name: `QA alta individual ${sufijo} sin sucursal`,
+      prefix: PREFIJO_SIN_SUCURSAL,
+      price: 10,
+      costoUnitario: 7.5,
+      cantidadInicial: 4,
+    });
+    expect(resultado.success).toBe(true);
+
+    const producto = await prisma.product.findFirstOrThrow({
+      where: { codePrefix: PREFIJO_SIN_SUCURSAL },
+      select: { id: true },
+    });
+
+    try {
+      // Compra real en Postgres con branchId nulo.
+      const compras = await prisma.purchase.findMany({
+        where: { branchId: null, items: { some: { productId: producto.id } } },
+        select: {
+          totalAmount: true,
+          branchId: true,
+          items: { select: { price: true, quantity: true, subtotal: true } },
+        },
+      });
+      expect(compras).toHaveLength(1);
+      expect(compras[0].branchId).toBeNull();
+      expect(Number(compras[0].totalAmount)).toBe(30); // 7.5 × 4
+      expect(compras[0].items).toHaveLength(1);
+      expect(Number(compras[0].items[0].price)).toBe(7.5);
+      expect(compras[0].items[0].quantity).toBe(4);
+      expect(Number(compras[0].items[0].subtotal)).toBe(30);
+
+      // Sin sucursal no hay inventario ni movimiento de ingreso.
+      expect(
+        await prisma.branchInventory.count({ where: { productId: producto.id } })
+      ).toBe(0);
+      expect(
+        await prisma.branchMovement.count({ where: { productId: producto.id } })
+      ).toBe(0);
+    } finally {
+      await prisma.purchase.deleteMany({
+        where: { branchId: null, items: { some: { productId: producto.id } } },
+      });
     }
   });
 
