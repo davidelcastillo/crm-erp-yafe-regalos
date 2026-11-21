@@ -8,7 +8,9 @@
  * (`inventory.external.ts`): solo lectura, sobre lo publicado en el canal «Web»
  * de `PrendaPublicacion` y con una lista cerrada de campos públicos. Nada de
  * costos, clientes, stock por sucursal ni notas internas — el select de cada
- * consulta es el contrato (`vidriera.test.ts` lo compara exacto).
+ * consulta es el contrato (`vidriera.test.ts` lo compara exacto). La ficha
+ * publica el **nombre** de las sucursales con stock > 0 (dónde retirar), nunca
+ * la cifra.
  *
  * El stock y las ventas se usan **solo para derivar el estado**; el número no
  * sale de acá.
@@ -26,18 +28,28 @@ export type VidrieraItem = {
   id: number;
   code: string;
   name: string;
+  /** Precio público ya convertido: la acción devuelve `Decimal` como `number`. */
   price: number;
   kind: "PRENDA" | "PRODUCT";
   estado: EstadoVidriera;
   /** Portada (posición 0) en miniatura, o `null` si el producto no tiene fotos. */
   portada: string | null;
-  /** Categoría de prenda; los productos normales no tienen. */
+  /** Categoría de prenda; los productos normales usan su `Category`. */
   categoria: string | null;
+  /** Id de `categoria` (prenda o `Category` del producto). Opcional en el tipo
+   * para no romper los fixtures de las páginas en rediseño; la action lo manda. */
+  categoriaId?: number | null;
 };
 
 export type VidrieraFicha = VidrieraItem & {
   /** Todas las fotos en tamaño ficha, de la portada en adelante. */
   fotos: { url: string; alt: string }[];
+  /** `Product.description`, con el placeholder histórico `"-"` ya vaciado.
+   * Opcional en el tipo por lo mismo que `categoriaId`. */
+  descripcion?: string;
+  /** Nombres de las sucursales con stock > 0: dónde se puede retirar.
+   * Opcional en el tipo por lo mismo que `categoriaId`. */
+  sucursales?: { id: number; name: string }[];
   condicion: string | null;
   detalleCondicion: string | null;
   talles: string[];
@@ -65,6 +77,9 @@ const SELECT_LISTA = {
 
 const SELECT_FICHA = {
   ...SELECT_LISTA,
+  // La ficha también publica descripción y categoría de los productos normales.
+  description: true,
+  category: { select: { id: true, name: true } },
   prenda: {
     select: {
       ...SELECT_LISTA.prenda.select,
@@ -81,6 +96,9 @@ type FilaPublica = {
   price: unknown;
   kind: "PRENDA" | "PRODUCT";
   images: { path: string; alt: string | null }[];
+  /** Solo lo pide `SELECT_FICHA` (la lista no los publica). */
+  description?: string | null;
+  category?: { id: number; name: string } | null;
   prenda: {
     categoria: { id: number; name: string } | null;
     condicion: { name: string } | null;
@@ -121,6 +139,17 @@ const aPublico = (
   portada: fila.images[0] ? urlFoto(fila.id, fila.images[0].path, "sm") : null,
   categoria: fila.prenda?.categoria?.name ?? null,
 });
+
+/** Sucursales donde el ítem tiene stock > 0: disponibilidad pública, sin el número. */
+const sucursalesConStock = async (productId: number) =>
+  (
+    await prisma.branchInventory.findMany({
+      // Solo sucursales activas: una desactivada no es punto de retiro.
+      where: { productId, stock: { gt: 0 }, branch: { isActive: true } },
+      select: { branch: { select: { id: true, name: true } } },
+      orderBy: { branch: { name: "asc" } },
+    })
+  ).map((fila) => fila.branch);
 
 /** Stock total por producto, pedidos abiertos y ventas, de una lista de ids. */
 const leerEstado = async (ids: number[]) => {
@@ -249,18 +278,25 @@ export async function getVidrieraItem(data: unknown) {
     });
     if (!fila) return { success: false as const };
 
-    const { stockPorProducto, reservados, vendidos } = await leerEstado([fila.id]);
+    const [{ stockPorProducto, reservados, vendidos }, sucursales] = await Promise.all([
+      leerEstado([fila.id]),
+      sucursalesConStock(fila.id),
+    ]);
     const item = aPublico(
       fila,
       stockPorProducto.get(fila.id) ?? 0,
       reservados.has(fila.id),
       vendidos.has(fila.id)
     );
+    // La ficha suma la categoría del producto normal (la prenda ya la trae).
+    const categoria = fila.prenda?.categoria ?? fila.category ?? null;
 
     return {
       success: true as const,
       data: {
         ...item,
+        categoria: categoria?.name ?? null,
+        categoriaId: categoria?.id ?? null,
         fotos: fila.images.map((foto) => ({
           url: urlFoto(fila.id, foto.path, "lg"),
           // Sin alt cargado se usa el nombre: la foto nunca queda sin texto.
@@ -269,6 +305,8 @@ export async function getVidrieraItem(data: unknown) {
         condicion: fila.prenda?.condicion?.name ?? null,
         detalleCondicion: fila.prenda?.detalleCondicion ?? null,
         talles: fila.prenda?.talles?.map((talle) => talle.talle) ?? [],
+        descripcion: fila.description === "-" ? "" : (fila.description ?? ""),
+        sucursales,
       },
     };
   } catch (error) {

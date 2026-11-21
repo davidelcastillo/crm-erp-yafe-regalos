@@ -19,6 +19,7 @@ import { getVidriera, getVidrieraItem } from "@/app/actions/vidriera";
 const mockProductFindMany = jest.fn();
 const mockProductFindFirst = jest.fn();
 const mockInventoryGroupBy = jest.fn();
+const mockInventoryFindMany = jest.fn();
 const mockPedidoItemFindMany = jest.fn();
 const mockSaleItemFindMany = jest.fn();
 const mockCategoriaFindMany = jest.fn();
@@ -29,7 +30,10 @@ jest.mock("@/lib/prisma", () => ({
       findMany: (...args: unknown[]) => mockProductFindMany(...args),
       findFirst: (...args: unknown[]) => mockProductFindFirst(...args),
     },
-    branchInventory: { groupBy: (...args: unknown[]) => mockInventoryGroupBy(...args) },
+    branchInventory: {
+      groupBy: (...args: unknown[]) => mockInventoryGroupBy(...args),
+      findMany: (...args: unknown[]) => mockInventoryFindMany(...args),
+    },
     pedidoItem: { findMany: (...args: unknown[]) => mockPedidoItemFindMany(...args) },
     saleItem: { findMany: (...args: unknown[]) => mockSaleItemFindMany(...args) },
     categoriaPrenda: { findMany: (...args: unknown[]) => mockCategoriaFindMany(...args) },
@@ -40,9 +44,12 @@ type Fila = {
   id: number;
   code: string;
   name: string;
+  description: string | null;
   price: number;
   kind: "PRENDA" | "PRODUCT";
   active: boolean;
+  /** Categoría propia del producto normal (las prendas usan la de prenda). */
+  category: { id: number; name: string } | null;
   /** Canales de `PrendaPublicacion`: la vidriera solo muestra «Web». */
   canales: string[];
   images: { path: string; alt: string | null }[];
@@ -58,9 +65,12 @@ const CAMPERA: Fila = {
   id: 1,
   code: "PK-1",
   name: "Campera de jean",
+  // Placeholder heredado: la ficha pública lo devuelve vacío.
+  description: "-",
   price: 45000,
   kind: "PRENDA",
   active: true,
+  category: null,
   canales: ["Web"],
   images: [
     { path: "hash-portada", alt: "Campera de frente" },
@@ -78,9 +88,11 @@ const REMERA: Fila = {
   id: 2,
   code: "PK-2",
   name: "Remera lisa",
+  description: "Remera de algodón",
   price: 12000,
   kind: "PRENDA",
   active: true,
+  category: null,
   // Publicada en Instagram, no en la web: no va a la vidriera.
   canales: ["Instagram"],
   images: [],
@@ -95,9 +107,11 @@ const PERFUME: Fila = {
   id: 3,
   code: "AR-1",
   name: "Perfume floral",
+  description: "Perfume floral 100 ml",
   price: 30000,
   kind: "PRODUCT",
   active: true,
+  category: { id: 9, name: "Perfumes" },
   canales: ["Web"],
   images: [{ path: "hash-perfume", alt: null }],
   prenda: null,
@@ -105,8 +119,19 @@ const PERFUME: Fila = {
 
 const PUBLICADAS = [CAMPERA, REMERA, PERFUME];
 
-/** Stock por (producto, sucursal) sumado: lo que devolvería el groupBy. */
-let STOCK: Record<number, number> = { 1: 1, 2: 1, 3: 0 };
+type FilaStock = { productId: number; branch: { id: number; name: string }; stock: number };
+
+/** Stock por (producto, sucursal): el `groupBy` lo suma y la ficha lista las
+ * sucursales con stock > 0. Un producto sin filas está en 0. */
+let INVENTARIO: FilaStock[] = [];
+
+const CASA_CENTRAL = { id: 1, name: "Casa central" };
+
+/** Deja el stock de un producto en una sola sucursal (los tests de estado). */
+const setStock = (productId: number, stock: number) => {
+  INVENTARIO = INVENTARIO.filter((fila) => fila.productId !== productId);
+  if (stock > 0) INVENTARIO.push({ productId, branch: CASA_CENTRAL, stock });
+};
 /** Productos con un pedido abierto (`RESERVADO`). */
 let RESERVADOS: number[] = [];
 /** Productos con al menos una venta. */
@@ -140,7 +165,10 @@ const porIds = <T extends { productId: number }>(filas: T[], where?: { productId
 
 beforeEach(() => {
   jest.clearAllMocks();
-  STOCK = { 1: 1, 2: 1, 3: 0 };
+  INVENTARIO = [
+    { productId: 1, branch: CASA_CENTRAL, stock: 1 },
+    { productId: 2, branch: CASA_CENTRAL, stock: 1 },
+  ];
   RESERVADOS = [];
   VENDIDOS = [];
 
@@ -156,16 +184,27 @@ beforeEach(() => {
   mockInventoryGroupBy.mockImplementation(
     async (args: { where?: { productId?: { in?: number[] } } }) => {
       const agrupado = new Map<number, number>();
-      for (const productId of args?.where?.productId?.in ?? []) {
-        const stock = STOCK[productId];
-        if (stock === undefined) continue;
-        agrupado.set(productId, stock);
+      for (const fila of INVENTARIO) {
+        if (!(args?.where?.productId?.in ?? []).includes(fila.productId)) continue;
+        agrupado.set(fila.productId, (agrupado.get(fila.productId) ?? 0) + fila.stock);
       }
       return [...agrupado].map(([productId, stock]) => ({
         productId,
         _sum: { stock },
       }));
     }
+  );
+  // Sucursales con stock > 0 de un producto, ordenadas por nombre (la base lo hace).
+  mockInventoryFindMany.mockImplementation(
+    async (args: { where?: { productId?: number; stock?: { gt?: number } } }) =>
+      INVENTARIO
+        .filter(
+          (fila) =>
+            fila.productId === args?.where?.productId &&
+            fila.stock > (args?.where?.stock?.gt ?? 0)
+        )
+        .map((fila) => ({ branch: fila.branch }))
+        .sort((a, b) => a.branch.name.localeCompare(b.branch.name))
   );
   mockPedidoItemFindMany.mockImplementation(
     async (args: { where?: { productId?: { in?: number[] } } }) =>
@@ -286,21 +325,21 @@ describe("getVidriera — estados derivados (S2)", () => {
   });
 
   it("una prenda sin stock y con venta queda Vendida", async () => {
-    STOCK = { 1: 0, 2: 1, 3: 0 };
+    setStock(1, 0);
     VENDIDOS = [1];
 
     expect(await estadoDe("PK-1")).toBe("VENDIDA");
   });
 
   it("un producto sin stock queda Agotado (aunque se haya vendido)", async () => {
-    STOCK = { 1: 1, 2: 1, 3: 0 };
+    setStock(3, 0);
     VENDIDOS = [3];
 
     expect(await estadoDe("AR-1")).toBe("AGOTADO");
   });
 
   it("un producto con stock queda Disponible", async () => {
-    STOCK = { 1: 1, 2: 1, 3: 4 };
+    setStock(3, 4);
 
     expect(await estadoDe("AR-1")).toBe("DISPONIBLE");
   });
@@ -369,6 +408,9 @@ describe("getVidrieraItem — ficha pública (T5)", () => {
       estado: "DISPONIBLE",
       portada: expect.stringMatching(/\/hash-portada_sm\.webp$/),
       categoria: "Camperas",
+      categoriaId: 7,
+      descripcion: "",
+      sucursales: [{ id: 1, name: "Casa central" }],
       condicion: "Muy bueno",
       detalleCondicion: "Con marcas en el ruedo",
       talles: ["M", "S"],
@@ -407,7 +449,11 @@ describe("getVidrieraItem — ficha pública (T5)", () => {
       orderBy: { talle: "asc" },
       select: { talle: true },
     });
+    // Datos públicos que la ficha necesita también para productos normales.
+    expect(consulta.select?.description).toBe(true);
+    expect(consulta.select?.category).toEqual({ select: { id: true, name: true } });
     expect(JSON.stringify(consulta.select)).not.toContain("costo");
+    expect(JSON.stringify(consulta.select)).not.toContain("inventory");
   });
 
   it("un producto publicado muestra sus datos públicos", async () => {
@@ -422,7 +468,11 @@ describe("getVidrieraItem — ficha pública (T5)", () => {
       kind: "PRODUCT",
       estado: "AGOTADO",
       portada: expect.stringMatching(/\/hash-perfume_sm\.webp$/),
-      categoria: null,
+      categoria: "Perfumes",
+      categoriaId: 9,
+      descripcion: "Perfume floral 100 ml",
+      // Sin stock no hay sucursal para mostrar, pero el campo siempre viene.
+      sucursales: [],
       condicion: null,
       detalleCondicion: null,
       talles: [],
@@ -433,6 +483,37 @@ describe("getVidrieraItem — ficha pública (T5)", () => {
         },
       ],
     });
+  });
+
+  it("un producto con stock muestra las sucursales donde retirarlo, sin el stock", async () => {
+    setStock(3, 0);
+    INVENTARIO.push(
+      { productId: 3, branch: { id: 2, name: "Sucursal Norte" }, stock: 3 },
+      { productId: 3, branch: { id: 1, name: "Casa central" }, stock: 1 }
+    );
+
+    const resultado = await getVidrieraItem({ id: 3 });
+
+    if (!resultado.success) throw new Error("la ficha tendría que responder");
+    expect(resultado.data.sucursales).toEqual([
+      { id: 1, name: "Casa central" },
+      { id: 2, name: "Sucursal Norte" },
+    ]);
+    // Disponibilidad pública, no inventario: ni el stock ni el costo salen de acá.
+    expect(JSON.stringify(resultado.data)).not.toContain("stock");
+    expect(JSON.stringify(resultado.data)).not.toContain("costo");
+  });
+
+  it("el placeholder \"-\" de la descripción se publica vacío", async () => {
+    PERFUME.description = "-";
+    try {
+      const resultado = await getVidrieraItem({ id: 3 });
+
+      if (!resultado.success) throw new Error("la ficha tendría que responder");
+      expect(resultado.data.descripcion).toBe("");
+    } finally {
+      PERFUME.description = "Perfume floral 100 ml";
+    }
   });
 
   it("no publicado y no existente dan la misma respuesta (sin filtrar la existencia)", async () => {
