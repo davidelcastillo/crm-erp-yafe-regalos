@@ -89,11 +89,11 @@ describe('generateStockControlPdf (S10)', () => {
     expect(text).toContain(`Página ${doc.getPageCount()} de ${doc.getPageCount()}`);
   });
 
-  test('pinta el título con el rosa de marca y el encabezado de tabla en blanco', async () => {
+  test('pinta el título con el frutilla de la marca y el encabezado de tabla en blanco', async () => {
     const { colors } = await readPdf(await generateStockControlPdf(receipt));
 
-    // #be185d = rgb(0,75 · 0,09 · 0,36): el rosa de marca del sistema; el encabezado va en blanco encima.
-    expect(colors.get('Ajuste de stock')).toEqual([0.75, 0.09, 0.36]);
+    // #C8323C = rgb(0,78 · 0,20 · 0,24): el frutilla de la marca; el encabezado va en blanco encima.
+    expect(colors.get('Ajuste de stock')).toEqual([0.78, 0.2, 0.24]);
     expect(colors.get('Código')).toEqual([1, 1, 1]);
   });
 

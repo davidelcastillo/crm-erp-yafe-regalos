@@ -1,12 +1,12 @@
 // src/lib/utils/pdf.ts
 import { PDFDocument, type PDFFont, type PDFPage } from 'pdf-lib';
 import {
-  DOCUMENT_COLOR,
   DOCUMENT_FONT_SIZE,
   documentColor,
   embedDocumentFonts,
 } from '@/lib/fonts/document-fonts';
-import { LOGO_PNG_BASE64 } from './pdf-logo';
+import { drawBrandLogo } from './pdf-logo';
+import { PDF_BRAND_COLOR } from '@/lib/pdf-brand';
 
 export interface ProductRow {
   code: string;
@@ -51,11 +51,11 @@ export const ROWS_PER_PAGE = Math.floor(
   (TABLE_TOP - TABLE_HEAD_HEIGHT - (MARGIN + SUMMARY_HEIGHT)) / ROW_HEIGHT
 );
 
-const INK = DOCUMENT_COLOR.ink;
-const MUTED = DOCUMENT_COLOR.muted;
-const BRAND = DOCUMENT_COLOR.brand;
-const HAIRLINE = DOCUMENT_COLOR.hairline;
-const ZEBRA = DOCUMENT_COLOR.zebra;
+const INK = PDF_BRAND_COLOR.cacao;
+const MUTED = PDF_BRAND_COLOR.cacaoSoft;
+const BRAND = PDF_BRAND_COLOR.strawberry;
+const HAIRLINE = PDF_BRAND_COLOR.border;
+const ZEBRA = PDF_BRAND_COLOR.cream;
 const WHITE = '#ffffff';
 
 /**
@@ -108,7 +108,6 @@ export async function generateProductsPdf(
   const pdfDoc = await PDFDocument.create();
   const { font, bold } = await embedDocumentFonts(pdfDoc);
   const { title, body, label: labelSize, footer: footerSize } = DOCUMENT_FONT_SIZE;
-  const logo = await pdfDoc.embedPng(LOGO_PNG_BASE64);
 
   const tableWidth = PAGE_WIDTH - 2 * MARGIN;
   const totalPages = Math.max(1, Math.ceil(rows.length / ROWS_PER_PAGE));
@@ -132,14 +131,9 @@ export async function generateProductsPdf(
     });
   };
 
-  // Sin banda ni acento: el título grande y el violeta de marca son la jerarquía.
+  // Sin banda ni acento: el título grande y el rojo frutilla de la marca son la jerarquía.
   const drawHeader = (page: PDFPage) => {
-    page.drawImage(logo, {
-      x: MARGIN,
-      y: HEADER_TOP - LOGO_SIZE,
-      width: LOGO_SIZE,
-      height: LOGO_SIZE,
-    });
+    drawBrandLogo(page, { x: MARGIN, y: HEADER_TOP, size: LOGO_SIZE });
     page.drawText(clip(`${meta.branchName} (${meta.branchCode})`, bold, title, tableWidth), {
       x: MARGIN,
       y: TITLE_BASELINE,
@@ -156,7 +150,7 @@ export async function generateProductsPdf(
     });
   };
 
-  // Encabezado de tabla: banda violeta con el texto en blanco en negrita.
+  // Encabezado de tabla: banda frutilla con el texto en blanco en negrita.
   const drawTitles = (page: PDFPage) => {
     page.drawRectangle({
       x: MARGIN,

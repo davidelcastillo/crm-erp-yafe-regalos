@@ -18,6 +18,8 @@
  * superior izquierda y las medidas que el dibujo necesita.
  */
 
+import { PDF_BRAND_COLOR } from './pdf-brand';
+
 /** 1 mm en puntos PostScript (72 pt = 1 pulgada). */
 export const MM_TO_PT = 72 / 25.4;
 
@@ -50,19 +52,19 @@ export const CUT_MARK_LENGTH_MM = 1.1;
 /** Separación entre el borde de la etiqueta y el tick, en mm. */
 export const CUT_MARK_OFFSET_MM = 0.15;
 export const CUT_MARK_WIDTH_MM = 0.2;
-export const CUT_MARK_COLOR = '#000000';
+export const CUT_MARK_COLOR = PDF_BRAND_COLOR.cacao;
 
-// --- Colores medidos ------------------------------------------------------
+// --- Colores de la marca --------------------------------------------------
 /** Fondo de la etiqueta. */
-export const LABEL_BACKGROUND_COLOR = '#fcd2d3';
+export const LABEL_BACKGROUND_COLOR = PDF_BRAND_COLOR.cream;
 /** Cajas del código y del precio. */
-export const BOX_COLOR = '#ffeff3';
-/** `$` y `@feria_conexx`: el tono de marca de la plantilla. */
-export const TEXT_COLOR = '#6b2b43';
-/** Código del producto: oscuro, en negrita, para que se lea de lejos (L12). */
-export const CODE_TEXT_COLOR = '#222222';
-/** Importe: negro pleno (L12). */
-export const PRICE_TEXT_COLOR = '#000000';
+export const BOX_COLOR = PDF_BRAND_COLOR.pink;
+/** `$` y el handle «Polkalina's». */
+export const TEXT_COLOR = PDF_BRAND_COLOR.cacao;
+/** Código del producto: en negrita y en cacao, para que se lea de lejos (L12). */
+export const CODE_TEXT_COLOR = PDF_BRAND_COLOR.cacao;
+/** Importe: cacao pleno (L12). */
+export const PRICE_TEXT_COLOR = PDF_BRAND_COLOR.cacao;
 
 // --- Caja del código (81 % del ancho, centrada) ---------------------------
 export const BOX_WIDTH_MM = 26.7;
@@ -86,7 +88,7 @@ export const PRICE_GAP_MM = 0.6;
 export const CURRENCY_SYMBOL = '$';
 
 // --- Handle, justo debajo de la caja del precio ---------------------------
-export const HANDLE_TEXT = '@feria_conexx';
+export const HANDLE_TEXT = "Polkalina's";
 export const HANDLE_TOP_MM = PRICE_BOX_TOP_MM + PRICE_BOX_HEIGHT_MM; // 20,7
 /** Ancho máximo del handle: 88 % de la caja (23,4 mm). */
 export const HANDLE_MAX_WIDTH_RATIO = 0.88;

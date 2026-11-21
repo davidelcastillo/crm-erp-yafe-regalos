@@ -88,8 +88,8 @@ describe('generateEntryReceiptWithLabels — comprobante + etiquetas (S2)', () =
     expect(labels.match(/AAA001/g)).toHaveLength(2);
     expect(labels.match(/BBB888/g)).toHaveLength(1);
     expect(labels).toContain('1.250,00');
-    // El handle de la plantilla sigue leyéndose por ToUnicode: una vez por etiqueta.
-    expect(text.filter((value) => value === '@feria_conexx')).toHaveLength(3);
+    // El handle de la marca sigue leyéndose por ToUnicode: una vez por etiqueta.
+    expect(text.filter((value) => value === "Polkalina's")).toHaveLength(3);
   });
 
   test('la última hoja de etiquetas queda rellena para escribir a mano (S4)', async () => {
@@ -104,7 +104,7 @@ describe('generateEntryReceiptWithLabels — comprobante + etiquetas (S2)', () =
     const labels = winAnsiText(doc, 1);
     expect(labels.match(/AAA001/g)).toHaveLength(2);
     expect(labels.match(/BBB888/g)).toHaveLength(1);
-    expect(text.filter((value) => value === '@feria_conexx')).toHaveLength(3);
+    expect(text.filter((value) => value === "Polkalina's")).toHaveLength(3);
   });
 
   test('nombra el archivo como el comprobante de un ingreso con etiquetas', async () => {

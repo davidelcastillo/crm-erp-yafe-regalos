@@ -83,6 +83,15 @@ const textOrigins = (base64: string) =>
 
 const LABELS_PER_SHEET = 72;
 
+/** `r g b rg` (relleno) o `r g b RG` (trazo), como lo escribe pdf-lib para un hex. */
+const colorOp = (hex: string, op: 'rg' | 'RG'): string =>
+  `${[1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).join(' ')} ${op}`;
+
+/** Paleta de la marca: cacao del texto, crema del fondo y rosa de las cajas. */
+const CACAO = '#4A2C2A';
+const CREAM = '#FFF6F0';
+const PINK = '#F2C4CC';
+
 beforeEach(() => {
   jest.clearAllMocks();
   mockBranchFindUnique.mockResolvedValue({ code: 'DEP' });
@@ -185,7 +194,7 @@ describe('generateProductLabels — PDF según la plantilla (§S3)', () => {
     expect(text).toContain('1.250,00');
   });
 
-  test('el codigo va oscuro y el importe en negro; el tono de marca queda para $ y handle', async () => {
+  test('el código, el importe, el `$` y el handle van en cacao de la marca', async () => {
     mockProductFindMany.mockResolvedValue([{ id: 1, code: 'AAA001', price: 1500 }]);
 
     const result = await generateProductLabels({
@@ -196,19 +205,15 @@ describe('generateProductLabels — PDF según la plantilla (§S3)', () => {
     if (!result.success) throw new Error(result.error);
 
     const content = pageStreams(result.data.pdfBase64).join("\n");
-    // Código: #222222, en negrita.
-    expect(content).toContain(
-      '0.13333333333333333 0.13333333333333333 0.13333333333333333 rg'
-    );
-    // Importe: negro pleno.
-    expect(content).toContain('0 0 0 rg');
-    // El tono de marca (#6b2b43) queda solo en el `$` y en @feria_conexx.
-    expect(
-      content.match(/0\.4196078431372549 0\.16862745098039217 0\.2627450980392157 rg/g)
-    ).toHaveLength(2);
+    // Los cuatro textos (código, $, importe y handle) van en cacao #4A2C2A.
+    expect(content).toContain(colorOp(CACAO, 'rg'));
+    // Nada de la paleta vieja: ni #222222, ni #6b2b43, ni negro pleno.
+    expect(content).not.toContain(colorOp('#222222', 'rg'));
+    expect(content).not.toContain(colorOp('#6b2b43', 'rg'));
+    expect(content).not.toContain(colorOp('#000000', 'rg'));
   });
 
-  test('dibuja las marcas de corte: 8 ticks por etiqueta, en negro', async () => {
+  test('dibuja las marcas de corte: 8 ticks por etiqueta, en cacao', async () => {
     const result = await generateProductLabels({
       branchId: 1,
       selections: [{ productId: 1, quantity: 5 }],
@@ -216,8 +221,9 @@ describe('generateProductLabels — PDF según la plantilla (§S3)', () => {
     if (!result.success) throw new Error(result.error);
 
     const content = pageStreams(result.data.pdfBase64).join(' ');
-    // Negro como color de TRAZO (RG), no de relleno (rg).
-    expect(content).toContain('0 0 0 RG');
+    // Cacao como color de TRAZO (RG), no de relleno (rg): negro ya no se usa.
+    expect(content).toContain(colorOp(CACAO, 'RG'));
+    expect(content).not.toContain(colorOp('#000000', 'RG'));
     // Dos ticks por esquina: 8 por etiqueta, 40 para 5 etiquetas.
     expect(strokeOps(result.data.pdfBase64)).toBe(5 * 8);
   });
@@ -237,11 +243,13 @@ describe('generateProductLabels — PDF según la plantilla (§S3)', () => {
     expect(text.match(/BBB888/g)).toHaveLength(2);
     expect(text.match(/1\.250,00/g)).toHaveLength(3);
 
-    // Cuatro textos por etiqueta: código, $, precio y @feria_conexx.
+    // Cuatro textos por etiqueta: código, $, precio y «Polkalina's».
     expect(textOperators(result.data.pdfBase64)).toBe(5 * 4);
 
-    // El handle (@feria_conexx = 13 glifos) va una vez por etiqueta, con su hex.
-    const handles = hexTexts(result.data.pdfBase64).filter((hex) => hex.length === 13 * 4);
+    // El handle («Polkalina's» = 11 glifos) va una vez por etiqueta, con su hex.
+    const handles = hexTexts(result.data.pdfBase64).filter(
+      (hex) => hex.length === "Polkalina's".length * 4
+    );
     expect(handles).toHaveLength(5);
     expect(new Set(handles).size).toBe(1);
   });
@@ -338,11 +346,11 @@ describe('generateProductLabels — última hoja rellenada (S4)', () => {
     expect(pdfText(result.data.pdfBase64).match(/AAA001/g)).toHaveLength(5);
     expect(textOperators(result.data.pdfBase64)).toBe(5 * 4);
 
-    // El relleno conserva la etiqueta rosa (72 fondos) y las marcas de corte (72 × 8).
-    expect(fillOps(result.data.pdfBase64, '#fcd2d3')).toBe(LABELS_PER_SHEET);
+    // El relleno conserva la etiqueta crema (72 fondos) y las marcas de corte (72 × 8).
+    expect(fillOps(result.data.pdfBase64, CREAM)).toBe(LABELS_PER_SHEET);
     expect(strokeOps(result.data.pdfBase64)).toBe(LABELS_PER_SHEET * 8);
     // Cajas del código y del precio solo en las 5 reales: 6 rellenos por caja.
-    expect(fillOps(result.data.pdfBase64, '#ffeff3')).toBe(5 * 2 * 6);
+    expect(fillOps(result.data.pdfBase64, PINK)).toBe(5 * 2 * 6);
   });
 
   test('sin el relleno la hoja queda como estaba: solo las etiquetas pedidas', async () => {
@@ -352,9 +360,9 @@ describe('generateProductLabels — última hoja rellenada (S4)', () => {
     });
     if (!result.success) throw new Error(result.error);
 
-    expect(fillOps(result.data.pdfBase64, '#fcd2d3')).toBe(5);
+    expect(fillOps(result.data.pdfBase64, CREAM)).toBe(5);
     expect(strokeOps(result.data.pdfBase64)).toBe(5 * 8);
-    expect(fillOps(result.data.pdfBase64, '#ffeff3')).toBe(5 * 2 * 6);
+    expect(fillOps(result.data.pdfBase64, PINK)).toBe(5 * 2 * 6);
   });
 
   test('el relleno se suma a las hojas ya completas sin agregar páginas', async () => {
