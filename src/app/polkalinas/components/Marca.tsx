@@ -40,7 +40,14 @@ export function Marca({
           className={CORONA[corona]}
         />
         {LUNARES.map((lunar) => (
-          <circle key={lunar.cy} cx={lunar.cx} cy={lunar.cy} r="6" className="fill-background" />
+          // Clave compuesta: dos lunares comparten `cy`, así que `cy` sola se repite.
+          <circle
+            key={`${lunar.cx}-${lunar.cy}`}
+            cx={lunar.cx}
+            cy={lunar.cy}
+            r="6"
+            className="fill-background"
+          />
         ))}
       </svg>
       {/* El wordmark del mockup mide ~0,77 del SVG (39/30, 44/34, 31/24). */}

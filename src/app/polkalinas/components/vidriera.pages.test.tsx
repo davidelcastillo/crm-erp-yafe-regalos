@@ -320,6 +320,18 @@ describe("home /polkalinas", () => {
     expect(main.queryByRole("link", { name: /accesorios/i })).not.toBeInTheDocument();
   });
 
+  it("no repite claves entre hermanos: la frutilla de la marca dibuja cada lunar una vez", async () => {
+    const errores = jest.spyOn(console, "error").mockImplementation(() => {});
+
+    render(await HomePage());
+
+    const repetidas = errores.mock.calls.filter((argumentos) =>
+      argumentos.some((argumento) => String(argumento).includes("same key"))
+    );
+    errores.mockRestore();
+    expect(repetidas).toEqual([]);
+  });
+
   it("invita al próximo drop con el WhatsApp del dueño", async () => {
     render(await HomePage());
 
