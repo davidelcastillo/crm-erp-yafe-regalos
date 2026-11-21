@@ -54,7 +54,9 @@ export default async function PolkalinasPage() {
   if (!resultado.success) notFound();
 
   const { items } = resultado.data;
-  const destacado = items[0];
+  // El destacado lo elige el dueño desde la prenda; si no hay ninguno, la
+  // portada cae a la primera publicada para no quedar vacía.
+  const destacado = items.find((item) => item.destacado) ?? items[0];
   const fotos = items.flatMap((item) => (item.portada ? [item.portada] : []));
 
   return (
@@ -96,7 +98,7 @@ export default async function PolkalinasPage() {
               {destacado && (
                 <Link
                   href={`/polkalinas/${destacado.id}`}
-                  aria-label={`Pieza única: ${destacado.name}, $ ${formatPrice(destacado.price)}`}
+                  aria-label={`Pieza única: ${destacado.name}, ${destacado.talles?.[0] ?? ""},$ ${formatPrice(destacado.price)}`}
                   className="absolute bottom-[18px] left-[18px] flex w-36 flex-col items-center gap-1.5 rounded-[14px] border border-hairline bg-background px-3.5 py-3 text-center"
                 >
                   <span
