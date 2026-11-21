@@ -5,6 +5,7 @@ import { Product } from "@prisma/client";
 import { updateProduct, deleteProduct, toggleProductActive, updateProductExtended } from "@/app/actions/product";
 import { sumStock, type StockSource } from "@/lib/inventory-stock";
 import { PrendaForm } from "./PrendaForm";
+import { ProductForm } from "@/app/productos/components/ProductForm";
 import Swal from "sweetalert2";
 
 interface InventarioCardProps {
@@ -20,6 +21,11 @@ type SerializedProduct = Omit<Product, "createdAt" | "updatedAt"> & {
   createdAt: string;
   updatedAt: string;
 };
+
+/** Fila de `BranchInventory` tal como la devuelve `getProductsWithBranchStock`. */
+type BranchStockRow = { stock: number; branch?: { id: number; name: string } | null };
+
+const MAX_SUCURSALES_VISIBLES = 3;
 
 function getStockStatus(stock: number): {
   color: string;
@@ -37,6 +43,9 @@ function getStockStatus(stock: number): {
 
 export function InventarioCard({ product, dataProductId, isHighlighted, onViewMovements, categories = [] }: InventarioCardProps) {
   const [isEditing, setIsEditing] = useState(false);
+  // Un producto normal se edita con el mismo modal del alta: el editor inline
+  // de la card quedó sin uso (ver `isEditing`), el dueño decide si se borra.
+  const [isEditingProduct, setIsEditingProduct] = useState(false);
   // Una prenda no se edita con el formulario de producto: tiene su ficha (U3).
   const [isEditingPrenda, setIsEditingPrenda] = useState(false);
   // Sum stock across all branch rows: correct for "Todas" and for a single branch.
@@ -54,7 +63,7 @@ export function InventarioCard({ product, dataProductId, isHighlighted, onViewMo
       setIsEditingPrenda(true);
       return;
     }
-    setIsEditing(true);
+    setIsEditingProduct(true);
   };
 
   const handleCancel = () => {
@@ -171,6 +180,17 @@ export function InventarioCard({ product, dataProductId, isHighlighted, onViewMo
     );
   }
 
+  // Mismo refresh que la prenda: la card se vuelve a leer del servidor.
+  if (isEditingProduct) {
+    return (
+      <ProductForm
+        product={product}
+        onClose={() => setIsEditingProduct(false)}
+        onSuccess={() => window.location.reload()}
+      />
+    );
+  }
+
    if (isEditing) {
      // Edit mode - show form
      return (
@@ -277,6 +297,15 @@ export function InventarioCard({ product, dataProductId, isHighlighted, onViewMo
     }).format(num);
   };
 
+  // Sucursales donde el producto tiene stock > 0: una etiqueta por sucursal.
+  const stockBranches = (
+    (product as unknown as { inventory?: BranchStockRow[] }).inventory ?? []
+  ).filter((row): row is BranchStockRow & { branch: { id: number; name: string } } =>
+    row.stock > 0 && !!row.branch
+  );
+  const visibleBranches = stockBranches.slice(0, MAX_SUCURSALES_VISIBLES);
+  const hiddenBranches = stockBranches.length - visibleBranches.length;
+
 // View mode - show product info
    return (
      <div className={`glass rounded-2xl border border-hairline-soft p-4 ${isHighlighted ? "ring-2 ring-info" : ""}`} data-product-id={dataProductId}>
@@ -304,6 +333,29 @@ export function InventarioCard({ product, dataProductId, isHighlighted, onViewMo
            <span className="text-sm font-semibold text-ink">{formatPrice(product.price)}</span>
          </div>
        </div>
+
+       {/* Etiquetas de sucursal: en mobile envuelven y el nombre se recorta. */}
+       {stockBranches.length > 0 && (
+         <ul className="mt-3 flex flex-wrap gap-1.5" aria-label="Sucursales con stock">
+           {visibleBranches.map((row) => (
+             <li
+               key={row.branch.id}
+               aria-label={`Stock en ${row.branch.name}: ${row.stock} unidades`}
+               className="inline-block max-w-full truncate rounded-full bg-surface-strong px-2.5 py-1 text-xs text-ink-muted"
+             >
+               {row.branch.name} · {row.stock}
+             </li>
+           ))}
+           {hiddenBranches > 0 && (
+             <li
+               aria-label={`${hiddenBranches} sucursales más`}
+               className="inline-block rounded-full bg-surface-strong px-2.5 py-1 text-xs text-ink-muted"
+             >
+               +{hiddenBranches}
+             </li>
+           )}
+         </ul>
+       )}
 
        {/* Los botones se envuelven: en un celular chico no entran los tres en una fila. */}
        <div className="mt-3 flex flex-wrap gap-2 border-t border-hairline-soft pt-3">
