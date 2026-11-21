@@ -9,6 +9,7 @@ import {
 } from "@/app/actions/foto";
 import {
   MAX_BYTES_FOTO,
+  MAX_BYTES_ORIGEN,
   MAX_FOTOS,
   PRODUCT_IMAGES_BUCKET,
   nombreFoto,
@@ -20,6 +21,8 @@ import {
  * la posición 0 es la portada. El archivo se redimensiona acá en el navegador
  * (máx. ~1200px para la ficha y ~400px para la miniatura, WebP) y se sube
  * directo al bucket con una URL firmada; la fila la escribe `confirmarFoto`.
+ * El original puede ser grande (hasta `MAX_BYTES_ORIGEN`): lo que se mide
+ * contra `MAX_BYTES_FOTO` es el WebP resultante, no el archivo de entrada.
  *
  * En el alta la prenda/producto todavía no existe: las fotos quedan pendientes
  * y el formulario las sube con `subirFotos` cuando la creación devuelve el id.
@@ -28,6 +31,8 @@ import {
 const LADO_LG = 1200;
 const LADO_SM = 400;
 const CALIDAD_WEBP = 0.85;
+const CALIDAD_MINIMA = 0.5;
+const PASO_CALIDAD = 0.07;
 
 /** Foto ya guardada, tal como la devuelve `getFotosProducto`. */
 export type FotoGuardada = { position: number; path: string; alt: string | null };
@@ -42,17 +47,30 @@ export interface FotoUploaderProps {
 }
 
 /** URL pública y estable de un tamaño de la foto (bucket público, ADR-08). */
-export const urlFoto = (path: string, tamano: TamanoFoto = "sm") =>
-  `${process.env.NEXT_PUBLIC_SUPABASE_STORAGE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""}/storage/v1/object/public/${PRODUCT_IMAGES_BUCKET}/${nombreFoto(path, tamano)}`;
+export const urlFoto = (productId: number, path: string, tamano: TamanoFoto = "sm") =>
+  `${process.env.NEXT_PUBLIC_SUPABASE_STORAGE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""}/storage/v1/object/public/${PRODUCT_IMAGES_BUCKET}/${nombreFoto(productId, path, tamano)}`;
 
-/** Rechaza antes de firmar: el peso y el tipo se validan en el cliente. */
+/** Rechaza antes de firmar: el tipo y el peso del ORIGINAL se validan acá. */
 const validarArchivo = (archivo: File): string | null => {
   if (!archivo.type.startsWith("image/")) return `«${archivo.name}» no es una imagen`;
-  if (archivo.size > MAX_BYTES_FOTO) return `«${archivo.name}» supera los 2 MB`;
+  if (archivo.size > MAX_BYTES_ORIGEN) return `«${archivo.name}» supera los 25 MB`;
   return null;
 };
 
-/** Redimensiona sin ampliar: el lado mayor queda en `lado` y se guarda en WebP. */
+const aWebp = (lienzo: HTMLCanvasElement, calidad: number) =>
+  new Promise<Blob>((resolver, rechazar) =>
+    lienzo.toBlob(
+      (blob) => (blob ? resolver(blob) : rechazar(new Error("No se pudo convertir la imagen"))),
+      "image/webp",
+      calidad
+    )
+  );
+
+/**
+ * Redimensiona sin ampliar (el lado mayor queda en `lado`) y baja la calidad
+ * de a `PASO_CALIDAD` hasta que el WebP entre en `MAX_BYTES_FOTO`. Las
+ * dimensiones no se tocan: un celular de 8 MB entra igual.
+ */
 export async function redimensionar(archivo: File, lado: number): Promise<Blob> {
   const bitmap = await createImageBitmap(archivo);
   const escala = Math.min(1, lado / Math.max(bitmap.width, bitmap.height));
@@ -64,13 +82,12 @@ export async function redimensionar(archivo: File, lado: number): Promise<Blob> 
   contexto.drawImage(bitmap, 0, 0, lienzo.width, lienzo.height);
   bitmap.close?.();
 
-  return new Promise<Blob>((resolver, rechazar) =>
-    lienzo.toBlob(
-      (blob) => (blob ? resolver(blob) : rechazar(new Error("No se pudo convertir la imagen"))),
-      "image/webp",
-      CALIDAD_WEBP
-    )
-  );
+  for (let calidad = CALIDAD_WEBP; calidad >= CALIDAD_MINIMA - 1e-9; calidad -= PASO_CALIDAD) {
+    const blob = await aWebp(lienzo, calidad);
+    if (blob.size <= MAX_BYTES_FOTO) return blob;
+  }
+
+  throw new Error(`«${archivo.name}» no se pudo comprimir por debajo de 2 MB`);
 }
 
 /** SHA-256 en hex del `lg`: es el prefijo que guarda `ProductImage.path`. */
@@ -104,7 +121,7 @@ export async function subirFoto(
     const sm = await redimensionar(archivo, LADO_SM);
     const hash = await hashDe(lg);
 
-    const firmada = await firmarSubidaFoto({ hash, bytes: lg.size });
+    const firmada = await firmarSubidaFoto({ productId, hash, bytes: lg.size });
     if (!firmada.success) return { success: false, error: firmada.error };
 
     for (const [tamano, blob] of [
@@ -116,7 +133,16 @@ export async function subirFoto(
         headers: { "Content-Type": "image/webp" },
         body: blob,
       });
-      if (!subida.ok) return { success: false, error: "No se pudo subir la foto" };
+      if (!subida.ok) {
+        // 400/403 = la URL firmada ya no sirve (vence a las 2 h).
+        const vencida = subida.status === 400 || subida.status === 403;
+        return {
+          success: false,
+          error: vencida
+            ? `No se pudo subir la foto (HTTP ${subida.status}): el enlace de subida venció, reintentá`
+            : `No se pudo subir la foto (HTTP ${subida.status})`,
+        };
+      }
     }
 
     const confirmada = await confirmarFoto({ productId, hash, alt, bytes: lg.size });
@@ -125,7 +151,9 @@ export async function subirFoto(
       : { success: false, error: confirmada.error ?? "No se pudo confirmar la foto" };
   } catch (error) {
     console.error("Error al subir la foto:", error);
-    return { success: false, error: "No se pudo procesar la foto" };
+    // Los errores de compresión ya traen un mensaje útil para el usuario.
+    const mensaje = error instanceof Error && error.message ? error.message : null;
+    return { success: false, error: mensaje ?? "No se pudo procesar la foto" };
   }
 }
 
@@ -148,6 +176,9 @@ export function FotoUploader({ productId, onPendientesChange }: FotoUploaderProp
   const [subiendo, setSubiendo] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Las fotos guardadas solo existen con producto (en el alta la lista está vacía).
+  const idProducto = productId ?? 0;
 
   const total = fotos.length + pendientes.length;
 
@@ -252,8 +283,8 @@ export function FotoUploader({ productId, onPendientesChange }: FotoUploaderProp
           ＋ Agregar fotos
         </label>
         <p className="mt-2 text-xs text-ink-muted">
-          En el celular, tocá para elegir; en la compu podés arrastrarlas. Hasta {MAX_FOTOS} fotos
-          de 2 MB.
+          En el celular, tocá para elegir; en la compu podés arrastrarlas. Hasta {MAX_FOTOS} fotos:
+          las achicamos y comprimimos solas.
         </p>
       </div>
 
@@ -275,7 +306,7 @@ export function FotoUploader({ productId, onPendientesChange }: FotoUploaderProp
               {/* Bucket público con URL estable: la miniatura va sin optimizador. */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={urlFoto(foto.path)}
+                src={urlFoto(idProducto, foto.path)}
                 alt={foto.alt ?? `Foto ${indice + 1}`}
                 className="aspect-square w-full object-cover"
               />

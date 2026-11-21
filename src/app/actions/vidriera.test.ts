@@ -245,7 +245,7 @@ describe("getVidriera — qué se publica (S2)", () => {
       price: 45000,
       kind: "PRENDA",
       estado: "DISPONIBLE",
-      portada: expect.stringMatching(/\/product-images\/hash-portada_sm\.webp$/),
+      portada: expect.stringMatching(/\/product-images\/1\/hash-portada_sm\.webp$/),
       categoria: "Camperas",
     });
   });
@@ -374,11 +374,11 @@ describe("getVidrieraItem — ficha pública (T5)", () => {
       talles: ["M", "S"],
       fotos: [
         {
-          url: expect.stringMatching(/\/product-images\/hash-portada_lg\.webp$/),
+          url: expect.stringMatching(/\/product-images\/1\/hash-portada_lg\.webp$/),
           alt: "Campera de frente",
         },
         {
-          url: expect.stringMatching(/\/product-images\/hash-espalda_lg\.webp$/),
+          url: expect.stringMatching(/\/product-images\/1\/hash-espalda_lg\.webp$/),
           // Sin alt cargado se usa el nombre: nunca queda una foto sin texto.
           alt: "Campera de jean",
         },
@@ -428,7 +428,7 @@ describe("getVidrieraItem — ficha pública (T5)", () => {
       talles: [],
       fotos: [
         {
-          url: expect.stringMatching(/\/product-images\/hash-perfume_lg\.webp$/),
+          url: expect.stringMatching(/\/product-images\/3\/hash-perfume_lg\.webp$/),
           alt: "Perfume floral",
         },
       ],

@@ -34,6 +34,7 @@ const hashSchema = z
   .regex(/^[a-f0-9]{16,64}$/i, "Hash de archivo inválido");
 
 const firmarSchema = z.object({
+  productId: z.number().int().positive("Producto inválido"),
   hash: hashSchema,
   bytes: z
     .number()
@@ -62,7 +63,8 @@ type SubidaFirmada = { path: string; token: string; signedUrl: string };
 
 /**
  * Emite las dos URLs firmadas de una foto. El path lo calcula el servidor a
- * partir del hash, así el cliente solo puede escribir `<hash>_lg/_sm.webp`.
+ * partir del producto y el hash, así el cliente solo puede escribir
+ * `<productId>/<hash>_lg/_sm.webp` y dos productos nunca comparten objeto.
  *
  * shortcut: la URL de subida vence a las 2 h que fija Storage; `supabase-js` no
  * expone `expiresIn` para subidas firmadas. El riesgo está acotado: la URL solo
@@ -78,7 +80,7 @@ export async function firmarSubidaFoto(data: unknown) {
     const subidas = {} as Record<TamanoFoto, SubidaFirmada>;
 
     for (const tamano of TAMANOS_FOTO) {
-      const path = nombreFoto(parsed.hash, tamano);
+      const path = nombreFoto(parsed.productId, parsed.hash, tamano);
       const { data: firmada, error } = await bucket.createSignedUploadUrl(path);
 
       if (error || !firmada) {
@@ -202,7 +204,7 @@ export async function quitarFoto(data: unknown) {
 
     const { error } = await createAdminClient()
       .storage.from(PRODUCT_IMAGES_BUCKET)
-      .remove(nombresFoto(borrada));
+      .remove(nombresFoto(parsed.productId, borrada));
     if (error) console.error("No se pudieron borrar las fotos del bucket:", error);
 
     revalidatePath("/inventario");

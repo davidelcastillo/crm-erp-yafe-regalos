@@ -45,8 +45,8 @@ export type VidrieraFicha = VidrieraItem & {
 
 /** URL pública y estable del bucket (ADR-08). Mismo criterio que `urlFoto`;
  * lee la variable pública de storage cuando está definida (desarrollo local). */
-const urlFoto = (path: string, tamano: TamanoFoto) =>
-  `${process.env.NEXT_PUBLIC_SUPABASE_STORAGE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""}/storage/v1/object/public/${PRODUCT_IMAGES_BUCKET}/${nombreFoto(path, tamano)}`;
+const urlFoto = (productId: number, path: string, tamano: TamanoFoto) =>
+  `${process.env.NEXT_PUBLIC_SUPABASE_STORAGE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""}/storage/v1/object/public/${PRODUCT_IMAGES_BUCKET}/${nombreFoto(productId, path, tamano)}`;
 
 const SELECT_LISTA = {
   id: true,
@@ -118,7 +118,7 @@ const aPublico = (
   price: Number(fila.price),
   kind: fila.kind,
   estado: estadoDe(fila, stock, reservado, vendido),
-  portada: fila.images[0] ? urlFoto(fila.images[0].path, "sm") : null,
+  portada: fila.images[0] ? urlFoto(fila.id, fila.images[0].path, "sm") : null,
   categoria: fila.prenda?.categoria?.name ?? null,
 });
 
@@ -262,7 +262,7 @@ export async function getVidrieraItem(data: unknown) {
       data: {
         ...item,
         fotos: fila.images.map((foto) => ({
-          url: urlFoto(foto.path, "lg"),
+          url: urlFoto(fila.id, foto.path, "lg"),
           // Sin alt cargado se usa el nombre: la foto nunca queda sin texto.
           alt: foto.alt ?? fila.name,
         })),

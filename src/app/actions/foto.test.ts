@@ -5,10 +5,11 @@
  * `firmarSubidaFoto`, `confirmarFoto`, `quitarFoto` y `getFotosProducto`.
  *
  * Lo que se fija acá: guardián admin primero en las cuatro acciones, hash y
- * bytes validados antes de tocar Storage, dos URLs firmadas por foto
- * (`<hash>_lg.webp` para la ficha y `<hash>_sm.webp` para la miniatura), tope
- * de 4 con posición libre (0 = portada), borrado que compacta las posiciones
- * sin huecos y limpieza del bucket best-effort después de la transacción.
+ * bytes validados antes de tocar Storage, dos URLs firmadas por foto bajo el
+ * path del producto (`<productId>/<hash>_lg.webp` y `<productId>/<hash>_sm.webp`)
+ * para que dos productos con la misma imagen no compartan objeto, tope de 4 con
+ * posición libre (0 = portada), borrado que compacta las posiciones sin huecos
+ * y limpieza del bucket best-effort después de la transacción.
  */
 import { confirmarFoto, firmarSubidaFoto, getFotosProducto, quitarFoto } from "./foto";
 import { prisma } from "@/lib/prisma";
@@ -99,8 +100,8 @@ describe("guardián admin primero", () => {
 });
 
 describe("convención de dos tamaños", () => {
-  test("los nombres salen del hash: lg para la ficha, sm para la miniatura", () => {
-    expect(nombresFoto(HASH)).toEqual([`${HASH}_lg.webp`, `${HASH}_sm.webp`]);
+  test("los nombres salen del producto y el hash: lg para la ficha, sm para la miniatura", () => {
+    expect(nombresFoto(7, HASH)).toEqual([`7/${HASH}_lg.webp`, `7/${HASH}_sm.webp`]);
   });
 
   test("la primera posición libre es la menor de 0..3; sin lugar devuelve null", () => {
@@ -112,38 +113,40 @@ describe("convención de dos tamaños", () => {
 });
 
 describe("firmarSubidaFoto", () => {
-  test("firma una subida por tamaño con el tiempo corto y el hash del cliente", async () => {
-    const result = await firmarSubidaFoto({ hash: HASH, bytes: 180_000 });
+  test("firma una subida por tamaño bajo el path del producto", async () => {
+    const result = await firmarSubidaFoto({ productId: 7, hash: HASH, bytes: 180_000 });
 
     expect(result).toEqual({
       success: true,
       data: {
         subidas: {
           lg: {
-            path: `${HASH}_lg.webp`,
-            token: `token-${HASH}_lg.webp`,
-            signedUrl: `https://storage.test/${HASH}_lg.webp`,
+            path: `7/${HASH}_lg.webp`,
+            token: `token-7/${HASH}_lg.webp`,
+            signedUrl: `https://storage.test/7/${HASH}_lg.webp`,
           },
           sm: {
-            path: `${HASH}_sm.webp`,
-            token: `token-${HASH}_sm.webp`,
-            signedUrl: `https://storage.test/${HASH}_sm.webp`,
+            path: `7/${HASH}_sm.webp`,
+            token: `token-7/${HASH}_sm.webp`,
+            signedUrl: `https://storage.test/7/${HASH}_sm.webp`,
           },
         },
       },
     });
     expect(mockCreateSignedUploadUrl).toHaveBeenCalledTimes(2);
-    expect(mockCreateSignedUploadUrl).toHaveBeenNthCalledWith(1, `${HASH}_lg.webp`);
-    expect(mockCreateSignedUploadUrl).toHaveBeenNthCalledWith(2, `${HASH}_sm.webp`);
+    expect(mockCreateSignedUploadUrl).toHaveBeenNthCalledWith(1, `7/${HASH}_lg.webp`);
+    expect(mockCreateSignedUploadUrl).toHaveBeenNthCalledWith(2, `7/${HASH}_sm.webp`);
   });
 
   test.each([
-    ["hash ausente", {}],
-    ["hash no hexadecimal", { hash: "campera-de-jean", bytes: 1_000 }],
-    ["hash demasiado corto", { hash: "abc123", bytes: 1_000 }],
-    ["bytes cero", { hash: HASH, bytes: 0 }],
-    ["bytes negativos", { hash: HASH, bytes: -5 }],
-    ["bytes por encima de 2 MB", { hash: HASH, bytes: 2 * 1024 * 1024 + 1 }],
+    ["productId ausente", { hash: HASH, bytes: 1_000 }],
+    ["productId inválido", { productId: 0, hash: HASH, bytes: 1_000 }],
+    ["hash ausente", { productId: 7 }],
+    ["hash no hexadecimal", { productId: 7, hash: "campera-de-jean", bytes: 1_000 }],
+    ["hash demasiado corto", { productId: 7, hash: "abc123", bytes: 1_000 }],
+    ["bytes cero", { productId: 7, hash: HASH, bytes: 0 }],
+    ["bytes negativos", { productId: 7, hash: HASH, bytes: -5 }],
+    ["bytes por encima de 2 MB", { productId: 7, hash: HASH, bytes: 2 * 1024 * 1024 + 1 }],
   ])("rechaza %s sin firmar nada", async (_caso, payload) => {
     const result = await firmarSubidaFoto(payload);
 
@@ -157,7 +160,7 @@ describe("firmarSubidaFoto", () => {
       error: { message: "bucket no existe" },
     });
 
-    const result = await firmarSubidaFoto({ hash: HASH, bytes: 1_000 });
+    const result = await firmarSubidaFoto({ productId: 7, hash: HASH, bytes: 1_000 });
 
     expect(result.success).toBe(false);
   });
@@ -260,7 +263,7 @@ describe("quitarFoto", () => {
 
     await quitarFoto({ productId: 7, position: 0 });
 
-    expect(mockRemove).toHaveBeenCalledWith(nombresFoto(HASH));
+    expect(mockRemove).toHaveBeenCalledWith(nombresFoto(7, HASH));
     expect(mockPrisma.$transaction.mock.invocationCallOrder[0]).toBeLessThan(
       mockRemove.mock.invocationCallOrder[0]
     );

@@ -3,10 +3,13 @@
  *
  * Fotos del producto (S1, T2 de `odd/tasks/fotos-vidriera-polkalinas.md`).
  *
- * Lo que se fija acá: el tipo y el peso se rechazan en el cliente ANTES de
- * firmar, el orden firmar → subir `lg` → subir `sm` → confirmar con los bytes
- * reales, el tope de 4, la portada marcada (posición 0), el borrado de una foto
- * guardada y que en el alta las fotos queden pendientes sin firmar nada.
+ * Lo que se fija acá: el tipo se rechaza en el cliente ANTES de firmar, un
+ * original grande se comprime hasta entrar en 2 MB (bajando la calidad, no el
+ * lado), el orden firmar → subir `lg` → subir `sm` → confirmar con los bytes
+ * reales, el path con `productId` para que dos productos con la misma imagen no
+ * compartan objeto, el error del PUT con su status, el tope de 4, la portada
+ * marcada (posición 0), el borrado de una foto guardada y que en el alta las
+ * fotos queden pendientes sin firmar nada.
  */
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { FotoUploader, hashDe, subirFoto, urlFoto } from "./FotoUploader";
@@ -28,6 +31,13 @@ const mockGetFotos = getFotosProducto as jest.MockedFunction<typeof getFotosProd
 /** SHA-256 simulado: 32 bytes en 7 → hash hex "07" repetido 64 veces. */
 const HASH = "07".repeat(32);
 
+const MB = 1024 * 1024;
+
+/** jsdom no dibuja: cada test arranca con el `toBlob` simulado (1 byte). */
+const toBlobStub = function (callback: BlobCallback) {
+  callback(new Blob(["x"], { type: "image/webp" }));
+} as HTMLCanvasElement["toBlob"];
+
 const archivo = (name = "foto.jpg", type = "image/jpeg", size = 1000) => {
   const file = new File(["x"], name, { type });
   Object.defineProperty(file, "size", { value: size });
@@ -44,9 +54,7 @@ beforeAll(() => {
   HTMLCanvasElement.prototype.getContext = jest.fn(() => ({
     drawImage: jest.fn(),
   })) as unknown as HTMLCanvasElement["getContext"];
-  HTMLCanvasElement.prototype.toBlob = function (callback: BlobCallback) {
-    callback(new Blob(["x"], { type: "image/webp" }));
-  } as HTMLCanvasElement["toBlob"];
+  HTMLCanvasElement.prototype.toBlob = toBlobStub;
   (globalThis as { createImageBitmap?: unknown }).createImageBitmap = jest.fn(
     async () => ({ width: 1600, height: 900, close: jest.fn() })
   );
@@ -59,12 +67,14 @@ beforeAll(() => {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  HTMLCanvasElement.prototype.toBlob = toBlobStub;
+  (globalThis as { fetch?: unknown }).fetch = jest.fn(async () => ({ ok: true }));
   mockFirmar.mockResolvedValue({
     success: true,
     data: {
       subidas: {
-        lg: { path: `${HASH}_lg.webp`, token: "t-lg", signedUrl: "https://storage.test/lg" },
-        sm: { path: `${HASH}_sm.webp`, token: "t-sm", signedUrl: "https://storage.test/sm" },
+        lg: { path: `7/${HASH}_lg.webp`, token: "t-lg", signedUrl: "https://storage.test/lg" },
+        sm: { path: `7/${HASH}_sm.webp`, token: "t-sm", signedUrl: "https://storage.test/sm" },
       },
     },
   } as never);
@@ -85,13 +95,45 @@ describe("FotoUploader: validación en el cliente", () => {
     expect(mockConfirmar).not.toHaveBeenCalled();
   });
 
-  it("rechaza un archivo de más de 2 MB sin firmar nada", async () => {
+  it("rechaza un original de más de 25 MB sin firmar nada", async () => {
     render(<FotoUploader productId={7} />);
     const input = screen.getByLabelText(/agregar fotos/i) as HTMLInputElement;
 
-    elegirArchivos(input, [archivo("grande.jpg", "image/jpeg", 3 * 1024 * 1024)]);
+    elegirArchivos(input, [archivo("enorme.jpg", "image/jpeg", 30 * MB)]);
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(/2 MB/i);
+    expect(await screen.findByRole("alert")).toHaveTextContent(/25 MB/i);
+    expect(mockFirmar).not.toHaveBeenCalled();
+  });
+
+  it("acepta un original de 5 MB y lo comprime bajando la calidad", async () => {
+    // 0.85 y 0.78 dan más de 2 MB; recién en 0.71 entra (5 MB entra en 3 pasos).
+    HTMLCanvasElement.prototype.toBlob = function (callback: BlobCallback, _tipo, calidad) {
+      const bytes = calidad !== undefined && calidad > 0.75 ? 3 * MB : 500 * 1000;
+      callback(new Blob([new Uint8Array(bytes)], { type: "image/webp" }));
+    } as HTMLCanvasElement["toBlob"];
+
+    render(<FotoUploader productId={7} />);
+    const input = screen.getByLabelText(/agregar fotos/i) as HTMLInputElement;
+
+    elegirArchivos(input, [archivo("celular.jpg", "image/jpeg", 5 * MB)]);
+
+    await waitFor(() => expect(mockConfirmar).toHaveBeenCalled());
+    const cuerpos = (fetch as jest.Mock).mock.calls.map(
+      ([, opciones]: [string, { body: Blob }]) => opciones.body.size
+    );
+    expect(cuerpos).toHaveLength(2);
+    for (const bytes of cuerpos) expect(bytes).toBeLessThanOrEqual(2 * MB);
+  });
+
+  it("rechaza con un mensaje útil si ni en calidad mínima entra en 2 MB", async () => {
+    HTMLCanvasElement.prototype.toBlob = function (callback: BlobCallback) {
+      callback(new Blob([new Uint8Array(3 * MB)], { type: "image/webp" }));
+    } as HTMLCanvasElement["toBlob"];
+
+    const resultado = await subirFoto(7, archivo("pesada.jpg", "image/jpeg", 6 * MB));
+
+    expect(resultado).toMatchObject({ success: false });
+    expect(resultado.success === false && resultado.error).toMatch(/pesada\.jpg.*2 MB/i);
     expect(mockFirmar).not.toHaveBeenCalled();
   });
 });
@@ -104,7 +146,7 @@ describe("FotoUploader: subida", () => {
     elegirArchivos(input, [archivo()]);
 
     await waitFor(() => expect(mockConfirmar).toHaveBeenCalled());
-    expect(mockFirmar).toHaveBeenCalledWith({ hash: HASH, bytes: 1 });
+    expect(mockFirmar).toHaveBeenCalledWith({ productId: 7, hash: HASH, bytes: 1 });
     // Un PUT por tamaño, en el orden en que se firmaron.
     expect((fetch as jest.Mock).mock.calls).toEqual([
       ["https://storage.test/lg", expect.objectContaining({ method: "PUT" })],
@@ -166,7 +208,7 @@ describe("FotoUploader: fotos existentes", () => {
     expect(screen.getAllByRole("img")).toHaveLength(2);
     expect(screen.getByRole("img", { name: /foto 1/i })).toHaveAttribute(
       "src",
-      urlFoto("hash-portada")
+      urlFoto(7, "hash-portada")
     );
   });
 
@@ -189,9 +231,9 @@ describe("FotoUploader: fotos existentes", () => {
 });
 
 describe("FotoUploader: helpers de subida", () => {
-  it("urlFoto deriva la miniatura del path guardado", () => {
-    expect(urlFoto("abc")).toMatch(/\/product-images\/abc_sm\.webp$/);
-    expect(urlFoto("abc", "lg")).toMatch(/\/product-images\/abc_lg\.webp$/);
+  it("urlFoto deriva el path con producto y la miniatura del hash guardado", () => {
+    expect(urlFoto(7, "abc")).toMatch(/\/product-images\/7\/abc_sm\.webp$/);
+    expect(urlFoto(7, "abc", "lg")).toMatch(/\/product-images\/7\/abc_lg\.webp$/);
   });
 
   it("hashDe devuelve el SHA-256 en hex", async () => {
@@ -199,11 +241,27 @@ describe("FotoUploader: helpers de subida", () => {
   });
 
   it("subirFoto corta si el PUT falla y no confirma", async () => {
-    (globalThis as { fetch?: unknown }).fetch = jest.fn(async () => ({ ok: false }));
+    (globalThis as { fetch?: unknown }).fetch = jest.fn(async () => ({ ok: false, status: 413 }));
 
     const resultado = await subirFoto(7, archivo());
 
     expect(resultado.success).toBe(false);
     expect(mockConfirmar).not.toHaveBeenCalled();
+  });
+
+  it("el error del PUT incluye el status HTTP", async () => {
+    (globalThis as { fetch?: unknown }).fetch = jest.fn(async () => ({ ok: false, status: 413 }));
+
+    const resultado = await subirFoto(7, archivo());
+
+    expect(resultado.success === false && resultado.error).toMatch(/HTTP 413/);
+  });
+
+  it("distingue la URL de subida vencida y sugiere reintentar", async () => {
+    (globalThis as { fetch?: unknown }).fetch = jest.fn(async () => ({ ok: false, status: 403 }));
+
+    const resultado = await subirFoto(7, archivo());
+
+    expect(resultado.success === false && resultado.error).toMatch(/venci[oó].*reintent/i);
   });
 });
