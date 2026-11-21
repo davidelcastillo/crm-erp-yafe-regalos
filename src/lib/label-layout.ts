@@ -57,8 +57,10 @@ export const CUT_MARK_COLOR = PDF_BRAND_COLOR.cacao;
 // --- Colores de la marca --------------------------------------------------
 /** Fondo de la etiqueta. */
 export const LABEL_BACKGROUND_COLOR = PDF_BRAND_COLOR.cream;
-/** Cajas del código y del precio. */
+/** Cajas del código y del precio: el rosa de la marca. */
 export const BOX_COLOR = PDF_BRAND_COLOR.pink;
+/** Caja del importe: rosa muy claro, para que el número a 20 pt no se vea pesado. */
+export const PRICE_BOX_COLOR = PDF_BRAND_COLOR.pinkSoft;
 /** `$` y el handle «Polkalina's». */
 export const TEXT_COLOR = PDF_BRAND_COLOR.cacao;
 /** Código del producto: en negrita y en cacao, para que se lea de lejos (L12). */
@@ -92,6 +94,17 @@ export const HANDLE_TEXT = "Polkalina's";
 export const HANDLE_TOP_MM = PRICE_BOX_TOP_MM + PRICE_BOX_HEIGHT_MM; // 20,7
 /** Ancho máximo del handle: 88 % de la caja (23,4 mm). */
 export const HANDLE_MAX_WIDTH_RATIO = 0.88;
+/**
+ * Alto máximo de la tinta del handle dentro de su banda. Shrikhand declara
+ * 1,458 em de alto de línea, más que la banda entera (2,8 mm): lo que se mide
+ * es la tinta, y se deja un 10 % de aire arriba y abajo.
+ */
+export const HANDLE_MAX_HEIGHT_RATIO = 0.9;
+/**
+ * Alto de la tinta de «Polkalina's» sobre la línea base, medido en el TTF: 0,75
+ * em (y 0,009 em por debajo, que se desprecia). Es lo que centra la banda.
+ */
+export const HANDLE_INK_ASCENT_EM = 0.75;
 
 // --- Tamaños de fuente (pt) ----------------------------------------------
 export const CODE_FONT_SIZE_PT = 12;
@@ -101,6 +114,15 @@ export const PRICE_FONT_SIZE_PT = 20;
  * glifo a 0,89 em, así que 5,5 / 0,89 ≈ 6,18 mm ≈ 17,5 pt.
  */
 export const DOLLAR_FONT_SIZE_PT = 17.5;
+
+/**
+ * Mínimos legibles: por debajo de esto la etiqueta ya no se lee de lejos. Si el
+ * importe no entra a 8 pt se parte en dos líneas (entero y centavos) en vez de
+ * achicarlo más; el handle baja como mucho a 9 pt.
+ */
+export const CODE_MIN_FONT_SIZE_PT = 8;
+export const AMOUNT_MIN_FONT_SIZE_PT = 8;
+export const HANDLE_MIN_FONT_SIZE_PT = 9;
 
 /** Esquina superior izquierda de una etiqueta dentro de su hoja. */
 export interface LabelSlot {
@@ -189,4 +211,15 @@ export function formatPrice(price: number): string {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
+}
+
+/**
+ * El mismo importe en dos líneas, para cuando ni al mínimo legible entra en una:
+ * parte entera y `,` + centavos. Conserva el dato completo (no se pierden los
+ * centavos).
+ */
+export function formatPriceLines(price: number): [string, string] {
+  const formatted = formatPrice(price);
+  const comma = formatted.lastIndexOf(',');
+  return [formatted.slice(0, comma), formatted.slice(comma)];
 }

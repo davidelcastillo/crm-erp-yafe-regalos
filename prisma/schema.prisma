@@ -26,6 +26,8 @@ model Product {
   // Aditivo: una prenda es un Product con ficha PrendaDetalle (variante C).
   kind              ProductKind         @default(PRODUCT)
   prenda            PrendaDetalle?
+  // Estilos del producto normal (las prendas los tienen en su ficha).
+  estilosProducto   ProductEstilo[]
   publicaciones     PrendaPublicacion[]
   images            ProductImage[]
   purchaseItems     PurchaseItem[]
@@ -361,7 +363,8 @@ model EstiloPrenda {
   id      Int            @id @default(autoincrement())
   name    String         @unique
   active  Boolean        @default(true)
-  prendas PrendaEstilo[]
+  prendas  PrendaEstilo[]
+  productos ProductEstilo[]
 }
 
 model PrendaEstilo {
@@ -369,6 +372,17 @@ model PrendaEstilo {
   estiloId  Int
   prenda    PrendaDetalle @relation(fields: [productId], references: [productId], onDelete: Cascade)
   estilo    EstiloPrenda  @relation(fields: [estiloId], references: [id])
+
+  @@id([productId, estiloId])
+  @@index([estiloId])
+}
+
+// Estilos de un producto normal (los de prenda viven en PrendaEstilo).
+model ProductEstilo {
+  productId Int
+  estiloId  Int
+  product   Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  estilo    EstiloPrenda @relation(fields: [estiloId], references: [id])
 
   @@id([productId, estiloId])
   @@index([estiloId])

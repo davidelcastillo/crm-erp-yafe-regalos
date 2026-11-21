@@ -1,7 +1,7 @@
 /**
  * Integration test for createProduct Server Action
  */
-import { createProduct, createProductsBatch, getProducts, searchProducts, updateProductExtended } from "../actions/product";
+import { createProduct, createProductsBatch, getProductById, getProducts, searchProducts, updateProductExtended } from "../actions/product";
 import { createProductSchema, createProductsBatchSchema } from "@/lib/validations/product";
 import { prefixLockKey } from "@/lib/utils/product-code";
 import { revalidatePath } from "next/cache";
@@ -24,6 +24,10 @@ jest.mock("@/lib/prisma", () => {
   const mockProductUpdate = jest.fn();
   const mockPublicacionCreateMany = jest.fn();
   const mockPublicacionDeleteMany = jest.fn();
+  // Estilos del producto (`ProductEstilo`, la misma taxonomía que la prenda).
+  const mockEstiloFindMany = jest.fn();
+  const mockProductEstiloCreateMany = jest.fn();
+  const mockProductEstiloDeleteMany = jest.fn();
   const mockTransaction = jest.fn(async (callback: (tx: unknown) => Promise<unknown>) => {
     const tx = {
       product: {
@@ -44,6 +48,11 @@ jest.mock("@/lib/prisma", () => {
         createMany: mockPublicacionCreateMany,
         deleteMany: mockPublicacionDeleteMany,
       },
+      productEstilo: {
+        createMany: mockProductEstiloCreateMany,
+        deleteMany: mockProductEstiloDeleteMany,
+      },
+      estiloPrenda: { findMany: mockEstiloFindMany },
       purchase: { create: mockPurchaseCreate },
       purchaseItem: { createMany: mockPurchaseItemCreateMany },
       $executeRawUnsafe: mockExecuteRawUnsafe,
@@ -82,6 +91,11 @@ jest.mock("@/lib/prisma", () => {
         createMany: mockPublicacionCreateMany,
         deleteMany: mockPublicacionDeleteMany,
       },
+      productEstilo: {
+        createMany: mockProductEstiloCreateMany,
+        deleteMany: mockProductEstiloDeleteMany,
+      },
+      estiloPrenda: { findMany: mockEstiloFindMany },
     },
   };
 });

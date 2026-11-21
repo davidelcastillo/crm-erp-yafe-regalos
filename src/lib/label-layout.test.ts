@@ -1,7 +1,13 @@
 // src/lib/label-layout.test.ts
 import {
+  AMOUNT_MIN_FONT_SIZE_PT,
+  CODE_MIN_FONT_SIZE_PT,
   CODE_TEXT_COLOR,
+  PRICE_BOX_COLOR,
   PRICE_TEXT_COLOR,
+  HANDLE_INK_ASCENT_EM,
+  HANDLE_MAX_HEIGHT_RATIO,
+  HANDLE_MIN_FONT_SIZE_PT,
   BOX_COLOR,
   BOX_LEFT_MM,
   BOX_WIDTH_MM,
@@ -39,7 +45,23 @@ import {
   calculateSheetCount,
   cutMarksForSlot,
   formatPrice,
+  formatPriceLines,
 } from './label-layout';
+
+/** Luminancia relativa de un hex, para medir contraste (WCAG 2.1). */
+const luminance = (hex: string) => {
+  const [r, g, b] = [1, 3, 5].map((i) => {
+    const c = parseInt(hex.slice(i, i + 2), 16) / 255;
+    return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+
+/** Contraste entre dos hex (1 = ninguno, 21 = negro sobre blanco). */
+const contrast = (a: string, b: string) => {
+  const [claro, oscuro] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (claro + 0.05) / (oscuro + 0.05);
+};
 
 describe('label-layout.ts — hoja A4 horizontal 9 × 8 (S6)', () => {
   test('la hoja es A4 horizontal y la grilla entra exacta', () => {
@@ -199,5 +221,42 @@ describe('formatPrice', () => {
   test('formatea en es-AR con dos decimales y sin símbolo', () => {
     expect(formatPrice(1250)).toBe('1.250,00');
     expect(formatPrice(99.5)).toBe('99,50');
+  });
+});
+
+// L13: con textos largos nada se sale de la caja y nada baja del mínimo legible.
+describe('label-layout.ts — textos largos y legibilidad', () => {
+  test('deja un mínimo legible para el código, el importe y el handle', () => {
+    expect(CODE_MIN_FONT_SIZE_PT).toBeGreaterThanOrEqual(8);
+    expect(AMOUNT_MIN_FONT_SIZE_PT).toBeGreaterThanOrEqual(8);
+    expect(HANDLE_MIN_FONT_SIZE_PT).toBeGreaterThanOrEqual(9);
+    expect(HANDLE_MIN_FONT_SIZE_PT).toBeLessThanOrEqual(10);
+  });
+
+  test('el handle entra en su banda sin bajar de 9 pt', () => {
+    const bandaPt = (LABEL_HEIGHT_MM - HANDLE_TOP_MM) * (72 / 25.4);
+    // La tinta del handle (no su caja de línea) tiene que caber en la banda.
+    expect(HANDLE_MIN_FONT_SIZE_PT * HANDLE_INK_ASCENT_EM).toBeLessThanOrEqual(
+      bandaPt * HANDLE_MAX_HEIGHT_RATIO
+    );
+    expect(HANDLE_MAX_HEIGHT_RATIO).toBeLessThanOrEqual(1);
+  });
+
+  test('el importe va en cacao sobre un rosa muy claro, no sobre el rosa saturado', () => {
+    expect(PRICE_TEXT_COLOR).toBe('#4A2C2A');
+    // La caja del importe se aclara; la del código conserva el rosa de la marca.
+    expect(PRICE_BOX_COLOR).not.toBe(BOX_COLOR);
+    // Contraste AAA (>= 7) contra la caja y contra el fondo crema.
+    expect(contrast(PRICE_TEXT_COLOR, PRICE_BOX_COLOR)).toBeGreaterThanOrEqual(7);
+    expect(contrast(PRICE_TEXT_COLOR, LABEL_BACKGROUND_COLOR)).toBeGreaterThanOrEqual(7);
+    // Y el par elegido sigue siendo más suave que el rosa saturado.
+    expect(luminance(PRICE_BOX_COLOR)).toBeGreaterThan(luminance(BOX_COLOR));
+  });
+});
+
+describe('formatPriceLines', () => {
+  test('parte el importe en entero y centavos sin perder el dato', () => {
+    expect(formatPriceLines(299999999.99)).toEqual(['299.999.999', ',99']);
+    expect(formatPriceLines(1250)).toEqual(['1.250', ',00']);
   });
 });

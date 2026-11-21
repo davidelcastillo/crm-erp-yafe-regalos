@@ -13,6 +13,11 @@ export const PDF_BRAND_COLOR = {
   cream: '#FFF6F0',
   /** `--accent-soft` / `--palette-brand-rosa`: cajas de la etiqueta. */
   pink: '#F2C4CC',
+  /**
+   * Rosa muy claro para la caja del importe: en el rosa saturado el número a
+   * 20 pt pesaba demasiado al imprimir. El cacao encima da ~11:1 de contraste.
+   */
+  pinkSoft: '#FBE7EC',
   /** `--ink` / `--palette-near-black`: código, precio y texto de las tablas. */
   cacao: '#4A2C2A',
   /** `--ink-muted` / `--palette-secondary-gray`: metadatos y pie. */

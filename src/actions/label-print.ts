@@ -19,6 +19,7 @@ import { drawBrandLogo } from '@/lib/utils/pdf-logo';
 import { SHRIKHAND_TTF_BASE64 } from '@/lib/fonts/shrikhand';
 import { generateStockMovementPdf } from '@/lib/utils/stock-movement-pdf';
 import {
+  AMOUNT_MIN_FONT_SIZE_PT,
   BOX_COLOR,
   BOX_LEFT_MM,
   BOX_WIDTH_MM,
@@ -27,13 +28,17 @@ import {
   CODE_BOX_TOP_MM,
   CODE_FONT_SIZE_PT,
   CODE_MAX_WIDTH_RATIO,
+  CODE_MIN_FONT_SIZE_PT,
   CURRENCY_SYMBOL,
   CUT_MARK_COLOR,
   CUT_MARK_WIDTH_MM,
   cutMarksForSlot,
   DOLLAR_FONT_SIZE_PT,
   DOLLAR_INSET_MM,
+  HANDLE_INK_ASCENT_EM,
+  HANDLE_MAX_HEIGHT_RATIO,
   HANDLE_MAX_WIDTH_RATIO,
+  HANDLE_MIN_FONT_SIZE_PT,
   HANDLE_TEXT,
   HANDLE_TOP_MM,
   LABELS_PER_SHEET,
@@ -41,6 +46,7 @@ import {
   LABEL_HEIGHT_MM,
   LABEL_WIDTH_MM,
   MM_TO_PT,
+  PRICE_BOX_COLOR,
   PRICE_BOX_HEIGHT_MM,
   PRICE_BOX_RADIUS_MM,
   PRICE_BOX_TOP_MM,
@@ -54,6 +60,7 @@ import {
   calculateLabelSlots,
   calculateSheetCount,
   formatPrice,
+  formatPriceLines,
   type LabelSlot,
 } from '@/lib/label-layout';
 import {
@@ -119,15 +126,21 @@ const color = (hex: string) =>
   );
 
 /**
- * Tamaño de fuente que entra en `maxWidthPt` sin pasar `maxSizePt`: el más chico
- * entre el tamaño base y el que ocupa exactamente el ancho disponible.
+ * Tamaño de fuente que entra en `maxWidthPt` sin pasar `maxSizePt` ni bajar de
+ * `minSizePt`: el más chico entre el tamaño base y el que ocupa exactamente el
+ * ancho disponible.
  */
 const fitFontSize = (
   font: PDFFont,
   text: string,
   maxWidthPt: number,
-  maxSizePt: number
-) => Math.min(maxSizePt, maxWidthPt / Math.max(font.widthOfTextAtSize(text, 1), 1e-6));
+  maxSizePt: number,
+  minSizePt = 0
+) =>
+  Math.max(
+    Math.min(minSizePt, maxSizePt),
+    Math.min(maxSizePt, maxWidthPt / Math.max(font.widthOfTextAtSize(text, 1), 1e-6))
+  );
 
 /** mm desde el borde superior de la hoja al borde inferior de pdf-lib. */
 const yFromTop = (topMm: number, heightMm: number) =>
@@ -195,8 +208,9 @@ const drawCutMarks = (page: PDFPage, slots: LabelSlot[]) => {
 type LabelContent = { code: string; price: number };
 
 /**
- * Una etiqueta: fondo, cajas redondeadas y sus cuatro textos. Sin contenido se
- * dibuja solo el fondo rosa, que es el relleno para escribir a mano (S4).
+ * Una etiqueta: fondo, cajas redondeadas y sus textos (código, `$`, importe y
+ * handle; el importe se parte en dos líneas si no entra en una). Sin contenido
+ * se dibuja solo el fondo crema, que es el relleno para escribir a mano (S4).
  */
 const drawLabel = (
   page: PDFPage,
@@ -236,7 +250,8 @@ const drawLabel = (
     bold,
     code,
     boxWidthPt * CODE_MAX_WIDTH_RATIO,
-    CODE_FONT_SIZE_PT
+    CODE_FONT_SIZE_PT,
+    CODE_MIN_FONT_SIZE_PT
   );
   const codeWidth = bold.widthOfTextAtSize(code, codeSize);
   const codeAscent = bold.heightAtSize(codeSize, { descender: false });
@@ -248,7 +263,7 @@ const drawLabel = (
     color: color(CODE_TEXT_COLOR),
   });
 
-  // Caja del precio.
+  // Caja del precio: rosa muy claro, para que el número a 20 pt no pese tanto.
   const priceBoxTop = slot.y + PRICE_BOX_TOP_MM;
   drawRoundedRect(page, {
     x: mm(boxX),
@@ -256,7 +271,7 @@ const drawLabel = (
     width: boxWidthPt,
     height: mm(PRICE_BOX_HEIGHT_MM),
     radius: mm(PRICE_BOX_RADIUS_MM),
-    fill: color(BOX_COLOR),
+    fill: color(PRICE_BOX_COLOR),
   });
 
   // `$` e importe comparten la línea de base, centrada en la caja.
@@ -266,39 +281,70 @@ const drawLabel = (
   const dollarX = mm(boxX) + mm(DOLLAR_INSET_MM);
   const amountMaxWidth =
     boxWidthPt - mm(DOLLAR_INSET_MM) - dollarWidth - mm(PRICE_GAP_MM) - mm(DOLLAR_INSET_MM);
-  const amountSize = fitFontSize(bold, amount, amountMaxWidth, PRICE_FONT_SIZE_PT);
+  const priceCenterY = yFromTop(priceBoxTop, PRICE_BOX_HEIGHT_MM) + mm(PRICE_BOX_HEIGHT_MM) / 2;
+
+  // Al mínimo legible el importe todavía tiene que entrar: si no, se parte en
+  // dos líneas (entero y centavos) antes que achicarlo más o recortarlo.
+  const oneLineSize = fitFontSize(bold, amount, amountMaxWidth, PRICE_FONT_SIZE_PT);
+  let amountLines = [amount];
+  let amountSize = Math.max(AMOUNT_MIN_FONT_SIZE_PT, oneLineSize);
+  if (oneLineSize < AMOUNT_MIN_FONT_SIZE_PT) {
+    amountLines = formatPriceLines(price);
+    amountSize = Math.min(
+      ...amountLines.map((line) =>
+        fitFontSize(bold, line, amountMaxWidth, PRICE_FONT_SIZE_PT, AMOUNT_MIN_FONT_SIZE_PT)
+      )
+    );
+    // shortcut: el entero partido entra hasta diez cifras; de ahí para arriba
+    // no habría más salida que recortar, fuera del rango de la tienda.
+  }
+
   const amountAscent = bold.heightAtSize(amountSize, { descender: false });
-  const priceBaseline =
-    mm(SHEET_HEIGHT_MM - priceBoxTop) - (mm(PRICE_BOX_HEIGHT_MM) + amountAscent) / 2;
+  const amountBaselines =
+    amountLines.length === 1
+      ? [priceCenterY - amountAscent / 2]
+      : [priceCenterY + amountSize * 0.55, priceCenterY - amountSize * 0.55];
 
   page.drawText(CURRENCY_SYMBOL, {
     x: dollarX,
-    y: priceBaseline,
+    y: amountBaselines[0],
     size: dollarSize,
     font: display,
     color: inkColor,
   });
 
-  page.drawText(amount, {
-    x: dollarX + dollarWidth + mm(PRICE_GAP_MM),
-    y: priceBaseline,
-    size: amountSize,
-    font: bold,
-    color: color(PRICE_TEXT_COLOR),
+  amountLines.forEach((line, lineIndex) => {
+    page.drawText(line, {
+      x: dollarX + dollarWidth + mm(PRICE_GAP_MM),
+      y: amountBaselines[lineIndex],
+      size: amountSize,
+      font: bold,
+      color: color(PRICE_TEXT_COLOR),
+    });
   });
 
-  // Handle debajo de la caja del precio, centrado y ajustado al 88 % del ancho.
-  const handleSize = fitFontSize(display, HANDLE_TEXT, boxWidthPt * HANDLE_MAX_WIDTH_RATIO, Infinity);
+  // Handle debajo de la caja del precio, centrado en el ancho útil. Shrikhand
+  // declara 1,458 em de alto de línea contra 0,75 em de tinta: se centra la
+  // tinta dentro de la banda, o el handle se come la caja del precio y el pie
+  // de la etiqueta.
+  const handleBandPt = mm(LABEL_HEIGHT_MM - HANDLE_TOP_MM);
+  const handleSize = fitFontSize(
+    display,
+    HANDLE_TEXT,
+    boxWidthPt * HANDLE_MAX_WIDTH_RATIO,
+    (handleBandPt * HANDLE_MAX_HEIGHT_RATIO) / HANDLE_INK_ASCENT_EM,
+    HANDLE_MIN_FONT_SIZE_PT
+  );
   const handleWidth = display.widthOfTextAtSize(HANDLE_TEXT, handleSize);
-  const handleAscent = display.heightAtSize(handleSize, { descender: false }) / MM_TO_PT;
-  const handleHeight = display.heightAtSize(handleSize) / MM_TO_PT;
-  // La banda libre va desde el pie de la caja del precio hasta el borde de la celda.
-  const bandTop = slot.y + HANDLE_TOP_MM;
-  const bandHeight = LABEL_HEIGHT_MM - HANDLE_TOP_MM;
-  const handleBaseline = bandTop + (bandHeight - handleHeight) / 2 + handleAscent;
+  const handleInkHeightMm = (handleSize * HANDLE_INK_ASCENT_EM) / MM_TO_PT;
+  const handleBaselineMm =
+    slot.y +
+    HANDLE_TOP_MM +
+    (LABEL_HEIGHT_MM - HANDLE_TOP_MM - handleInkHeightMm) / 2 +
+    handleInkHeightMm;
   page.drawText(HANDLE_TEXT, {
     x: mm(boxX) + (boxWidthPt - handleWidth) / 2,
-    y: mm(SHEET_HEIGHT_MM - handleBaseline),
+    y: mm(SHEET_HEIGHT_MM - handleBaselineMm),
     size: handleSize,
     font: display,
     color: inkColor,
