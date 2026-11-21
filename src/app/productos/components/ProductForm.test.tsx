@@ -80,6 +80,15 @@ const mockUpdateProductExtended = updateProductExtended as jest.MockedFunction<
 const mockGetProductById = getProductById as jest.MockedFunction<typeof getProductById>;
 const mockSubirFotos = subirFotos as jest.MockedFunction<typeof subirFotos>;
 
+/**
+ * El alta es un wizard (2 pasos): la sucursal primero y la ficha después. Los
+ * campos de la ficha solo existen en el paso 2.
+ */
+const irAlPaso2 = async () => {
+  fireEvent.click(screen.getByRole("button", { name: /continuar/i }));
+  await screen.findByLabelText(/nombre/i);
+};
+
 describe("ProductForm Component", () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -118,24 +127,49 @@ describe("ProductForm Component", () => {
     });
   });
 
-  it("renders form fields correctly (create mode)", () => {
+  it("renders the create form as a two-step wizard, branch first", async () => {
     render(<ProductForm product={null} onClose={() => {}} />);
 
-    expect(screen.getByLabelText(/nombre/i)).toBeInTheDocument();
+    // Paso 1: sucursal, con la opción explícita de no cargar stock.
+    expect(screen.getByText(/paso 1 de 2 · elegí la sucursal/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /sin sucursal/i })).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
+    // Sin sucursal elegida se puede continuar: el producto se crea sin stock.
+    expect(screen.getByRole("button", { name: /continuar/i })).toBeEnabled();
+    expect(screen.queryByLabelText(/nombre/i)).not.toBeInTheDocument();
+
+    await irAlPaso2();
+
+    expect(screen.getByText(/paso 2 de 2/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/descripción/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/prefijo.*2-4 letras/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/precio de venta/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /crear producto/i })).toBeInTheDocument();
-    // No initial stock field anymore (stock lives in BranchInventory)
-    expect(screen.queryByLabelText(/cantidad inicial/i)).not.toBeInTheDocument();
-    // Category selector is rendered
+    // Categoría, fotos y canales viven en el paso 2.
     expect(screen.getByTestId("category-selector")).toBeInTheDocument();
+    expect(screen.getByText("Fotos")).toBeInTheDocument();
     // Active toggle is NOT shown in create mode (defaults to active=true)
     expect(screen.queryByRole("switch")).not.toBeInTheDocument();
   });
 
+  it("cantidad y costo se cargan siempre: sin sucursal el aviso lo explica", async () => {
+    render(<ProductForm product={null} onClose={() => {}} />);
+    await irAlPaso2();
+
+    expect(screen.getByLabelText(/cantidad inicial/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^costo/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /sin sucursal: no se carga stock; el costo igual queda registrado como compra/i
+      )
+    ).toBeInTheDocument();
+  });
+
   it("shows validation error when required fields are empty", async () => {
     render(<ProductForm product={null} onClose={() => {}} />);
+    await irAlPaso2();
 
     const submitButton = screen.getByRole("button", { name: /crear producto/i });
     fireEvent.click(submitButton);
@@ -149,6 +183,7 @@ describe("ProductForm Component", () => {
 
   it("calls createProduct with correct data when form is submitted", async () => {
     render(<ProductForm product={null} onClose={() => {}} />);
+    await irAlPaso2();
 
     const nameInput = screen.getByLabelText(/nombre/i);
     const descInput = screen.getByLabelText(/descripción/i);
@@ -174,12 +209,17 @@ describe("ProductForm Component", () => {
         categoryId: null,
         // Sin canales elegidos no publica en ninguno (T3).
         publicadaEn: [],
+        // Sin sucursal el payload no lleva branchId, pero la cantidad y el
+        // costo viajan siempre (se registran como compra).
+        cantidadInicial: 0,
+        costoUnitario: 0,
       });
     });
   });
 
   it("sends the chosen category in the create payload (H2)", async () => {
     render(<ProductForm product={null} onClose={() => {}} />);
+    await irAlPaso2();
 
     fireEvent.change(screen.getByLabelText(/nombre/i), { target: { value: "Con categoría" } });
     fireEvent.change(screen.getByLabelText(/prefijo.*2-4 letras/i), { target: { value: "AA" } });
@@ -199,6 +239,7 @@ describe("ProductForm Component", () => {
 
   it("keeps the create payload valid for the schema when no category is chosen", async () => {
     render(<ProductForm product={null} onClose={() => {}} />);
+    await irAlPaso2();
 
     fireEvent.change(screen.getByLabelText(/nombre/i), { target: { value: "Sin categoría" } });
     fireEvent.change(screen.getByLabelText(/prefijo.*2-4 letras/i), { target: { value: "AA" } });
@@ -218,6 +259,7 @@ describe("ProductForm Component", () => {
     mockCreateProduct.mockResolvedValue({ success: false, error: "El nombre es requerido" });
 
     render(<ProductForm product={null} onClose={() => {}} />);
+    await irAlPaso2();
 
     const nameInput = screen.getByLabelText(/nombre/i);
     const prefixInput = screen.getByLabelText(/prefijo.*2-4 letras/i);
@@ -284,6 +326,7 @@ describe("ProductForm Component", () => {
         onSuccess={onSuccessMock}
       />
     );
+    await irAlPaso2();
 
     const nameInput = screen.getByLabelText(/nombre/i);
     const prefixInput = screen.getByLabelText(/prefijo.*2-4 letras/i);
@@ -313,6 +356,7 @@ describe("ProductForm Component", () => {
     });
 
     render(<ProductForm product={null} onClose={onCloseMock} />);
+    await irAlPaso2();
 
     const nameInput = screen.getByLabelText(/nombre/i);
     const prefixInput = screen.getByLabelText(/prefijo.*2-4 letras/i);
@@ -502,10 +546,10 @@ describe("ProductForm Component", () => {
 });
 
 /**
- * T3 (odd/tasks/talles-y-compra-alta.md): el alta individual gana sucursal,
- * cantidad inicial y costo. Sin sucursal elegida el alta queda como hoy.
+ * Alta sin sucursal (pedido del dueño): la sucursal es opcional en el wizard y
+ * el costo se registra como compra igual, con la cantidad que da las unidades.
  */
-describe("ProductForm · alta con stock y costo (T3)", () => {
+describe("ProductForm · alta sin sucursal", () => {
   const SUCURSALES = [
     { id: 1, name: "Sucursal Centro" },
     { id: 2, name: "Sucursal Norte" },
@@ -513,16 +557,11 @@ describe("ProductForm · alta con stock y costo (T3)", () => {
 
   const mockGetBranchOptions = getBranchOptions as jest.MockedFunction<typeof getBranchOptions>;
 
-  /** Elige la sucursal y espera los campos que dependen de ella. */
-  const elegirSucursal = async () => {
-    fireEvent.click(await screen.findByRole("button", { name: "Sucursal Centro" }));
-    await screen.findByLabelText(/cantidad inicial/i);
-  };
-
-  const llenarAlta = () => {
-    fireEvent.change(screen.getByLabelText(/nombre/i), { target: { value: "Jabón de Avena" } });
-    fireEvent.change(screen.getByLabelText(/prefijo.*2-4 letras/i), { target: { value: "AA" } });
-    fireEvent.change(screen.getByLabelText(/precio de venta/i), { target: { value: "1500" } });
+  /** Paso 1 → elige la sucursal y continúa a la ficha. */
+  const elegirSucursal = async (nombre: string) => {
+    const opcion = await screen.findByRole("button", { name: nombre });
+    fireEvent.click(opcion);
+    await irAlPaso2();
   };
 
   beforeEach(() => {
@@ -531,19 +570,24 @@ describe("ProductForm · alta con stock y costo (T3)", () => {
     mockCreateProduct.mockResolvedValue({ success: true, data: { id: 1 } } as never);
   });
 
-  it("sin sucursal elegida no muestra cantidad inicial ni costo", async () => {
+  const llenarFicha = () => {
+    fireEvent.change(screen.getByLabelText(/nombre/i), { target: { value: "Jabón de Avena" } });
+    fireEvent.change(screen.getByLabelText(/prefijo.*2-4 letras/i), { target: { value: "AA" } });
+    fireEvent.change(screen.getByLabelText(/precio de venta/i), { target: { value: "1500" } });
+  };
+
+  it("sin sucursal manda cantidad y costo y NO manda branchId", async () => {
     render(<ProductForm product={null} onClose={() => {}} />);
 
-    expect(await screen.findByRole("group", { name: "Sucursal" })).toBeInTheDocument();
-    expect(screen.queryByLabelText(/cantidad inicial/i)).not.toBeInTheDocument();
-    expect(screen.queryByLabelText(/^costo/i)).not.toBeInTheDocument();
-  });
+    // La opción de no cargar stock arranca elegida y el paso 2 la mantiene.
+    expect(await screen.findByRole("button", { name: "Sucursal Centro" })).toHaveAttribute(
+      "aria-pressed",
+      "false"
+    );
+    await irAlPaso2();
+    expect(screen.getByText(/paso 2 de 2 · sin sucursal/i)).toBeInTheDocument();
 
-  it("con sucursal carga cantidad y costo, y el payload los lleva", async () => {
-    render(<ProductForm product={null} onClose={() => {}} />);
-    llenarAlta();
-    await elegirSucursal();
-
+    llenarFicha();
     fireEvent.change(screen.getByLabelText(/cantidad inicial/i), { target: { value: "5" } });
     fireEvent.change(screen.getByLabelText(/^costo/i), { target: { value: "100" } });
     fireEvent.click(screen.getByRole("button", { name: /crear producto/i }));
@@ -551,16 +595,34 @@ describe("ProductForm · alta con stock y costo (T3)", () => {
     await waitFor(() => expect(mockCreateProduct).toHaveBeenCalled());
 
     const payload = mockCreateProduct.mock.calls[0][0];
+    expect(payload).not.toHaveProperty("branchId");
     expect(payload).toEqual(
-      expect.objectContaining({ branchId: 1, cantidadInicial: 5, costoUnitario: 100 })
+      expect.objectContaining({ cantidadInicial: 5, costoUnitario: 100 })
     );
     expect(createProductSchema.safeParse(payload).success).toBe(true);
   });
 
+  it("con sucursal manda branchId, cantidad y costo", async () => {
+    render(<ProductForm product={null} onClose={() => {}} />);
+    await elegirSucursal("Sucursal Centro");
+    expect(screen.getByText(/paso 2 de 2 · sucursal centro/i)).toBeInTheDocument();
+
+    llenarFicha();
+    fireEvent.change(screen.getByLabelText(/cantidad inicial/i), { target: { value: "5" } });
+    fireEvent.change(screen.getByLabelText(/^costo/i), { target: { value: "100" } });
+    fireEvent.click(screen.getByRole("button", { name: /crear producto/i }));
+
+    await waitFor(() => expect(mockCreateProduct).toHaveBeenCalled());
+
+    expect(mockCreateProduct.mock.calls[0][0]).toEqual(
+      expect.objectContaining({ branchId: 1, cantidadInicial: 5, costoUnitario: 100 })
+    );
+  });
+
   it("con sucursal y sin costo el payload viaja con costo 0", async () => {
     render(<ProductForm product={null} onClose={() => {}} />);
-    llenarAlta();
-    await elegirSucursal();
+    await elegirSucursal("Sucursal Centro");
+    llenarFicha();
     fireEvent.change(screen.getByLabelText(/cantidad inicial/i), { target: { value: "3" } });
     fireEvent.click(screen.getByRole("button", { name: /crear producto/i }));
 
@@ -571,7 +633,27 @@ describe("ProductForm · alta con stock y costo (T3)", () => {
     );
   });
 
-  it("en la edición no hay sucursal, cantidad ni costo", async () => {
+  it("se puede volver a «Sin sucursal» después de elegir una", async () => {
+    render(<ProductForm product={null} onClose={() => {}} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Sucursal Centro" }));
+    expect(screen.getByRole("button", { name: "Sucursal Centro" })).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /sin sucursal/i }));
+    expect(screen.getByRole("button", { name: /sin sucursal/i })).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
+    expect(screen.getByRole("button", { name: "Sucursal Centro" })).toHaveAttribute(
+      "aria-pressed",
+      "false"
+    );
+  });
+
+  it("en la edición no hay wizard, sucursal, cantidad ni costo", async () => {
     const product = {
       id: 1,
       name: "Producto Existente",
@@ -587,6 +669,8 @@ describe("ProductForm · alta con stock y costo (T3)", () => {
 
     render(<ProductForm product={product} onClose={() => {}} />);
 
+    expect(screen.queryByText(/paso 1 de 2/i)).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/nombre/i)).toBeInTheDocument();
     expect(screen.queryByRole("group", { name: "Sucursal" })).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/cantidad inicial/i)).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/^costo/i)).not.toBeInTheDocument();
@@ -608,7 +692,8 @@ describe("ProductForm · fotos y «Publicar en» (T2/T3)", () => {
     mockUpdateProductExtended.mockResolvedValue({ success: true, data: { id: 1 } } as never);
   });
 
-  const llenarAlta = () => {
+  const llenarAlta = async () => {
+    await irAlPaso2();
     fireEvent.change(screen.getByLabelText(/nombre/i), { target: { value: "Jabón de Avena" } });
     fireEvent.change(screen.getByLabelText(/prefijo.*2-4 letras/i), { target: { value: "AA" } });
     fireEvent.change(screen.getByLabelText(/precio de venta/i), { target: { value: "1500" } });
@@ -619,8 +704,9 @@ describe("ProductForm · fotos y «Publicar en» (T2/T3)", () => {
     fireEvent.change(input);
   };
 
-  it("muestra la sección de fotos en el alta", () => {
+  it("muestra la sección de fotos en el alta", async () => {
     render(<ProductForm product={null} onClose={() => {}} />);
+    await irAlPaso2();
 
     expect(screen.getByText("Fotos")).toBeInTheDocument();
     expect(screen.getByLabelText(/agregar fotos/i)).toBeInTheDocument();
@@ -628,7 +714,7 @@ describe("ProductForm · fotos y «Publicar en» (T2/T3)", () => {
 
   it("manda publicadaEn con los canales elegidos", async () => {
     render(<ProductForm product={null} onClose={() => {}} />);
-    llenarAlta();
+    await llenarAlta();
     fireEvent.click(screen.getByLabelText("Web"));
 
     fireEvent.click(screen.getByRole("button", { name: /crear producto/i }));
@@ -641,7 +727,7 @@ describe("ProductForm · fotos y «Publicar en» (T2/T3)", () => {
 
   it("sin canales elegidos manda publicadaEn vacío", async () => {
     render(<ProductForm product={null} onClose={() => {}} />);
-    llenarAlta();
+    await llenarAlta();
 
     fireEvent.click(screen.getByRole("button", { name: /crear producto/i }));
 
@@ -688,7 +774,7 @@ describe("ProductForm · fotos y «Publicar en» (T2/T3)", () => {
     mockCreateProduct.mockResolvedValue({ success: true, data: { id: 12 } } as never);
 
     render(<ProductForm product={null} onClose={() => {}} />);
-    llenarAlta();
+    await llenarAlta();
     elegirFoto(screen.getByLabelText(/agregar fotos/i) as HTMLInputElement, [
       new File(["x"], "foto.jpg", { type: "image/jpeg" }),
     ]);

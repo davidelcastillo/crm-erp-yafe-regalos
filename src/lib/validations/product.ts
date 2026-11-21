@@ -43,8 +43,9 @@ const productFields = {
 /**
  * Alta individual (T3 de `talles-y-compra-alta.md`): gana sucursal, cantidad
  * inicial y costo, todos opcionales. Sin ellos el alta queda exactamente como
- * antes. Con cantidad ≥ 1 se crea el inventario y su `ENTRY`; con costo > 0
- * además la compra del alta, que necesita sucursal y cantidad para existir.
+ * antes. Con cantidad ≥ 1 y sucursal se crea el inventario y su `ENTRY`; con
+ * costo > 0 además la compra del alta, que ya no necesita sucursal: la cantidad
+ * cargada es la que da las unidades de la compra.
  */
 export const createProductSchema = z
   .object({
@@ -61,11 +62,11 @@ export const createProductSchema = z
   })
   .superRefine((data, ctx) => {
     if ((data.costoUnitario ?? 0) <= 0) return;
-    if (data.branchId === undefined || (data.cantidadInicial ?? 0) < 1) {
+    if ((data.cantidadInicial ?? 0) < 1) {
       ctx.addIssue({
         code: "custom",
-        message: "Para registrar el costo cargá la sucursal y la cantidad inicial",
-        path: ["costoUnitario"],
+        message: "Para registrar el costo cargá la cantidad inicial (1 o más)",
+        path: ["cantidadInicial"],
       });
     }
   });
@@ -87,8 +88,8 @@ const createProductsBatchRowSchema = z.object({
  * repetida; el choque con un nombre que ya existe se valida en el servidor,
  * contra los productos activos (S3).
  *
- * `branchId` es opcional a propósito: es la sucursal global del lote (D8) y,
- * mientras la UI no la mande, el lote sigue creando solo productos.
+ * `branchId` es opcional a propósito: es la sucursal global del lote (D8). Sin
+ * sucursal el lote crea igual los productos y su compra (sin stock).
  */
 export const createProductsBatchSchema = z
   .object({
@@ -113,14 +114,18 @@ export const createProductsBatchSchema = z
       vistos.add(clave);
     });
 
-    // T4: la compra del lote usa la sucursal global; sin ella el costo se perdería.
-    if (data.branchId === undefined && data.rows.some((row) => (row.costo ?? 0) > 0)) {
-      ctx.addIssue({
-        code: "custom",
-        message: "Para registrar el costo elegí la sucursal del lote",
-        path: ["branchId"],
-      });
-    }
+    // Sin sucursal no hay stock, así que la cantidad de la fila es la única
+    // fuente de unidades de la compra: sin ella el costo se perdería.
+    if (data.branchId !== undefined) return;
+    data.rows.forEach((row, rowIndex) => {
+      if ((row.costo ?? 0) > 0 && (row.initialStock ?? 0) < 1) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Para registrar el costo cargá el stock inicial de esa fila (1 o más)",
+          path: ["rows", rowIndex, "initialStock"],
+        });
+      }
+    });
   });
 
 export type CreateProductsBatchValues = z.infer<typeof createProductsBatchSchema>;

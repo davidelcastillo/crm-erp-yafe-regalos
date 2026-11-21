@@ -59,6 +59,14 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
   const [costo, setCosto] = useState("");
 
   /**
+   * Wizard del alta: 1 = sucursal (o sin sucursal), 2 = ficha. La edición no
+   * tiene pasos.
+   */
+  const [paso, setPaso] = useState(1);
+  const enPasoSucursal = !isEdit && paso === 1;
+  const sucursalElegida = branches.find((b) => b.id === branchId)?.name;
+
+  /**
    * T3: «Publicar en» para productos normales (misma tabla que la prenda).
    * En la edición arranca en `null` hasta que llegan los canales guardados, así
    * guardar sin haber cargado no borra publicaciones.
@@ -167,15 +175,11 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
           // que antes (categoryId=null).
           categoryId: categoryId,
           publicadaEn: publicadaEn ?? [],
-          // Stock inicial y costo solo con sucursal (T3). Sin ella el payload
-          // queda idéntico al de antes.
-          ...(branchId !== null
-            ? {
-                branchId,
-                cantidadInicial: Number(cantidadInicial) || 0,
-                costoUnitario: Number(costo) || 0,
-              }
-            : {}),
+          // La cantidad y el costo viajan siempre: con costo se registra la
+          // compra del alta, haya o no sucursal. Sin sucursal no hay stock.
+          ...(branchId !== null ? { branchId } : {}),
+          cantidadInicial: Number(cantidadInicial) || 0,
+          costoUnitario: Number(costo) || 0,
         };
 
     const result = isEdit
@@ -235,26 +239,73 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
   return (
     <div className="fixed inset-0 bg-scrim-strong backdrop-blur-sm z-[60] flex items-end justify-center">
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="product-form-title"
         className="bg-surface w-full max-w-lg rounded-t-3xl p-6 animate-slide-up max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-semibold text-ink">
-            {isEdit ? "Editar Producto" : "Nuevo Producto"}
-          </h2>
+        <div className="flex justify-between items-start gap-3 mb-6">
+          <div className="min-w-0">
+            <h2 id="product-form-title" className="text-xl font-semibold text-ink">
+              {isEdit ? "Editar Producto" : "Nuevo Producto"}
+            </h2>
+            {!isEdit && (
+              <p className="mt-1 text-sm text-ink-muted">
+                {enPasoSucursal
+                  ? "Paso 1 de 2 · Elegí la sucursal"
+                  : `Paso 2 de 2 · ${sucursalElegida ?? "Sin sucursal"}`}
+              </p>
+            )}
+            {!isEdit && !enPasoSucursal && (
+              <button
+                type="button"
+                onClick={() => setPaso(1)}
+                className="mt-1 text-sm text-accent underline-offset-2 hover:underline"
+              >
+                Cambiar sucursal
+              </button>
+            )}
+          </div>
           <button
             type="button"
             onClick={onClose}
-            className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full hover:bg-surface-strong transition-colors touch-manipulation"
+            className="btn btn-icon btn-round text-ink-muted hover:bg-surface-strong"
             aria-label="Cerrar"
           >
-            <svg className="w-6 h-6 text-ink-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {enPasoSucursal ? (
+            <div className="space-y-3">
+              <BranchPicker
+                branches={branches}
+                value={branchId}
+                onChange={setBranchId}
+                label="Sucursal"
+                columns={2}
+                emptyLabel="No hay sucursales activas: el producto se crea sin stock"
+              />
+              {/* La sucursal es opcional: sin ella el producto nace sin stock. */}
+              <button
+                type="button"
+                aria-pressed={branchId === null}
+                onClick={() => setBranchId(null)}
+                className={`w-full min-h-[44px] rounded-2xl bg-surface px-4 py-3 text-left text-sm font-medium transition-all touch-manipulation ${
+                  branchId === null
+                    ? "border-2 border-accent ring-2 ring-accent/40 text-ink"
+                    : "border border-hairline text-ink-muted"
+                }`}
+              >
+                Sin sucursal (el producto se crea sin stock)
+              </button>
+            </div>
+          ) : (
+            <>
           <div>
             <label htmlFor="product-name" className={labelClass}>Nombre *</label>
             <input
@@ -361,24 +412,9 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
             </>
           )}
 
-          {/* T3: sucursal, cantidad inicial y costo del alta. */}
+          {/* Cantidad y costo: siempre visibles. El costo se registra como
+              compra del alta, haya o no sucursal. */}
           {!isEdit && (
-            <div>
-              <span className={labelClass}>Sucursal</span>
-              <BranchPicker
-                branches={branches}
-                value={branchId}
-                onChange={setBranchId}
-                label="Sucursal"
-                emptyLabel="No hay sucursales activas: el producto se crea sin stock"
-              />
-              <p className="text-xs text-ink-muted mt-1">
-                Sin sucursal: el producto se crea sin stock.
-              </p>
-            </div>
-          )}
-
-          {!isEdit && branchId !== null && (
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label htmlFor="product-cantidad-inicial" className={labelClass}>
@@ -412,10 +448,12 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
                   className={inputClass}
                   placeholder="0.00"
                 />
-                <p className="text-xs text-ink-muted mt-1">
-                  Con costo y cantidad se registra la compra en Compras.
-                </p>
               </div>
+              <p className="col-span-2 text-xs text-ink-muted">
+                {branchId === null
+                  ? "Sin sucursal: no se carga stock; el costo igual queda registrado como compra."
+                  : "Con costo y cantidad se registra la compra en Compras."}
+              </p>
             </div>
           )}
 
@@ -488,18 +526,39 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
             </div>
           )}
 
-          <div>
+          </>
+          )}
+
+          {/* Pie: en el paso 1 se continúa (siempre habilitado); en el 2 se guarda. */}
+          <div className="flex gap-2 pt-2">
             <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-4 min-h-[48px] bg-ink text-surface font-medium rounded-xl hover:bg-ink-body hover:text-surface transition-colors disabled:opacity-50 touch-manipulation"
+              type="button"
+              onClick={onClose}
+              className="px-5 py-4 min-h-[48px] rounded-xl border border-hairline text-ink font-medium hover:bg-surface-strong transition-colors touch-manipulation"
             >
-              {loading
-                ? "Guardando…"
-                : isEdit
-                  ? "Actualizar Producto"
-                  : "Crear Producto"}
+              Cancelar
             </button>
+            {enPasoSucursal ? (
+              <button
+                type="button"
+                onClick={() => setPaso(2)}
+                className="flex-1 py-4 min-h-[48px] bg-ink text-surface font-medium rounded-xl hover:bg-ink-body hover:text-surface transition-colors touch-manipulation"
+              >
+                Continuar
+              </button>
+            ) : (
+              <button
+                type="submit"
+                disabled={loading}
+                className="flex-1 py-4 min-h-[48px] bg-ink text-surface font-medium rounded-xl hover:bg-ink-body hover:text-surface transition-colors disabled:opacity-50 touch-manipulation"
+              >
+                {loading
+                  ? "Guardando…"
+                  : isEdit
+                    ? "Actualizar Producto"
+                    : "Crear Producto"}
+              </button>
+            )}
           </div>
         </form>
       </div>

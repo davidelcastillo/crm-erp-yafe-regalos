@@ -114,29 +114,30 @@ export async function createProduct(data: unknown) {
             });
           }
 
-          // Sin sucursal ni cantidad el alta queda como antes.
-          if (!branch || cantidadInicial < 1) return creado;
+          // Sin sucursal o sin cantidad no hay stock: ni inventario ni ENTRY.
+          if (branch && cantidadInicial >= 1) {
+            await tx.branchInventory.create({
+              data: { branchId: branch.id, productId: creado.id, stock: cantidadInicial },
+            });
 
-          await tx.branchInventory.create({
-            data: { branchId: branch.id, productId: creado.id, stock: cantidadInicial },
-          });
-
-          await tx.branchMovement.create({
-            data: {
-              productId: creado.id,
-              branchId: branch.id,
-              movementType: "ENTRY",
-              quantity: cantidadInicial,
-              reference: PRODUCT_ENTRY_REFERENCE,
-              // `performedBy` es obligatorio: sin email queda un responsable explícito.
-              performedBy: auth.email || "sistema",
-            },
-          });
+            await tx.branchMovement.create({
+              data: {
+                productId: creado.id,
+                branchId: branch.id,
+                movementType: "ENTRY",
+                quantity: cantidadInicial,
+                reference: PRODUCT_ENTRY_REFERENCE,
+                // `performedBy` es obligatorio: sin email queda un responsable explícito.
+                performedBy: auth.email || "sistema",
+              },
+            });
+          }
 
           // T3/S2: con costo > 0 la compra del alta se registra en la misma
           // transacción (solo registro: el ENTRY de arriba ya ingresó el stock).
+          // Sin sucursal la compra queda con `branchId` null.
           if ((validatedData.costoUnitario ?? 0) > 0) {
-            await registrarCompraDelAlta(tx, branch.id, [
+            await registrarCompraDelAlta(tx, branch?.id ?? null, [
               {
                 productId: creado.id,
                 price: validatedData.costoUnitario!,
@@ -349,8 +350,24 @@ export async function createProductsBatch(data: unknown) {
               name: producto.name,
             }));
 
-            // Sin sucursal el lote queda como antes: solo productos.
-            if (!branch) return { products, receipt: null };
+            // T4: UNA sola compra del lote, solo con las filas que tienen costo y
+            // stock cargado. El ENTRY de abajo ya ingresa el stock: la compra no lo toca.
+            const itemsDeCompra = filasCreadas
+              .filter((fila) => fila.costo > 0 && fila.stockInicial > 0)
+              .map(({ producto, stockInicial, costo }) => ({
+                productId: producto.id,
+                price: costo,
+                quantity: stockInicial,
+              }));
+
+            // Sin sucursal no hay stock, pero la compra del alta se registra igual
+            // (branchId null) y el lote no crea inventario ni movimientos.
+            if (!branch) {
+              if (itemsDeCompra.length > 0) {
+                await registrarCompraDelAlta(tx, null, itemsDeCompra);
+              }
+              return { products, receipt: null };
+            }
 
             // S11: la fila de inventario se crea siempre, también con stock 0,
             // para que el producto nuevo se vea en la vista por sucursal (H1).
@@ -382,19 +399,10 @@ export async function createProductsBatch(data: unknown) {
               });
             }
 
-            // T4: UNA sola compra del lote, solo con las filas que tienen costo y
-            // stock. El ENTRY de arriba ya ingresó el stock: la compra no lo toca.
-            const conCompra = conStock.filter((fila) => fila.costo > 0);
-            if (conCompra.length > 0) {
-              await registrarCompraDelAlta(
-                tx,
-                branch.id,
-                conCompra.map(({ producto, stockInicial, costo }) => ({
-                  productId: producto.id,
-                  price: costo,
-                  quantity: stockInicial,
-                }))
-              );
+            // T4: la compra usa el mismo conjunto de filas (costo y stock); el
+            // ENTRY de arriba ya ingresó el stock, así que la compra no lo toca.
+            if (itemsDeCompra.length > 0) {
+              await registrarCompraDelAlta(tx, branch.id, itemsDeCompra);
             }
 
             const receipt: StockMovementReceipt | null =

@@ -1,7 +1,7 @@
 /**
  * Integration test for registerPurchase Server Action (multiple products)
  */
-import { registerPurchase, getPurchases } from "../actions/purchase";
+import { registerPurchase, getPurchases, getPurchaseById } from "../actions/purchase";
 
 // Mock prisma
 const mockBranchFindFirst = jest.fn();
@@ -10,6 +10,7 @@ const mockPurchaseItemCreateMany = jest.fn();
 const mockBranchInventoryUpsert = jest.fn();
 const mockPurchaseItemFindMany = jest.fn();
 const mockPurchaseFindMany = jest.fn();
+const mockPurchaseFindUnique = jest.fn();
 
 jest.mock("@/lib/prisma", () => ({
   prisma: {
@@ -33,6 +34,7 @@ jest.mock("@/lib/prisma", () => ({
     }),
     purchase: {
       findMany: (...args: unknown[]) => mockPurchaseFindMany(...args),
+      findUnique: (...args: unknown[]) => mockPurchaseFindUnique(...args),
     },
   },
 }));
@@ -148,6 +150,52 @@ describe("getPurchases", () => {
     expect(result.success).toBe(true);
     expect(result.data?.[0]?.date).toBe("2026-04-16T17:19:51.968Z");
     expect(result.data?.[0]?.totalAmount).toBe(150);
+  });
+
+  it("sin filtro de sucursal devuelve también las compras sin sucursal", async () => {
+    mockPurchaseFindMany.mockResolvedValue([
+      {
+        id: 9,
+        date: new Date("2026-04-16T17:19:51.968Z"),
+        totalAmount: 120,
+        branchId: null,
+        branch: null,
+        items: [],
+      },
+    ]);
+
+    const result = await getPurchases();
+
+    expect(result.success).toBe(true);
+    // Sin filtro no se ocultan: el where no lleva branchId.
+    expect(mockPurchaseFindMany.mock.calls[0][0].where).toEqual({});
+    const compra = result.data?.[0] as { branch: unknown; branchId: unknown } | undefined;
+    expect(compra?.branch).toBeNull();
+    expect(compra?.branchId).toBeNull();
+  });
+
+  it("con filtro de sucursal siguen filtrándose por branchId", async () => {
+    mockPurchaseFindMany.mockResolvedValue([]);
+
+    await getPurchases({ branchId: 3 });
+
+    expect(mockPurchaseFindMany.mock.calls[0][0].where).toEqual({ branchId: 3 });
+  });
+
+  it("getPurchaseById tolera una compra sin sucursal", async () => {
+    mockPurchaseFindUnique.mockResolvedValue({
+      id: 9,
+      date: new Date("2026-04-16T17:19:51.968Z"),
+      totalAmount: 120,
+      branchId: null,
+      items: [],
+    });
+
+    const result = await getPurchaseById(9);
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect((result.data as { branchId: unknown }).branchId).toBeNull();
   });
 });
 // AGENTS.md §0.2: sesión + rol admin antes de validar y antes de Prisma.

@@ -51,11 +51,11 @@ export function PurchaseCard({ purchase, onExpand, expanded }: PurchaseCardProps
             <p className="text-sm text-ink-muted mt-1 break-words">
               {purchase.items.map(item => item.product.name).join(', ')}
             </p>
-            {purchase.branch && (
-              <span className="inline-block max-w-full truncate align-top mt-1 px-2 py-0.5 bg-info/10 text-info rounded text-xs font-medium">
-                {purchase.branch.name}
-              </span>
-            )}
+            {/* La compra del alta sin sucursal no tiene nombre que mostrar, pero
+                existe: se dice explícitamente en vez de dejarla sin contexto. */}
+            <span className="inline-block max-w-full truncate align-top mt-1 px-2 py-0.5 bg-info/10 text-info rounded text-xs font-medium">
+              {purchase.branch?.name ?? "Sin sucursal"}
+            </span>
           </div>
           <div className="flex shrink-0 flex-col items-end gap-2">
             {/* El monto total entra animado cuando la card se vuelve a pintar (S9),

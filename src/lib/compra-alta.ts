@@ -7,10 +7,13 @@ import type { Prisma } from "@prisma/client";
  * con su propio movimiento `ENTRY`. Reusar `registerPurchase` contaría el
  * stock dos veces, así que este helper solo escribe `Purchase` +
  * `PurchaseItem` y aparece en `/compras` como cualquier compra.
+ *
+ * `branchId` es opcional: el alta sin sucursal no tiene stock que ingresar,
+ * pero el costo igual es un gasto de mercadería y la compra se registra.
  */
 export async function registrarCompraDelAlta(
   tx: Prisma.TransactionClient,
-  branchId: number,
+  branchId: number | null,
   items: Array<{ productId: number; price: number; quantity: number }>
 ): Promise<void> {
   if (items.length === 0) return;

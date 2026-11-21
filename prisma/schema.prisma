@@ -80,8 +80,10 @@ model Purchase {
   createdAt   DateTime       @default(now())
   totalAmount Decimal        @default(0) @db.Decimal(10, 2)
   updatedAt   DateTime       @updatedAt
-  branchId    Int
-  branch      Branch         @relation("BranchPurchases", fields: [branchId], references: [id])
+  // Opcional: la compra del alta de un producto creado SIN sucursal se
+  // registra igual (es un gasto de mercadería, no de una sucursal puntual).
+  branchId    Int?
+  branch      Branch?        @relation("BranchPurchases", fields: [branchId], references: [id])
   items       PurchaseItem[]
 
   @@index([branchId])

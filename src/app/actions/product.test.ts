@@ -14,6 +14,10 @@ jest.mock("@/lib/prisma", () => {
   const mockCategoryFindUnique = jest.fn();
   const mockCategoryFindMany = jest.fn();
   const mockBranchFindFirst = jest.fn();
+  const mockInventoryCreate = jest.fn();
+  const mockMovementCreate = jest.fn();
+  const mockPurchaseCreate = jest.fn();
+  const mockPurchaseItemCreateMany = jest.fn();
   const mockInventoryCreateManyAndReturn = jest.fn();
   const mockMovementCreateMany = jest.fn();
   const mockExecuteRawUnsafe = jest.fn().mockResolvedValue(undefined);
@@ -28,12 +32,20 @@ jest.mock("@/lib/prisma", () => {
         update: mockProductUpdate,
         createManyAndReturn: mockCreateManyAndReturn,
       },
-      branchInventory: { createManyAndReturn: mockInventoryCreateManyAndReturn },
-      branchMovement: { createMany: mockMovementCreateMany },
+      branchInventory: {
+        create: mockInventoryCreate,
+        createManyAndReturn: mockInventoryCreateManyAndReturn,
+      },
+      branchMovement: {
+        create: mockMovementCreate,
+        createMany: mockMovementCreateMany,
+      },
       prendaPublicacion: {
         createMany: mockPublicacionCreateMany,
         deleteMany: mockPublicacionDeleteMany,
       },
+      purchase: { create: mockPurchaseCreate },
+      purchaseItem: { createMany: mockPurchaseItemCreateMany },
       $executeRawUnsafe: mockExecuteRawUnsafe,
     };
     return callback(tx);
@@ -56,8 +68,16 @@ jest.mock("@/lib/prisma", () => {
         findMany: mockCategoryFindMany,
       },
       branch: { findFirst: mockBranchFindFirst },
-      branchInventory: { createManyAndReturn: mockInventoryCreateManyAndReturn },
-      branchMovement: { createMany: mockMovementCreateMany },
+      branchInventory: {
+        create: mockInventoryCreate,
+        createManyAndReturn: mockInventoryCreateManyAndReturn,
+      },
+      branchMovement: {
+        create: mockMovementCreate,
+        createMany: mockMovementCreateMany,
+      },
+      purchase: { create: mockPurchaseCreate },
+      purchaseItem: { createMany: mockPurchaseItemCreateMany },
       prendaPublicacion: {
         createMany: mockPublicacionCreateMany,
         deleteMany: mockPublicacionDeleteMany,
@@ -941,5 +961,141 @@ describe("productos: «Publicar en» (T3)", () => {
 
     expect(publicaciones().deleteMany).not.toHaveBeenCalled();
     expect(publicaciones().createMany).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Alta sin sucursal (pedido del dueño): la sucursal es opcional, el costo se
+ * registra igual como compra y la cantidad cargada es la que da las unidades.
+ */
+describe("createProduct: compra del alta sin sucursal", () => {
+  const alta = { name: "Jabón de Avena", prefix: "AA", price: 100 };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (prisma.product.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.product.create as jest.Mock).mockResolvedValue({
+      id: 9,
+      code: "AA000",
+      name: "Jabón de Avena",
+      price: 100,
+    });
+    (prisma.purchase.create as jest.Mock).mockResolvedValue({ id: 5 });
+  });
+
+  it("sin sucursal registra la compra con branchId null y no toca inventario ni movimientos", async () => {
+    const result = await createProduct({ ...alta, cantidadInicial: 3, costoUnitario: 40 });
+
+    expect(result.success).toBe(true);
+    expect(prisma.branch.findFirst).not.toHaveBeenCalled();
+    expect(prisma.branchInventory.create).not.toHaveBeenCalled();
+    expect(prisma.branchMovement.create).not.toHaveBeenCalled();
+    expect(prisma.purchase.create).toHaveBeenCalledWith({
+      data: { totalAmount: 120, branchId: null },
+    });
+    expect(prisma.purchaseItem.createMany).toHaveBeenCalledWith({
+      data: [{ purchaseId: 5, productId: 9, price: 40, quantity: 3, subtotal: 120 }],
+    });
+  });
+
+  it("con sucursal y costo deja inventario, movimiento y compra", async () => {
+    (prisma.branch.findFirst as jest.Mock).mockResolvedValue({ id: 3 });
+    (prisma.branchInventory.create as jest.Mock).mockResolvedValue({ stock: 3 });
+
+    const result = await createProduct({ ...alta, branchId: 3, cantidadInicial: 3, costoUnitario: 40 });
+
+    expect(result.success).toBe(true);
+    expect((prisma.branchInventory.create as jest.Mock).mock.calls[0][0].data).toEqual({
+      branchId: 3,
+      productId: 9,
+      stock: 3,
+    });
+    expect((prisma.branchMovement.create as jest.Mock).mock.calls[0][0].data).toEqual({
+      productId: 9,
+      branchId: 3,
+      movementType: "ENTRY",
+      quantity: 3,
+      reference: "ALTA DE PRODUCTO",
+      performedBy: "test@feria.test",
+    });
+    expect(prisma.purchase.create).toHaveBeenCalledWith({
+      data: { totalAmount: 120, branchId: 3 },
+    });
+  });
+
+  it("sin costo no hay compra, con o sin sucursal", async () => {
+    await createProduct({ ...alta, cantidadInicial: 2 });
+    await createProduct({ ...alta, name: "Otro", branchId: 3, cantidadInicial: 2 });
+
+    expect(prisma.purchase.create).not.toHaveBeenCalled();
+    expect(prisma.purchaseItem.createMany).not.toHaveBeenCalled();
+  });
+
+  it("el costo exige la cantidad y lo dice con un mensaje claro", () => {
+    const sinCantidad = createProductSchema.safeParse({ ...alta, costoUnitario: 40 });
+
+    expect(sinCantidad.success).toBe(false);
+    if (sinCantidad.success) return;
+    expect(sinCantidad.error.issues[0]?.message).toBe(
+      "Para registrar el costo cargá la cantidad inicial (1 o más)"
+    );
+    expect(sinCantidad.error.issues[0]?.path).toEqual(["cantidadInicial"]);
+
+    // Con cantidad, el costo ya no necesita sucursal.
+    expect(
+      createProductSchema.safeParse({ ...alta, costoUnitario: 40, cantidadInicial: 1 }).success
+    ).toBe(true);
+  });
+});
+
+describe("createProductsBatch: compra del lote sin sucursal", () => {
+  const fila = (n: number, initialStock: number | undefined, costo: number) => ({
+    name: `Producto ${n}`,
+    prefix: "ZZ",
+    price: n * 10,
+    ...(initialStock === undefined ? {} : { initialStock }),
+    costo,
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (prisma.product.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.product.createManyAndReturn as jest.Mock).mockResolvedValue([
+      { id: 1, code: "ZZ000", name: "Producto 1", price: 10 },
+      { id: 2, code: "ZZ001", name: "Producto 2", price: 20 },
+    ]);
+    (prisma.purchase.create as jest.Mock).mockResolvedValue({ id: 8 });
+  });
+
+  it("registra UNA compra sin sucursal con las filas que tienen costo y stock", async () => {
+    const result = await createProductsBatch({
+      rows: [fila(1, 2, 100), fila(2, 3, 50)],
+    });
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.receipt).toBeNull();
+    expect(prisma.branch.findFirst).not.toHaveBeenCalled();
+    expect(prisma.branchInventory.createManyAndReturn).not.toHaveBeenCalled();
+    expect(prisma.branchMovement.createMany).not.toHaveBeenCalled();
+    expect(prisma.purchase.create).toHaveBeenCalledTimes(1);
+    expect(prisma.purchase.create).toHaveBeenCalledWith({
+      data: { totalAmount: 350, branchId: null },
+    });
+    expect((prisma.purchaseItem.createMany as jest.Mock).mock.calls[0][0].data).toEqual([
+      { purchaseId: 8, productId: 1, price: 100, quantity: 2, subtotal: 200 },
+      { purchaseId: 8, productId: 2, price: 50, quantity: 3, subtotal: 150 },
+    ]);
+  });
+
+  it("sin sucursal, la fila con costo necesita su stock inicial y lo dice en la fila", () => {
+    const parsed = createProductsBatchSchema.safeParse({ rows: [fila(1, 0, 100)] });
+
+    expect(parsed.success).toBe(false);
+    if (parsed.success) return;
+    expect(parsed.error.issues[0]?.message).toBe(
+      "Para registrar el costo cargá el stock inicial de esa fila (1 o más)"
+    );
+    expect(parsed.error.issues[0]?.path).toEqual(["rows", 0, "initialStock"]);
   });
 });
