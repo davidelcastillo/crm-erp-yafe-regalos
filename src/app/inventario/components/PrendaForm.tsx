@@ -112,6 +112,13 @@ export function PrendaForm({ prenda, branches = [], onClose, onSuccess }: Prenda
     };
   }, []);
 
+  // El fondo no scrollea mientras el modal está abierto (mismo cuidado que en
+  // el alta de producto: sin esto el gesto arrastra la página de atrás).
+  useEffect(() => {
+    document.body.classList.add("overflow-hidden");
+    return () => document.body.classList.remove("overflow-hidden");
+  }, []);
+
   // Edición: la ficha llega del servidor (la card solo tiene el producto).
   useEffect(() => {
     if (!prenda) return;

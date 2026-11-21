@@ -75,6 +75,15 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
   /** T2: fotos elegidas en el alta; se suben recién con el producto creado (id). */
   const [fotosPendientes, setFotosPendientes] = useState<File[]>([]);
 
+  /**
+   * Con el modal abierto la página de atrás no scrollea: en el celular el gesto
+   * se escapaba del modal y movía /inventario. Es DOM, no estado de React.
+   */
+  useEffect(() => {
+    document.body.classList.add("overflow-hidden");
+    return () => document.body.classList.remove("overflow-hidden");
+  }, []);
+
   const toggleCanal = (canal: string) =>
     setPublicadaEn((prev) =>
       (prev ?? []).includes(canal)
@@ -242,10 +251,11 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="product-form-title"
-        className="bg-surface w-full max-w-lg rounded-t-3xl p-6 animate-slide-up max-h-[90vh] overflow-y-auto"
+        className="flex max-h-[90dvh] w-full max-w-lg flex-col rounded-t-3xl bg-surface animate-slide-up md:max-w-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex justify-between items-start gap-3 mb-6">
+        {/* Cabecera fija, fuera del scroll. */}
+        <div className="flex items-start justify-between gap-3 px-6 pb-2 pt-6">
           <div className="min-w-0">
             <h2 id="product-form-title" className="text-xl font-semibold text-ink">
               {isEdit ? "Editar Producto" : "Nuevo Producto"}
@@ -279,7 +289,9 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+          {/* Área central: scrollea sola y retiene el gesto (overscroll-contain). */}
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-6 pb-4">
           {enPasoSucursal ? (
             <div className="space-y-3">
               <BranchPicker
@@ -528,9 +540,11 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
 
           </>
           )}
+          </div>
 
-          {/* Pie: en el paso 1 se continúa (siempre habilitado); en el 2 se guarda. */}
-          <div className="flex gap-2 pt-2">
+          {/* Pie fijo, fuera del scroll: en el paso 1 se continúa; en el 2 se guarda. */}
+          <div className="border-t border-hairline bg-surface px-6 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4 md:pb-4">
+          <div className="flex gap-2">
             <button
               type="button"
               onClick={onClose}
@@ -559,6 +573,7 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
                     : "Crear Producto"}
               </button>
             )}
+          </div>
           </div>
         </form>
       </div>

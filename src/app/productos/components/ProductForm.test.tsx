@@ -69,6 +69,7 @@ jest.mock("sweetalert2", () => ({
 import { createProduct, updateProductExtended, getProductById } from "../../actions/product";
 import { getBranchOptions } from "@/app/actions/branch";
 import { subirFotos } from "@/components/ui/FotoUploader";
+import { getFotosProducto } from "@/app/actions/foto";
 import { createProductSchema } from "@/lib/validations/product";
 import { useRouter } from "next/navigation";
 import Swal from "sweetalert2";
@@ -782,5 +783,98 @@ describe("ProductForm · fotos y «Publicar en» (T2/T3)", () => {
     fireEvent.click(screen.getByRole("button", { name: /crear producto/i }));
 
     await waitFor(() => expect(mockSubirFotos).toHaveBeenCalledWith(12, [expect.any(File)]));
+  });
+});
+
+/**
+ * Reporte del dueño: «El modal de productos no me deja hacer scroll hacia
+ * abajo, baja la página de atrás de inventario» y «editar un producto normal
+ * sigue sin dejarme ver las fotos». El shell pasa a ser el de `PrendaForm`:
+ * cabecera fija, área central scrolleable que contiene el gesto y pie fijo.
+ */
+describe("ProductForm · scroll del modal (reporte del dueño)", () => {
+  const productoExistente = {
+    id: 7,
+    name: "Producto Existente",
+    description: "-",
+    categoryId: null,
+    active: true,
+    price: 500,
+    code: "EX001",
+    codePrefix: "EX",
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  } as unknown as Product;
+
+  const mockGetBranchOptions = getBranchOptions as jest.MockedFunction<typeof getBranchOptions>;
+  const mockGetFotosProducto = getFotosProducto as jest.MockedFunction<typeof getFotosProducto>;
+
+  /** Área central: scrollea sola y no deja que el gesto llegue al fondo. */
+  const areaScrolleable = () => {
+    const area = screen.getByRole("dialog").querySelector(".overscroll-contain");
+    expect(area).not.toBeNull();
+    return area as HTMLElement;
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockGetBranchOptions.mockResolvedValue({ success: true, data: [] } as never);
+    mockGetProductById.mockResolvedValue({ success: true, data: { publicadaEn: [] } } as never);
+    mockGetFotosProducto.mockResolvedValue({ success: true, data: [] } as never);
+  });
+
+  it("tiene un área central scrolleable que retiene el gesto", async () => {
+    render(<ProductForm product={null} onClose={() => {}} />);
+
+    const area = areaScrolleable();
+    expect(area.className).toContain("overflow-y-auto");
+    expect(area.className).toContain("overscroll-contain");
+    expect(area.className).toContain("min-h-0");
+    expect(area.className).toContain("flex-1");
+  });
+
+  it("deja el pie (Cancelar/Continuar) fuera del área scrolleable", async () => {
+    render(<ProductForm product={null} onClose={() => {}} />);
+
+    const area = areaScrolleable();
+    expect(area.contains(screen.getByRole("button", { name: /continuar/i }))).toBe(false);
+    expect(area.contains(screen.getByRole("button", { name: /cancelar/i }))).toBe(false);
+  });
+
+  it("el bloque de fotos del alta vive dentro del área scrolleable", async () => {
+    render(<ProductForm product={null} onClose={() => {}} />);
+    await irAlPaso2();
+
+    const area = areaScrolleable();
+    expect(area.contains(screen.getByText("Fotos"))).toBe(true);
+    expect(area.contains(screen.getByLabelText(/agregar fotos/i))).toBe(true);
+  });
+
+  it("en la edición las fotos se ven, cargan las guardadas y quedan alcanzables", async () => {
+    mockGetFotosProducto.mockResolvedValue({
+      success: true,
+      data: [{ position: 0, path: "a.jpg", alt: "Frente" }],
+    } as never);
+
+    render(<ProductForm product={productoExistente} onClose={() => {}} />);
+
+    const area = areaScrolleable();
+    expect(area.contains(screen.getByText("Fotos"))).toBe(true);
+    expect(area.contains(screen.getByLabelText(/agregar fotos/i))).toBe(true);
+    expect(screen.getByRole("button", { name: /actualizar producto/i })).toBeInTheDocument();
+
+    // El uploader recibe el id del producto para traer las fotos existentes.
+    await waitFor(() => expect(mockGetFotosProducto).toHaveBeenCalledWith({ productId: 7 }));
+    expect(await screen.findByAltText(/frente/i)).toBeInTheDocument();
+    expect(screen.getByText("Portada")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /quitar foto 1/i })).toBeInTheDocument();
+  });
+
+  it("bloquea el scroll del body mientras está abierto y lo libera al cerrar", () => {
+    const { unmount } = render(<ProductForm product={null} onClose={() => {}} />);
+    expect(document.body).toHaveClass("overflow-hidden");
+
+    unmount();
+    expect(document.body).not.toHaveClass("overflow-hidden");
   });
 });
