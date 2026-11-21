@@ -58,7 +58,7 @@ export function ProductoCard({ item, className = "" }: { item: ItemVidriera; cla
           <EstadoVidrieraBadge estado={item.estado} />
         </span>
       </div>
-      <p className="font-display text-[15px] leading-tight text-ink md:text-lg">{item.name}</p>
+      <p className="font-display text-[15px] leading-tight break-words text-ink md:text-lg">{item.name}</p>
       {dato && <p className="text-[13px] text-ink-muted">{dato}</p>}
       <p className="font-display text-lg italic tabular-nums text-ink">$ {formatPrice(item.price)}</p>
     </Link>

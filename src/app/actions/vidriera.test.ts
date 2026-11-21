@@ -258,6 +258,8 @@ describe("getVidriera — qué se publica (S2)", () => {
       name: true,
       price: true,
       kind: true,
+      // Categoría propia del producto normal (`Category`): dato público del ítem.
+      category: { select: { id: true, name: true } },
       images: {
         orderBy: { position: "asc" },
         select: { path: true, alt: true },
@@ -290,9 +292,33 @@ describe("getVidriera — qué se publica (S2)", () => {
       estado: "DISPONIBLE",
       portada: expect.stringMatching(/\/product-images\/1\/hash-portada_sm\.webp$/),
       categoria: "Camperas",
+      categoriaId: 7,
       talles: ["M", "S"],
       estilos: [],
     });
+  });
+
+  it("un producto normal llega con su categoría de producto", async () => {
+    const resultado = await getVidriera();
+    if (!resultado.success) throw new Error("la vidriera tendría que responder");
+
+    const perfume = resultado.data.items.find((item) => item.code === "AR-1");
+    expect(perfume?.categoria).toBe("Perfumes");
+    expect(perfume?.categoriaId).toBe(9);
+  });
+
+  it("un producto sin categoría no rompe la lista", async () => {
+    PERFUME.category = null;
+    try {
+      const resultado = await getVidriera();
+      if (!resultado.success) throw new Error("la vidriera tendría que responder");
+
+      const perfume = resultado.data.items.find((item) => item.code === "AR-1");
+      expect(perfume?.categoria).toBeNull();
+      expect(perfume?.categoriaId).toBeNull();
+    } finally {
+      PERFUME.category = { id: 9, name: "Perfumes" };
+    }
   });
 
   it("lista para los chips solo las categorías con prendas publicadas", async () => {

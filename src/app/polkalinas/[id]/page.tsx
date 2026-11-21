@@ -98,7 +98,7 @@ export default async function FichaVidrieraPage({
               <EstadoVidrieraBadge estado={item.estado} />
             </div>
 
-            <h1 className="font-display text-[26px] leading-tight text-ink md:text-[40px]">
+            <h1 className="font-display text-[26px] leading-tight break-words text-ink md:text-[40px]">
               {palabras(item.name)}
             </h1>
 
@@ -113,7 +113,7 @@ export default async function FichaVidrieraPage({
             )}
 
             {item.descripcion && (
-              <p className="text-[15px] leading-relaxed text-ink-body">{item.descripcion}</p>
+              <p className="text-[15px] leading-relaxed break-words text-ink-body">{item.descripcion}</p>
             )}
 
             {/* TODO: `getVidrieraItem` todavía no publica las medidas de la prenda. */}

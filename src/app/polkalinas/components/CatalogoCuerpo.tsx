@@ -67,7 +67,6 @@ export async function CatalogoCuerpo({
         <CatalogoVista
           titulo={titulo}
           items={resultado.data.items}
-          categorias={resultado.data.categorias}
           valores={valores}
           rutaBase={rutaBase}
           categoriaFija={categoriaFija}

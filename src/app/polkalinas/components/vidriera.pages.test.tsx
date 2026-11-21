@@ -128,6 +128,45 @@ const CATEGORIAS = [
   { id: 3, name: "Second hand" },
 ];
 
+/** Cositas: dos productos con su `Category` propia, uno sin categoría y una prenda suelta. */
+const PRODUCTOS: VidrieraItem[] = [
+  {
+    id: 21,
+    code: "AR-9",
+    name: "Arito corazón",
+    price: 3000,
+    kind: "PRODUCT",
+    estado: "DISPONIBLE",
+    portada: null,
+    categoria: "Aritos",
+    categoriaId: 21,
+  },
+  {
+    id: 22,
+    code: "AR-10",
+    name: "Perfume floral",
+    price: 30000,
+    kind: "PRODUCT",
+    estado: "DISPONIBLE",
+    portada: null,
+    categoria: "Perfumes",
+    categoriaId: 22,
+  },
+  {
+    id: 23,
+    code: "AR-11",
+    name: "Sticker suelto",
+    price: 500,
+    kind: "PRODUCT",
+    estado: "AGOTADO",
+    portada: null,
+    categoria: null,
+    categoriaId: null,
+  },
+  // Una prenda publicada: en Cositas no entra y tampoco aporta categorías.
+  CATALOGO[0],
+];
+
 const FICHA: VidrieraFicha = {
   ...CATALOGO[0],
   name: "Campera de jean intervenida",
@@ -544,6 +583,128 @@ describe("catálogo /polkalinas/catalogo", () => {
     render(await CatalogoPage({ searchParams: Promise.resolve({}) }));
 
     expect(screen.getByText(/no hay prendas ni productos publicados/i)).toBeInTheDocument();
+  });
+});
+
+describe("categorías del aside según lo que muestra la vista", () => {
+  const grupoCategoria = () =>
+    within(screen.getByRole("complementary", { name: /filtros/i })).getByRole("group", {
+      name: "Categoría",
+    });
+
+  it("en el catálogo general sigue ofreciendo las categorías de prenda", async () => {
+    getVidriera.mockResolvedValue({
+      success: true,
+      data: { items: CATALOGO, categorias: CATEGORIAS },
+    });
+
+    render(await CatalogoPage({ searchParams: Promise.resolve({}) }));
+
+    const categoria = grupoCategoria();
+    expect(within(categoria).getByRole("checkbox", { name: /intervenido/i })).toHaveAccessibleName(
+      /1/
+    );
+    expect(
+      within(categoria).getByRole("checkbox", { name: /segunda|second hand/i })
+    ).toHaveAccessibleName(/1/);
+    expect(within(categoria).getByRole("checkbox", { name: /nuevo/i })).toHaveAccessibleName(/1/);
+  });
+
+  it("en Cositas ofrece las categorías de producto, no las de prenda", async () => {
+    getVidriera.mockResolvedValue({
+      success: true,
+      data: { items: PRODUCTOS, categorias: CATEGORIAS },
+    });
+
+    render(await CositasPage({ searchParams: Promise.resolve({}) }));
+
+    const categoria = grupoCategoria();
+    expect(within(categoria).getByRole("checkbox", { name: /aritos/i })).toHaveAccessibleName(/1/);
+    expect(within(categoria).getByRole("checkbox", { name: /perfumes/i })).toHaveAccessibleName(
+      /1/
+    );
+    expect(within(categoria).queryByRole("checkbox", { name: /intervenido/i })).toBeNull();
+    // Aritos, Perfumes y el agregado «Cositas»: el producto sin categoría no
+    // agrega una opción vacía.
+    expect(within(categoria).getAllByRole("checkbox")).toHaveLength(3);
+  });
+
+  it("en Cositas elegir una categoría filtra la grilla y deja el chip", async () => {
+    getVidriera.mockResolvedValue({
+      success: true,
+      data: { items: PRODUCTOS, categorias: CATEGORIAS },
+    });
+
+    render(await CositasPage({ searchParams: Promise.resolve({ categoria: "Perfumes" }) }));
+
+    expect(screen.getByRole("link", { name: /Perfume floral/ })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Arito corazón/ })).toBeNull();
+    expect(screen.queryByRole("link", { name: /Sticker suelto/ })).toBeNull();
+
+    const activos = screen.getByRole("group", { name: /filtros activos/i });
+    expect(
+      within(activos).getByRole("link", { name: /quitar filtro perfumes/i })
+    ).toHaveAttribute("href", "/polkalinas/cositas");
+  });
+
+  it("un producto sin categoría se muestra y no rompe el aside", async () => {
+    getVidriera.mockResolvedValue({
+      success: true,
+      data: { items: PRODUCTOS, categorias: CATEGORIAS },
+    });
+
+    render(await CositasPage({ searchParams: Promise.resolve({}) }));
+
+    expect(screen.getByRole("link", { name: /Sticker suelto/ })).toBeInTheDocument();
+    expect(grupoCategoria()).toBeInTheDocument();
+  });
+
+  it("una categoría que no es de las cuatro del header también filtra, por nombre", async () => {
+    getVidriera.mockResolvedValue({
+      success: true,
+      data: { items: ITEMS, categorias: [{ id: 7, name: "Camperas" }] },
+    });
+
+    render(await CatalogoPage({ searchParams: Promise.resolve({ categoria: "Polleras" }) }));
+
+    expect(screen.getByRole("link", { name: /Pollera escocesa/ })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Campera de jean/ })).toBeNull();
+    expect(
+      within(screen.getByRole("group", { name: /filtros activos/i })).getByRole("link", {
+        name: /quitar filtro polleras/i,
+      })
+    ).toBeInTheDocument();
+  });
+
+  it("cuando la vista mezcla prendas y productos, unifica las categorías de los dos", async () => {
+    getVidriera.mockResolvedValue({
+      success: true,
+      data: { items: [...CATALOGO, PRODUCTOS[0]], categorias: CATEGORIAS },
+    });
+
+    render(await CatalogoPage({ searchParams: Promise.resolve({}) }));
+
+    const categoria = grupoCategoria();
+    // La de prenda y la de producto conviven, cada una con su conteo.
+    expect(within(categoria).getByRole("checkbox", { name: /intervenido/i })).toBeInTheDocument();
+    expect(within(categoria).getByRole("checkbox", { name: /aritos/i })).toHaveAccessibleName(/1/);
+  });
+
+  it("la categoría de producto también filtra en el catálogo general", async () => {
+    getVidriera.mockResolvedValue({
+      success: true,
+      data: { items: [...CATALOGO, PRODUCTOS[0]], categorias: CATEGORIAS },
+    });
+
+    render(await CatalogoPage({ searchParams: Promise.resolve({ categoria: "Aritos" }) }));
+
+    expect(screen.getByRole("link", { name: /Arito corazón/ })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Campera intervenida/ })).toBeNull();
+    expect(
+      within(screen.getByRole("group", { name: /filtros activos/i })).getByRole("link", {
+        name: /quitar filtro aritos/i,
+      })
+    ).toBeInTheDocument();
   });
 });
 

@@ -80,14 +80,12 @@ const url = (
 export function CatalogoVista({
   titulo,
   items,
-  categorias,
   valores,
   rutaBase,
   categoriaFija,
 }: {
   titulo: string;
   items: VidrieraItem[];
-  categorias: { id: number; name: string }[];
   valores: ValoresFiltros;
   rutaBase: string;
   categoriaFija?: CategoriaSlug;
@@ -95,18 +93,29 @@ export function CatalogoVista({
   const [sheetAbierto, setSheetAbierto] = useState(false);
   const [verTodas, setVerTodas] = useState(false);
 
-  const categoriasActivas = [...valores.categoria, ...(categoriaFija ? [categoriaFija] : [])];
+  const categoriasActivas = [
+    ...valores.categoria,
+    // En su propia ruta «Cositas» ya acota la vista: no entra al OR de categorías.
+    ...(categoriaFija && categoriaFija !== "cositas" ? [categoriaFija] : []),
+  ];
 
   const coincideCategoria = (item: VidrieraItem) => {
+    if (categoriaFija === "cositas" && item.kind !== "PRODUCT") return false;
     if (categoriasActivas.length === 0) return true;
     return categoriasActivas.some((valor) => {
       if (valor === "cositas") return item.kind === "PRODUCT";
       const id = Number(valor);
       if (Number.isInteger(id) && id > 0) return item.categoriaId === id;
-      const nombre = NOMBRE_CATEGORIA[valor as CategoriaSlug];
-      return nombre !== undefined && item.categoria === nombre;
+      return item.categoria === (NOMBRE_CATEGORIA[valor as CategoriaSlug] ?? valor);
     });
   };
+
+  /** Ítem que la ruta ya deja fijo: «Cositas» son los productos, el slug es la prenda. */
+  const deLaRuta = (item: VidrieraItem) =>
+    !categoriaFija ||
+    (categoriaFija === "cositas"
+      ? item.kind === "PRODUCT"
+      : item.categoria === NOMBRE_CATEGORIA[categoriaFija]);
 
   const desde = Number(valores.desde) || 0;
   const hasta = Number(valores.hasta) || 0;
@@ -127,12 +136,19 @@ export function CatalogoVista({
 
   const visibles = verTodas ? ordenados : ordenados.slice(0, VISIBLES);
 
+  // Las opciones son las categorías presentes en lo que muestra la vista: la de
+  // producto (`Category`) en Cositas, la de prenda en el resto. Si conviven, se
+  // unifican por nombre con el conteo de las dos.
+  const conteosCategoria = new Map<string, number>();
+  for (const item of items) {
+    if (!item.categoria || !deLaRuta(item)) continue;
+    conteosCategoria.set(item.categoria, (conteosCategoria.get(item.categoria) ?? 0) + 1);
+  }
+
   const opciones: OpcionCategoria[] = [
-    ...categorias.map((categoria) => ({
-      valor: slugDe(categoria.name) ?? String(categoria.id),
-      nombre: categoria.name,
-      conteo: items.filter((item) => item.categoria === categoria.name).length,
-    })),
+    ...[...conteosCategoria]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([nombre, conteo]) => ({ valor: slugDe(nombre) ?? nombre, nombre, conteo })),
     {
       valor: "cositas",
       nombre: "Cositas",

@@ -70,6 +70,8 @@ const SELECT_LISTA = {
   name: true,
   price: true,
   kind: true,
+  // Categoría del producto normal (`Category`): la prenda trae la suya.
+  category: { select: { id: true, name: true } },
   images: { orderBy: { position: "asc" }, select: { path: true, alt: true } },
   prenda: {
     select: {
@@ -85,9 +87,8 @@ const SELECT_LISTA = {
 
 const SELECT_FICHA = {
   ...SELECT_LISTA,
-  // La ficha también publica descripción y categoría de los productos normales.
+  // La ficha también publica la descripción del producto.
   description: true,
-  category: { select: { id: true, name: true } },
   prenda: {
     select: {
       ...SELECT_LISTA.prenda.select,
@@ -104,8 +105,9 @@ type FilaPublica = {
   price: unknown;
   kind: "PRENDA" | "PRODUCT";
   images: { path: string; alt: string | null }[];
-  /** Solo lo pide `SELECT_FICHA` (la lista no los publica). */
+  /** Solo lo pide `SELECT_FICHA`. */
   description?: string | null;
+  /** Categoría propia de los productos normales (las prendas usan la de prenda). */
   category?: { id: number; name: string } | null;
   prenda: {
     categoria: { id: number; name: string } | null;
@@ -138,20 +140,26 @@ const aPublico = (
   stock: number,
   reservado: boolean,
   vendido: boolean
-): VidrieraItem => ({
-  id: fila.id,
-  code: fila.code,
-  name: fila.name,
-  price: Number(fila.price),
-  kind: fila.kind,
-  estado: estadoDe(fila, stock, reservado, vendido),
-  portada: fila.images[0] ? urlFoto(fila.id, fila.images[0].path, "sm") : null,
-  categoria: fila.prenda?.categoria?.name ?? null,
-  // Talles disponibles (solo prendas): la card los muestra en lugar del código.
-  talles: fila.prenda?.talles?.map((filaTalle) => filaTalle.talle) ?? [],
-  // Estilos de la prenda (filtro del catálogo).
-  estilos: fila.prenda?.estilos?.map((filaEstilo) => filaEstilo.estilo.name) ?? [],
-});
+): VidrieraItem => {
+  // Prenda o producto: la categoría pública es la del ítem, no solo la de prenda.
+  const categoria = fila.prenda?.categoria ?? fila.category ?? null;
+
+  return {
+    id: fila.id,
+    code: fila.code,
+    name: fila.name,
+    price: Number(fila.price),
+    kind: fila.kind,
+    estado: estadoDe(fila, stock, reservado, vendido),
+    portada: fila.images[0] ? urlFoto(fila.id, fila.images[0].path, "sm") : null,
+    categoria: categoria?.name ?? null,
+    categoriaId: categoria?.id ?? null,
+    // Talles disponibles (solo prendas): la card los muestra en lugar del código.
+    talles: fila.prenda?.talles?.map((filaTalle) => filaTalle.talle) ?? [],
+    // Estilos de la prenda (filtro del catálogo).
+    estilos: fila.prenda?.estilos?.map((filaEstilo) => filaEstilo.estilo.name) ?? [],
+  };
+};
 
 /** Sucursales donde el ítem tiene stock > 0: disponibilidad pública, sin el número. */
 const sucursalesConStock = async (productId: number) =>
@@ -301,15 +309,11 @@ export async function getVidrieraItem(data: unknown) {
       reservados.has(fila.id),
       vendidos.has(fila.id)
     );
-    // La ficha suma la categoría del producto normal (la prenda ya la trae).
-    const categoria = fila.prenda?.categoria ?? fila.category ?? null;
 
     return {
       success: true as const,
       data: {
         ...item,
-        categoria: categoria?.name ?? null,
-        categoriaId: categoria?.id ?? null,
         fotos: fila.images.map((foto) => ({
           url: urlFoto(fila.id, foto.path, "lg"),
           // Sin alt cargado se usa el nombre: la foto nunca queda sin texto.
