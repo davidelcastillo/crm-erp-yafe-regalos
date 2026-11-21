@@ -192,13 +192,17 @@ export function PrendaForm({ prenda, branches = [], onClose, onSuccess }: Prenda
     maximumFractionDigits: 0,
   }).format(precioNumero - costoNumero);
 
-  /** El destacado exige producto publicado en Web; en el alta todavía no existe. */
+  /** Marcar exige estar publicado en Web; **desmarcar siempre se puede** (si se
+   * quitó la publicación, igual hay que poder sacarla de la portada). */
   const puedeDestacar = isEdit && publicadaEn.includes("Web");
+  const puedeCambiarDestacado = isEdit && (puedeDestacar || destacado);
   const ayudaDestacado = !isEdit
     ? "Se elige después de publicar"
     : puedeDestacar
       ? "Reemplaza al destacado anterior de la portada."
-      : "Publicá en Web para destacarla";
+      : destacado
+        ? "Está en la portada. Desmarcala para quitarla."
+        : "Publicá en Web para destacarla";
 
   /** La categoría precarga «única» mientras nadie haya tocado la marca. */
   const cambiarCategoria = (id: number | null) => {
@@ -430,7 +434,8 @@ export function PrendaForm({ prenda, branches = [], onClose, onSuccess }: Prenda
         return;
       }
       // El destacado se guarda aparte: si falla, la prenda ya quedó guardada.
-      if (puedeDestacar && destacado !== destacadoOriginal) {
+      // Marcar exige publicación Web; desmarcar se permite siempre.
+      if (puedeCambiarDestacado && destacado !== destacadoOriginal) {
         const marcado = await destacarPrenda({ productId: prenda!.id, destacado });
         if (!marcado.success) {
           setError(`La prenda se guardó, pero no se pudo destacar: ${marcado.error}`);
@@ -1006,9 +1011,9 @@ export function PrendaForm({ prenda, branches = [], onClose, onSuccess }: Prenda
                   <input
                     id="prenda-destacado"
                     type="checkbox"
-                    checked={puedeDestacar && destacado}
+                    checked={destacado}
                     onChange={(e) => setDestacado(e.target.checked)}
-                    disabled={!puedeDestacar}
+                    disabled={!puedeCambiarDestacado}
                     aria-describedby="prenda-destacado-ayuda"
                     className="h-5 w-5 accent-accent"
                   />
