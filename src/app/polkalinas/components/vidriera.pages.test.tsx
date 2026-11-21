@@ -11,10 +11,13 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 
 import FichaPage from "@/app/polkalinas/[id]/page";
 import CatalogoPage from "@/app/polkalinas/catalogo/page";
+import CositasPage from "@/app/polkalinas/cositas/page";
+import IntervenidoPage from "@/app/polkalinas/intervenido/page";
+import NuevoPage from "@/app/polkalinas/nuevo/page";
 import HomePage from "@/app/polkalinas/page";
+import SecondHandPage from "@/app/polkalinas/second-hand/page";
 import { EstadoVidrieraBadge } from "@/app/polkalinas/components/EstadoVidrieraBadge";
 import { ProductoCard } from "@/app/polkalinas/components/ProductoCard";
-import { linkConsulta } from "@/app/polkalinas/components/whatsapp";
 import type { VidrieraFicha, VidrieraItem } from "@/app/actions/vidriera";
 
 jest.mock("next/navigation", () => ({
@@ -66,16 +69,95 @@ const ITEMS: VidrieraItem[] = [
   },
 ];
 
+/** El catálogo del rediseño: dos prendas con categoría y talles, y un producto normal. */
+const CATALOGO: VidrieraItem[] = [
+  {
+    id: 11,
+    code: "RPI-1",
+    name: "Campera intervenida",
+    price: 45000,
+    kind: "PRENDA",
+    estado: "DISPONIBLE",
+    portada: null,
+    categoria: "Intervenido",
+    categoriaId: 2,
+    talles: ["M"],
+    estilos: ["Vintage", "Coquette"],
+  },
+  {
+    id: 12,
+    code: "RPH-1",
+    name: "Pollera vintage",
+    price: 20000,
+    kind: "PRENDA",
+    estado: "VENDIDA",
+    portada: null,
+    categoria: "Second hand",
+    categoriaId: 3,
+    talles: ["S"],
+  },
+  {
+    id: 13,
+    code: "AR-1",
+    name: "Llavero frutilla",
+    price: 5000,
+    kind: "PRODUCT",
+    estado: "DISPONIBLE",
+    portada: null,
+    categoria: null,
+    categoriaId: null,
+  },
+  {
+    id: 14,
+    code: "RP-1",
+    name: "Remera baby tee",
+    price: 18000,
+    kind: "PRENDA",
+    estado: "DISPONIBLE",
+    portada: null,
+    categoria: "Nuevo",
+    categoriaId: 1,
+    talles: ["S", "M"],
+    estilos: ["Vintage", "Y2K"],
+  },
+];
+
+const CATEGORIAS = [
+  { id: 1, name: "Nuevo" },
+  { id: 2, name: "Intervenido" },
+  { id: 3, name: "Second hand" },
+];
+
 const FICHA: VidrieraFicha = {
-  ...ITEMS[0],
-  estado: "RESERVADA",
+  ...CATALOGO[0],
+  name: "Campera de jean intervenida",
+  talles: ["M", "S"],
   condicion: "Muy bueno",
   detalleCondicion: null,
-  talles: ["M", "S"],
+  descripcion: "Intervenida a mano con encaje.",
+  sucursales: [],
   fotos: [
     { url: "https://storage.test/product-images/hash-portada_lg.webp", alt: "Campera de frente" },
     { url: "https://storage.test/product-images/hash-espalda_lg.webp", alt: "Campera de espalda" },
   ],
+};
+
+const FICHA_PRODUCTO: VidrieraFicha = {
+  id: 13,
+  code: "AR-1",
+  name: "Llavero frutilla",
+  price: 5000,
+  kind: "PRODUCT",
+  estado: "DISPONIBLE",
+  portada: null,
+  categoria: "Perfumes",
+  categoriaId: 9,
+  talles: [],
+  fotos: [],
+  condicion: null,
+  detalleCondicion: null,
+  descripcion: "Un llavero con forma de frutilla.",
+  sucursales: [{ id: 1, name: "Salta" }],
 };
 
 beforeEach(() => {
@@ -261,149 +343,187 @@ describe("home /polkalinas", () => {
 });
 
 describe("catálogo /polkalinas/catalogo", () => {
-  it("renderiza una tarjeta por ítem con nombre, precio, foto y estado", async () => {
+  beforeEach(() => {
+    getVidriera.mockResolvedValue({
+      success: true,
+      data: { items: CATALOGO, categorias: CATEGORIAS },
+    });
+  });
+
+  it("pone los filtros del mockup en un aside, con los conteos por categoría", async () => {
     render(await CatalogoPage({ searchParams: Promise.resolve({}) }));
 
-    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Catálogo");
-    expect(screen.getByRole("link", { name: /Campera de jean/ })).toHaveAttribute(
-      "href",
-      "/polkalinas/1"
-    );
-    expect(screen.getByRole("link", { name: /Perfume floral/ })).toHaveAttribute(
-      "href",
-      "/polkalinas/3"
-    );
-    expect(screen.getByText("$ 45.000,00")).toBeInTheDocument();
-    expect(screen.getByText("Disponible")).toBeInTheDocument();
-    expect(screen.getByText("Agotado")).toBeInTheDocument();
-    // La foto es contenido: lleva texto alternativo con el nombre del producto.
-    expect(screen.getByAltText("Campera de jean")).toHaveAttribute(
-      "src",
-      "https://storage.test/product-images/hash-portada_sm.webp"
-    );
+    const filtros = screen.getByRole("complementary", { name: /filtros/i });
+    expect(within(filtros).getByRole("group", { name: "Categoría" })).toBeInTheDocument();
+    expect(within(filtros).getByRole("group", { name: "Talle" })).toBeInTheDocument();
+    expect(within(filtros).getByRole("group", { name: "Estilo" })).toBeInTheDocument();
+    expect(within(filtros).getByRole("group", { name: "Precio" })).toBeInTheDocument();
+    expect(within(filtros).getByRole("checkbox", { name: /ocultar vendidas/i })).not.toBeChecked();
+    // El conteo del mockup: cuántas piezas hay en cada categoría.
+    expect(
+      within(filtros).getByRole("checkbox", { name: /segunda|second hand/i })
+    ).toHaveAccessibleName(/1/);
   });
 
-  it("arma los chips con las categorías publicadas y filtra por la elegida", async () => {
-    render(
-      await CatalogoPage({ searchParams: Promise.resolve({ categoria: "7" }) })
-    );
-
-    expect(screen.getByRole("link", { name: "Todas" })).toHaveAttribute(
-      "href",
-      "/polkalinas/catalogo"
-    );
-    expect(screen.getByRole("link", { name: "Camperas" })).toHaveAttribute(
-      "href",
-      "/polkalinas/catalogo?categoria=7"
-    );
-    expect(getVidriera).toHaveBeenCalledWith({ categoriaId: 7, q: undefined });
-  });
-
-  it("pinta en cacao el chip de la categoría activa, y solo ese", async () => {
-    render(
-      await CatalogoPage({ searchParams: Promise.resolve({ categoria: "7" }) })
-    );
-
-    const activo = screen.getByRole("link", { name: "Camperas" });
-    const todas = screen.getByRole("link", { name: "Todas" });
-
-    expect(activo).toHaveAttribute("aria-current", "page");
-    expect(activo.className).toContain("bg-ink");
-    expect(activo.className).toContain("text-background");
-    expect(todas).not.toHaveAttribute("aria-current");
-    expect(todas.className).not.toContain("bg-ink");
-  });
-
-  it("lleva el header de la tienda: el aviso del dueño, la marca y la vuelta al catálogo", async () => {
+  it("elige el orden con el select del mockup, al lado de la grilla", async () => {
     render(await CatalogoPage({ searchParams: Promise.resolve({}) }));
+
+    const orden = screen.getByRole("combobox", { name: /ordenar/i });
+    expect(within(orden).getAllByRole("option").map((opcion) => opcion.textContent)).toEqual([
+      "Más nuevas",
+      "Menor precio",
+      "Mayor precio",
+    ]);
+  });
+
+  it("busca por texto con ?q= y deja la búsqueda como filtro activo", async () => {
+    render(await CatalogoPage({ searchParams: Promise.resolve({ q: "campera" }) }));
+
+    expect(getVidriera).toHaveBeenCalledWith({ categoriaId: undefined, q: "campera" });
+    const activos = screen.getByRole("group", { name: /filtros activos/i });
+    expect(
+      within(activos).getByRole("link", { name: /quitar filtro campera/i })
+    ).toBeInTheDocument();
+  });
+
+  it("filtra por el slug de la categoría, como los links del header", async () => {
+    render(
+      await CatalogoPage({ searchParams: Promise.resolve({ categoria: "second-hand" }) })
+    );
+
+    expect(screen.getByRole("link", { name: /Pollera vintage/ })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Remera baby tee/ })).toBeNull();
+  });
+
+  it("«cositas» lista los productos normales, no las prendas", async () => {
+    render(await CatalogoPage({ searchParams: Promise.resolve({ categoria: "cositas" }) }));
+
+    expect(screen.getByRole("link", { name: /Llavero frutilla/ })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Pollera vintage/ })).toBeNull();
+  });
+
+  it("muestra los filtros activos con su X, y solo cuando hay alguno", async () => {
+    const { unmount } = render(
+      await CatalogoPage({
+        searchParams: Promise.resolve({ categoria: "second-hand", talle: "S" }),
+      })
+    );
+
+    const activos = screen.getByRole("group", { name: /filtros activos/i });
+    expect(
+      within(activos).getByRole("link", { name: /quitar filtro second hand/i })
+    ).toHaveAttribute("href", "/polkalinas/catalogo?talle=S");
+    expect(
+      within(activos).getByRole("link", { name: /quitar filtro talle s/i })
+    ).toBeInTheDocument();
+
+    unmount();
+    render(await CatalogoPage({ searchParams: Promise.resolve({}) }));
+    expect(screen.queryByRole("group", { name: /filtros activos/i })).toBeNull();
+  });
+
+  it("arma el filtro «Estilo» con los estilos reales de las prendas, habilitados", async () => {
+    render(await CatalogoPage({ searchParams: Promise.resolve({}) }));
+
+    const filtros = screen.getByRole("complementary", { name: /filtros/i });
+    const estilos = within(filtros).getByRole("group", { name: "Estilo" });
+    const checks = within(estilos).getAllByRole("checkbox") as HTMLInputElement[];
+
+    expect(checks.map((check) => check.value)).toEqual(["Coquette", "Vintage", "Y2K"]);
+    checks.forEach((check) => expect(check).toBeEnabled());
+  });
+
+  it("filtra por estilo y deja el chip activo con su X", async () => {
+    render(await CatalogoPage({ searchParams: Promise.resolve({ estilo: "Vintage" }) }));
+
+    expect(screen.getByRole("link", { name: /Campera intervenida/ })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Llavero frutilla/ })).toBeNull();
+
+    const filtros = screen.getByRole("complementary", { name: /filtros/i });
+    expect(
+      within(within(filtros).getByRole("group", { name: "Estilo" })).getByRole("checkbox", {
+        name: "Vintage",
+      })
+    ).toBeChecked();
+
+    const activos = screen.getByRole("group", { name: /filtros activos/i });
+    expect(
+      within(activos).getByRole("link", { name: /quitar filtro vintage/i })
+    ).toHaveAttribute("href", "/polkalinas/catalogo");
+  });
+
+  it("combina el estilo con la categoría sin perder ninguna de las dos", async () => {
+    render(
+      await CatalogoPage({
+        searchParams: Promise.resolve({ categoria: "cositas", estilo: "Vintage" }),
+      })
+    );
+
+    // «Cositas» no tiene estilos: el filtro no rompe, solo deja la grilla vacía.
+    expect(screen.getByText(/no hay prendas con esos filtros/i)).toBeInTheDocument();
+    const activos = screen.getByRole("group", { name: /filtros activos/i });
+    expect(
+      within(activos).getByRole("link", { name: /quitar filtro cositas/i })
+    ).toBeInTheDocument();
+    expect(
+      within(activos).getByRole("link", { name: /quitar filtro vintage/i })
+    ).toHaveAttribute("href", "/polkalinas/catalogo?categoria=cositas");
+  });
+
+  it("sin estilos cargados no muestra el filtro «Estilo»", async () => {
+    getVidriera.mockResolvedValue({
+      success: true,
+      data: { items: ITEMS, categorias: [{ id: 7, name: "Camperas" }] },
+    });
+
+    render(await CatalogoPage({ searchParams: Promise.resolve({}) }));
+
+    const filtros = screen.getByRole("complementary", { name: /filtros/i });
+    expect(within(filtros).queryByRole("group", { name: "Estilo" })).toBeNull();
+  });
+
+  it("filtra por talle", async () => {
+    render(await CatalogoPage({ searchParams: Promise.resolve({ talle: "M" }) }));
+
+    expect(screen.getByRole("link", { name: /Remera baby tee/ })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Pollera vintage/ })).toBeNull();
+  });
+
+  it("filtra por rango de precio, con los dos extremos incluidos", async () => {
+    render(
+      await CatalogoPage({ searchParams: Promise.resolve({ desde: "5000", hasta: "20000" }) })
+    );
+
+    expect(screen.getByRole("link", { name: /Llavero frutilla/ })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Pollera vintage/ })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Campera intervenida/ })).toBeNull();
+  });
+
+  it("ordena por precio cuando se lo pedís", async () => {
+    render(await CatalogoPage({ searchParams: Promise.resolve({ orden: "precio-asc" }) }));
+
+    const tarjetas = within(
+      screen.getByRole("list", { name: /prendas y productos/i })
+    ).getAllByRole("link");
+    expect(tarjetas[0]).toHaveTextContent("Llavero frutilla");
+    expect(tarjetas[tarjetas.length - 1]).toHaveTextContent("Campera intervenida");
+  });
+
+  it("esconde las vendidas cuando se lo pedís", async () => {
+    render(await CatalogoPage({ searchParams: Promise.resolve({ ocultarVendidas: "1" }) }));
+
+    expect(screen.queryByRole("link", { name: /Pollera vintage/ })).toBeNull();
+    expect(screen.getByRole("link", { name: /Remera baby tee/ })).toBeInTheDocument();
+  });
+  it("lleva el header de la tienda y cierra con la franja piano del footer", async () => {
+    const { container } = render(await CatalogoPage({ searchParams: Promise.resolve({}) }));
 
     expect(screen.getByText(/Envíos a todo el país desde Salta/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Polkalina's, inicio/ })).toHaveAttribute(
       "href",
       "/polkalinas"
     );
-    expect(screen.getByRole("navigation", { name: /tienda/i })).toBeInTheDocument();
-  });
-
-  it("titula la página en Fraunces y cierra con la franja piano del footer", async () => {
-    const { container } = render(
-      await CatalogoPage({ searchParams: Promise.resolve({}) })
-    );
-
-    expect(screen.getByRole("heading", { level: 1 }).className).toContain("font-display");
-    // Las franjas piano son teclas blancas y negras, no una imagen: una bajo el
-    // header y otra arriba del footer, como el mockup.
-    const franjas = container.querySelectorAll('[data-testid="franja-piano"]');
-    expect(franjas).toHaveLength(2);
-    franjas.forEach((franja) => {
-      expect(franja.querySelectorAll("span")).toHaveLength(14);
-      expect(franja.querySelectorAll("i")).toHaveLength(10);
-    });
-  });
-
-  it("deja el precio al final de la tarjeta, debajo del nombre y la meta", async () => {
-    render(await CatalogoPage({ searchParams: Promise.resolve({}) }));
-
-    const tarjeta = screen.getByRole("link", { name: /Campera de jean/ });
-    const bloques = Array.from(tarjeta.children);
-    const ultimo = bloques[bloques.length - 1];
-
-    expect(ultimo).toHaveTextContent("$ 45.000,00");
-    expect(ultimo.className).toContain("font-display");
-    expect(screen.getByText("Campera de jean").className).toContain("font-display");
-    expect(bloques[bloques.length - 2]).toHaveTextContent("PK-1 · Camperas");
-  });
-
-  it("el chip «Cositas» lista los productos normales, no las prendas", async () => {
-    render(await CatalogoPage({ searchParams: Promise.resolve({ tipo: "cositas" }) }));
-
-    expect(screen.getByRole("link", { name: /Perfume floral/ })).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: /Campera de jean/ })).not.toBeInTheDocument();
-
-    // El nav de la tienda también tiene «Cositas»: el chip está en su propio nav.
-    const chips = screen.getByRole("navigation", { name: "Categorías" });
-    const cositas = within(chips).getByRole("link", { name: "Cositas" });
-    expect(cositas).toHaveAttribute("aria-current", "page");
-    expect(cositas).toHaveAttribute("href", "/polkalinas/catalogo?tipo=cositas");
-    expect(getVidriera).toHaveBeenCalledWith({ categoriaId: undefined, q: undefined });
-  });
-
-  it("el header de tienda lleva al catálogo y a la home", async () => {
-    render(await CatalogoPage({ searchParams: Promise.resolve({}) }));
-
-    expect(screen.getByRole("link", { name: /Polkalina's, inicio/ })).toHaveAttribute(
-      "href",
-      "/polkalinas"
-    );
-    // El nav del header arranca en «Nuevo», el catálogo filtrado por categoría.
-    expect(
-      within(screen.getByRole("navigation", { name: /tienda/i })).getAllByRole("link")[0]
-    ).toHaveAttribute("href", "/polkalinas/catalogo?categoria=nuevo");
-  });
-
-  it("busca por texto desde el formulario", async () => {
-    render(await CatalogoPage({ searchParams: Promise.resolve({ q: "campera" }) }));
-
-    expect(screen.getByRole("searchbox", { name: /buscar/i })).toHaveValue("campera");
-    expect(getVidriera).toHaveBeenCalledWith({ categoriaId: undefined, q: "campera" });
-  });
-
-  it("la categoría va como etiqueta sobre la foto, solo si el ítem tiene categoría", async () => {
-    render(await CatalogoPage({ searchParams: Promise.resolve({}) }));
-
-    // La etiqueta vive dentro de la caja de la foto, no en la meta de abajo.
-    expect(screen.getByAltText("Campera de jean").parentElement).toHaveTextContent("Camperas");
-    expect(screen.getByAltText("Campera de jean").parentElement?.querySelector("span")).toHaveClass(
-      "absolute"
-    );
-    expect(screen.getByText("Sin foto").parentElement).not.toHaveTextContent("Polleras");
-  });
-
-  it("atenúa la foto cuando la prenda está vendida", async () => {
-    render(await CatalogoPage({ searchParams: Promise.resolve({}) }));
-
-    expect(screen.getByAltText("Pollera escocesa").className).toContain("opacity-60");
-    expect(screen.getByAltText("Campera de jean").className).not.toContain("opacity-60");
+    expect(container.querySelectorAll('[data-testid="franja-piano"]')).toHaveLength(2);
   });
 
   it("sin ítems publicados muestra el aviso en lugar de una grilla vacía", async () => {
@@ -412,6 +532,41 @@ describe("catálogo /polkalinas/catalogo", () => {
     render(await CatalogoPage({ searchParams: Promise.resolve({}) }));
 
     expect(screen.getByText(/no hay prendas ni productos publicados/i)).toBeInTheDocument();
+  });
+});
+
+describe("rutas filtradas del catálogo", () => {
+  beforeEach(() => {
+    getVidriera.mockResolvedValue({
+      success: true,
+      data: { items: CATALOGO, categorias: CATEGORIAS },
+    });
+  });
+
+  it.each([
+    ["Nuevo", NuevoPage, /Remera baby tee/, /Pollera vintage/],
+    ["Second hand", SecondHandPage, /Pollera vintage/, /Remera baby tee/],
+    ["Intervenido", IntervenidoPage, /Campera intervenida/, /Remera baby tee/],
+    ["Cositas", CositasPage, /Llavero frutilla/, /Campera intervenida/],
+  ])("la ruta %s muestra su título y el catálogo ya filtrado", async (titulo, Pagina, presente, ausente) => {
+    render(await Pagina({ searchParams: Promise.resolve({}) }));
+
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(titulo);
+    expect(screen.getByRole("link", { name: presente })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: ausente })).toBeNull();
+    expect(screen.getByRole("complementary", { name: /filtros/i })).toBeInTheDocument();
+  });
+
+  it("el filtro «Estilo» convive con la categoría fija de la ruta", async () => {
+    const { unmount } = render(
+      await NuevoPage({ searchParams: Promise.resolve({ estilo: "Y2K" }) })
+    );
+    expect(screen.getByRole("link", { name: /Remera baby tee/ })).toBeInTheDocument();
+
+    unmount();
+    render(await NuevoPage({ searchParams: Promise.resolve({ estilo: "Coquette" }) }));
+    expect(screen.queryByRole("link", { name: /Remera baby tee/ })).toBeNull();
+    expect(screen.queryByRole("link", { name: /Campera intervenida/ })).toBeNull();
   });
 });
 
@@ -432,47 +587,117 @@ describe("EstadoVidrieraBadge", () => {
 });
 
 describe("ficha /polkalinas/[id]", () => {
-  it("muestra la galería, el estado y el detalle público", async () => {
-    render(await FichaPage({ params: Promise.resolve({ id: "1" }) }));
+  beforeEach(() => {
+    getVidriera.mockResolvedValue({
+      success: true,
+      data: { items: CATALOGO, categorias: CATEGORIAS },
+    });
+    getVidrieraItem.mockResolvedValue({ success: true, data: FICHA });
+  });
 
-    expect(
-      screen.getByRole("heading", { level: 1, name: "Campera de jean" })
-    ).toBeInTheDocument();
+  it("abre con las migas, el título en Fraunces con su parte en itálica y el precio", async () => {
+    render(await FichaPage({ params: Promise.resolve({ id: "11" }) }));
+
+    const migas = screen.getByRole("navigation", { name: /ruta/i });
+    expect(within(migas).getByRole("link", { name: "Inicio" })).toHaveAttribute(
+      "href",
+      "/polkalinas"
+    );
+    expect(within(migas).getByRole("link", { name: "Intervenido" })).toHaveAttribute(
+      "href",
+      "/polkalinas/catalogo?categoria=2"
+    );
+
+    const h1 = screen.getByRole("heading", { level: 1 });
+    expect(h1).toHaveTextContent("Campera de jean intervenida");
+    expect(h1.className).toContain("font-display");
+    expect(within(h1).getByText("intervenida")).toHaveClass("italic");
     expect(screen.getByText("$ 45.000,00")).toBeInTheDocument();
-    expect(screen.getByText("Reservada · consultá")).toBeInTheDocument();
-    expect(screen.getByText("Muy bueno")).toBeInTheDocument();
-    expect(screen.getByText("Talles: M, S")).toBeInTheDocument();
+  });
+
+  it("arriba lleva «Pieza única» y el estado, sin guía de talles ni código", async () => {
+    render(await FichaPage({ params: Promise.resolve({ id: "11" }) }));
+
+    expect(screen.getByText("Pieza única")).toBeInTheDocument();
+    // El estado está en la ficha; las cards de «Te puede interesar» también lo dicen.
+    expect(screen.getAllByText("Disponible", { selector: "span" }).length).toBeGreaterThan(0);
+    // El footer enlaza la guía de talles como ayuda: la ficha no la repite.
+    expect(within(screen.getByRole("main")).queryByText(/guía de talles/i)).toBeNull();
+    expect(screen.queryByText("RPI-1")).toBeNull();
+  });
+
+  it("elige el talle y el mensaje de WhatsApp lo lleva", async () => {
+    render(await FichaPage({ params: Promise.resolve({ id: "11" }) }));
+
+    const selector = screen.getByRole("group", { name: /talle/i });
+    const medio = within(selector).getByRole("button", { name: "M" });
+    expect(medio).toHaveAttribute("aria-pressed", "false");
+
+    fireEvent.click(medio);
+
+    expect(medio).toHaveAttribute("aria-pressed", "true");
+    const consulta = screen.getByRole("link", { name: /lo quiero por whatsapp/i });
+    expect(decodeURIComponent(consulta.getAttribute("href") ?? "")).toContain("Talle M");
+    expect(consulta.getAttribute("href")).toContain("https://wa.me/5493876360163?text=");
+  });
+
+  it("cambia la foto grande al tocar una miniatura", async () => {
+    render(await FichaPage({ params: Promise.resolve({ id: "11" }) }));
+
     expect(screen.getByAltText("Campera de frente")).toHaveAttribute(
       "src",
       "https://storage.test/product-images/hash-portada_lg.webp"
     );
-  });
-
-  it("cambia la foto grande al tocar una miniatura", async () => {
-    render(await FichaPage({ params: Promise.resolve({ id: "1" }) }));
 
     fireEvent.click(screen.getByRole("button", { name: "Ver foto 2" }));
 
     expect(screen.getByAltText("Campera de espalda")).toBeInTheDocument();
   });
 
+  it("muestra la descripción, el estado y las tres filas de envío, retiro y pago", async () => {
+    render(await FichaPage({ params: Promise.resolve({ id: "11" }) }));
+
+    expect(screen.getByText("Intervenida a mano con encaje.")).toBeInTheDocument();
+    expect(screen.getByText(/muy bueno/i)).toBeInTheDocument();
+    // El footer también enlaza estas ayudas: las filas de la ficha van en negrita.
+    expect(screen.getByText("Envíos a todo el país", { selector: "strong" })).toBeInTheDocument();
+    expect(screen.getByText("Retiro en Salta", { selector: "strong" })).toBeInTheDocument();
+    expect(screen.getByText("Medios de pago", { selector: "strong" })).toBeInTheDocument();
+  });
+
+  it("al final sugiere «Te puede interesar» sin la prenda que estás viendo", async () => {
+    render(await FichaPage({ params: Promise.resolve({ id: "11" }) }));
+
+    expect(screen.getByRole("heading", { name: /te puede interesar/i })).toBeInTheDocument();
+    const lista = screen.getByRole("list", { name: /te puede interesar/i });
+    expect(
+      within(lista).queryByRole("link", { name: /Campera de jean intervenida/ })
+    ).toBeNull();
+    expect(within(lista).getAllByRole("listitem").length).toBeLessThanOrEqual(4);
+    expect(screen.getByRole("link", { name: /ver catálogo/i })).toHaveAttribute(
+      "href",
+      "/polkalinas/catalogo"
+    );
+  });
+
+  it("un producto normal no tiene selector de talle y muestra descripción, categoría y sucursales", async () => {
+    getVidrieraItem.mockResolvedValue({ success: true, data: FICHA_PRODUCTO });
+
+    render(await FichaPage({ params: Promise.resolve({ id: "13" }) }));
+
+    expect(screen.queryByRole("group", { name: /talle/i })).toBeNull();
+    expect(screen.queryByText("Pieza única")).toBeNull();
+    expect(screen.getByText("Un llavero con forma de frutilla.")).toBeInTheDocument();
+    expect(screen.getByText(/categoría: perfumes/i)).toBeInTheDocument();
+    expect(screen.getByText(/disponible en: salta/i)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /lo quiero por whatsapp/i })).toBeInTheDocument();
+  });
+
   it("cierra con la franja piano, como el catálogo", async () => {
-    const { container } = render(await FichaPage({ params: Promise.resolve({ id: "1" }) }));
+    const { container } = render(await FichaPage({ params: Promise.resolve({ id: "11" }) }));
 
     // Header y footer: el piano es el mismo en las dos puntas de la página.
     expect(container.querySelectorAll('[data-testid="franja-piano"]')).toHaveLength(2);
-  });
-
-  it("el botón de WhatsApp lleva el número del dueño y el mensaje con nombre y código", async () => {
-    render(await FichaPage({ params: Promise.resolve({ id: "1" }) }));
-
-    const consulta = screen.getByRole("link", { name: /consultar por whatsapp/i });
-
-    expect(consulta).toHaveAttribute("href", linkConsulta("Campera de jean", "PK-1"));
-    expect(consulta.getAttribute("href")).toContain("https://wa.me/5493876360163?text=");
-    expect(decodeURIComponent(consulta.getAttribute("href") ?? "")).toContain(
-      "Hola! Consulto por Campera de jean (PK-1)"
-    );
   });
 
   it("un ítem no publicado no existe para el visitante (misma respuesta que inexistente)", async () => {

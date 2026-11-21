@@ -268,6 +268,8 @@ describe("getVidriera — qué se publica (S2)", () => {
           condicion: { select: { name: true } },
           // Talles para mostrarlos en la card (dato público de la prenda).
           talles: { select: { talle: true, cantidad: true }, orderBy: { talle: "asc" } },
+          // Estilos: filtro «Estilo» del catálogo (dato público de la prenda).
+          estilos: { select: { estilo: { select: { name: true } } } },
         },
       },
     });
@@ -289,6 +291,7 @@ describe("getVidriera — qué se publica (S2)", () => {
       portada: expect.stringMatching(/\/product-images\/1\/hash-portada_sm\.webp$/),
       categoria: "Camperas",
       talles: ["M", "S"],
+      estilos: [],
     });
   });
 
@@ -417,6 +420,7 @@ describe("getVidrieraItem — ficha pública (T5)", () => {
       condicion: "Muy bueno",
       detalleCondicion: "Con marcas en el ruedo",
       talles: ["M", "S"],
+      estilos: [],
       fotos: [
         {
           url: expect.stringMatching(/\/product-images\/1\/hash-portada_lg\.webp$/),
@@ -479,6 +483,7 @@ describe("getVidrieraItem — ficha pública (T5)", () => {
       condicion: null,
       detalleCondicion: null,
       talles: [],
+      estilos: [],
       fotos: [
         {
           url: expect.stringMatching(/\/product-images\/3\/hash-perfume_lg\.webp$/),
