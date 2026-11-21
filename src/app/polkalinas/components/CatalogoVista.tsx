@@ -136,12 +136,14 @@ export function CatalogoVista({
 
   const visibles = verTodas ? ordenados : ordenados.slice(0, VISIBLES);
 
-  // Las opciones son las categorías presentes en lo que muestra la vista: la de
-  // producto (`Category`) en Cositas, la de prenda en el resto. Si conviven, se
-  // unifican por nombre con el conteo de las dos.
+  // Las opciones son las categorías del tipo que lista la vista: la de prenda
+  // (`CategoriaPrenda`) en el catálogo y en las rutas de prendas, la de producto
+  // (`Category`) en Cositas. Un producto en el catálogo general muestra su
+  // categoría en la card, pero no agrega opción de filtro.
+  const kindDeOpciones = categoriaFija === "cositas" ? "PRODUCT" : "PRENDA";
   const conteosCategoria = new Map<string, number>();
   for (const item of items) {
-    if (!item.categoria || !deLaRuta(item)) continue;
+    if (item.kind !== kindDeOpciones || !item.categoria || !deLaRuta(item)) continue;
     conteosCategoria.set(item.categoria, (conteosCategoria.get(item.categoria) ?? 0) + 1);
   }
 

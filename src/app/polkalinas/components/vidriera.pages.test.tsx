@@ -676,7 +676,7 @@ describe("categorías del aside según lo que muestra la vista", () => {
     ).toBeInTheDocument();
   });
 
-  it("cuando la vista mezcla prendas y productos, unifica las categorías de los dos", async () => {
+  it("cuando la vista mezcla prendas y productos, el aside ofrece solo las de prenda", async () => {
     getVidriera.mockResolvedValue({
       success: true,
       data: { items: [...CATALOGO, PRODUCTOS[0]], categorias: CATEGORIAS },
@@ -685,9 +685,67 @@ describe("categorías del aside según lo que muestra la vista", () => {
     render(await CatalogoPage({ searchParams: Promise.resolve({}) }));
 
     const categoria = grupoCategoria();
-    // La de prenda y la de producto conviven, cada una con su conteo.
+    // La card del producto muestra su categoría, pero no crea opción de filtro.
+    expect(screen.getByRole("link", { name: /Arito corazón/ })).toBeInTheDocument();
     expect(within(categoria).getByRole("checkbox", { name: /intervenido/i })).toBeInTheDocument();
-    expect(within(categoria).getByRole("checkbox", { name: /aritos/i })).toHaveAccessibleName(/1/);
+    expect(within(categoria).queryByRole("checkbox", { name: /aritos/i })).toBeNull();
+  });
+
+  it.each([
+    ["Nuevo", NuevoPage],
+    ["Second hand", SecondHandPage],
+    ["Intervenido", IntervenidoPage],
+  ] as const)(
+    "en la ruta %s el conteo de la categoría suma solo prendas",
+    async (nombre, Pagina) => {
+      // Un producto cuya `Category` se llama igual que la categoría de la ruta.
+      const producto = { ...PRODUCTOS[0], id: 40, categoria: nombre };
+      getVidriera.mockResolvedValue({
+        success: true,
+        data: { items: [...CATALOGO, producto], categorias: CATEGORIAS },
+      });
+
+      render(await Pagina({ searchParams: Promise.resolve({}) }));
+
+      expect(within(grupoCategoria()).getByRole("checkbox", { name: `${nombre} 1` })).toBeInTheDocument();
+    }
+  );
+
+  it("en Cositas no ofrece el filtro «Talle», que sí está en las rutas de prendas", async () => {
+    getVidriera.mockResolvedValue({
+      success: true,
+      data: { items: PRODUCTOS, categorias: CATEGORIAS },
+    });
+
+    const { unmount } = render(await CositasPage({ searchParams: Promise.resolve({}) }));
+    const filtros = screen.getByRole("complementary", { name: /filtros/i });
+    expect(within(filtros).queryByRole("group", { name: "Talle" })).toBeNull();
+    // El resto de los filtros de Cositas se mantiene.
+    expect(within(filtros).getByRole("group", { name: "Categoría" })).toBeInTheDocument();
+    expect(within(filtros).getByRole("group", { name: "Precio" })).toBeInTheDocument();
+    expect(within(filtros).getByRole("group", { name: "Disponibilidad" })).toBeInTheDocument();
+
+    unmount();
+    render(await NuevoPage({ searchParams: Promise.resolve({}) }));
+    expect(
+      within(screen.getByRole("complementary", { name: /filtros/i })).getByRole("group", {
+        name: "Talle",
+      })
+    ).toBeInTheDocument();
+  });
+
+  it("en Cositas una prenda con la misma categoría no suma a la opción de producto", async () => {
+    const prenda: VidrieraItem = { ...CATALOGO[0], id: 41, categoria: "Aritos" };
+    getVidriera.mockResolvedValue({
+      success: true,
+      data: { items: [PRODUCTOS[0], prenda], categorias: CATEGORIAS },
+    });
+
+    render(await CositasPage({ searchParams: Promise.resolve({}) }));
+
+    const categoria = grupoCategoria();
+    expect(within(categoria).getByRole("checkbox", { name: "Aritos 1" })).toBeInTheDocument();
+    expect(within(categoria).queryByRole("checkbox", { name: /intervenido/i })).toBeNull();
   });
 
   it("la categoría de producto también filtra en el catálogo general", async () => {

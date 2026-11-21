@@ -134,27 +134,30 @@ export function FiltrosCatalogo({
           ))}
         </fieldset>
 
-        <fieldset className={GRUPO}>
-          <legend className={LEYENDA}>Talle</legend>
-          {talles.length === 0 ? (
-            <p className="text-[13px] text-ink-muted">Todavía no hay talles cargados.</p>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              {talles.map((talle) => (
-                <button
-                  key={talle}
-                  type="submit"
-                  name="talle"
-                  value={talle}
-                  aria-pressed={valores.talle === talle}
-                  className={TALLE}
-                >
-                  {talle}
-                </button>
-              ))}
-            </div>
-          )}
-        </fieldset>
+        {/* Cositas son productos: no tienen talle, así que el filtro no aplica. */}
+        {categoriaFija !== "cositas" && (
+          <fieldset className={GRUPO}>
+            <legend className={LEYENDA}>Talle</legend>
+            {talles.length === 0 ? (
+              <p className="text-[13px] text-ink-muted">Todavía no hay talles cargados.</p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {talles.map((talle) => (
+                  <button
+                    key={talle}
+                    type="submit"
+                    name="talle"
+                    value={talle}
+                    aria-pressed={valores.talle === talle}
+                    className={TALLE}
+                  >
+                    {talle}
+                  </button>
+                ))}
+              </div>
+            )}
+          </fieldset>
+        )}
 
         {estilos.length > 0 && (
           <fieldset className={GRUPO}>
