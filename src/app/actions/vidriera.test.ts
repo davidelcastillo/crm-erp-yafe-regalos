@@ -54,6 +54,8 @@ type Fila = {
   destacado: boolean;
   /** Categoría propia del producto normal (las prendas usan la de prenda). */
   category: { id: number; name: string } | null;
+  /** Categorías del producto (`ProductCategory`): varias, todas equivalentes. */
+  categorias?: { category: { id: number; name: string } }[];
   /** Canales de `PrendaPublicacion`: la vidriera solo muestra «Web». */
   canales: string[];
   images: { path: string; alt: string | null }[];
@@ -153,11 +155,20 @@ let RESERVADOS: number[] = [];
 /** Productos con al menos una venta. */
 let VENDIDOS: number[] = [];
 
-type Where = {
+/** Condición de un `where`: lo que arma la acción, con o sin `AND` alrededor. */
+type Condicion = {
+  name?: { contains?: string };
+  code?: { contains?: string };
+  prenda?: { categoriaId?: number };
+  categorias?: { some?: { categoryId?: number } };
+  OR?: Condicion[];
+};
+
+type Where = Condicion & {
   active?: boolean;
   publicaciones?: { some?: { canal?: string } };
-  prenda?: { categoriaId?: number };
-  OR?: { name?: { contains?: string }; code?: { contains?: string } }[];
+  AND?: Condicion[];
+  OR?: Condicion[];
 };
 
 /** Orden pedido a la base: la misma forma que acepta Prisma. */
@@ -189,6 +200,31 @@ const coincide = (fila: Fila, where: Where | undefined): boolean => {
   if (canal && !fila.canales.includes(canal)) return false;
   const categoriaId = where.prenda?.categoriaId;
   if (categoriaId !== undefined && fila.prenda?.categoria?.id !== categoriaId) return false;
+  // N:N del producto: la categoría pedida puede ser cualquiera de las suyas.
+  const enElPuente = where.categorias?.some?.categoryId;
+  if (
+    enElPuente !== undefined &&
+    !(fila.categorias ?? []).some((filaCategoria) => filaCategoria.category.id === enElPuente)
+  ) {
+    return false;
+  }
+  // El filtro por categoría va en un `AND` para no chocar con el `OR` de `q`.
+  const porCategoria = where.AND?.[0];
+  if (
+    porCategoria &&
+    !porCategoria.OR?.some(
+      (alternativa) =>
+        (alternativa.prenda?.categoriaId !== undefined &&
+          fila.prenda?.categoria?.id === alternativa.prenda.categoriaId) ||
+        (alternativa.categorias?.some?.categoryId !== undefined &&
+          (fila.categorias ?? []).some(
+            (filaCategoria) =>
+              filaCategoria.category.id === alternativa.categorias?.some?.categoryId
+          ))
+    )
+  ) {
+    return false;
+  }
   const texto = where.OR?.[0]?.name?.contains?.toLowerCase();
   if (texto) {
     return (
@@ -317,6 +353,10 @@ describe("getVidriera — qué se publica (S2)", () => {
       destacado: true,
       // Categoría propia del producto normal (`Category`): dato público del ítem.
       category: { select: { id: true, name: true } },
+      // Categorías del producto (N:N, todas públicas): la card las muestra todas.
+      categorias: {
+        select: { categoryId: true, category: { select: { id: true, name: true } } },
+      },
       images: {
         orderBy: { position: "asc" },
         select: { path: true, alt: true },
@@ -355,6 +395,8 @@ describe("getVidriera — qué se publica (S2)", () => {
       portada: expect.stringMatching(/\/product-images\/1\/hash-portada_sm\.webp$/),
       categoria: "Camperas",
       categoriaId: 7,
+      categorias: ["Camperas"],
+      categoriaIds: [7],
       talles: ["M", "S"],
       estilos: [],
       // Una prenda no tiene variantes: el campo viene vacío.
@@ -383,6 +425,26 @@ describe("getVidriera — qué se publica (S2)", () => {
     const perfume = resultado.data.items.find((item) => item.code === "AR-1");
     expect(perfume?.categoria).toBe("Perfumes");
     expect(perfume?.categoriaId).toBe(9);
+  });
+
+  it("un producto con varias categorías las expone todas, sin repetir", async () => {
+    PERFUME.categorias = [
+      { category: { id: 9, name: "Perfumes" } },
+      { category: { id: 12, name: "Regalos" } },
+    ];
+    try {
+      const resultado = await getVidriera();
+      if (!resultado.success) throw new Error("la vidriera tendría que responder");
+
+      const perfume = resultado.data.items.find((item) => item.code === "AR-1");
+      expect(perfume?.categorias).toEqual(["Perfumes", "Regalos"]);
+      expect(perfume?.categoriaIds).toEqual([9, 12]);
+      // La principal sigue siendo la primera: los consumidores viejos no cambian.
+      expect(perfume?.categoria).toBe("Perfumes");
+      expect(perfume?.categoriaId).toBe(9);
+    } finally {
+      delete PERFUME.categorias;
+    }
   });
 
   it("un producto sin categoría no rompe la lista", async () => {
@@ -476,11 +538,33 @@ describe("getVidriera — filtros", () => {
     try {
       const resultado = await getVidriera({ categoriaId: 8 });
 
-      expect(mockProductFindMany.mock.calls[0][0].where.prenda).toEqual({ categoriaId: 8 });
+      expect(mockProductFindMany.mock.calls[0][0].where.AND).toEqual([
+        {
+          OR: [
+            { prenda: { categoriaId: 8 } },
+            { categorias: { some: { categoryId: 8 } } },
+          ],
+        },
+      ]);
       if (!resultado.success) throw new Error("la vidriera tendría que responder");
       expect(resultado.data.items.map((item) => item.code)).toEqual(["PK-2"]);
     } finally {
       REMERA.canales = ["Instagram"];
+    }
+  });
+
+  it("el filtro por categoría encuentra el producto por su segunda categoría", async () => {
+    PERFUME.categorias = [
+      { category: { id: 9, name: "Perfumes" } },
+      { category: { id: 12, name: "Regalos" } },
+    ];
+    try {
+      const resultado = await getVidriera({ categoriaId: 12 });
+
+      if (!resultado.success) throw new Error("la vidriera tendría que responder");
+      expect(resultado.data.items.map((item) => item.code)).toEqual(["AR-1"]);
+    } finally {
+      delete PERFUME.categorias;
     }
   });
 
@@ -519,6 +603,8 @@ describe("getVidrieraItem — ficha pública (T5)", () => {
       portada: expect.stringMatching(/\/hash-portada_sm\.webp$/),
       categoria: "Camperas",
       categoriaId: 7,
+      categorias: ["Camperas"],
+      categoriaIds: [7],
       descripcion: "",
       sucursales: [{ id: 1, name: "Casa central" }],
       condicion: "Muy bueno",
@@ -584,6 +670,8 @@ describe("getVidrieraItem — ficha pública (T5)", () => {
       portada: expect.stringMatching(/\/hash-perfume_sm\.webp$/),
       categoria: "Perfumes",
       categoriaId: 9,
+      categorias: ["Perfumes"],
+      categoriaIds: [9],
       descripcion: "Perfume floral 100 ml",
       // Sin stock no hay sucursal para mostrar, pero el campo siempre viene.
       sucursales: [],

@@ -6,13 +6,15 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Product } from "@prisma/client";
 import Swal from "sweetalert2";
-import { CategorySelector } from "@/components/ui/CategorySelector";
+import { CategoriasPicker } from "@/components/ui/CategoriasPicker";
+import type { CategoryOption } from "@/components/ui/CategorySelector";
 import { BranchPicker } from "@/components/ui/BranchPicker";
 import { FotoUploader, subirFotos } from "@/components/ui/FotoUploader";
 import { EstilosPicker } from "@/components/ui/EstilosPicker";
 import { CANALES_PUBLICACION } from "@/lib/validations/prenda";
 import type { TaxonomyOption } from "@/lib/validations/prendaTaxonomy";
 import { getBranchOptions } from "@/app/actions/branch";
+import { getCategoryOptions } from "@/app/actions/category";
 import { getFotosProducto } from "@/app/actions/foto";
 import { getEstiloPrendaOptions } from "@/app/actions/prendaTaxonomy";
 import {
@@ -33,11 +35,12 @@ interface ProductFormProps {
  * Reusable create/edit modal for Products (App Router Client Component).
  *
  * Fase 3:
- *  - Adds a Category field (CategorySelector with inline "+ Nueva categoría").
+ *  - Adds a Category field (CategoriasPicker: varias por producto, con alta
+ *    rápida de categoría).
  *  - Adds an Active/Inactive toggle (edit mode only) with a SweetAlert2
  *    confirmation before deactivating.
  *  - Uses `updateProductExtended` for the extended payload in edit mode
- *    (carrying categoryId + active on top of the HU2 fields).
+ *    (carrying `categorias` + active on top of the HU2 fields).
  *  - `code` and `codePrefix` are immutable in edit mode (read-only display).
  *  - There is NO `stock` field on Product anymore (stock lives in BranchInventory
  *    per branch). The HU2 create mode no longer asks for initial stock.
@@ -49,9 +52,13 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const isEdit = !!product;
-  const [categoryId, setCategoryId] = useState<number | null>(
-    product?.categoryId ?? null
-  );
+  /**
+   * Categorías del producto: varias y todas equivalentes (pedido del dueño). En
+   * la edición arranca en `null` hasta leer las guardadas, así guardar sin haber
+   * cargado no las borra.
+   */
+  const [categorias, setCategorias] = useState<number[] | null>(isEdit ? null : []);
+  const [categoriasDisponibles, setCategoriasDisponibles] = useState<CategoryOption[]>([]);
   const [isActive, setIsActive] = useState<boolean>(product?.active ?? true);
 
   /**
@@ -123,6 +130,31 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
         : [...(prev ?? []), canal]
     );
 
+  // Las categorías se piden una vez, en el alta y en la edición.
+  useEffect(() => {
+    let cancelado = false;
+    (async () => {
+      try {
+        const resultado = await getCategoryOptions();
+        if (!cancelado && resultado.success && resultado.data) {
+          setCategoriasDisponibles(resultado.data as CategoryOption[]);
+        }
+      } catch (error) {
+        console.error("Error loading category options:", error);
+      }
+    })();
+    return () => {
+      cancelado = true;
+    };
+  }, []);
+
+  const toggleCategoria = (id: number) =>
+    setCategorias((prev) =>
+      (prev ?? []).includes(id)
+        ? (prev ?? []).filter((actual) => actual !== id)
+        : [...(prev ?? []), id]
+    );
+
   const toggleEstilo = (id: number) =>
     setEstilos((prev) =>
       (prev ?? []).includes(id) ? (prev ?? []).filter((actual) => actual !== id) : [...(prev ?? []), id]
@@ -181,10 +213,12 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
         const ficha = resultado.data as {
           publicadaEn?: string[];
           estilos?: number[];
+          categorias?: number[];
           variantes?: { nombre: string; cantidad: number; fotoPosition: number | null }[];
         };
         setPublicadaEn(ficha.publicadaEn ?? []);
         setEstilos(ficha.estilos ?? []);
+        setCategorias(ficha.categorias ?? []);
         // Si ya se tocó el interruptor, el usuario manda: no se pisa lo tipeado.
         if (variantesTocadas.current) return;
         const guardadas = ficha.variantes ?? [];
@@ -305,8 +339,9 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
           name: formData.name,
           description: formData.description || null,
           price: formData.price,
-          categoryId: categoryId,
           active: isActive,
+          // Sin categorías cargadas todavía no se tocan las guardadas.
+          ...(categorias !== null ? { categorias } : {}),
           // Sin canales cargados todavía no se toca lo publicado.
           ...(publicadaEn !== null ? { publicadaEn } : {}),
           // Sin estilos cargados todavía no se tocan los guardados.
@@ -318,10 +353,8 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
           description: formData.description,
           prefix: formData.prefix,
           price: formData.price,
-          // La categoría elegida viaja en el alta (H2). Sin elección va null
-          // explícito: el esquema la acepta nullable y el producto queda igual
-          // que antes (categoryId=null).
-          categoryId: categoryId,
+          // Las categorías elegidas viajan en el alta (vacío = sin categoría).
+          categorias: categorias ?? [],
           publicadaEn: publicadaEn ?? [],
           estilos: estilos ?? [],
           // La cantidad y el costo viajan siempre: con costo se registra la
@@ -727,15 +760,20 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
             </div>
           )}
 
-          {/* Category Selector */}
-          <div>
-            <span className={labelClass}>Categoría</span>
-            <CategorySelector
-              selectedId={categoryId}
-              onValueChange={setCategoryId}
-              label=""
-            />
-          </div>
+          {/* Categorías: varias por producto, todas equivalentes. */}
+          <CategoriasPicker
+            id="product-categorias"
+            options={categoriasDisponibles}
+            onOptionsChange={setCategoriasDisponibles}
+            selected={categorias ?? []}
+            onToggle={toggleCategoria}
+            onCreated={(id) =>
+              setCategorias((prev) =>
+                (prev ?? []).includes(id) ? (prev ?? []) : [...(prev ?? []), id]
+              )
+            }
+            disabled={loading}
+          />
 
           {/* Estilos: la misma taxonomía que la prenda, con su alta rápida. */}
           <EstilosPicker

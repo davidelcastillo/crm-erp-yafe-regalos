@@ -100,11 +100,13 @@ describe("getProductsWithBranchStock (Fase 3)", () => {
     expect(result.data?.[0]?.category?.name).toBe("General");
   });
 
-  it("filters by categoryId when passed", async () => {
+  it("filters by any of the product categories when categoryId is passed", async () => {
     mockProductFindMany.mockResolvedValue([]);
     await getProductsWithBranchStock({ categoryId: 3 });
     expect(mockProductFindMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: expect.objectContaining({ categoryId: 3 }) })
+      expect.objectContaining({
+        where: expect.objectContaining({ categorias: { some: { categoryId: 3 } } }),
+      })
     );
   });
 

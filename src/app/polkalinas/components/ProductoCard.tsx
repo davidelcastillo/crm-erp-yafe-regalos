@@ -26,6 +26,13 @@ const meta = ({ talles, categoria }: ItemVidriera) => {
 };
 
 /**
+ * Categorías públicas del ítem: todas las del producto (son equivalentes). Si la
+ * lista no viene, queda la principal para no romper los consumidores viejos.
+ */
+const categoriasDe = (item: ItemVidriera) =>
+  item.categorias ?? (item.categoria ? [item.categoria] : []);
+
+/**
  * Tarjeta de producto de la vidriera (`article.prod` de `web/index.html`): foto
  * 4:5 con la categoría arriba y el estado abajo, nombre en Fraunces, meta y
  * precio al final. Vendida se atenúa entera, como el mockup. Sin favoritos ni
@@ -34,6 +41,7 @@ const meta = ({ talles, categoria }: ItemVidriera) => {
 export function ProductoCard({ item, className = "" }: { item: ItemVidriera; className?: string }) {
   const vendida = item.estado === "VENDIDA";
   const dato = meta(item);
+  const categorias = categoriasDe(item);
 
   return (
     <Link
@@ -49,9 +57,23 @@ export function ProductoCard({ item, className = "" }: { item: ItemVidriera; cla
           /* eslint-disable-next-line @next/next/no-img-element */
           <img src={item.portada} alt={item.name} className="size-full object-cover" />
         )}
-        {item.categoria && (
+        {categorias.length > 0 && (
           <span className="absolute top-2.5 left-2.5 rounded-full bg-background px-2.5 py-1 text-[11px] font-semibold tracking-[.08em] text-accent uppercase">
-            {item.categoria}
+            {categorias[0]}
+          </span>
+        )}
+        {/* Las demás categorías del producto, debajo de la primera: todas son
+            equivalentes y la card las muestra todas. */}
+        {categorias.length > 1 && (
+          <span className="absolute top-2.5 left-2.5 mt-7 flex max-w-[calc(100%-1.25rem)] flex-wrap gap-1">
+            {categorias.slice(1).map((categoria) => (
+              <span
+                key={categoria}
+                className="rounded-full bg-background px-2.5 py-1 text-[11px] font-semibold tracking-[.08em] text-accent uppercase"
+              >
+                {categoria}
+              </span>
+            ))}
           </span>
         )}
         <span className="absolute inset-x-2.5 bottom-2.5 flex">

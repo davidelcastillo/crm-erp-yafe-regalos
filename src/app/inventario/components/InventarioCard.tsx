@@ -29,6 +29,8 @@ type BranchStockRow = { stock: number; branch?: { id: number; name: string } | n
 type ProductExtra = {
   images?: { path: string }[];
   variantes?: { nombre: string }[];
+  /** Categorías del producto (N:N): la card las muestra todas. */
+  categorias?: { category: { id: number; name: string } }[];
 };
 
 const MAX_SUCURSALES_VISIBLES = 3;
@@ -315,6 +317,7 @@ export function InventarioCard({ product, dataProductId, isHighlighted, onViewMo
   // La primera foto por posición es la portada: la card la muestra en miniatura.
   const portada = extra.images?.[0]?.path ?? null;
   const variantes = extra.variantes ?? [];
+  const categorias = extra.categorias ?? [];
 
 // View mode - show product info
    return (
@@ -339,6 +342,18 @@ export function InventarioCard({ product, dataProductId, isHighlighted, onViewMo
              <p className="text-sm text-ink-muted mt-1 line-clamp-2">
                {product.description}
              </p>
+           )}
+           {categorias.length > 0 && (
+             <ul aria-label="Categorías" className="mt-2 flex flex-wrap gap-1.5">
+               {categorias.map((fila) => (
+                 <li
+                   key={fila.category.id}
+                   className="rounded-full bg-surface-strong px-2.5 py-1 text-xs text-ink-muted"
+                 >
+                   {fila.category.name}
+                 </li>
+               ))}
+             </ul>
            )}
            {variantes.length > 0 && (
              <ul aria-label="Variantes" className="mt-2 flex flex-wrap gap-1.5">

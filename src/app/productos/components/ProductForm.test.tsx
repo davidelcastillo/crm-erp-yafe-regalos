@@ -28,24 +28,10 @@ jest.mock("@/app/actions/foto", () => ({
   getFotosProducto: jest.fn(async () => ({ success: true, data: [] })),
 }));
 
-// Mock CategorySelector to keep this suite focused on ProductForm behavior
-type CategorySelectorMockProps = {
-  selectedId?: number | null;
-  onValueChange?: (id: number | null) => void;
-};
-
-jest.mock("@/components/ui/CategorySelector", () => ({
-  CategorySelector: ({ onValueChange, selectedId }: CategorySelectorMockProps) => (
-    <div data-testid="category-selector">
-      <button
-        type="button"
-        onClick={() => onValueChange?.(42)}
-        aria-label="select-category"
-      >
-        Select category {selectedId ?? "none"}
-      </button>
-    </div>
-  ),
+// Categorías: el picker múltiple carga la lista desde la action (una sola vez).
+jest.mock("@/app/actions/category", () => ({
+  getCategoryOptions: jest.fn(),
+  createCategory: jest.fn(),
 }));
 
 // El alta pide la sucursal del stock inicial (T3): se mockean las opciones.
@@ -73,6 +59,7 @@ jest.mock("sweetalert2", () => ({
 }));
 
 import { createProduct, updateProductExtended, getProductById } from "../../actions/product";
+import { createCategory, getCategoryOptions } from "@/app/actions/category";
 import { getBranchOptions } from "@/app/actions/branch";
 import { createEstiloPrenda, getEstiloPrendaOptions } from "@/app/actions/prendaTaxonomy";
 import { subirFotos } from "@/components/ui/FotoUploader";
@@ -93,6 +80,17 @@ const mockGetEstiloPrendaOptions = getEstiloPrendaOptions as jest.MockedFunction
 const mockCreateEstiloPrenda = createEstiloPrenda as jest.MockedFunction<
   typeof createEstiloPrenda
 >;
+const mockGetCategoryOptions = getCategoryOptions as jest.MockedFunction<
+  typeof getCategoryOptions
+>;
+const mockCreateCategory = createCategory as jest.MockedFunction<typeof createCategory>;
+
+/**
+ * Categorías del producto: pills múltiples (todas equivalentes). La lista se
+ * pide una vez al abrir el modal.
+ */
+const elegirCategoria = (nombre: string) =>
+  fireEvent.click(screen.getByRole("button", { name: nombre }));
 /** Los estilos activos se piden una vez al abrir el modal: default para toda la suite. */
 mockGetEstiloPrendaOptions.mockResolvedValue({
   success: true,
@@ -114,6 +112,13 @@ const irAlPaso2 = async () => {
 describe("ProductForm Component", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockGetCategoryOptions.mockResolvedValue({
+      success: true,
+      data: [
+        { id: 5, name: "Bebidas" },
+        { id: 7, name: "Limpieza" },
+      ],
+    } as never);
     mockGetProductById.mockResolvedValue({ success: true, data: { publicadaEn: [] } } as never);
     mockCreateProduct.mockResolvedValue({
       success: true,
@@ -172,7 +177,7 @@ describe("ProductForm Component", () => {
     expect(screen.getByLabelText(/precio de venta/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /crear producto/i })).toBeInTheDocument();
     // Categoría, fotos y canales viven en el paso 2.
-    expect(screen.getByTestId("category-selector")).toBeInTheDocument();
+    expect(screen.getByText("Categorías")).toBeInTheDocument();
     expect(screen.getByText("Fotos")).toBeInTheDocument();
     // Active toggle is NOT shown in create mode (defaults to active=true)
     expect(screen.queryByRole("switch")).not.toBeInTheDocument();
@@ -228,9 +233,9 @@ describe("ProductForm Component", () => {
         description: "Jabón artesanal exfoliante",
         prefix: "AA",
         price: 1500,
-        // Sin categoría elegida el alta manda null explícito (H2): el esquema
-        // la acepta como nullable, así que el payload sigue siendo válido.
-        categoryId: null,
+        // Sin categorías elegidas el alta manda la lista vacía: el producto
+        // queda igual que antes (sin categoría).
+        categorias: [],
         // Sin canales elegidos no publica en ninguno (T3).
         publicadaEn: [],
         // Sin estilos elegidos el alta manda la lista vacía.
@@ -243,7 +248,7 @@ describe("ProductForm Component", () => {
     });
   });
 
-  it("sends the chosen category in the create payload (H2)", async () => {
+  it("sends the chosen categories in the create payload", async () => {
     render(<ProductForm product={null} onClose={() => {}} />);
     await irAlPaso2();
 
@@ -251,16 +256,34 @@ describe("ProductForm Component", () => {
     fireEvent.change(screen.getByLabelText(/prefijo.*2-4 letras/i), { target: { value: "AA" } });
     fireEvent.change(screen.getByLabelText(/precio de venta/i), { target: { value: "100" } });
 
-    // El mock de CategorySelector avisa 42 al hacer clic
-    fireEvent.click(screen.getByLabelText(/select-category/i));
+    // Un producto puede tener varias: todas viajan en el alta.
+    elegirCategoria("Bebidas");
+    elegirCategoria("Limpieza");
 
     fireEvent.click(screen.getByRole("button", { name: /crear producto/i }));
 
     await waitFor(() => {
       expect(mockCreateProduct).toHaveBeenCalledWith(
-        expect.objectContaining({ name: "Con categoría", categoryId: 42 })
+        expect.objectContaining({ name: "Con categoría", categorias: [5, 7] })
       );
     });
+  });
+
+  it("crear una categoría desde el picker la deja elegida sin recargar la lista", async () => {
+    ;(Swal.fire as jest.Mock).mockResolvedValueOnce({ isConfirmed: true, value: "Almacén" });
+    mockCreateCategory.mockResolvedValue({
+      success: true,
+      data: { id: 11, name: "Almacén" },
+    } as never);
+
+    render(<ProductForm product={null} onClose={() => {}} />);
+    await irAlPaso2();
+
+    fireEvent.click(screen.getByRole("button", { name: "Crear nueva categoría" }));
+
+    const nueva = await screen.findByRole("button", { name: "Almacén" });
+    expect(nueva).toHaveAttribute("aria-pressed", "true");
+    expect(mockGetCategoryOptions).toHaveBeenCalledTimes(1);
   });
 
   it("keeps the create payload valid for the schema when no category is chosen", async () => {
@@ -278,7 +301,7 @@ describe("ProductForm Component", () => {
     const payload = mockCreateProduct.mock.calls[0][0];
     const parsed = createProductSchema.safeParse(payload);
     expect(parsed.success).toBe(true);
-    expect(parsed.success && parsed.data.categoryId).toBeNull();
+    expect(parsed.success && parsed.data.categorias).toEqual([]);
   });
 
   it("displays error message when createProduct fails", async () => {
@@ -461,7 +484,7 @@ describe("ProductForm Component", () => {
     });
   });
 
-  it("uses updateProductExtended with id, name, price, categoryId, active when editing", async () => {
+  it("uses updateProductExtended with id, name, price, categorias, active when editing", async () => {
     const existingProduct = {
       id: 1,
       name: "Producto",
@@ -475,6 +498,12 @@ describe("ProductForm Component", () => {
       updatedAt: new Date(),
     } as unknown as Product;
 
+    // La edición precarga las categorías guardadas del producto.
+    mockGetProductById.mockResolvedValue({
+      success: true,
+      data: { publicadaEn: [], categorias: [5, 7] },
+    } as never);
+
     render(
       <ProductForm
         product={existingProduct}
@@ -483,8 +512,17 @@ describe("ProductForm Component", () => {
       />
     );
 
-    // Use the mocked CategorySelector to set categoryId
-    fireEvent.click(screen.getByLabelText(/select-category/i));
+    // Las dos pills llegan marcadas desde la ficha.
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Bebidas" })).toHaveAttribute(
+        "aria-pressed",
+        "true"
+      )
+    );
+    expect(screen.getByRole("button", { name: "Limpieza" })).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
 
     const submitButton = screen.getByRole("button", { name: /actualizar producto/i });
     fireEvent.click(submitButton);
@@ -493,11 +531,13 @@ describe("ProductForm Component", () => {
       expect(mockUpdateProductExtended).toHaveBeenCalledWith(
         expect.objectContaining({
           id: 1,
-          categoryId: 42,
+          categorias: [5, 7],
           active: true,
         })
       );
     });
+    // La columna heredada la sincroniza el servidor con la primera categoría.
+    expect(mockUpdateProductExtended.mock.calls[0][0]).not.toHaveProperty("categoryId");
   });
 
   it("confirms with SweetAlert2 before deactivating a product (edit mode)", async () => {

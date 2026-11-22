@@ -59,7 +59,7 @@ jest.mock("@/app/actions/prendaTaxonomy", () => ({
   getMedidaTipoOptions: jest.fn(),
 }));
 
-// El modal de producto trae fotos y selector de categoría: se mockean sus
+// El modal de producto trae fotos y el picker de categorías: se mockean sus
 // acciones para que la suite hable solo de la card.
 jest.mock("@/app/actions/foto", () => ({
   firmarSubidaFoto: jest.fn(),
@@ -70,6 +70,12 @@ jest.mock("@/app/actions/foto", () => ({
 
 jest.mock("@/components/ui/CategorySelector", () => ({
   CategorySelector: () => <div data-testid="category-selector" />,
+}));
+
+// El picker múltiple de categorías importa la action real (y con ella Prisma).
+jest.mock("@/app/actions/category", () => ({
+  getCategoryOptions: jest.fn(async () => ({ success: true, data: [] })),
+  createCategory: jest.fn(),
 }));
 
 jest.mock("@/app/actions/branch", () => ({
@@ -177,10 +183,10 @@ describe("InventarioCard — editar un producto abre el modal", () => {
     expect(screen.getByLabelText("Nombre *")).toHaveValue("Jabón de Avena");
     expect(screen.getByLabelText("Precio de venta *")).toHaveValue(1500);
     expect(screen.getByLabelText("Código")).toHaveValue("JA000");
-    // Fotos, «Publicar en», categoría y activo: lo que el editor inline no tenía.
+    // Fotos, «Publicar en», categorías y activo: lo que el editor inline no tenía.
     expect(screen.getByText("Fotos")).toBeInTheDocument();
     expect(screen.getByText("Publicar en")).toBeInTheDocument();
-    expect(screen.getByTestId("category-selector")).toBeInTheDocument();
+    expect(screen.getByText("Categorías")).toBeInTheDocument();
     expect(screen.getByRole("switch", { name: "Activo" })).toBeInTheDocument();
   });
 });
@@ -330,5 +336,28 @@ describe("InventarioCard — foto de portada y variantes", () => {
     renderCard();
 
     expect(screen.queryByLabelText("Variantes")).not.toBeInTheDocument();
+  });
+});
+
+describe("InventarioCard — categorías del producto (N:N)", () => {
+  const conCategorias = {
+    ...producto,
+    categorias: [
+      { categoryId: 1, category: { id: 1, name: "Limpieza" } },
+      { categoryId: 2, category: { id: 2, name: "Regalos" } },
+    ],
+  } as unknown as Product;
+
+  it("muestra todas las categorías del producto, no solo la primera", () => {
+    renderCard(conCategorias);
+
+    expect(screen.getByLabelText("Categorías")).toHaveTextContent("Limpieza");
+    expect(screen.getByLabelText("Categorías")).toHaveTextContent("Regalos");
+  });
+
+  it("sin categorías no hay chips", () => {
+    renderCard();
+
+    expect(screen.queryByLabelText("Categorías")).not.toBeInTheDocument();
   });
 });

@@ -145,7 +145,18 @@ export default async function FichaVidrieraPage({
               </div>
             )}
 
-            {item.categoria && <p className="text-[15px] text-ink-muted">Categoría: {item.categoria}</p>}
+            {/* Todas las categorías del producto: son equivalentes, así que se
+                listan juntas (la de prenda entra como única). */}
+            {item.categorias && item.categorias.length > 0 ? (
+              <p className="text-[15px] text-ink-muted">
+                {item.categorias.length > 1 ? "Categorías" : "Categoría"}:{" "}
+                {item.categorias.join(" · ")}
+              </p>
+            ) : (
+              item.categoria && (
+                <p className="text-[15px] text-ink-muted">Categoría: {item.categoria}</p>
+              )
+            )}
 
             {item.sucursales && item.sucursales.length > 0 && (
               <p className="text-[15px] text-ink-muted">

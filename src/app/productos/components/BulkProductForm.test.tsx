@@ -7,7 +7,7 @@
  * por fila con su resumen, el resultado del envío y, con sucursal elegida
  * (D8), el stock por fila con su comprobante.
  */
-import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act, within } from "@testing-library/react";
 import { BulkProductForm } from "../components/BulkProductForm";
 
 jest.mock("../../actions/product", () => ({
@@ -150,7 +150,7 @@ const renderForm = async () => {
 const nombres = () => screen.getAllByLabelText(/^nombre/i);
 const prefijos = () => screen.getAllByLabelText(/^prefijo/i);
 const precios = () => screen.getAllByLabelText(/^precio/i);
-const categorias = () => screen.getAllByLabelText(/^categoría/i);
+const categorias = () => screen.getAllByLabelText(/^categorías/i);
 /** Solo existe con una sucursal elegida (T5). */
 const stocks = () => screen.queryAllByLabelText(/^stock inicial/i);
 /** Costo por fila (T4): también solo con sucursal, porque la compra es del lote. */
@@ -159,7 +159,8 @@ const elegirSucursal = (nombre = "Sucursal Centro") =>
   fireEvent.click(screen.getByRole("button", { name: nombre }));
 
 /** Espera a que la lista única de categorías termine de cargar. */
-const esperarCategorias = () => waitFor(() => expect(categorias()[0]).toBeEnabled());
+const esperarCategorias = () =>
+  waitFor(() => expect(screen.getAllByRole("button", { name: "Bebidas" })).toHaveLength(1));
 
 /** Paso 1 → paso 2 (T15): Continuar y esperar la lista única de categorías. */
 const continuar = async () => {
@@ -342,11 +343,11 @@ describe("BulkProductForm", () => {
     expect(nombres()[1]).toHaveFocus();
   });
 
-  it("el error de categoría se anuncia en el disparador de la fila", async () => {
+  it("el error de categoría se anuncia en el grupo de pills de la fila", async () => {
     mockCreateProductsBatch.mockResolvedValue({
       success: false,
       error: "La categoría seleccionada no existe",
-      rowErrors: [{ row: 0, field: "categoryId", message: "La categoría seleccionada no existe" }],
+      rowErrors: [{ row: 0, field: "categorias", message: "La categoría seleccionada no existe" }],
     } as never);
 
     await renderForm();
@@ -388,7 +389,7 @@ describe("BulkProductForm", () => {
     await waitFor(() => expect(onSuccess).toHaveBeenCalled());
     expect(onClose).toHaveBeenCalled();
     expect(mockCreateProductsBatch).toHaveBeenCalledWith({
-      rows: [{ name: "Producto único", prefix: "AA", price: 10, categoryId: null, estilos: [] }],
+      rows: [{ name: "Producto único", prefix: "AA", price: 10, categorias: [], estilos: [] }],
     });
     expect(mockSwalFire).toHaveBeenCalledWith(
       expect.objectContaining({ text: expect.stringContaining("1 producto") })
@@ -410,8 +411,8 @@ describe("BulkProductForm", () => {
     expect(nombres()[0]).toHaveValue("Producto A");
   });
 
-  // S4: una categoría por fila. La lista se pide una sola vez para todo el modal.
-  it("cada fila tiene su categoría y viaja con su fila", async () => {
+  // S4: una fila puede tener varias categorías, todas equivalentes.
+  it("cada fila elige sus categorías y viajan con su fila", async () => {
     const { onSuccess } = await renderForm();
     await continuar();
 
@@ -420,18 +421,17 @@ describe("BulkProductForm", () => {
     llenarFila(1, "Producto dos");
 
     expect(categorias()).toHaveLength(2);
-    fireEvent.click(categorias()[0]);
-    fireEvent.click(screen.getByRole("option", { name: "Bebidas" }));
-    fireEvent.click(categorias()[1]);
-    fireEvent.click(screen.getByRole("option", { name: "Limpieza" }));
+    fireEvent.click(within(categorias()[0]).getByRole("button", { name: "Bebidas" }));
+    fireEvent.click(within(categorias()[0]).getByRole("button", { name: "Limpieza" }));
+    fireEvent.click(within(categorias()[1]).getByRole("button", { name: "Limpieza" }));
 
     fireEvent.click(screen.getByRole("button", { name: /crear 2 productos/i }));
 
     await waitFor(() => expect(onSuccess).toHaveBeenCalled());
     expect(mockCreateProductsBatch).toHaveBeenCalledWith({
       rows: [
-        { name: "Producto uno", prefix: "AA", price: 10, categoryId: 5, estilos: [] },
-        { name: "Producto dos", prefix: "AA", price: 10, categoryId: 7, estilos: [] },
+        { name: "Producto uno", prefix: "AA", price: 10, categorias: [5, 7], estilos: [] },
+        { name: "Producto dos", prefix: "AA", price: 10, categorias: [7], estilos: [] },
       ],
     });
   });
@@ -453,23 +453,26 @@ describe("BulkProductForm", () => {
     // La píldora de la segunda fila crea la categoría.
     fireEvent.click(screen.getAllByRole("button", { name: "Crear nueva categoría" })[1]);
 
-    await waitFor(() => expect(categorias()[1]).toHaveTextContent("Almacén"));
-    // Solo la fila que la creó la elige; la otra sigue vacía.
-    expect(categorias()[0]).toHaveTextContent("Seleccionar categoría");
+    await waitFor(() =>
+      expect(within(categorias()[1]).getByRole("button", { name: "Almacén" })).toHaveAttribute(
+        "aria-pressed",
+        "true"
+      )
+    );
+    // Solo la fila que la creó la elige; la otra la ofrece sin marcarla.
+    expect(within(categorias()[0]).getByRole("button", { name: "Almacén" })).toHaveAttribute(
+      "aria-pressed",
+      "false"
+    );
     expect(mockGetCategoryOptions).toHaveBeenCalledTimes(1);
-
-    // La lista del modal creció: la otra fila también la ofrece.
-    fireEvent.click(categorias()[0]);
-    expect(screen.getByRole("option", { name: "Almacén" })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("option", { name: "Sin categoría" }));
 
     fireEvent.click(screen.getByRole("button", { name: /crear 2 productos/i }));
 
     await waitFor(() => expect(onSuccess).toHaveBeenCalled());
     expect(mockCreateProductsBatch).toHaveBeenCalledWith({
       rows: [
-        { name: "Producto uno", prefix: "AA", price: 10, categoryId: null, estilos: [] },
-        { name: "Producto dos", prefix: "AA", price: 10, categoryId: 11, estilos: [] },
+        { name: "Producto uno", prefix: "AA", price: 10, categorias: [], estilos: [] },
+        { name: "Producto dos", prefix: "AA", price: 10, categorias: [11], estilos: [] },
       ],
     });
     expect(mockGetCategoryOptions).toHaveBeenCalledTimes(1);
@@ -519,7 +522,7 @@ describe("BulkProductForm", () => {
     await waitFor(() => expect(onSuccess).toHaveBeenCalled());
     // Sin sucursal no viajan `branchId` ni `initialStock`.
     expect(mockCreateProductsBatch).toHaveBeenCalledWith({
-      rows: [{ name: "Producto único", prefix: "AA", price: 10, categoryId: null, estilos: [] }],
+      rows: [{ name: "Producto único", prefix: "AA", price: 10, categorias: [], estilos: [] }],
     });
   });
 
@@ -547,8 +550,8 @@ describe("BulkProductForm", () => {
     expect(mockCreateProductsBatch).toHaveBeenCalledWith({
       branchId: 1,
       rows: [
-        { name: "Producto uno", prefix: "AA", price: 10, categoryId: null, estilos: [], initialStock: 5 },
-        { name: "Producto dos", prefix: "AA", price: 20, categoryId: null, estilos: [], initialStock: 0 },
+        { name: "Producto uno", prefix: "AA", price: 10, categorias: [], estilos: [], initialStock: 5 },
+        { name: "Producto dos", prefix: "AA", price: 20, categorias: [], estilos: [], initialStock: 0 },
       ],
     });
   });
@@ -578,8 +581,8 @@ describe("BulkProductForm", () => {
     expect(mockCreateProductsBatch).toHaveBeenCalledWith({
       branchId: 1,
       rows: [
-        { name: "Producto uno", prefix: "AA", price: 10, categoryId: null, estilos: [], initialStock: 2, costo: 100 },
-        { name: "Producto dos", prefix: "AA", price: 20, categoryId: null, estilos: [], initialStock: 0 },
+        { name: "Producto uno", prefix: "AA", price: 10, categorias: [], estilos: [], initialStock: 2, costo: 100 },
+        { name: "Producto dos", prefix: "AA", price: 20, categorias: [], estilos: [], initialStock: 0 },
       ],
     });
   });
@@ -600,7 +603,7 @@ describe("BulkProductForm", () => {
 
     await waitFor(() => expect(onSuccess).toHaveBeenCalled());
     expect(mockCreateProductsBatch).toHaveBeenCalledWith({
-      rows: [{ name: "Producto único", prefix: "AA", price: 10, categoryId: null, estilos: [] }],
+      rows: [{ name: "Producto único", prefix: "AA", price: 10, categorias: [], estilos: [] }],
     });
   });
 
@@ -829,8 +832,8 @@ describe("BulkProductForm: fotos del lote", () => {
     // El esquema del lote no tiene fotos: viajan solo los campos de la fila.
     expect(mockCreateProductsBatch).toHaveBeenCalledWith({
       rows: [
-        { name: "Producto uno", prefix: "AA", price: 10, categoryId: null, estilos: [] },
-        { name: "Producto dos", prefix: "AA", price: 10, categoryId: null, estilos: [] },
+        { name: "Producto uno", prefix: "AA", price: 10, categorias: [], estilos: [] },
+        { name: "Producto dos", prefix: "AA", price: 10, categorias: [], estilos: [] },
       ],
     });
   });

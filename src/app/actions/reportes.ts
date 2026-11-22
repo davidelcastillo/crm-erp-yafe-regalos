@@ -43,6 +43,25 @@ const estilosDe = (producto: ConEstilos) =>
     (fila) => fila.estilo.name
   );
 
+type ConCategorias = {
+  prenda: { categoria: { name: string } } | null;
+  category: { name: string } | null;
+  categorias?: { category: { name: string } }[];
+};
+
+/**
+ * Categorías del ítem, sin repetir: la de la prenda (una sola) o las del puente
+ * del producto. La heredada (`category`) es el respaldo de un producto sin filas
+ * en el puente; sin ninguna, el ítem cae en «Sin categoría».
+ */
+const categoriasDe = (producto: ConCategorias) => {
+  const todas = producto.prenda
+    ? [producto.prenda.categoria.name]
+    : (producto.categorias ?? []).map((fila) => fila.category.name);
+  if (todas.length > 0) return [...new Set(todas)];
+  return producto.category ? [producto.category.name] : [];
+};
+
 type Acumulado = { total: number; unidades: number };
 
 const acumular = (mapa: Map<string, Acumulado>, clave: string, total: number, unidades: number) => {
@@ -99,6 +118,8 @@ export async function getReportes(data?: unknown) {
           product: {
             select: {
               category: { select: { name: true } },
+              // Categorías del producto (N:N): el ítem se reparte entre todas.
+              categorias: { select: { category: { select: { name: true } } } },
               prenda: {
                 select: {
                   costo: true,
@@ -155,9 +176,11 @@ export async function getReportes(data?: unknown) {
 
       acumular(porSemana, semanaDe(item.sale.date), monto, item.quantity);
 
-      const categoria =
-        item.product.prenda?.categoria.name ?? item.product.category?.name ?? "Sin categoría";
-      acumular(porCategoria, categoria, monto, item.quantity);
+      const categorias = categoriasDe(item.product);
+      const partesCategoria = categorias.length || 1;
+      for (const categoria of categorias.length ? categorias : ["Sin categoría"]) {
+        acumular(porCategoria, categoria, monto / partesCategoria, item.quantity / partesCategoria);
+      }
 
       // Prorrateo en partes iguales entre los estilos del producto.
       const estilos = estilosDe(item.product);

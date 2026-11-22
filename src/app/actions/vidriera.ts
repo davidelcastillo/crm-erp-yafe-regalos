@@ -39,6 +39,11 @@ export type VidrieraItem = {
   /** Id de `categoria` (prenda o `Category` del producto). Opcional en el tipo
    * para no romper los fixtures de las páginas en rediseño; la action lo manda. */
   categoriaId?: number | null;
+  /** Todas las categorías del producto (N:N), todas equivalentes: la card y la
+   * ficha las muestran todas. La de prenda entra como única. */
+  categorias?: string[];
+  /** Ids de `categorias`, para que el filtro del catálogo elija por cualquiera. */
+  categoriaIds?: number[];
   /** Talles disponibles de una prenda (vacío en productos normales). */
   talles?: string[];
   /** Variantes del producto (opcional): nombre y si tiene foto propia. Sin
@@ -82,6 +87,10 @@ const SELECT_LISTA = {
   destacado: true,
   // Categoría del producto normal (`Category`): la prenda trae la suya.
   category: { select: { id: true, name: true } },
+  // Categorías del producto (N:N): la card y la ficha las muestran todas.
+  categorias: {
+    select: { categoryId: true, category: { select: { id: true, name: true } } },
+  },
   images: { orderBy: { position: "asc" }, select: { path: true, alt: true } },
   // Variantes del producto: la ficha las lista como opciones (nombre + si
   // tiene foto), nunca con la cantidad.
@@ -125,6 +134,8 @@ type FilaPublica = {
   description?: string | null;
   /** Categoría propia de los productos normales (las prendas usan la de prenda). */
   category?: { id: number; name: string } | null;
+  /** Categorías del producto (`ProductCategory`): varias, todas equivalentes. */
+  categorias?: { categoryId: number; category: { id: number; name: string } }[];
   prenda: {
     categoria: { id: number; name: string } | null;
     condicion: { name: string } | null;
@@ -151,14 +162,28 @@ const estadoDe = (
   return stock > 0 ? "DISPONIBLE" : "AGOTADO";
 };
 
+/**
+ * Categorías públicas del ítem, sin repetir: la de prenda (una sola), o las del
+ * puente del producto con la heredada (`category`) de respaldo. La primera queda
+ * como principal para los consumidores que leen `categoria`/`categoriaId`.
+ */
+const categoriasDelItem = (fila: FilaPublica) => {
+  const delPuente = (fila.categorias ?? []).map((filaCategoria) => filaCategoria.category);
+  const principal = fila.prenda?.categoria ?? fila.category ?? null;
+  const todas = principal ? [principal, ...delPuente] : delPuente;
+  return todas.filter(
+    (categoria, indice) => todas.findIndex((otra) => otra.id === categoria.id) === indice
+  );
+};
+
 const aPublico = (
   fila: FilaPublica,
   stock: number,
   reservado: boolean,
   vendido: boolean
 ): VidrieraItem => {
-  // Prenda o producto: la categoría pública es la del ítem, no solo la de prenda.
-  const categoria = fila.prenda?.categoria ?? fila.category ?? null;
+  // Prenda o producto: las categorías públicas son las del ítem, no solo la de prenda.
+  const categorias = categoriasDelItem(fila);
 
   return {
     id: fila.id,
@@ -168,8 +193,10 @@ const aPublico = (
     kind: fila.kind,
     estado: estadoDe(fila, stock, reservado, vendido),
     portada: fila.images[0] ? urlFoto(fila.id, fila.images[0].path, "sm") : null,
-    categoria: categoria?.name ?? null,
-    categoriaId: categoria?.id ?? null,
+    categoria: categorias[0]?.name ?? null,
+    categoriaId: categorias[0]?.id ?? null,
+    categorias: categorias.map((categoria) => categoria.name),
+    categoriaIds: categorias.map((categoria) => categoria.id),
     // Talles disponibles (solo prendas): la card los muestra en lugar del código.
     talles: fila.prenda?.talles?.map((filaTalle) => filaTalle.talle) ?? [],
     // Variantes (solo productos): nombre y si tiene foto propia.
@@ -248,7 +275,20 @@ export async function getVidriera(filtros?: unknown) {
       where: {
         active: true,
         publicaciones: { some: { canal: CANAL_WEB } },
-        ...(parsed.categoriaId ? { prenda: { categoriaId: parsed.categoriaId } } : {}),
+        // El filtro por categoría del catálogo alcanza a las dos taxonomías: la
+        // de prenda y las del producto, que coinciden por cualquiera de las suyas.
+        ...(parsed.categoriaId
+          ? {
+              AND: [
+                {
+                  OR: [
+                    { prenda: { categoriaId: parsed.categoriaId } },
+                    { categorias: { some: { categoryId: parsed.categoriaId } } },
+                  ],
+                },
+              ],
+            }
+          : {}),
         ...(q
           ? {
               OR: [

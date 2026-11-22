@@ -88,6 +88,14 @@ const productFields = {
   prefix: z.string().regex(/^[A-Za-z]{2,4}$/, "Prefijo: 2-4 letras (A-Z)").transform(v => v.toUpperCase()),
   price: z.number().min(0, "El precio no puede ser negativo"),
   categoryId: z.number().int().positive("Categoría inválida").nullable().optional(),
+  // Categorías del producto: varias y todas equivalentes. La primera queda
+  // como `categoryId` (la columna heredada); un id repetido no aporta nada, así
+  // que se descarta en vez de fallar, igual que los estilos. Sin el campo, el
+  // payload heredado (`categoryId`) es la única categoría.
+  categorias: z
+    .array(z.number().int().positive("Categoría inválida"))
+    .transform((ids) => [...new Set(ids)])
+    .optional(),
   // Estilos: la misma taxonomía que la prenda y opcional. Un id repetido no
   // aporta nada, así que se descarta en vez de fallar.
   estilos: z
@@ -211,6 +219,11 @@ export const updateProductExtendedSchema = z.object({
   description: z.string().max(2000, "Máximo 2000 caracteres").optional().nullable(),
   price: z.number().min(0, "El precio no puede ser negativo").optional(),
   categoryId: z.number().int().positive("Categoría inválida").nullable().optional(),
+  // Presente = reemplaza las categorías; ausente = no las toca (misma regla).
+  categorias: z
+    .array(z.number().int().positive("Categoría inválida"))
+    .transform((ids) => [...new Set(ids)])
+    .optional(),
   active: z.boolean().optional(),
   // Presente = reemplaza las publicaciones; ausente = no las toca.
   publicadaEn: publicadaEnEdicion,

@@ -10,7 +10,8 @@ import type { TaxonomyOption } from "@/lib/validations/prendaTaxonomy";
 import { CANALES_PUBLICACION } from "@/lib/validations/prenda";
 import { createProductsBatch } from "@/app/actions/product";
 import { createProductsBatchSchema } from "@/lib/validations/product";
-import { CategorySelector } from "@/components/ui/CategorySelector";
+import type { CategoryOption } from "@/components/ui/CategorySelector";
+import { CategoriasPicker } from "@/components/ui/CategoriasPicker";
 import { EstilosPicker } from "@/components/ui/EstilosPicker";
 import { BranchPicker } from "@/components/ui/BranchPicker";
 import { subirFoto } from "@/components/ui/FotoUploader";
@@ -26,7 +27,8 @@ type Fila = {
   name: string;
   prefix: string;
   price: string;
-  categoryId: number | null;
+  /** Categorías de la fila (varias, todas equivalentes); vacío son ninguna. */
+  categorias: number[];
   /** Stock inicial en la sucursal del lote; vacío es 0 (T5). */
   initialStock: string;
   /** Costo que salió cada unidad (T4); vacío es 0 y no entra en la compra. */
@@ -41,7 +43,7 @@ type Fila = {
   fotos: File[];
 };
 /** `row` es un mensaje que no pertenece a un campo puntual: se muestra en la card. */
-type Campo = "name" | "prefix" | "price" | "categoryId" | "initialStock" | "costo" | "row";
+type Campo = "name" | "prefix" | "price" | "categorias" | "initialStock" | "costo" | "row";
 type FilaError = { field: Campo; message: string };
 /** Paso 1: sucursal del stock inicial. Paso 2: las filas de productos (S17). */
 type Paso = "sucursal" | "productos";
@@ -66,7 +68,7 @@ function erroresPorFila(
       item.field === "name" ||
       item.field === "prefix" ||
       item.field === "price" ||
-      item.field === "categoryId" ||
+      item.field === "categorias" ||
       item.field === "initialStock" ||
       item.field === "costo"
         ? item.field
@@ -215,7 +217,7 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
       name: "",
       prefix: "",
       price: "",
-      categoryId: null,
+      categorias: [],
       initialStock: "",
       costo: "",
       estilos: [],
@@ -227,7 +229,7 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
   const [paso, setPaso] = useState<Paso>("sucursal");
   const [branchId, setBranchId] = useState<number | null>(null);
   const [receipt, setReceipt] = useState<StockMovementReceipt | null>(null);
-  const [categorias, setCategorias] = useState<{ id: number; name: string }[]>([]);
+  const [categorias, setCategorias] = useState<CategoryOption[]>([]);
   // Una sola lista de estilos activos para todas las filas.
   const [estilosDisponibles, setEstilosDisponibles] = useState<TaxonomyOption[]>([]);
   const [cargandoCategorias, setCargandoCategorias] = useState(true);
@@ -326,7 +328,7 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
       name: "",
       prefix: filas[filas.length - 1]?.prefix ?? "", // una fila nueva copia el prefijo anterior
       price: "",
-      categoryId: null,
+      categorias: [],
       initialStock: "",
       costo: "",
       estilos: [],
@@ -504,7 +506,8 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
         name: f.name,
         prefix: f.prefix,
         price: Number(f.price),
-        categoryId: f.categoryId,
+        // Categorías de la fila: varias y todas equivalentes (vacío = ninguna).
+        categorias: f.categorias,
         // Estilos de la fila: sin elegir ninguno no viaja (el esquema lo deja vacío).
         ...(f.estilos.length > 0 ? { estilos: f.estilos } : {}),
         // Canales de la fila: sin elegir ninguno no viaja (queda sin publicar).
@@ -999,22 +1002,35 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
                         )}
 
                         <div>
-                          <label htmlFor={`${base}-categoryId`} className={labelClass}>
-                            Categoría
-                          </label>
-                          <CategorySelector
-                            id={`${base}-categoryId`}
-                            selectedId={fila.categoryId}
-                            onValueChange={(id) => actualizarFila(fila.id, "categoryId", id)}
+                          <span id={`${base}-categorias-label`} className={labelClass}>
+                            Categorías
+                          </span>
+                          <CategoriasPicker
+                            compact
+                            id={`${base}-categorias`}
+                            labelledBy={`${base}-categorias-label`}
                             options={categorias}
                             onOptionsChange={setCategorias}
+                            selected={fila.categorias}
+                            onToggle={(id) =>
+                              actualizarFila(
+                                fila.id,
+                                "categorias",
+                                fila.categorias.includes(id)
+                                  ? fila.categorias.filter((actual) => actual !== id)
+                                  : [...fila.categorias, id]
+                              )
+                            }
+                            onCreated={(id) =>
+                              actualizarFila(fila.id, "categorias", [...fila.categorias, id])
+                            }
                             disabled={cargandoCategorias || loading}
-                            invalid={Boolean(mensajeDe("categoryId"))}
-                            describedBy={descritoPor("categoryId")}
+                            invalid={Boolean(mensajeDe("categorias"))}
+                            describedBy={descritoPor("categorias")}
                           />
-                          {mensajeDe("categoryId") && (
-                            <p id={`${base}-categoryId-error`} className="mt-1 text-sm text-error-ink">
-                              {mensajeDe("categoryId")}
+                          {mensajeDe("categorias") && (
+                            <p id={`${base}-categorias-error`} className="mt-1 text-sm text-error-ink">
+                              {mensajeDe("categorias")}
                             </p>
                           )}
                         </div>

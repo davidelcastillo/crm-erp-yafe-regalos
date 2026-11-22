@@ -419,6 +419,65 @@ describe("getReportes", () => {
     );
   });
 
+  it("reparte el monto entre las categorías del producto y la suma cuadra", async () => {
+    mockSaleItemFindMany.mockResolvedValue([
+      {
+        saleId: 1,
+        quantity: 2,
+        subtotal: 400,
+        sale: venta(new Date(2026, 2, 4, 10, 0), null, null),
+        product: {
+          name: "Set limpieza",
+          category: { name: "Limpieza" },
+          categorias: [
+            { category: { name: "Limpieza" } },
+            { category: { name: "Regalos" } },
+          ],
+          prenda: null,
+          estilosProducto: [],
+        },
+      },
+    ]);
+
+    const resultado = await getReportes({ desde: "2026-03-01", hasta: "2026-03-31" });
+    expect(resultado.success).toBe(true);
+    if (!resultado.success) return;
+
+    // Mismo criterio que los estilos: el ítem aporta su parte a cada categoría.
+    expect(resultado.data.categorias).toEqual([
+      { categoria: "Limpieza", total: 200, unidades: 1 },
+      { categoria: "Regalos", total: 200, unidades: 1 },
+    ]);
+    const suma = resultado.data.categorias.reduce((total, fila) => total + fila.total, 0);
+    expect(suma).toBeCloseTo(resultado.data.kpis.ingresos, 6);
+  });
+
+  it("un producto sin ninguna categoría cae en «Sin categoría»", async () => {
+    mockSaleItemFindMany.mockResolvedValue([
+      {
+        saleId: 1,
+        quantity: 1,
+        subtotal: 100,
+        sale: venta(new Date(2026, 2, 4, 10, 0), null, null),
+        product: {
+          name: "Suelto",
+          category: null,
+          categorias: [],
+          prenda: null,
+          estilosProducto: [],
+        },
+      },
+    ]);
+
+    const resultado = await getReportes({ desde: "2026-03-01", hasta: "2026-03-31" });
+    expect(resultado.success).toBe(true);
+    if (!resultado.success) return;
+
+    expect(resultado.data.categorias).toEqual([
+      { categoria: "Sin categoría", total: 100, unidades: 1 },
+    ]);
+  });
+
   it("reparte el stock entre los estilos del producto", async () => {
     const resultado = await getReportes({
       desde: "2026-03-01",

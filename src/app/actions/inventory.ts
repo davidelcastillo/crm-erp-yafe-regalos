@@ -254,7 +254,9 @@ export async function getProductsWithBranchStock(filters?: unknown) {
     const opts = getProductsWithBranchStockSchema.parse(filters ?? {});
     const where: Record<string, unknown> = {};
     if (opts.activeOnly !== false) where.active = true;
-    if (opts.categoryId) where.categoryId = opts.categoryId;
+    // Categorías del producto (N:N, todas equivalentes): alcanza con que una
+    // coincida. Las prendas usan la categoría de su ficha, no este puente.
+    if (opts.categoryId) where.categorias = { some: { categoryId: opts.categoryId } };
     // Filtro de sucursal a nivel where, INDEPENDIENTE de onlyWithStock.
     // El producto se devuelve si tiene al menos una fila BranchInventory en la
     // sucursal (incluye filas con stock 0). onlyWithStock añade stock > 0 en AND.
@@ -283,6 +285,9 @@ export async function getProductsWithBranchStock(filters?: unknown) {
       orderBy: { name: "asc" },
       include: {
         category: { select: { id: true, name: true } },
+        // Todas las categorías del producto: la card las muestra y el filtro de
+        // la página elige entre ellas.
+        categorias: { select: { category: { select: { id: true, name: true } } } },
         // Categoría de la prenda: el filtro de tipo de /inventario la necesita
         // para acotar sin otra consulta (dato interno, no del catálogo público).
         prenda: {
