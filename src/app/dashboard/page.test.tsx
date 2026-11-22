@@ -1,19 +1,22 @@
 /**
- * El período elegido en el dashboard tiene que gobernar todo el tablero: las
- * tarjetas y también el gráfico. Antes el gráfico pedía siempre `days: 30` sin
- * importar lo que se eligiera (bug 5 del usuario).
+ * Home interna calcada de `polkalinas-html/sistema/panel.html`: encabezado con
+ * «Nueva venta», cuatro KPIs, ventas por canal + reservas por cobrar, últimas
+ * ventas + para enviar, y el top de estilos del período.
+ *
+ * Los datos salen de `getResumenPanel` (mockeada acá: el action tiene su propia
+ * suite contra la base local) y el período sigue gobernando el gráfico.
  */
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import DashboardPage from './page';
 
-const mockGetStats = jest.fn();
+const mockGetResumenPanel = jest.fn();
 const mockGetPerformanceData = jest.fn();
 const mockGetProducts = jest.fn();
 
 jest.mock('../actions/dashboard', () => ({
-  getStats: (...args: unknown[]) => mockGetStats(...args),
+  getResumenPanel: (...args: unknown[]) => mockGetResumenPanel(...args),
   getPerformanceData: (...args: unknown[]) => mockGetPerformanceData(...args),
-  // El caso de `ProductAnalytics` (S18) renderiza el componente real, que lo pide al elegir.
+  // `ProductAnalytics` (S18) sigue al final del tablero y pide esto al elegir.
   getProductAnalytics: jest.fn(async () => ({ success: true, data: null })),
 }));
 
@@ -29,37 +32,236 @@ jest.mock('@/components/ui/BranchSelector', () => ({
   BranchSelector: () => null,
 }));
 
-// DashboardCards no se mockea: hay un caso que fija el título y los valores de las tarjetas.
 jest.mock('./components/ProductAnalytics', () => ({ ProductAnalytics: () => null }));
+
+/** Clave de día local, el formato en que el action entrega `venceEl`. */
+const claveDeHoy = () => {
+  const hoy = new Date();
+  return `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(
+    hoy.getDate()
+  ).padStart(2, '0')}`;
+};
+
+const RESUMEN = {
+  ventas: { monto: 845000, unidades: 70, cantidad: 62 },
+  prendasDisponibles: 64,
+  reservas: { cantidad: 5, saldo: 120000, vencenHoy: 2 },
+  paraEnviar: { cantidad: 3, salenHoy: 1 },
+  porCanal: [
+    { canal: 'WhatsApp', monto: 354900, porcentaje: 42 },
+    { canal: 'Instagram', monto: 236600, porcentaje: 28 },
+  ],
+  estilos: [
+    { estilo: 'Coquette', total: 300000, unidades: 12 },
+    { estilo: 'Sin estilo', total: 100000, unidades: 3 },
+  ],
+  reservasPorCobrar: [
+    {
+      id: 7,
+      numero: 'V-0007',
+      cliente: 'Mica R.',
+      prenda: 'Pollera escocesa',
+      venceEl: claveDeHoy(),
+      saldo: 60000,
+    },
+  ],
+  ultimasVentas: [
+    {
+      id: 1,
+      fecha: '2026-11-20',
+      cliente: 'Juli M.',
+      prenda: 'Campera de jean',
+      canal: 'WhatsApp',
+      monto: 24000,
+    },
+  ],
+  paraEnviarLista: [
+    {
+      id: 9,
+      numero: 'V-0009',
+      cliente: 'Lu T.',
+      prenda: 'Vestido lencero',
+      envioEstado: 'ETIQUETA_LISTA',
+    },
+  ],
+};
+
+const resumenVacio = {
+  ventas: { monto: 0, unidades: 0, cantidad: 0 },
+  prendasDisponibles: 0,
+  reservas: { cantidad: 0, saldo: 0, vencenHoy: 0 },
+  paraEnviar: { cantidad: 0, salenHoy: 0 },
+  porCanal: [],
+  estilos: [],
+  reservasPorCobrar: [],
+  ultimasVentas: [],
+  paraEnviarLista: [],
+};
 
 beforeEach(() => {
   jest.clearAllMocks();
-  mockGetStats.mockResolvedValue({ success: true, data: null });
+  mockGetResumenPanel.mockResolvedValue({ success: true, data: RESUMEN });
   mockGetPerformanceData.mockResolvedValue({ success: true, data: [] });
   mockGetProducts.mockResolvedValue({ success: true, data: [] });
 });
 
-describe('DashboardPage — período del gráfico', () => {
-  it('al elegir 90 días pide 90 días para el gráfico', async () => {
-    render(<DashboardPage />);
+/** Espera a que la página termine de cargar (el saludo es el encabezado). */
+const cargar = async () => {
+  render(<DashboardPage />);
+  await screen.findByRole('heading', { level: 1 });
+};
 
-    await waitFor(() =>
-      expect(mockGetPerformanceData).toHaveBeenCalledWith({ type: 'cierre', branchId: undefined })
-    );
+describe('Dashboard — encabezado', () => {
+  it('saluda, y ofrece sucursal y «Nueva venta» al mismo destino de siempre', async () => {
+    await cargar();
 
-    // La página muestra el estado de carga hasta que resuelven los datos.
-    fireEvent.click(await screen.findByRole('button', { name: '90 días' }));
-
-    await waitFor(() =>
-      expect(mockGetPerformanceData).toHaveBeenLastCalledWith({ type: '90', branchId: undefined })
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(/Hola/);
+    expect(screen.getByRole('link', { name: /Nueva venta/ })).toHaveAttribute(
+      'href',
+      '/ventas'
     );
   });
 
-  it('con el rango personalizado pide las fechas elegidas y las muestra en el gráfico', async () => {
-    render(<DashboardPage />);
+  it('pide el resumen del período por defecto (último cierre) sin sucursal', async () => {
+    await cargar();
 
-    // La página muestra el estado de carga hasta que resuelven los datos.
-    fireEvent.click(await screen.findByRole('button', { name: 'Personalizado' }));
+    await waitFor(() =>
+      expect(mockGetResumenPanel).toHaveBeenCalledWith({ type: 'cierre', branchId: undefined })
+    );
+  });
+});
+
+describe('Dashboard — cuatro KPIs', () => {
+  it('muestra ventas, prendas, reservas y envíos con sus datos', async () => {
+    await cargar();
+
+    expect(screen.getByText('Ventas del período')).toBeInTheDocument();
+    expect(screen.getByText(/\$ 845\.000/)).toBeInTheDocument();
+    expect(screen.getByText('62 ventas')).toBeInTheDocument();
+
+    expect(screen.getByText('Prendas disponibles')).toBeInTheDocument();
+    expect(screen.getByText('64')).toBeInTheDocument();
+
+    expect(screen.getByText('Reservas sin cobrar')).toBeInTheDocument();
+    expect(screen.getByText('2 vencen hoy')).toBeInTheDocument();
+
+    expect(screen.getByText('Pedidos para enviar')).toBeInTheDocument();
+    expect(screen.getByText('1 sale hoy')).toBeInTheDocument();
+  });
+});
+
+describe('Dashboard — ventas por canal', () => {
+  it('lista cada canal con su porcentaje y su link a reportes', async () => {
+    await cargar();
+
+    const tarjeta = screen.getByRole('heading', { name: 'Ventas por canal' }).closest('section')!;
+
+    expect(within(tarjeta).getByText('WhatsApp')).toBeInTheDocument();
+    expect(within(tarjeta).getByText('42%')).toBeInTheDocument();
+    expect(within(tarjeta).getByText('28%')).toBeInTheDocument();
+    expect(within(tarjeta).getByRole('link', { name: 'Ver reporte' })).toHaveAttribute(
+      'href',
+      '/reportes'
+    );
+  });
+});
+
+describe('Dashboard — reservas y envíos', () => {
+  it('lista la reserva con clienta, prenda y vencimiento', async () => {
+    await cargar();
+
+    const tarjeta = screen
+      .getByRole('heading', { name: 'Reservas por cobrar' })
+      .closest('section')!;
+
+    expect(within(tarjeta).getByText('Mica R.')).toBeInTheDocument();
+    expect(within(tarjeta).getByText(/Pollera escocesa/)).toBeInTheDocument();
+    expect(within(tarjeta).getByText(/vence hoy/)).toBeInTheDocument();
+  });
+
+  it('lista el pedido a enviar con su estado en palabras', async () => {
+    await cargar();
+
+    const tarjeta = screen.getByRole('heading', { name: 'Para enviar' }).closest('section')!;
+
+    expect(within(tarjeta).getByText('Lu T.')).toBeInTheDocument();
+    expect(within(tarjeta).getByText(/Vestido lencero/)).toBeInTheDocument();
+    expect(within(tarjeta).getByText('Etiqueta lista')).toBeInTheDocument();
+  });
+});
+
+describe('Dashboard — últimas ventas', () => {
+  it('muestra clienta, prenda, canal y monto', async () => {
+    await cargar();
+
+    const tarjeta = screen.getByRole('heading', { name: 'Últimas ventas' }).closest('section')!;
+
+    expect(within(tarjeta).getByText('Juli M.')).toBeInTheDocument();
+    expect(within(tarjeta).getByText('Campera de jean')).toBeInTheDocument();
+    expect(within(tarjeta).getByText('WhatsApp')).toBeInTheDocument();
+    expect(within(tarjeta).getByText(/\$ 24\.000/)).toBeInTheDocument();
+  });
+});
+
+describe('Dashboard — estilos del período', () => {
+  it('muestra el top de estilos con su monto y el link a reportes', async () => {
+    await cargar();
+
+    const tarjeta = screen.getByRole('heading', { name: 'Estilos más vendidos' }).closest('section')!;
+
+    expect(within(tarjeta).getByText('Coquette')).toBeInTheDocument();
+    expect(within(tarjeta).getByText(/\$ 300\.000/)).toBeInTheDocument();
+    // Los productos sin estilos no se pierden: caen en «Sin estilo».
+    expect(within(tarjeta).getByText('Sin estilo')).toBeInTheDocument();
+    expect(within(tarjeta).getByRole('link', { name: 'Ver reporte' })).toHaveAttribute(
+      'href',
+      '/reportes'
+    );
+  });
+});
+
+describe('Dashboard — listas vacías', () => {
+  it('cada tarjeta sin datos muestra su estado vacío y la página no se rompe', async () => {
+    mockGetResumenPanel.mockResolvedValue({ success: true, data: resumenVacio });
+
+    await cargar();
+
+    expect(screen.getByText('Sin ventas en el período.')).toBeInTheDocument();
+    expect(screen.getByText('No hay reservas sin cobrar.')).toBeInTheDocument();
+    expect(screen.getByText('Todavía no hay ventas.')).toBeInTheDocument();
+    expect(screen.getByText('No hay pedidos para enviar.')).toBeInTheDocument();
+    expect(screen.getByText('Todavía no hay estilos vendidos.')).toBeInTheDocument();
+    expect(screen.getByText('Ninguna vence hoy')).toBeInTheDocument();
+  });
+
+  it('si el action falla, el tablero queda en estados vacíos', async () => {
+    mockGetResumenPanel.mockResolvedValue({ success: false, error: 'sin sesión' });
+
+    await cargar();
+
+    expect(screen.getByText('Sin ventas en el período.')).toBeInTheDocument();
+  });
+});
+
+describe('Dashboard — período del gráfico', () => {
+  it('al elegir 90 días pide 90 días para el gráfico y el resumen', async () => {
+    await cargar();
+
+    fireEvent.click(screen.getByRole('button', { name: '90 días' }));
+
+    await waitFor(() =>
+      expect(mockGetPerformanceData).toHaveBeenLastCalledWith({
+        type: '90',
+        branchId: undefined,
+      })
+    );
+    expect(mockGetResumenPanel).toHaveBeenLastCalledWith({ type: '90', branchId: undefined });
+  });
+
+  it('con el rango personalizado pide las fechas elegidas y las rotula', async () => {
+    await cargar();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Personalizado' }));
     fireEvent.change(screen.getByLabelText('Desde'), { target: { value: '2026-10-01' } });
     fireEvent.change(screen.getByLabelText('Hasta'), { target: { value: '2026-10-15' } });
 
@@ -71,195 +273,14 @@ describe('DashboardPage — período del gráfico', () => {
         branchId: undefined,
       })
     );
-
-    // El rótulo del gráfico sigue al filtro (el de las tarjetas y el del gráfico son el mismo).
     expect(screen.getByText(/Del 01\/10\/2026 al 15\/10\/2026/)).toBeInTheDocument();
   });
-
-  it('con el rango personalizado incompleto no pide nada', async () => {
-    render(<DashboardPage />);
-    await waitFor(() => expect(mockGetStats).toHaveBeenCalledTimes(1));
-
-    fireEvent.click(screen.getByRole('button', { name: 'Personalizado' }));
-    fireEvent.change(screen.getByLabelText('Desde'), { target: { value: '2026-10-01' } });
-
-    expect(await screen.findByText(/Sin rango elegido/)).toBeInTheDocument();
-    expect(mockGetStats).toHaveBeenCalledTimes(1);
-    expect(mockGetPerformanceData).toHaveBeenCalledTimes(1);
-  });
 });
 
-// Sistema de botones (`globals.css`): el período elegido del control segmentado
-// va `btn-active` y los otros `btn-secondary`.
-describe('DashboardPage — variantes del sistema de botones', () => {
-  it('el período elegido va btn-active y el resto btn-secondary', async () => {
+describe('Dashboard — carga', () => {
+  it('mientras carga usa la ruedita compartida', () => {
     render(<DashboardPage />);
 
-    // Por defecto viene elegido el período del último cierre de caja.
-    expect(await screen.findByRole('button', { name: 'Desde el último cierre' })).toHaveClass(
-      'btn',
-      'btn-active'
-    );
-    expect(screen.getByRole('button', { name: '30 días' })).toHaveClass('btn', 'btn-secondary');
-
-    fireEvent.click(screen.getByRole('button', { name: '90 días' }));
-
-    expect(screen.getByRole('button', { name: '90 días' })).toHaveClass('btn', 'btn-active');
-    expect(screen.getByRole('button', { name: '30 días' })).toHaveClass('btn', 'btn-secondary');
-  });
-});
-
-describe('DashboardPage — carga', () => {
-  it('mientras carga usa la ruedita compartida y los esqueletos', () => {
-    render(<DashboardPage />);
-
-    // El estado de carga lo anuncia el Spinner compartido (role="status"),
-    // no un spinner dibujado a mano por la página.
     expect(screen.getByRole('status', { name: 'Cargando dashboard...' })).toBeInTheDocument();
-  });
-});
-
-// La forma del encabezado mientras carga (S2): sin ella la hoja salta al terminar.
-describe('DashboardPage — esqueleto del encabezado (S2)', () => {
-  it('mientras carga muestra la forma del encabezado y la reemplaza al terminar', async () => {
-    const { container } = render(<DashboardPage />);
-
-    // La píldora del encabezado, con la medida de la página real.
-    expect(container.querySelector('[aria-hidden="true"] .h-\\[60px\\]')).not.toBeNull();
-    // Y la hoja arranca donde arranca la de la página: `-mt-12 px-5 pt-6`.
-    const hoja = container.querySelector('.glass');
-    expect(hoja).toHaveClass('-mt-12', 'px-5', 'pt-6');
-
-    expect(
-      await screen.findByRole('heading', { level: 1, name: 'Dashboard' })
-    ).toBeInTheDocument();
-  });
-});
-
-// Parallax del encabezado y retiro del degradé (S10, S11): lo que se atenúa es
-// superficie decorativa, nunca un control.
-describe('DashboardPage — parallax y obscuration (S10, S11)', () => {
-  it('el degradé es una capa decorativa dentro de la banda y el encabezado va en su envoltorio', async () => {
-    const { container } = render(<DashboardPage />);
-    await screen.findByRole('heading', { level: 1, name: 'Dashboard' });
-
-    const capa = container.querySelector('.brand-gradient');
-    expect(capa).toHaveAttribute('aria-hidden', 'true');
-    expect(capa).toHaveClass('pointer-events-none', 'absolute', 'inset-0');
-    expect(capa?.parentElement).toHaveClass('relative', 'isolate');
-
-    // El encabezado se mueve solo: no está pegado al mismo nodo que la capa.
-    const encabezado = container.querySelector('header');
-    expect(encabezado).not.toBeNull();
-    expect(encabezado?.parentElement).not.toBe(capa?.parentElement);
-  });
-});
-
-// Cascada del recorrido (S7) y cambio de valor (S9) en las tarjetas del resumen.
-describe('DashboardPage — tarjetas del resumen (S7, S9)', () => {
-  it('cada tarjeta va en su propio envoltorio y el monto queda en un solo nodo', async () => {
-    mockGetStats.mockResolvedValueOnce({
-      success: true,
-      data: {
-        totalIncome: 1500,
-        totalExpense: 800,
-        netProfit: 700,
-        accountsReceivable: 250,
-      },
-    });
-
-    render(<DashboardPage />);
-    await screen.findByText('Ingresos');
-
-    const grilla = screen.getByRole('heading', { name: 'Resumen' })
-      .parentElement?.nextElementSibling as HTMLElement;
-    expect(grilla.children).toHaveLength(4);
-
-    // La raíz de la card no cambia: la que anima la entrada es el envoltorio.
-    for (const envoltorio of Array.from(grilla.children)) {
-      expect(envoltorio).not.toHaveClass('glass');
-      expect(envoltorio.firstElementChild).toHaveClass('glass');
-    }
-
-    // El monto entra animado y sigue siendo un único nodo de texto.
-    const monto = screen.getByText(/\$ 1\.500/);
-    expect(monto.tagName).toBe('SPAN');
-    expect(monto).toHaveClass('block');
-    expect(monto.childNodes).toHaveLength(1);
-  });
-});
-
-describe('DashboardPage — resumen', () => {
-  it('muestra el título y las tarjetas con sus valores', async () => {
-    mockGetStats.mockResolvedValueOnce({
-      success: true,
-      data: {
-        totalIncome: 1500,
-        totalExpense: 800,
-        netProfit: 700,
-        accountsReceivable: 250,
-      },
-    });
-
-    render(<DashboardPage />);
-
-    expect(await screen.findByText('Ingresos')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Dashboard' })).toBeInTheDocument();
-    expect(screen.getByText('Egresos')).toBeInTheDocument();
-    expect(screen.getByText('Ganancia Neta')).toBeInTheDocument();
-    expect(screen.getByText('Cobrar')).toBeInTheDocument();
-
-    expect(screen.getByText(/\$ 1\.500/)).toBeInTheDocument();
-    expect(screen.getByText(/\$ 800/)).toBeInTheDocument();
-    expect(screen.getByText(/\$ 700/)).toBeInTheDocument();
-    expect(screen.getByText(/\$ 250/)).toBeInTheDocument();
-  });
-});
-
-// Prueba visual del usuario (S18, U1): «el selector de productos cuando le hago
-// click para seleccionar es demasiado grande y se sale de la pantalla». Era un
-// `<select>` nativo: la lista la dibuja el sistema operativo y se abría tan ancha
-// como el nombre más largo, sin poder acotarla. Se reemplaza por un desplegable
-// del sistema, con alto máximo, scroll interno y ancho de la tarjeta.
-// La página mockea el componente, así que acá se renderiza el real.
-describe('ProductAnalytics — selector de producto acotado (S18)', () => {
-  const { ProductAnalytics } = jest.requireActual('./components/ProductAnalytics') as typeof import('./components/ProductAnalytics');
-
-  const productos = [
-    { id: 1, name: 'Producto con un nombre larguísimo que antes ensanchaba la lista' },
-  ] as never[];
-
-  const abrirSelector = () => {
-    const { container } = render(<ProductAnalytics products={productos} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Elegir producto' }));
-    return container;
-  };
-
-  it('abre un desplegable del sistema, no la lista nativa del navegador', () => {
-    const container = abrirSelector();
-
-    // Son botones de verdad dentro de un panel propio: cada opción se alcanza con
-    // Tab y se activa con Enter, sin que el sistema operativo dibuje la lista.
-    const opcion = screen.getByRole('button', { name: /nombre larguísimo/ });
-    expect(opcion).toHaveClass('truncate');
-    expect(container.querySelector('select')).toBeNull();
-    expect(screen.getByRole('button', { name: 'Elegir producto' })).toHaveAttribute(
-      'aria-expanded',
-      'true'
-    );
-
-    // Alto máximo con scroll adentro y el ancho del trigger: nada se sale de la pantalla.
-    expect(opcion.parentElement).toHaveClass('max-h-60', 'overflow-y-auto', 'w-full', 'absolute');
-  });
-
-  it('al elegir un producto cierra la lista y deja la elección a la vista', async () => {
-    abrirSelector();
-
-    fireEvent.click(screen.getByRole('button', { name: /nombre larguísimo/ }));
-
-    expect(screen.queryByRole('button', { name: /nombre larguísimo/ })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Elegir producto' })).toHaveTextContent(
-      /nombre larguísimo/
-    );
   });
 });
