@@ -367,7 +367,20 @@ export async function getResumenPanel(data?: unknown) {
       totalAmount: true,
       customer: { select: { name: true, surname: true } },
       pedido: { select: { canal: { select: { name: true } } } },
-      items: { select: { quantity: true, product: { select: { name: true } } } },
+      items: {
+        select: {
+          quantity: true,
+          subtotal: true,
+          product: {
+            select: {
+              name: true,
+              // Estilos de prenda (en la ficha) y de producto (en su puente).
+              prenda: { select: { estilos: { select: { estilo: { select: { name: true } } } } } },
+              estilosProducto: { select: { estilo: { select: { name: true } } } },
+            },
+          },
+        },
+      },
     } as const;
 
     const hoy = toLocalDateKey(new Date());
@@ -461,6 +474,35 @@ export async function getResumenPanel(data?: unknown) {
     const venceHoy = (fecha: Date | null) =>
       !!fecha && fecha >= hoyDesde && fecha <= hoyHasta;
 
+    // Top de estilos del período, con el MISMO prorrateo que /reportes: un producto
+    // con N estilos reparte su venta en partes iguales; sin estilos va a «Sin estilo».
+    const porEstilo = new Map<string, { total: number; unidades: number }>();
+    for (const venta of ventas) {
+      for (const item of venta.items) {
+        const estilos = [
+          ...(item.product.prenda?.estilos ?? []),
+          ...item.product.estilosProducto,
+        ].map((fila) => fila.estilo.name);
+        const partes = estilos.length || 1;
+        const montoItem = Number(item.subtotal);
+        for (const estilo of estilos.length ? estilos : ["Sin estilo"]) {
+          const fila = porEstilo.get(estilo) ?? { total: 0, unidades: 0 };
+          fila.total += montoItem / partes;
+          fila.unidades += item.quantity / partes;
+          porEstilo.set(estilo, fila);
+        }
+      }
+    }
+    const estilos = [...porEstilo.entries()]
+      .map(([estilo, fila]) => ({
+        estilo,
+        total: dosDecimales(fila.total),
+        unidades: dosDecimales(fila.unidades),
+      }))
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 6);
+
+
     return {
       success: true as const,
       data: {
@@ -473,6 +515,7 @@ export async function getResumenPanel(data?: unknown) {
         },
         paraEnviar: { cantidad: envios, salenHoy: enviosHoy },
         porCanal,
+        estilos,
         // La tarjeta es un resumen: muestra la primera prenda del pedido.
         reservasPorCobrar: conSaldo.slice(0, 5).map((p) => ({
           id: p.id,
