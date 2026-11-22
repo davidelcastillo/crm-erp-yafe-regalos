@@ -19,11 +19,9 @@ describe("BottomNav", () => {
     (usePathname as jest.Mock).mockReturnValue("/dashboard");
     render(React.createElement(BottomNav));
 
-    // 7 destinos: «Reportes» entró al rediseñar /reportes (el único lugar donde
-    // se ven costos y ganancias). «Clientes» salió de la barra (S6): se entra
-    // desde /sucursales.
+    // 6 destinos: «Reportes» se entra desde el botón del dashboard.
     const navLinks = screen.getAllByRole("link");
-    expect(navLinks).toHaveLength(7);
+    expect(navLinks).toHaveLength(6);
     expect(navLinks.map((l) => l.textContent)).toEqual(
       expect.arrayContaining([
         "Dashboard",
@@ -32,13 +30,9 @@ describe("BottomNav", () => {
         "Pedidos",
         "Inventario",
         "Sucursales",
-        "Reportes",
       ])
     );
-    expect(screen.getByRole("link", { name: /reportes/i })).toHaveAttribute(
-      "href",
-      "/reportes"
-    );
+    expect(screen.queryByRole("link", { name: /reportes/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /clientes/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /productos/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /inactivos/i })).not.toBeInTheDocument();
@@ -54,16 +48,6 @@ describe("BottomNav", () => {
     const nav = screen.getByRole("navigation");
     expect(nav.className).toContain("glass-nav");
     expect(nav.className).not.toContain("bg-white/70");
-  });
-
-  it("marca «Reportes» como activo en /reportes", () => {
-    (usePathname as jest.Mock).mockReturnValue("/reportes");
-    render(React.createElement(BottomNav));
-
-    expect(screen.getByRole("link", { name: /reportes/i })).toHaveAttribute(
-      "aria-current",
-      "page"
-    );
   });
 
   it("highlights active link", () => {

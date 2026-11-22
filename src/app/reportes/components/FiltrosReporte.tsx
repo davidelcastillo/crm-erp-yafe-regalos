@@ -3,13 +3,9 @@
 import { useRouter } from "next/navigation";
 import { BranchSelector } from "@/components/ui/BranchSelector";
 
-export const PERIODOS = [
-  { value: "mes", label: "Este mes" },
-  { value: "anterior", label: "Mes anterior" },
-  { value: "tres", label: "Últimos 3 meses" },
-] as const;
+import { PERIODOS, type Periodo } from "@/lib/periodos-reporte";
 
-export type Periodo = (typeof PERIODOS)[number]["value"];
+export type { Periodo };
 
 /**
  * Los dos filtros de `/reportes` viven en la URL (`?periodo=&sucursal=`): la

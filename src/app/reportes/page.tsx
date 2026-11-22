@@ -3,7 +3,8 @@ import { getReportes } from "@/app/actions/reportes";
 import { BrandBand } from "@/components/ui/BrandBand";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { toLocalDateKey, toShortLabel } from "@/lib/dates";
-import { FiltrosReporte, PERIODOS, type Periodo } from "./components/FiltrosReporte";
+import { FiltrosReporte } from "./components/FiltrosReporte";
+import { PERIODOS, type Periodo } from "@/lib/periodos-reporte";
 
 export const dynamic = "force-dynamic";
 
