@@ -69,6 +69,10 @@ const embeddedText = async (base64: string): Promise<string> => {
   return content.text.join('\n');
 };
 
+/** `r g b rg` (relleno), como lo escribe pdf-lib para un hex. */
+const fillOp = (hex: string) =>
+  `${[1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).join(' ')} rg`;
+
 const count = (haystack: string, needle: string) => haystack.split(needle).length - 1;
 
 const prendaConTalles = {
@@ -319,7 +323,7 @@ describe('generateProductLabels — la detección separa prendas de productos', 
     expect(texto).not.toContain('Talle:');
   });
 
-  test('los peluches marcados llevan la etiqueta chica y el resto la de producto', async () => {
+  test('los peluches marcados llevan la etiqueta del peluche y el resto la de producto', async () => {
     mockCatalogo([jabon, shampoo]);
 
     const result = await generateProductLabels({
@@ -339,9 +343,12 @@ describe('generateProductLabels — la detección separa prendas de productos', 
     expect(producto).toContain('AAA001');
     expect(producto).not.toContain('BBB888');
 
-    // La chica no dibuja código: solo marca y precio (99,50).
+    // La del peluche es vertical, lleva código, marca y precio.
     const chica = winAnsiPage(doc, 1);
-    expect(chica).not.toContain('BBB888');
+    const { width, height } = doc.getPage(1).getSize();
+    expect(width).toBeCloseTo(595.28, 1);
+    expect(height).toBeCloseTo(841.89, 1);
+    expect(chica).toContain('BBB888');
     expect(chica).toContain('99,50');
     const marca = await readPdfContent(
       new Uint8Array(Buffer.from(result.data.pdfBase64, 'base64'))
@@ -349,23 +356,73 @@ describe('generateProductLabels — la detección separa prendas de productos', 
     expect(marca.text).toContain("Polkalina's");
   });
 
-  test('el tamaño de la etiqueta chica se respeta: cabe doce veces por fila en A4 horizontal', async () => {
+  test('la etiqueta del peluche es de 30 × 45 mm y entran 36 por hoja A4 vertical', async () => {
     mockCatalogo([jabon]);
 
     const result = await generateProductLabels({
       branchId: 3,
-      selections: [{ productId: 1, quantity: 96 }],
+      selections: [{ productId: 1, quantity: 36 }],
       pelucheIds: [1],
     });
     if (!result.success) throw new Error(result.error);
 
     const doc = await PDFDocument.load(Buffer.from(result.data.pdfBase64, 'base64'));
-    // 96 etiquetas chicas entran en una sola hoja A4 horizontal.
+    // Grilla de 6 × 6 = 36 etiquetas por hoja.
     expect(doc.getPageCount()).toBe(1);
-    const { width, height } = doc.getPage(0).getSize();
-    expect(width).toBeCloseTo(841.89, 1);
-    expect(height).toBeCloseTo(595.28, 1);
-    expect(count(winAnsiPage(doc, 0), '1.250,00')).toBe(96);
+    expect(count(winAnsiPage(doc, 0), '1.250,00')).toBe(36);
+    expect(count(winAnsiPage(doc, 0), 'AAA001')).toBe(36);
+
+    const justo = await generateProductLabels({
+      branchId: 3,
+      selections: [{ productId: 1, quantity: 37 }],
+      pelucheIds: [1],
+    });
+    if (!justo.success) throw new Error(justo.error);
+    expect(
+      (await PDFDocument.load(Buffer.from(justo.data.pdfBase64, 'base64'))).getPageCount()
+    ).toBe(2);
+  });
+
+  test('un peluche con código largo y precio alto conserva el dato completo', async () => {
+    mockCatalogo([{ id: 1, code: 'ABCD1234', price: 299999.99, kind: 'PRODUCT' }]);
+
+    const result = await generateProductLabels({
+      branchId: 3,
+      selections: [{ productId: 1, quantity: 1 }],
+      pelucheIds: [1],
+    });
+    if (!result.success) throw new Error(result.error);
+
+    // El texto se achica para entrar en los 30 mm; nunca se recorta el dato.
+    const chica = winAnsiPage(
+      await PDFDocument.load(Buffer.from(result.data.pdfBase64, 'base64')),
+      0
+    );
+    expect(chica).toContain('Código: ABCD1234');
+    expect(chica).toContain('299.999,99');
+  });
+
+  test('la etiqueta del peluche: precio en frutilla y marca con la frutilla vectorial', async () => {
+    mockCatalogo([jabon]);
+
+    const result = await generateProductLabels({
+      branchId: 3,
+      selections: [{ productId: 1, quantity: 1 }],
+      pelucheIds: [1],
+    });
+    if (!result.success) throw new Error(result.error);
+
+    const chica = winAnsiPage(
+      await PDFDocument.load(Buffer.from(result.data.pdfBase64, 'base64')),
+      0
+    );
+    // El importe va en el frutilla de la marca; el código, en cacao.
+    expect(chica).toContain('Código: AAA001');
+    expect(chica).toContain(fillOp('#C8323C'));
+    expect(chica).toContain(fillOp('#4A2C2A'));
+    // Y ni el rosa viejo ni el rosa muy claro anterior aparecen.
+    expect(chica).not.toContain(fillOp('#FCD2D3'));
+    expect(chica).not.toContain(fillOp('#FBE7EC'));
   });
 
   test('un peluche que además es prenda sigue saliendo con la etiqueta de prenda', async () => {

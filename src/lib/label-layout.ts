@@ -57,16 +57,17 @@ export const CUT_MARK_COLOR = PDF_BRAND_COLOR.cacao;
 // --- Colores de la marca --------------------------------------------------
 /** Fondo de la etiqueta. */
 export const LABEL_BACKGROUND_COLOR = PDF_BRAND_COLOR.cream;
-/** Cajas del código y del precio: el rosa de la marca. */
+/** Las dos cajas (código y precio): el rosa de la marca. */
 export const BOX_COLOR = PDF_BRAND_COLOR.pink;
-/** Caja del importe: rosa muy claro, para que el número a 20 pt no se vea pesado. */
-export const PRICE_BOX_COLOR = PDF_BRAND_COLOR.pinkSoft;
+/** Borde fino cacao de las cajas: el rosa solo, sin borde, desentonaba al imprimir. */
+export const BOX_BORDER_COLOR = PDF_BRAND_COLOR.cacao;
+export const BOX_BORDER_WIDTH_MM = 0.25;
 /** `$` y el handle «Polkalina's». */
 export const TEXT_COLOR = PDF_BRAND_COLOR.cacao;
 /** Código del producto: en negrita y en cacao, para que se lea de lejos (L12). */
 export const CODE_TEXT_COLOR = PDF_BRAND_COLOR.cacao;
-/** Importe: cacao pleno (L12). */
-export const PRICE_TEXT_COLOR = PDF_BRAND_COLOR.cacao;
+/** Importe: frutilla, el cuarto color de la marca (L12). */
+export const PRICE_TEXT_COLOR = PDF_BRAND_COLOR.strawberry;
 
 // --- Caja del código (81 % del ancho, centrada) ---------------------------
 export const BOX_WIDTH_MM = 26.7;

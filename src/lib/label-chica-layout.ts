@@ -1,17 +1,14 @@
 // src/lib/label-chica-layout.ts
 /**
- * Geometría de la **etiqueta chica**, la del peluche: misma hoja A4 horizontal
- * de la etiqueta de producto, pero más angosta (21 × 23,5 mm contra 30 × 23,5)
- * para que el sticker entre en la panza del peluche.
+ * Geometría de la **etiqueta del peluche** (modelo del dueño): vertical, con
+ * agujero troquelado arriba, frutilla, «Polkalina's», la línea **Código** y el
+ * `$` con el importe. Reemplaza a la etiqueta apaisada de 21 × 23,5 mm, que no
+ * tenía lugar para el código.
  *
- * Hoja A4 horizontal (297 × 210 mm) con grilla de **12 columnas × 8 filas = 96
- * etiquetas**; la grilla entra exacta (12 × 24,75 = 297 y 8 × 26,25 = 210) y la
- * etiqueta queda centrada en su celda, con el resto como canal de corte.
- *
- * Contenido: frutilla, «Polkalina's» y `$ precio`. **No lleva código**: con este
- * ancho el alto lo toman la marca y la caja del precio (11 + 10 = 21 de los 23,5
- * mm), y el aire que sobra no alcanza para una línea de código legible. El
- * código sigue en la etiqueta de producto y en el sistema.
+ * Hoja **A4 vertical** (210 × 297 mm) con grilla de **6 columnas × 6 filas = 36
+ * etiquetas**: cada celda es la etiqueta de 30 × 45 mm más un canal de 2 mm
+ * (1 mm por lado) para pasar el cutter, y la grilla se centra. Las etiquetas se
+ * llenan **fila por fila**, de izquierda a derecha y después abajo.
  *
  * Módulo puro (sin pdf-lib), igual que `label-layout` y `label-prenda-layout`.
  */
@@ -19,50 +16,65 @@
 import { PDF_BRAND_COLOR } from './pdf-brand';
 
 // --- Hoja y grilla --------------------------------------------------------
-export const CHICA_COLS_PER_SHEET = 12;
-export const CHICA_ROWS_PER_SHEET = 8;
-export const CHICA_LABELS_PER_SHEET = CHICA_COLS_PER_SHEET * CHICA_ROWS_PER_SHEET; // 96
+export const CHICA_SHEET_WIDTH_MM = 210;
+export const CHICA_SHEET_HEIGHT_MM = 297;
+export const CHICA_COLS_PER_SHEET = 6;
+export const CHICA_ROWS_PER_SHEET = 6;
+export const CHICA_LABELS_PER_SHEET = CHICA_COLS_PER_SHEET * CHICA_ROWS_PER_SHEET; // 36
 /** Paso de la grilla: lo que ocupa cada etiqueta, incluido su canal. */
-export const CHICA_CELL_WIDTH_MM = 24.75;
-export const CHICA_CELL_HEIGHT_MM = 26.25;
+export const CHICA_CELL_WIDTH_MM = 32; // 30 + canal
+export const CHICA_CELL_HEIGHT_MM = 47; // 45 + canal
 
 // --- Etiqueta y canal -----------------------------------------------------
-export const CHICA_LABEL_WIDTH_MM = 21;
-export const CHICA_LABEL_HEIGHT_MM = 23.5;
+export const CHICA_LABEL_WIDTH_MM = 30;
+export const CHICA_LABEL_HEIGHT_MM = 45;
 /** Canal de corte: el resto de la celda, mitad de cada lado. */
-export const CHICA_GUTTER_X_MM = CHICA_CELL_WIDTH_MM - CHICA_LABEL_WIDTH_MM;
-export const CHICA_GUTTER_Y_MM = CHICA_CELL_HEIGHT_MM - CHICA_LABEL_HEIGHT_MM;
-export const CHICA_LABEL_INSET_X_MM = CHICA_GUTTER_X_MM / 2;
-export const CHICA_LABEL_INSET_Y_MM = CHICA_GUTTER_Y_MM / 2;
+export const CHICA_LABEL_INSET_X_MM = (CHICA_CELL_WIDTH_MM - CHICA_LABEL_WIDTH_MM) / 2;
+export const CHICA_LABEL_INSET_Y_MM = (CHICA_CELL_HEIGHT_MM - CHICA_LABEL_HEIGHT_MM) / 2;
+/** Aire entre el borde de la hoja y la primera etiqueta. */
+export const CHICA_MARGIN_X_MM =
+  (CHICA_SHEET_WIDTH_MM - CHICA_COLS_PER_SHEET * CHICA_CELL_WIDTH_MM) / 2; // 9
+export const CHICA_MARGIN_Y_MM =
+  (CHICA_SHEET_HEIGHT_MM - CHICA_ROWS_PER_SHEET * CHICA_CELL_HEIGHT_MM) / 2; // 7,5
 
 // --- Colores (paleta de la marca) ----------------------------------------
 export const CHICA_LABEL_BACKGROUND_COLOR = PDF_BRAND_COLOR.cream;
-export const CHICA_PRICE_BOX_COLOR = PDF_BRAND_COLOR.pinkSoft;
+/** Borde redondeado cacao, como la etiqueta de prenda. */
+export const CHICA_LABEL_BORDER_COLOR = PDF_BRAND_COLOR.cacao;
+/** Agujero troquelado: aro rosa de la marca. */
+export const CHICA_HOLE_COLOR = PDF_BRAND_COLOR.pink;
 export const CHICA_TEXT_COLOR = PDF_BRAND_COLOR.cacao;
-export const CHICA_PRICE_TEXT_COLOR = PDF_BRAND_COLOR.cacao;
+/** Importe: frutilla, el cuarto color de la marca. */
+export const CHICA_PRICE_TEXT_COLOR = PDF_BRAND_COLOR.strawberry;
 
 // --- Contenido, de arriba abajo ------------------------------------------
+export const CHICA_BORDER_WIDTH_MM = 0.4;
+export const CHICA_CORNER_RADIUS_MM = 3;
+
+/** Agujero troquelado, medido desde el borde superior de la etiqueta. */
+export const CHICA_HOLE_CENTER_TOP_MM = 6.5;
+export const CHICA_HOLE_RADIUS_MM = 2;
+export const CHICA_HOLE_BORDER_WIDTH_MM = 0.5;
+
 /** Frutilla vectorial, arriba y centrada. */
-export const CHICA_LOGO_TOP_MM = 1;
-export const CHICA_LOGO_SIZE_MM = 5.5;
+export const CHICA_LOGO_TOP_MM = 11;
+export const CHICA_LOGO_SIZE_MM = 11;
+
 /** «Polkalina's» debajo de la frutilla. */
-export const CHICA_BRAND_TOP_MM = 7;
-export const CHICA_BRAND_FONT_SIZE_PT = 8;
-export const CHICA_BRAND_MAX_WIDTH_MM = 17;
+export const CHICA_BRAND_TOP_MM = 24;
+export const CHICA_BRAND_FONT_SIZE_PT = 12;
+export const CHICA_BRAND_MAX_WIDTH_MM = 24;
 
-/** Caja del precio, centrada: el ancho lo deja el margen lateral. */
-export const CHICA_PRICE_BOX_TOP_MM = 11;
-export const CHICA_PRICE_BOX_HEIGHT_MM = 10;
-export const CHICA_PRICE_BOX_INSET_MM = 1.25;
-export const CHICA_PRICE_BOX_WIDTH_MM = CHICA_LABEL_WIDTH_MM - 2 * CHICA_PRICE_BOX_INSET_MM;
-export const CHICA_PRICE_BOX_RADIUS_MM = 2.5;
+/** Línea del código: vuelve porque en vertical hay alto para ella. */
+export const CHICA_CODE_PREFIX = 'Código: ';
+export const CHICA_CODE_TOP_MM = 30;
+export const CHICA_CODE_FONT_SIZE_PT = 9;
 
-/** `$` e importe dentro de la caja (el importe se achica y, si no entra, se parte). */
-export const CHICA_DOLLAR_FONT_SIZE_PT = 12;
-export const CHICA_DOLLAR_INSET_MM = 1.1;
-export const CHICA_PRICE_GAP_MM = 0.5;
-export const CHICA_PRICE_FONT_SIZE_PT = 14;
-export const CHICA_PRICE_MIN_FONT_SIZE_PT = 7;
+/** `$` e importe al pie. */
+export const CHICA_PRICE_TOP_MM = 36;
+export const CHICA_PRICE_FONT_SIZE_PT = 16;
+/** Ancho útil: la etiqueta menos 3 mm de margen a cada lado. */
+export const CHICA_PRICE_MAX_WIDTH_MM = 24;
 
 /** Esquina superior izquierda de una etiqueta dentro de su hoja. */
 export interface ChicaLabelSlot {
@@ -78,7 +90,7 @@ export interface ChicaLabelSlot {
   y: number;
 }
 
-/** Cantidad de hojas necesarias para `total` etiquetas chicas. */
+/** Cantidad de hojas necesarias para `total` etiquetas del peluche. */
 export function calculateChicaSheetCount(total: number): number {
   if (total <= 0) return 0;
   return Math.ceil(total / CHICA_LABELS_PER_SHEET);
@@ -101,8 +113,8 @@ export function calculateChicaLabelSlots(total: number): ChicaLabelSlot[] {
       page: Math.floor(index / CHICA_LABELS_PER_SHEET),
       column,
       row,
-      x: CHICA_LABEL_INSET_X_MM + column * CHICA_CELL_WIDTH_MM,
-      y: CHICA_LABEL_INSET_Y_MM + row * CHICA_CELL_HEIGHT_MM,
+      x: CHICA_MARGIN_X_MM + CHICA_LABEL_INSET_X_MM + column * CHICA_CELL_WIDTH_MM,
+      y: CHICA_MARGIN_Y_MM + CHICA_LABEL_INSET_Y_MM + row * CHICA_CELL_HEIGHT_MM,
     });
   }
 

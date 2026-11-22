@@ -20,6 +20,8 @@ import { SHRIKHAND_TTF_BASE64 } from '@/lib/fonts/shrikhand';
 import { generateStockMovementPdf } from '@/lib/utils/stock-movement-pdf';
 import {
   AMOUNT_MIN_FONT_SIZE_PT,
+  BOX_BORDER_COLOR,
+  BOX_BORDER_WIDTH_MM,
   BOX_COLOR,
   BOX_LEFT_MM,
   BOX_WIDTH_MM,
@@ -46,7 +48,6 @@ import {
   LABEL_HEIGHT_MM,
   LABEL_WIDTH_MM,
   MM_TO_PT,
-  PRICE_BOX_COLOR,
   PRICE_BOX_HEIGHT_MM,
   PRICE_BOX_RADIUS_MM,
   PRICE_BOX_TOP_MM,
@@ -83,26 +84,30 @@ import {
   type PrendaLabelSlot,
 } from '@/lib/label-prenda-layout';
 import {
+  CHICA_BORDER_WIDTH_MM,
   CHICA_BRAND_FONT_SIZE_PT,
   CHICA_BRAND_MAX_WIDTH_MM,
   CHICA_BRAND_TOP_MM,
-  CHICA_DOLLAR_FONT_SIZE_PT,
-  CHICA_DOLLAR_INSET_MM,
+  CHICA_CODE_FONT_SIZE_PT,
+  CHICA_CODE_PREFIX,
+  CHICA_CODE_TOP_MM,
+  CHICA_CORNER_RADIUS_MM,
+  CHICA_HOLE_BORDER_WIDTH_MM,
+  CHICA_HOLE_CENTER_TOP_MM,
+  CHICA_HOLE_COLOR,
+  CHICA_HOLE_RADIUS_MM,
   CHICA_LABEL_BACKGROUND_COLOR,
+  CHICA_LABEL_BORDER_COLOR,
   CHICA_LABEL_HEIGHT_MM,
   CHICA_LABEL_WIDTH_MM,
   CHICA_LOGO_SIZE_MM,
   CHICA_LOGO_TOP_MM,
-  CHICA_PRICE_BOX_COLOR,
-  CHICA_PRICE_BOX_HEIGHT_MM,
-  CHICA_PRICE_BOX_INSET_MM,
-  CHICA_PRICE_BOX_RADIUS_MM,
-  CHICA_PRICE_BOX_TOP_MM,
-  CHICA_PRICE_BOX_WIDTH_MM,
   CHICA_PRICE_FONT_SIZE_PT,
-  CHICA_PRICE_GAP_MM,
-  CHICA_PRICE_MIN_FONT_SIZE_PT,
+  CHICA_PRICE_MAX_WIDTH_MM,
   CHICA_PRICE_TEXT_COLOR,
+  CHICA_PRICE_TOP_MM,
+  CHICA_SHEET_HEIGHT_MM,
+  CHICA_SHEET_WIDTH_MM,
   CHICA_TEXT_COLOR,
   calculateChicaLabelSlots,
   calculateChicaSheetCount,
@@ -227,20 +232,22 @@ const drawRoundedRect = (
  *
  * Antes esto era un rectángulo de borde por celda de 33 × 26,25 mm, o sea
  * etiquetas pegadas una al lado de la otra: sin canal, el corte a mano no tenía
- * por dónde entrar (S2). La geometría de los ticks vive en `label-layout`.
+ * por dónde entrar (S2). La geometría de los ticks vive en `label-layout`; el
+ * alto de hoja se pasa porque la etiqueta del peluche va en A4 vertical.
  */
 const drawCutMarks = (
   page: PDFPage,
   slots: LabelSlot[],
-  size?: { widthMm: number; heightMm: number }
+  size?: { widthMm: number; heightMm: number },
+  sheetHeightMm: number = SHEET_HEIGHT_MM
 ) => {
   const stroke = { color: color(CUT_MARK_COLOR), width: mm(CUT_MARK_WIDTH_MM) };
 
   for (const slot of slots) {
     for (const mark of cutMarksForSlot(slot, size)) {
       page.drawLine({
-        start: { x: mm(mark.x1), y: yFromTop(mark.y1, 0) },
-        end: { x: mm(mark.x2), y: yFromTop(mark.y2, 0) },
+        start: { x: mm(mark.x1), y: mm(sheetHeightMm - mark.y1) },
+        end: { x: mm(mark.x2), y: mm(sheetHeightMm - mark.y2) },
         color: stroke.color,
         thickness: stroke.width,
       });
@@ -249,6 +256,27 @@ const drawCutMarks = (
 };
 
 type LabelContent = { code: string; price: number };
+
+/**
+ * Caja redondeada de la etiqueta: el rosa de la marca con un borde cacao fino
+ * (el relleno rosa solo desentonaba al imprimir).
+ */
+const drawLabelBox = (
+  page: PDFPage,
+  box: { x: number; y: number; width: number; height: number; radius: number }
+) => {
+  drawRoundedRect(page, { ...box, fill: color(BOX_BORDER_COLOR) });
+
+  const border = mm(BOX_BORDER_WIDTH_MM);
+  drawRoundedRect(page, {
+    x: box.x + border,
+    y: box.y + border,
+    width: box.width - 2 * border,
+    height: box.height - 2 * border,
+    radius: box.radius - border,
+    fill: color(BOX_COLOR),
+  });
+};
 
 /**
  * Una etiqueta: fondo, cajas redondeadas y sus textos (código, `$`, importe y
@@ -280,13 +308,12 @@ const drawLabel = (
 
   // Caja del código.
   const codeBoxTop = slot.y + CODE_BOX_TOP_MM;
-  drawRoundedRect(page, {
+  drawLabelBox(page, {
     x: mm(boxX),
     y: yFromTop(codeBoxTop, CODE_BOX_HEIGHT_MM),
     width: boxWidthPt,
     height: mm(CODE_BOX_HEIGHT_MM),
     radius: mm(CODE_BOX_RADIUS_MM),
-    fill: color(BOX_COLOR),
   });
 
   const codeSize = fitFontSize(
@@ -306,15 +333,14 @@ const drawLabel = (
     color: color(CODE_TEXT_COLOR),
   });
 
-  // Caja del precio: rosa muy claro, para que el número a 20 pt no pese tanto.
+  // Caja del precio: el mismo rosa de la marca, con su borde cacao.
   const priceBoxTop = slot.y + PRICE_BOX_TOP_MM;
-  drawRoundedRect(page, {
+  drawLabelBox(page, {
     x: mm(boxX),
     y: yFromTop(priceBoxTop, PRICE_BOX_HEIGHT_MM),
     width: boxWidthPt,
     height: mm(PRICE_BOX_HEIGHT_MM),
     radius: mm(PRICE_BOX_RADIUS_MM),
-    fill: color(PRICE_BOX_COLOR),
   });
 
   // `$` e importe comparten la línea de base, centrada en la caja.
@@ -564,140 +590,151 @@ const resolveLabelSheets = async (
   return { ok: true, data: resolved };
 };
 
+/** mm desde el borde superior de la hoja A4 vertical del peluche. */
+const chicaYFromTop = (topMm: number) => mm(CHICA_SHEET_HEIGHT_MM - topMm);
+
 /**
- * Una etiqueta chica (peluche): fondo crema, frutilla, «Polkalina's» y el precio.
- * No dibuja el código a propósito (ver `label-chica-layout`).
+ * Texto centrado en la etiqueta del peluche, con su **borde superior** en `topMm`.
+ */
+const drawChicaCenteredText = (
+  page: PDFPage,
+  {
+    slot,
+    topMm,
+    text,
+    font,
+    sizePt,
+    maxWidthMm,
+    fill,
+  }: {
+    slot: ChicaLabelSlot;
+    topMm: number;
+    text: string;
+    font: PDFFont;
+    sizePt: number;
+    maxWidthMm: number;
+    fill: ReturnType<typeof rgb>;
+  }
+) => {
+  const centerX = mm(slot.x + CHICA_LABEL_WIDTH_MM / 2);
+  const size = fitFontSize(font, text, mm(maxWidthMm), sizePt);
+  page.drawText(text, {
+    x: centerX - font.widthOfTextAtSize(text, size) / 2,
+    y: chicaYFromTop(topMm) - font.heightAtSize(size, { descender: false }),
+    size,
+    font,
+    color: fill,
+  });
+};
+
+/**
+ * Una etiqueta de peluche (modelo del dueño): vertical, borde cacao redondeado
+ * sobre fondo crema, agujero troquelado con aro rosa, frutilla, «Polkalina's»,
+ * la línea Código y el `$` con el importe en frutilla.
  */
 const drawChicaLabel = (
   page: PDFPage,
   slot: ChicaLabelSlot,
   content: LabelContent,
-  fonts: { display: PDFFont; bold: PDFFont }
+  fonts: { display: PDFFont; regular: PDFFont; bold: PDFFont }
 ) => {
-  const { display, bold } = fonts;
+  const { display, regular, bold } = fonts;
   const ink = color(CHICA_TEXT_COLOR);
+  const x = mm(slot.x);
+  const bottom = chicaYFromTop(slot.y + CHICA_LABEL_HEIGHT_MM);
+  const widthPt = mm(CHICA_LABEL_WIDTH_MM);
+  const heightPt = mm(CHICA_LABEL_HEIGHT_MM);
 
-  page.drawRectangle({
-    x: mm(slot.x),
-    y: yFromTop(slot.y, CHICA_LABEL_HEIGHT_MM),
-    width: mm(CHICA_LABEL_WIDTH_MM),
-    height: mm(CHICA_LABEL_HEIGHT_MM),
-    color: color(CHICA_LABEL_BACKGROUND_COLOR),
+  // Borde cacao: un rectángulo redondeado cacao y el fondo crema encima.
+  drawRoundedRect(page, {
+    x,
+    y: bottom,
+    width: widthPt,
+    height: heightPt,
+    radius: mm(CHICA_CORNER_RADIUS_MM),
+    fill: color(CHICA_LABEL_BORDER_COLOR),
+  });
+  const border = mm(CHICA_BORDER_WIDTH_MM);
+  drawRoundedRect(page, {
+    x: x + border,
+    y: bottom + border,
+    width: widthPt - 2 * border,
+    height: heightPt - 2 * border,
+    radius: mm(CHICA_CORNER_RADIUS_MM) - border,
+    fill: color(CHICA_LABEL_BACKGROUND_COLOR),
   });
 
   const centerXMm = slot.x + CHICA_LABEL_WIDTH_MM / 2;
 
+  // Agujero troquelado: aro rosa de la marca sobre el crema del fondo.
+  page.drawCircle({
+    x: mm(centerXMm),
+    y: chicaYFromTop(slot.y + CHICA_HOLE_CENTER_TOP_MM),
+    size: mm(CHICA_HOLE_RADIUS_MM),
+    borderColor: color(CHICA_HOLE_COLOR),
+    borderWidth: mm(CHICA_HOLE_BORDER_WIDTH_MM),
+  });
+
   drawBrandLogo(page, {
     x: mm(centerXMm - CHICA_LOGO_SIZE_MM / 2),
-    y: yFromTop(slot.y + CHICA_LOGO_TOP_MM, 0),
+    y: chicaYFromTop(slot.y + CHICA_LOGO_TOP_MM),
     size: mm(CHICA_LOGO_SIZE_MM),
   });
 
-  const brandSize = fitFontSize(
-    display,
-    HANDLE_TEXT,
-    mm(CHICA_BRAND_MAX_WIDTH_MM),
-    CHICA_BRAND_FONT_SIZE_PT
-  );
-  const brandWidth = display.widthOfTextAtSize(HANDLE_TEXT, brandSize);
-  const brandAscent = display.heightAtSize(brandSize, { descender: false });
-  page.drawText(HANDLE_TEXT, {
-    x: mm(centerXMm) - brandWidth / 2,
-    y: yFromTop(slot.y + CHICA_BRAND_TOP_MM, 0) - brandAscent,
-    size: brandSize,
+  drawChicaCenteredText(page, {
+    slot,
+    topMm: slot.y + CHICA_BRAND_TOP_MM,
+    text: HANDLE_TEXT,
     font: display,
-    color: ink,
+    sizePt: CHICA_BRAND_FONT_SIZE_PT,
+    maxWidthMm: CHICA_BRAND_MAX_WIDTH_MM,
+    fill: ink,
   });
 
-  // Caja del precio: es lo único que tiene que leerse a un metro del peluche.
-  const boxX = slot.x + CHICA_PRICE_BOX_INSET_MM;
-  const boxWidthPt = mm(CHICA_PRICE_BOX_WIDTH_MM);
-  const boxTop = slot.y + CHICA_PRICE_BOX_TOP_MM;
-  drawRoundedRect(page, {
-    x: mm(boxX),
-    y: yFromTop(boxTop, CHICA_PRICE_BOX_HEIGHT_MM),
-    width: boxWidthPt,
-    height: mm(CHICA_PRICE_BOX_HEIGHT_MM),
-    radius: mm(CHICA_PRICE_BOX_RADIUS_MM),
-    fill: color(CHICA_PRICE_BOX_COLOR),
+  // En vertical hay alto para el código, que la versión apaisada no tenía.
+  drawChicaCenteredText(page, {
+    slot,
+    topMm: slot.y + CHICA_CODE_TOP_MM,
+    text: CHICA_CODE_PREFIX + content.code,
+    font: regular,
+    sizePt: CHICA_CODE_FONT_SIZE_PT,
+    maxWidthMm: CHICA_PRICE_MAX_WIDTH_MM,
+    fill: ink,
   });
 
-  const amount = formatPrice(content.price);
-  const dollarSize = CHICA_DOLLAR_FONT_SIZE_PT;
-  const dollarWidth = display.widthOfTextAtSize(CURRENCY_SYMBOL, dollarSize);
-  const dollarX = mm(boxX) + mm(CHICA_DOLLAR_INSET_MM);
-  const amountMaxWidth =
-    boxWidthPt -
-    mm(CHICA_DOLLAR_INSET_MM) -
-    dollarWidth -
-    mm(CHICA_PRICE_GAP_MM) -
-    mm(CHICA_DOLLAR_INSET_MM);
-  const centerY =
-    yFromTop(boxTop, CHICA_PRICE_BOX_HEIGHT_MM) + mm(CHICA_PRICE_BOX_HEIGHT_MM) / 2;
-
-  // Como en la etiqueta de producto: si no entra a una línea se parte, antes que
-  // bajar del mínimo legible.
-  const oneLineSize = fitFontSize(bold, amount, amountMaxWidth, CHICA_PRICE_FONT_SIZE_PT);
-  let amountLines = [amount];
-  let amountSize = Math.max(CHICA_PRICE_MIN_FONT_SIZE_PT, oneLineSize);
-  if (oneLineSize < CHICA_PRICE_MIN_FONT_SIZE_PT) {
-    amountLines = formatPriceLines(content.price);
-    amountSize = Math.min(
-      ...amountLines.map((line) =>
-        fitFontSize(
-          bold,
-          line,
-          amountMaxWidth,
-          CHICA_PRICE_FONT_SIZE_PT,
-          CHICA_PRICE_MIN_FONT_SIZE_PT
-        )
-      )
-    );
-  }
-
-  const ascent = bold.heightAtSize(amountSize, { descender: false });
-  const baselines =
-    amountLines.length === 1
-      ? [centerY - ascent / 2]
-      : [centerY + amountSize * 0.55, centerY - amountSize * 0.55];
-
-  page.drawText(CURRENCY_SYMBOL, {
-    x: dollarX,
-    y: baselines[0],
-    size: dollarSize,
-    font: display,
-    color: ink,
-  });
-
-  amountLines.forEach((line, lineIndex) => {
-    page.drawText(line, {
-      x: dollarX + dollarWidth + mm(CHICA_PRICE_GAP_MM),
-      y: baselines[lineIndex],
-      size: amountSize,
-      font: bold,
-      color: color(CHICA_PRICE_TEXT_COLOR),
-    });
+  // El precio, en frutilla: lo que se lee a un metro del peluche.
+  drawChicaCenteredText(page, {
+    slot,
+    topMm: slot.y + CHICA_PRICE_TOP_MM,
+    text: `${CURRENCY_SYMBOL} ${formatPrice(content.price)}`,
+    font: bold,
+    sizePt: CHICA_PRICE_FONT_SIZE_PT,
+    maxWidthMm: CHICA_PRICE_MAX_WIDTH_MM,
+    fill: color(CHICA_PRICE_TEXT_COLOR),
   });
 };
 
-/** Hojas A4 horizontales con las etiquetas chicas de los peluches. */
+/** Hojas A4 verticales con las etiquetas de los peluches. */
 const renderChicaLabelsPdf = async (labels: LabelContent[]): Promise<Uint8Array> => {
   const pdfDoc = await PDFDocument.create();
   pdfDoc.registerFontkit(fontkit);
   const fonts = {
     display: await pdfDoc.embedFont(Buffer.from(SHRIKHAND_TTF_BASE64, 'base64')),
+    regular: await pdfDoc.embedFont(StandardFonts.Helvetica),
     bold: await pdfDoc.embedFont(StandardFonts.HelveticaBold),
   };
 
   const pages = Array.from(
     { length: calculateChicaSheetCount(labels.length) },
-    () => pdfDoc.addPage([mm(SHEET_WIDTH_MM), mm(SHEET_HEIGHT_MM)])
+    () => pdfDoc.addPage([mm(CHICA_SHEET_WIDTH_MM), mm(CHICA_SHEET_HEIGHT_MM)])
   );
   for (const slot of calculateChicaLabelSlots(labels.length)) {
-    drawCutMarks(pages[slot.page], [slot], {
-      widthMm: CHICA_LABEL_WIDTH_MM,
-      heightMm: CHICA_LABEL_HEIGHT_MM,
-    });
+    drawCutMarks(
+      pages[slot.page],
+      [slot],
+      { widthMm: CHICA_LABEL_WIDTH_MM, heightMm: CHICA_LABEL_HEIGHT_MM },
+      CHICA_SHEET_HEIGHT_MM
+    );
     drawChicaLabel(pages[slot.page], slot, labels[slot.index], fonts);
   }
 

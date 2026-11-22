@@ -3,7 +3,8 @@ import {
   AMOUNT_MIN_FONT_SIZE_PT,
   CODE_MIN_FONT_SIZE_PT,
   CODE_TEXT_COLOR,
-  PRICE_BOX_COLOR,
+  BOX_BORDER_COLOR,
+  BOX_BORDER_WIDTH_MM,
   PRICE_TEXT_COLOR,
   HANDLE_INK_ASCENT_EM,
   HANDLE_MAX_HEIGHT_RATIO,
@@ -168,12 +169,14 @@ describe('label-layout.ts — posiciones', () => {
 });
 
 describe('label-layout.ts — medidas y colores de la plantilla (§S3)', () => {
-  test('usa la paleta de la marca Polkalina\'s', () => {
-    // Crema de fondo, rosa de las cajas y cacao del texto: los mismos tokens de
-    // la app (`globals.css`), no la paleta rosa/vino anterior.
+  test('usa solo la paleta de la marca Polkalina\'s', () => {
+    // Crema de fondo, rosa de las cajas, cacao del texto y del borde, frutilla
+    // del precio: los mismos tokens de la app (`globals.css`).
     expect(LABEL_BACKGROUND_COLOR).toBe('#FFF6F0');
     expect(BOX_COLOR).toBe('#F2C4CC');
+    expect(BOX_BORDER_COLOR).toBe('#4A2C2A');
     expect(TEXT_COLOR).toBe('#4A2C2A');
+    expect(PRICE_TEXT_COLOR).toBe('#C8323C');
     expect(CUT_MARK_COLOR).toBe('#4A2C2A');
   });
 
@@ -190,11 +193,15 @@ describe('label-layout.ts — medidas y colores de la plantilla (§S3)', () => {
     expect(CODE_BOX_HEIGHT_MM).toBe(6.9);
     expect(CODE_BOX_RADIUS_MM).toBe(2.7);
     expect(CODE_MAX_WIDTH_RATIO).toBe(0.9);
-    // Texto: `$`, código e importe van todos en cacao (L12 sigue cumplido:
-    // el código y el precio se leen de lejos, ahora con el tono de la marca).
+    // Texto: `$` y código en cacao; el importe en frutilla, el cuarto color de
+    // la marca (L12 sigue cumplido: los tres se leen de lejos).
     expect(TEXT_COLOR).toBe('#4A2C2A');
     expect(CODE_TEXT_COLOR).toBe('#4A2C2A');
-    expect(PRICE_TEXT_COLOR).toBe('#4A2C2A');
+    expect(PRICE_TEXT_COLOR).toBe('#C8323C');
+    // Las dos cajas van en el mismo rosa de la marca, con borde cacao fino.
+    expect(BOX_BORDER_COLOR).toBe('#4A2C2A');
+    expect(BOX_BORDER_WIDTH_MM).toBeGreaterThan(0);
+    expect(BOX_BORDER_WIDTH_MM).toBeLessThanOrEqual(0.3);
 
     // Caja del precio: alto 44,5 % y arranca a 9 mm del borde superior, o sea
     // 1,1 mm después del pie de la caja del código (top medido en la plantilla).
@@ -242,15 +249,19 @@ describe('label-layout.ts — textos largos y legibilidad', () => {
     expect(HANDLE_MAX_HEIGHT_RATIO).toBeLessThanOrEqual(1);
   });
 
-  test('el importe va en cacao sobre un rosa muy claro, no sobre el rosa saturado', () => {
-    expect(PRICE_TEXT_COLOR).toBe('#4A2C2A');
-    // La caja del importe se aclara; la del código conserva el rosa de la marca.
-    expect(PRICE_BOX_COLOR).not.toBe(BOX_COLOR);
-    // Contraste AAA (>= 7) contra la caja y contra el fondo crema.
-    expect(contrast(PRICE_TEXT_COLOR, PRICE_BOX_COLOR)).toBeGreaterThanOrEqual(7);
-    expect(contrast(PRICE_TEXT_COLOR, LABEL_BACKGROUND_COLOR)).toBeGreaterThanOrEqual(7);
-    // Y el par elegido sigue siendo más suave que el rosa saturado.
-    expect(luminance(PRICE_BOX_COLOR)).toBeGreaterThan(luminance(BOX_COLOR));
+  test('el importe va en frutilla sobre el rosa de la marca con borde cacao', () => {
+    expect(PRICE_TEXT_COLOR).toBe('#C8323C');
+    // Un solo rosa para las dos cajas: el rosa muy claro anterior desentonaba.
+    expect(PRICE_TEXT_COLOR).not.toBe(CODE_TEXT_COLOR);
+    // AAA (>= 7) del cacao sobre el rosa de las cajas y sobre el crema del fondo.
+    expect(contrast(CODE_TEXT_COLOR, BOX_COLOR)).toBeGreaterThanOrEqual(7);
+    expect(contrast(CODE_TEXT_COLOR, LABEL_BACKGROUND_COLOR)).toBeGreaterThanOrEqual(7);
+    // El frutilla a 20 pt es texto grande: alcanza AA (>= 3) sobre su caja y AAA
+    // sobre el crema, que es donde se usa.
+    expect(contrast(PRICE_TEXT_COLOR, BOX_COLOR)).toBeGreaterThanOrEqual(3);
+    expect(contrast(PRICE_TEXT_COLOR, LABEL_BACKGROUND_COLOR)).toBeGreaterThanOrEqual(4.5);
+    // Y el borde cacao de la caja se distingue del relleno.
+    expect(contrast(BOX_BORDER_COLOR, BOX_COLOR)).toBeGreaterThanOrEqual(7);
   });
 });
 
