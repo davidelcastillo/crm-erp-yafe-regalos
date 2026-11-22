@@ -43,6 +43,13 @@ const InventoryIcon = ({ active }: { active: boolean }) => (
 
 
 
+// Barras: el reporte de la dueña (costos, ganancias y estilos).
+const ReportesIcon = () => (
+  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 20h16M7 20v-6M12 20V8M17 20v-9" />
+  </svg>
+);
+
 // Icon for Sucursales (simple building-like icon)
 const SucursalIcon = ({ active }: { active: boolean }) => (
    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -50,8 +57,9 @@ const SucursalIcon = ({ active }: { active: boolean }) => (
    </svg>
 );
 
-// Seis destinos (pedido del dueño 2026-11-20: «Pedidos» en la barra para
-// entrar rápido). STYLE.md declaraba cinco como máximo; se actualiza a seis.
+// Siete destinos: al rediseñar /reportes entró «Reportes» (el único lugar donde
+// se ven costos y ganancias). STYLE.md declaraba cinco como máximo; se actualiza
+// a siete, con rótulos cortos para que entren en un celular de 360 px.
 // «Clientes» no está: se entra desde el botón del encabezado de /sucursales (S6).
 const navItems = [
    { href: "/dashboard", label: "Dashboard", icon: DashboardIcon },
@@ -60,6 +68,7 @@ const navItems = [
    { href: "/ventas/pedidos", label: "Pedidos", icon: PedidoIcon },
    { href: "/inventario", label: "Inventario", icon: InventoryIcon },
    { href: "/sucursales", label: "Sucursales", icon: SucursalIcon },
+   { href: "/reportes", label: "Reportes", icon: ReportesIcon },
 ];
 
 export default function BottomNav() {
