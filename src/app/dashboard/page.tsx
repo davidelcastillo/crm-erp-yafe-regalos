@@ -121,6 +121,9 @@ export default function DashboardPage() {
               onChange={(id) => setBranchId(id)}
               label="Filtrar por sucursal"
             />
+            <Link href="/reportes" className="btn btn-secondary whitespace-nowrap">
+              Reportes
+            </Link>
             <Link href="/ventas" className="btn btn-primary whitespace-nowrap">
               Nueva venta
             </Link>
