@@ -56,6 +56,7 @@ jest.mock("@/app/actions/branch", () => ({
 // Los estilos activos son la misma taxonomía que la prenda (pills seleccionables).
 jest.mock("@/app/actions/prendaTaxonomy", () => ({
   getEstiloPrendaOptions: jest.fn(),
+  createEstiloPrenda: jest.fn(),
 }));
 
 // Mock next/navigation
@@ -73,7 +74,7 @@ jest.mock("sweetalert2", () => ({
 
 import { createProduct, updateProductExtended, getProductById } from "../../actions/product";
 import { getBranchOptions } from "@/app/actions/branch";
-import { getEstiloPrendaOptions } from "@/app/actions/prendaTaxonomy";
+import { createEstiloPrenda, getEstiloPrendaOptions } from "@/app/actions/prendaTaxonomy";
 import { subirFotos } from "@/components/ui/FotoUploader";
 import { getFotosProducto } from "@/app/actions/foto";
 import { createProductSchema } from "@/lib/validations/product";
@@ -88,6 +89,9 @@ const mockGetProductById = getProductById as jest.MockedFunction<typeof getProdu
 const mockSubirFotos = subirFotos as jest.MockedFunction<typeof subirFotos>;
 const mockGetEstiloPrendaOptions = getEstiloPrendaOptions as jest.MockedFunction<
   typeof getEstiloPrendaOptions
+>;
+const mockCreateEstiloPrenda = createEstiloPrenda as jest.MockedFunction<
+  typeof createEstiloPrenda
 >;
 /** Los estilos activos se piden una vez al abrir el modal: default para toda la suite. */
 mockGetEstiloPrendaOptions.mockResolvedValue({
@@ -978,6 +982,80 @@ describe("ProductForm · estilos", () => {
       expect(mockUpdateProductExtended).toHaveBeenCalledWith(
         expect.objectContaining({ id: 1, estilos: [2] })
       )
+    );
+  });
+});
+
+/**
+ * Alta rápida de un estilo desde el formulario (pedido del dueño): mismo
+ * diálogo que la prenda, con la action existente `createEstiloPrenda`.
+ */
+describe("ProductForm · nuevo estilo", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCreateProduct.mockResolvedValue({ success: true, data: { id: 1 } } as never);
+    mockGetProductById.mockResolvedValue({
+      success: true,
+      data: { publicadaEn: [], estilos: [] },
+    } as never);
+    mockGetEstiloPrendaOptions.mockResolvedValue({
+      success: true,
+      data: [
+        { id: 1, name: "Y2K" },
+        { id: 2, name: "Alternativo" },
+      ],
+    } as never);
+  });
+
+  it("crea el estilo con el nombre recortado y queda seleccionado", async () => {
+    mockCreateEstiloPrenda.mockResolvedValue({
+      success: true,
+      data: { id: 9, name: "Grunge" },
+    } as never);
+    (Swal.fire as jest.Mock).mockResolvedValueOnce({
+      isConfirmed: true,
+      value: "  Grunge  ",
+    });
+
+    render(<ProductForm product={null} onClose={() => {}} />);
+    await irAlPaso2();
+
+    fireEvent.click(await screen.findByRole("button", { name: /nuevo estilo/i }));
+
+    await waitFor(() =>
+      expect(mockCreateEstiloPrenda).toHaveBeenCalledWith({ name: "Grunge" })
+    );
+    expect(await screen.findByRole("button", { name: "Grunge" })).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
+  });
+
+  it("el error del servidor se muestra y no toca la selección", async () => {
+    mockCreateEstiloPrenda.mockResolvedValue({
+      success: false,
+      error: "Ya existe un estilo con ese nombre",
+    } as never);
+    (Swal.fire as jest.Mock)
+      .mockResolvedValueOnce({ isConfirmed: true, value: "Y2K" })
+      .mockResolvedValueOnce({ isConfirmed: true });
+
+    render(<ProductForm product={null} onClose={() => {}} />);
+    await irAlPaso2();
+
+    fireEvent.click(await screen.findByRole("button", { name: /nuevo estilo/i }));
+
+    await waitFor(() =>
+      expect(Swal.fire).toHaveBeenCalledWith(
+        expect.objectContaining({
+          icon: "error",
+          text: "Ya existe un estilo con ese nombre",
+        })
+      )
+    );
+    expect(screen.getByRole("button", { name: "Y2K" })).toHaveAttribute(
+      "aria-pressed",
+      "false"
     );
   });
 });

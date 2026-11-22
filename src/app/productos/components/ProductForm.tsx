@@ -9,6 +9,7 @@ import Swal from "sweetalert2";
 import { CategorySelector } from "@/components/ui/CategorySelector";
 import { BranchPicker } from "@/components/ui/BranchPicker";
 import { FotoUploader, subirFotos } from "@/components/ui/FotoUploader";
+import { EstilosPicker } from "@/components/ui/EstilosPicker";
 import { CANALES_PUBLICACION } from "@/lib/validations/prenda";
 import type { TaxonomyOption } from "@/lib/validations/prendaTaxonomy";
 import { getBranchOptions } from "@/app/actions/branch";
@@ -514,33 +515,16 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
             />
           </div>
 
-          {/* Estilos: la misma taxonomía que la prenda, con sus mismas pills. */}
-          <div>
-            <span className={labelClass}>Estilos</span>
-            <div className="flex flex-wrap gap-2">
-              {estilosDisponibles.map((estilo) => {
-                const elegido = (estilos ?? []).includes(estilo.id);
-                return (
-                  <button
-                    key={estilo.id}
-                    type="button"
-                    aria-pressed={elegido}
-                    onClick={() => toggleEstilo(estilo.id)}
-                    className={`min-h-[44px] rounded-full border px-4 py-2 text-sm transition-colors touch-manipulation ${
-                      elegido
-                        ? "border-accent bg-accent/10 font-medium text-brand-rosa-texto"
-                        : "border-hairline bg-surface text-ink"
-                    }`}
-                  >
-                    {estilo.name}
-                  </button>
-                );
-              })}
-              {estilosDisponibles.length === 0 && (
-                <p className="text-xs text-ink-muted">No hay estilos cargados</p>
-              )}
-            </div>
-          </div>
+          {/* Estilos: la misma taxonomía que la prenda, con su alta rápida. */}
+          <EstilosPicker
+            options={estilosDisponibles}
+            onOptionsChange={setEstilosDisponibles}
+            selected={estilos ?? []}
+            onToggle={toggleEstilo}
+            onCreated={(id) =>
+              setEstilos((prev) => (prev ?? []).includes(id) ? (prev ?? []) : [...(prev ?? []), id])
+            }
+          />
 
           {/* T3: «Publicar en» — mismo patrón que la prenda. */}
           <div>

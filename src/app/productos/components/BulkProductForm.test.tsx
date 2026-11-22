@@ -25,6 +25,7 @@ jest.mock("@/app/actions/category", () => ({
 // todas las filas del lote.
 jest.mock("@/app/actions/prendaTaxonomy", () => ({
   getEstiloPrendaOptions: jest.fn(),
+  createEstiloPrenda: jest.fn(),
 }));
 
 jest.mock("sweetalert2", () => ({
@@ -66,7 +67,7 @@ jest.mock("@/app/inventario/components/StockMovementReceiptPanel", () => ({
 
 import { createProductsBatch } from "../../actions/product";
 import { getCategoryOptions, createCategory } from "@/app/actions/category";
-import { getEstiloPrendaOptions } from "@/app/actions/prendaTaxonomy";
+import { createEstiloPrenda, getEstiloPrendaOptions } from "@/app/actions/prendaTaxonomy";
 import type { StockMovementReceipt } from "@/lib/stock-movement-receipt";
 import Swal from "sweetalert2";
 import { subirFoto } from "@/components/ui/FotoUploader";
@@ -85,6 +86,9 @@ const mockGetCategoryOptions = getCategoryOptions as jest.MockedFunction<typeof 
 const mockCreateCategory = createCategory as jest.MockedFunction<typeof createCategory>;
 const mockGetEstiloPrendaOptions = getEstiloPrendaOptions as jest.MockedFunction<
   typeof getEstiloPrendaOptions
+>;
+const mockCreateEstiloPrenda = createEstiloPrenda as jest.MockedFunction<
+  typeof createEstiloPrenda
 >;
 /** Estilos activos: una sola lista para todas las filas del lote. */
 mockGetEstiloPrendaOptions.mockResolvedValue({
@@ -970,5 +974,30 @@ describe("BulkProductForm · estilos por fila", () => {
     await continuar();
 
     expect(screen.getByText("No hay estilos cargados")).toBeInTheDocument();
+  });
+
+  it("crear un estilo lo suma a la lista compartida y lo marca solo en su fila", async () => {
+    mockCreateEstiloPrenda.mockResolvedValue({
+      success: true,
+      data: { id: 9, name: "Grunge" },
+    } as never);
+    mockSwalFire.mockResolvedValueOnce({ isConfirmed: true, value: " Grunge " } as never);
+
+    await renderForm();
+    await continuar();
+    fireEvent.click(screen.getByRole("button", { name: /agregar producto/i }));
+    llenarFila(0, "Producto uno");
+    llenarFila(1, "Producto dos");
+
+    // El alta vive en la card de cada fila: se crea desde la primera.
+    fireEvent.click(screen.getAllByRole("button", { name: /nuevo estilo/i })[0]);
+
+    await waitFor(() =>
+      expect(mockCreateEstiloPrenda).toHaveBeenCalledWith({ name: "Grunge" })
+    );
+    const grunge = await screen.findAllByRole("button", { name: "Grunge" });
+    expect(grunge).toHaveLength(2);
+    expect(grunge[0]).toHaveAttribute("aria-pressed", "true");
+    expect(grunge[1]).toHaveAttribute("aria-pressed", "false");
   });
 });

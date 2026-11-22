@@ -28,6 +28,8 @@ model Product {
   prenda            PrendaDetalle?
   // Estilos del producto normal (las prendas los tienen en su ficha).
   estilosProducto   ProductEstilo[]
+  // Variantes libres (color, tamaño, sabor…). Sin filas = sin variantes.
+  variantes         ProductVariante[]
   publicaciones     PrendaPublicacion[]
   images            ProductImage[]
   purchaseItems     PurchaseItem[]
@@ -521,4 +523,17 @@ enum EnvioPreparacion {
   COORDINAR
   FALTA_EMBALAR
   ETIQUETA_LISTA
+}
+
+// Variantes de un producto normal: nombre libre + cantidad (suma el stock).
+model ProductVariante {
+  id        Int     @id @default(autoincrement())
+  productId Int
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  nombre    String
+  cantidad  Int     @default(0)
+  createdAt DateTime @default(now())
+
+  @@unique([productId, nombre])
+  @@index([productId])
 }

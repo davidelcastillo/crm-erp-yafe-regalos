@@ -10,6 +10,7 @@ import type { TaxonomyOption } from "@/lib/validations/prendaTaxonomy";
 import { createProductsBatch } from "@/app/actions/product";
 import { createProductsBatchSchema } from "@/lib/validations/product";
 import { CategorySelector } from "@/components/ui/CategorySelector";
+import { EstilosPicker } from "@/components/ui/EstilosPicker";
 import { BranchPicker } from "@/components/ui/BranchPicker";
 import { subirFoto } from "@/components/ui/FotoUploader";
 import { MAX_FOTOS } from "@/lib/storage";
@@ -891,40 +892,25 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
                         </div>
 
                         {/* Estilos de la fila: la misma taxonomía que la prenda, compacta. */}
-                        <div>
-                          <span className={labelClass}>Estilos</span>
-                          <div className="flex flex-wrap gap-2">
-                            {estilosDisponibles.map((estilo) => {
-                              const elegido = fila.estilos.includes(estilo.id);
-                              return (
-                                <button
-                                  key={estilo.id}
-                                  type="button"
-                                  aria-pressed={elegido}
-                                  onClick={() =>
-                                    actualizarFila(
-                                      fila.id,
-                                      "estilos",
-                                      elegido
-                                        ? fila.estilos.filter((id) => id !== estilo.id)
-                                        : [...fila.estilos, estilo.id]
-                                    )
-                                  }
-                                  className={`min-h-[44px] rounded-full border px-3 py-2 text-sm touch-manipulation ${
-                                    elegido
-                                      ? "border-accent bg-accent/10 font-medium text-brand-rosa-texto"
-                                      : "border-hairline bg-surface text-ink"
-                                  }`}
-                                >
-                                  {estilo.name}
-                                </button>
-                              );
-                            })}
-                            {estilosDisponibles.length === 0 && (
-                              <p className="text-xs text-ink-muted">No hay estilos cargados</p>
-                            )}
-                          </div>
-                        </div>
+                        <EstilosPicker
+                          compact
+                          options={estilosDisponibles}
+                          onOptionsChange={setEstilosDisponibles}
+                          selected={fila.estilos}
+                          onToggle={(id) =>
+                            actualizarFila(
+                              fila.id,
+                              "estilos",
+                              fila.estilos.includes(id)
+                                ? fila.estilos.filter((actual) => actual !== id)
+                                : [...fila.estilos, id]
+                            )
+                          }
+                          onCreated={(id) =>
+                            actualizarFila(fila.id, "estilos", [...fila.estilos, id])
+                          }
+                          disabled={loading}
+                        />
 
                         {/* U2: fotos de la fila, pendientes hasta que el producto exista. */}
                         <FotosFila
