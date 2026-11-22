@@ -1,7 +1,7 @@
 // src/app/productos/components/ProductForm.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Product } from "@prisma/client";
@@ -13,6 +13,7 @@ import { EstilosPicker } from "@/components/ui/EstilosPicker";
 import { CANALES_PUBLICACION } from "@/lib/validations/prenda";
 import type { TaxonomyOption } from "@/lib/validations/prendaTaxonomy";
 import { getBranchOptions } from "@/app/actions/branch";
+import { getFotosProducto } from "@/app/actions/foto";
 import { getEstiloPrendaOptions } from "@/app/actions/prendaTaxonomy";
 import {
   createProduct,
@@ -86,6 +87,27 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
   const [fotosPendientes, setFotosPendientes] = useState<File[]>([]);
 
   /**
+   * Variantes (opcionales, como los talles de la prenda): nombre libre +
+   * cantidad y, si existe, la foto del producto a la que se asocian. En la
+   * edición arranca en `null` hasta leer las guardadas, así guardar antes de
+   * cargar no las borra.
+   */
+  const [tieneVariantes, setTieneVariantes] = useState(false);
+  const [variantes, setVariantes] = useState<
+    { key: number; nombre: string; cantidad: string; fotoPosition: string }[] | null
+  >(isEdit ? null : []);
+  /** Fotos ya guardadas del producto: alimentan el selector de foto de la variante. */
+  const [fotos, setFotos] = useState<{ position: number }[]>([]);
+  /** Clave estable de cada fila; el interruptor también cuenta como toque. */
+  const siguienteKey = useRef(0);
+  const variantesTocadas = useRef(false);
+  const variantesFilas = variantes ?? [];
+  const totalVariantes = variantesFilas.reduce(
+    (total, fila) => total + (Number(fila.cantidad) || 0),
+    0
+  );
+
+  /**
    * Con el modal abierto la página de atrás no scrollea: en el celular el gesto
    * se escapaba del modal y movía /inventario. Es DOM, no estado de React.
    */
@@ -105,6 +127,32 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
     setEstilos((prev) =>
       (prev ?? []).includes(id) ? (prev ?? []).filter((actual) => actual !== id) : [...(prev ?? []), id]
     );
+
+  const nuevaFilaVariante = () => ({
+    key: ++siguienteKey.current,
+    nombre: "",
+    cantidad: "",
+    fotoPosition: "",
+  });
+
+  /** El interruptor arma la primera fila; al apagarse la lista queda vacía. */
+  const toggleVariantes = (activar: boolean) => {
+    variantesTocadas.current = true;
+    setTieneVariantes(activar);
+    setVariantes(activar ? (variantesFilas.length > 0 ? variantesFilas : [nuevaFilaVariante()]) : []);
+  };
+
+  const cambiarVariante = (
+    key: number,
+    campo: "nombre" | "cantidad" | "fotoPosition",
+    valor: string
+  ) =>
+    setVariantes((prev) =>
+      (prev ?? []).map((fila) => (fila.key === key ? { ...fila, [campo]: valor } : fila))
+    );
+  const agregarVariante = () => setVariantes((prev) => [...(prev ?? []), nuevaFilaVariante()]);
+  const quitarVariante = (key: number) =>
+    setVariantes((prev) => (prev ?? []).filter((fila) => fila.key !== key));
 
   // Los estilos activos se piden una vez, en el alta y en la edición.
   useEffect(() => {
@@ -130,12 +178,48 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
       try {
         const resultado = await getProductById(product.id);
         if (cancelado || !resultado.success) return;
-        const ficha = resultado.data as { publicadaEn?: string[]; estilos?: number[] };
+        const ficha = resultado.data as {
+          publicadaEn?: string[];
+          estilos?: number[];
+          variantes?: { nombre: string; cantidad: number; fotoPosition: number | null }[];
+        };
         setPublicadaEn(ficha.publicadaEn ?? []);
         setEstilos(ficha.estilos ?? []);
+        // Si ya se tocó el interruptor, el usuario manda: no se pisa lo tipeado.
+        if (variantesTocadas.current) return;
+        const guardadas = ficha.variantes ?? [];
+        setTieneVariantes(guardadas.length > 0);
+        setVariantes(
+          guardadas.map((variante) => ({
+            key: ++siguienteKey.current,
+            nombre: variante.nombre,
+            cantidad: String(variante.cantidad),
+            fotoPosition: variante.fotoPosition === null ? "" : String(variante.fotoPosition),
+          }))
+        );
       } catch (error) {
         console.error("Error loading product publications:", error);
         if (!cancelado) setPublicadaEn([]);
+      }
+    })();
+    return () => {
+      cancelado = true;
+    };
+  }, [product]);
+
+  // Las fotos guardadas solo existen en la edición: son las opciones del
+  // selector de foto de cada variante.
+  useEffect(() => {
+    if (!product) return;
+    let cancelado = false;
+    (async () => {
+      try {
+        const resultado = await getFotosProducto({ productId: product.id });
+        if (!cancelado && resultado.success) {
+          setFotos(resultado.data.map((foto) => ({ position: foto.position })));
+        }
+      } catch (error) {
+        console.error("Error loading product photos:", error);
       }
     })();
     return () => {
@@ -196,6 +280,25 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
     e.preventDefault();
     setLoading(true);
 
+    /**
+     * Variantes para el payload: solo las filas con nombre. Apagado en el alta
+     * la clave no viaja; apagado en la edición viaja vacío y borra las guardadas
+     * (`null` = todavía no se leyeron: no se toca nada).
+     */
+    const variantesPayload = tieneVariantes
+      ? variantesFilas
+          .filter((fila) => fila.nombre.trim() !== "")
+          .map((fila) => ({
+            nombre: fila.nombre.trim(),
+            cantidad: Number(fila.cantidad) || 0,
+            ...(fila.fotoPosition !== "" ? { fotoPosition: Number(fila.fotoPosition) } : {}),
+          }))
+      : isEdit && variantes !== null
+        ? []
+        : null;
+    const variantesDelPayload =
+      variantesPayload !== null ? { variantes: variantesPayload } : {};
+
     const payload = isEdit
       ? {
           id: product!.id,
@@ -208,6 +311,7 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
           ...(publicadaEn !== null ? { publicadaEn } : {}),
           // Sin estilos cargados todavía no se tocan los guardados.
           ...(estilos !== null ? { estilos } : {}),
+          ...variantesDelPayload,
         }
       : {
           name: formData.name,
@@ -223,8 +327,10 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
           // La cantidad y el costo viajan siempre: con costo se registra la
           // compra del alta, haya o no sucursal. Sin sucursal no hay stock.
           ...(branchId !== null ? { branchId } : {}),
-          cantidadInicial: Number(cantidadInicial) || 0,
+          // Con variantes el total sale de la suma, como los talles de prenda.
+          cantidadInicial: tieneVariantes ? totalVariantes : Number(cantidadInicial) || 0,
           costoUnitario: Number(costo) || 0,
+          ...variantesDelPayload,
         };
 
     const result = isEdit
@@ -460,27 +566,143 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
             </>
           )}
 
-          {/* Cantidad y costo: siempre visibles. El costo se registra como
-              compra del alta, haya o no sucursal. */}
+          {/* Interruptor de variantes (opcional, como los talles de prenda). */}
+          <div className="flex items-center justify-between gap-3 rounded-xl bg-surface-soft p-4">
+            <div className="min-w-0">
+              <label htmlFor="product-tiene-variantes" className="text-sm font-medium text-ink">
+                Este producto tiene variantes
+              </label>
+              <p className="text-xs text-ink-muted">
+                Con variantes el total de unidades sale de la suma de las filas.
+              </p>
+            </div>
+            <input
+              id="product-tiene-variantes"
+              type="checkbox"
+              checked={tieneVariantes}
+              onChange={(e) => toggleVariantes(e.target.checked)}
+              className="h-5 w-5 accent-accent"
+            />
+          </div>
+
+          {/* Filas «Nombre + cantidad» y, si la foto existe, a cuál se asocian. */}
+          {tieneVariantes && (
+            <div className="space-y-2">
+              <span className={labelClass}>Variantes</span>
+              {variantesFilas.map((fila, indice) => {
+                const numero = indice + 1;
+                return (
+                  <div
+                    key={fila.key}
+                    className="space-y-2 rounded-xl border border-hairline bg-surface p-3"
+                  >
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={fila.nombre}
+                        onChange={(e) => cambiarVariante(fila.key, "nombre", e.target.value)}
+                        aria-label={`Variante ${numero}`}
+                        maxLength={40}
+                        placeholder="Ej: Roja"
+                        className={inputClass}
+                      />
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        step="1"
+                        min="0"
+                        max="999"
+                        value={fila.cantidad}
+                        onChange={(e) => cambiarVariante(fila.key, "cantidad", e.target.value)}
+                        aria-label={`Cantidad de la variante ${numero}`}
+                        placeholder="0"
+                        className={`${inputClass} w-24 text-center`}
+                      />
+                      {variantesFilas.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => quitarVariante(fila.key)}
+                          aria-label={`Quitar variante ${numero}`}
+                          className="btn btn-icon text-ink-muted hover:bg-surface-strong"
+                        >
+                          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                    <div>
+                      <label
+                        htmlFor={`product-variante-${fila.key}-foto`}
+                        className="mb-1 block text-xs text-ink-muted"
+                      >
+                        Foto de la variante {numero}
+                      </label>
+                      <select
+                        id={`product-variante-${fila.key}-foto`}
+                        value={fila.fotoPosition}
+                        onChange={(e) => cambiarVariante(fila.key, "fotoPosition", e.target.value)}
+                        disabled={!isEdit}
+                        className={`${inputClass} bg-surface`}
+                      >
+                        <option value="">Sin foto</option>
+                        {fotos.map((foto) => (
+                          <option key={foto.position} value={String(foto.position)}>
+                            Foto {foto.position + 1}
+                          </option>
+                        ))}
+                      </select>
+                      {!isEdit && (
+                        <p className="mt-1 text-xs text-ink-muted">
+                          Las fotos se asocian cuando el producto ya existe (edición).
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+              <button
+                type="button"
+                onClick={agregarVariante}
+                className="btn btn-ghost text-sm text-accent"
+              >
+                ＋ Agregar variante
+              </button>
+            </div>
+          )}
+
+          {/* Cantidad y costo: el total de unidades se deriva con variantes. */}
           {!isEdit && (
             <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label htmlFor="product-cantidad-inicial" className={labelClass}>
-                  Cantidad inicial
-                </label>
-                <input
-                  id="product-cantidad-inicial"
-                  type="number"
-                  inputMode="numeric"
-                  step="1"
-                  min="0"
-                  max="999"
-                  value={cantidadInicial}
-                  onChange={(e) => setCantidadInicial(e.target.value)}
-                  className={inputClass}
-                  placeholder="0"
-                />
-              </div>
+              {tieneVariantes ? (
+                <div>
+                  <span className={labelClass}>Total de unidades</span>
+                  <p
+                    data-testid="product-cantidad-total"
+                    className={`${inputClass} bg-surface-strong text-sm text-ink-muted`}
+                  >
+                    {totalVariantes} {totalVariantes === 1 ? "unidad" : "unidades"}
+                  </p>
+                </div>
+              ) : (
+                <div>
+                  <label htmlFor="product-cantidad-inicial" className={labelClass}>
+                    Cantidad inicial
+                  </label>
+                  <input
+                    id="product-cantidad-inicial"
+                    type="number"
+                    inputMode="numeric"
+                    step="1"
+                    min="0"
+                    max="999"
+                    value={cantidadInicial}
+                    onChange={(e) => setCantidadInicial(e.target.value)}
+                    className={inputClass}
+                    placeholder="0"
+                  />
+                </div>
+              )}
               <div>
                 <label htmlFor="product-costo" className={labelClass}>
                   Costo

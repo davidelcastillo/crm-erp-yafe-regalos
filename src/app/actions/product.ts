@@ -29,7 +29,7 @@ const searchProductsSchema = z.object({
 const updateProductSchema = z.object({
   id: z.number().int().positive("ID inválido"),
   name: z.string().min(1, "El nombre es requerido").max(255, "El nombre es muy largo").optional(),
-  description: z.string().max(500, "La descripción es muy larga").optional().nullable(),
+  description: z.string().max(2000, "La descripción es muy larga").optional().nullable(),
   price: z.number().min(0, "El precio no puede ser negativo").optional(),
   // code y codePrefix NO están en el schema - son inmutables tras creación
 });
@@ -424,6 +424,15 @@ export async function createProductsBatch(data: unknown) {
             );
             if (estilosDelLote.length > 0) {
               await tx.productEstilo.createMany({ data: estilosDelLote });
+            }
+
+            // «Publicar en» de cada fila: una sola `createMany` para todo el
+            // lote, cruzando por código como los estilos.
+            const publicacionesDelLote = filasCreadas.flatMap(({ producto }, i) =>
+              (rows[i].publicadaEn ?? []).map((canal) => ({ productId: producto.id, canal }))
+            );
+            if (publicacionesDelLote.length > 0) {
+              await tx.prendaPublicacion.createMany({ data: publicacionesDelLote });
             }
 
             // Variantes: una sola `createMany` para todo el lote (sin fotos:

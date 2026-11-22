@@ -1,7 +1,7 @@
 /**
  * Integration test for createProduct Server Action
  */
-import { createProduct, createProductsBatch, getProductById, getProducts, searchProducts, updateProductExtended } from "../actions/product";
+import { createProduct, createProductsBatch, getProductById, getProducts, searchProducts, updateProduct, updateProductExtended } from "../actions/product";
 import {
   createProductSchema,
   createProductsBatchSchema,
@@ -1482,6 +1482,14 @@ describe("productos: variantes (ProductVariante)", () => {
     expect(prisma.product.update).not.toHaveBeenCalled();
   });
 
+  it("la acción legada updateProduct ya no corta la descripción en 500", async () => {
+    (prisma.product.update as jest.Mock).mockResolvedValue({ id: 5 });
+
+    const result = await updateProduct({ id: 5, description: "a".repeat(1500) });
+
+    expect(result.success).toBe(true);
+  });
+
   it("getProductById devuelve las variantes guardadas", async () => {
     (prisma.product.findUnique as jest.Mock).mockResolvedValue({
       id: 12,
@@ -1540,5 +1548,54 @@ describe("productos: variantes (ProductVariante)", () => {
     expect(
       (prisma.branchInventory.createManyAndReturn as jest.Mock).mock.calls[0][0].data
     ).toEqual([{ branchId: 3, productId: 21, stock: 5 }]);
+  });
+});
+
+/**
+ * «Publicar en» del lote (pedido del dueño): el alta masiva pide los mismos
+ * canales que el alta individual, por fila. Una sola `createMany` para todo el
+ * lote, cruzando por código, y sin canales no escribe nada.
+ */
+describe("productos: «Publicar en» del lote", () => {
+  const publicaciones = () =>
+    prisma.prendaPublicacion as unknown as { createMany: jest.Mock; deleteMany: jest.Mock };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (prisma.product.findMany as jest.Mock).mockResolvedValue([]);
+  });
+
+  it("el lote escribe los canales de cada fila en una sola createMany", async () => {
+    (prisma.product.createManyAndReturn as jest.Mock).mockResolvedValue([
+      { id: 10, code: "ZZ000", name: "Producto A" },
+      { id: 11, code: "ZZ001", name: "Producto B" },
+    ]);
+
+    const result = await createProductsBatch({
+      rows: [
+        // TikTok no es un canal: lo descarta el mismo filtro que el individual.
+        { name: "Producto A", prefix: "ZZ", price: 10, publicadaEn: ["Web", "TikTok"] },
+        { name: "Producto B", prefix: "ZZ", price: 10 },
+      ],
+    });
+
+    expect(result.success).toBe(true);
+    expect(publicaciones().createMany).toHaveBeenCalledTimes(1);
+    expect(publicaciones().createMany).toHaveBeenCalledWith({
+      data: [{ productId: 10, canal: "Web" }],
+    });
+  });
+
+  it("sin canales el lote no escribe publicaciones", async () => {
+    (prisma.product.createManyAndReturn as jest.Mock).mockResolvedValue([
+      { id: 10, code: "ZZ000", name: "Producto A" },
+    ]);
+
+    const result = await createProductsBatch({
+      rows: [{ name: "Producto A", prefix: "ZZ", price: 10 }],
+    });
+
+    expect(result.success).toBe(true);
+    expect(publicaciones().createMany).not.toHaveBeenCalled();
   });
 });

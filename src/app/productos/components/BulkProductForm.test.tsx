@@ -1049,3 +1049,48 @@ describe("BulkProductForm · variantes", () => {
     expect((mockCreateProductsBatch.mock.calls[0][0] as { rows: unknown[] }).rows[0]).not.toHaveProperty("variantes");
   });
 });
+
+/**
+ * «Publicar en» por fila (pedido del dueño): los mismos checkboxes que el alta
+ * individual, dentro de la card de cada producto, y viajan en su fila.
+ */
+describe("BulkProductForm · publicar en por fila", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCreateProductsBatch.mockResolvedValue({
+      success: true,
+      data: {
+        products: [
+          { id: 1, code: "AA000", name: "Producto uno" },
+          { id: 2, code: "AA001", name: "Producto dos" },
+        ],
+        receipt: null,
+      },
+    } as never);
+  });
+
+  it("cada fila elige sus canales y solo viajan los elegidos", async () => {
+    await renderForm();
+    await continuar();
+    fireEvent.click(screen.getByRole("button", { name: /agregar producto/i }));
+    llenarFila(0, "Producto uno");
+    llenarFila(1, "Producto dos");
+
+    // Los mismos tres canales en cada fila.
+    expect(screen.getAllByLabelText("Web")).toHaveLength(2);
+    expect(screen.getAllByLabelText("Instagram")).toHaveLength(2);
+    expect(screen.getAllByLabelText("WhatsApp")).toHaveLength(2);
+
+    fireEvent.click(screen.getAllByLabelText("Web")[0]);
+
+    fireEvent.click(screen.getByRole("button", { name: /crear 2 productos/i }));
+
+    await waitFor(() => expect(mockCreateProductsBatch).toHaveBeenCalled());
+    const payload = mockCreateProductsBatch.mock.calls[0][0] as {
+      rows: Record<string, unknown>[];
+    };
+    expect(payload.rows[0]).toEqual(expect.objectContaining({ publicadaEn: ["Web"] }));
+    // La fila sin canales no manda la clave (el esquema la deja vacía).
+    expect(payload.rows[1]).not.toHaveProperty("publicadaEn");
+  });
+});

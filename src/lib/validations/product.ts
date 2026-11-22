@@ -26,6 +26,9 @@ const publicadaEnAlta = z
 /** Edición: sin el campo la edición no toca las publicaciones existentes. */
 const publicadaEnEdicion = z.array(z.string()).transform(filtrarCanales).optional();
 
+/** Fila del lote: sin canales la clave no viaja (no inventa un array vacío). */
+const publicadaEnFila = z.array(z.string()).transform(filtrarCanales).optional();
+
 /**
  * Variantes del producto (pedido del dueño): nombre libre + cantidad, opcional
  * como los talles de la prenda. `fotoPosition` guarda la `position` de una foto
@@ -134,6 +137,8 @@ const createProductsBatchRowSchema = z.object({
   ...productFields,
   initialStock: z.number().int().min(0, "El stock no puede ser negativo").optional(),
   costo: z.number().min(0, "El costo no puede ser negativo").optional(),
+  // «Publicar en» de la fila: mismo filtro de canales que el alta individual.
+  publicadaEn: publicadaEnFila,
   // Variantes opcionales de la fila: con ellas su stock es la suma.
   variantes: variantesSchema.optional(),
 });

@@ -7,6 +7,7 @@ import Swal from "sweetalert2";
 import { getCategoryOptions } from "@/app/actions/category";
 import { getEstiloPrendaOptions } from "@/app/actions/prendaTaxonomy";
 import type { TaxonomyOption } from "@/lib/validations/prendaTaxonomy";
+import { CANALES_PUBLICACION } from "@/lib/validations/prenda";
 import { createProductsBatch } from "@/app/actions/product";
 import { createProductsBatchSchema } from "@/lib/validations/product";
 import { CategorySelector } from "@/components/ui/CategorySelector";
@@ -34,6 +35,8 @@ type Fila = {
   estilos: number[];
   /** Variantes de la fila (nombre + cantidad): con ellas el stock es la suma. */
   variantes: { nombre: string; cantidad: string }[];
+  /** «Publicar en» de la fila: los mismos canales que el alta individual. */
+  publicadaEn: string[];
   /** Fotos pendientes (U2): no viajan en el lote, se suben con el producto creado. */
   fotos: File[];
 };
@@ -217,6 +220,7 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
       costo: "",
       estilos: [],
       variantes: [],
+      publicadaEn: [],
       fotos: [],
     },
   ]);
@@ -327,6 +331,7 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
       costo: "",
       estilos: [],
       variantes: [],
+      publicadaEn: [],
       fotos: [],
     };
     idParaEnfocar.current = nueva.id;
@@ -344,6 +349,7 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
       fila.costo.trim() ||
       fila.estilos.length > 0 ||
       fila.variantes.length > 0 ||
+      fila.publicadaEn.length > 0 ||
       fila.fotos.length > 0;
     if (conDatos) {
       const confirmacion = await Swal.fire({
@@ -418,6 +424,7 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
         f.costo.trim() ||
         f.estilos.length > 0 ||
         f.variantes.length > 0 ||
+        f.publicadaEn.length > 0 ||
         f.fotos.length > 0
     );
     if (!conDatos) {
@@ -500,6 +507,8 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
         categoryId: f.categoryId,
         // Estilos de la fila: sin elegir ninguno no viaja (el esquema lo deja vacío).
         ...(f.estilos.length > 0 ? { estilos: f.estilos } : {}),
+        // Canales de la fila: sin elegir ninguno no viaja (queda sin publicar).
+        ...(f.publicadaEn.length > 0 ? { publicadaEn: f.publicadaEn } : {}),
         // Variantes de la fila: con ellas el stock es la suma, no `initialStock`.
         ...(f.variantes.length > 0
           ? {
@@ -1030,6 +1039,37 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
                           }
                           disabled={loading}
                         />
+
+                        {/* «Publicar en» de la fila: los mismos canales que el
+                            alta individual, compactos dentro de la card. */}
+                        <div>
+                          <span className={labelClass}>Publicar en</span>
+                          <div className="flex flex-wrap gap-2">
+                            {CANALES_PUBLICACION.map((canal) => (
+                              <label
+                                key={canal}
+                                className="inline-flex min-h-[44px] items-center gap-2 rounded-full border border-hairline bg-surface px-3 py-2 text-sm text-ink touch-manipulation"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={fila.publicadaEn.includes(canal)}
+                                  onChange={() =>
+                                    actualizarFila(
+                                      fila.id,
+                                      "publicadaEn",
+                                      fila.publicadaEn.includes(canal)
+                                        ? fila.publicadaEn.filter((actual) => actual !== canal)
+                                        : [...fila.publicadaEn, canal]
+                                    )
+                                  }
+                                  disabled={loading}
+                                  className="h-4 w-4 accent-accent"
+                                />
+                                {canal}
+                              </label>
+                            ))}
+                          </div>
+                        </div>
 
                         {/* U2: fotos de la fila, pendientes hasta que el producto exista. */}
                         <FotosFila
