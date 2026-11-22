@@ -26,6 +26,7 @@ import * as cashActions from "@/app/actions/cash";
 import * as categoryActions from "@/app/actions/category";
 import * as customerActions from "@/app/actions/customer";
 import * as dashboardActions from "@/app/actions/dashboard";
+import * as reportesActions from "@/app/actions/reportes";
 import * as fotoActions from "@/app/actions/foto";
 import * as inventoryActions from "@/app/actions/inventory";
 import * as pedidoActions from "@/app/actions/pedido";
@@ -64,6 +65,7 @@ const MODULES: Record<string, Record<string, unknown>> = {
   "prendaTaxonomy.ts": prendaTaxonomyActions as unknown as Record<string, unknown>,
   "product.ts": productActions as unknown as Record<string, unknown>,
   "purchase.ts": purchaseActions as unknown as Record<string, unknown>,
+  "reportes.ts": reportesActions as unknown as Record<string, unknown>,
   "sale.ts": saleActions as unknown as Record<string, unknown>,
   "stockControl.ts": stockControlActions as unknown as Record<string, unknown>,
   "label-print.ts": labelPrintActions as unknown as Record<string, unknown>,
@@ -116,6 +118,6 @@ describe("ninguna acción interna atiende sin sesión admin", () => {
     }
 
     expect(problems).toEqual([]);
-    expect(visited).toBe(106);
+    expect(visited).toBe(108);
   });
 });
