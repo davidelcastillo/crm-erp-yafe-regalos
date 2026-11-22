@@ -317,6 +317,197 @@ export async function getPerformanceData(data?: unknown) {
   }
 }
 
+const panelSchema = z.object({
+  type: z.enum(["cierre", "7", "30", "90", "custom"]).optional(),
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
+  branchId: z.coerce.number().int().positive().optional(),
+});
+
+const dosDecimales = (n: number) => Math.round(n * 100) / 100;
+
+const nombreCliente = (cliente: { name: string; surname: string } | null) =>
+  cliente ? `${cliente.name} ${cliente.surname}`.trim() : "Sin clienta";
+
+/**
+ * Home interna: KPIs del período, ventas por canal y las dos listas cortas
+ * (reservas sin cobrar y pedidos para enviar). Mismos períodos y sucursal que
+ * `getPerformanceData`, incluido el piso del último cierre de caja.
+ *
+ * Un pedido no tiene sucursal propia (la tienen sus ítems), así que el filtro de
+ * sucursal entra por `items.some`.
+ */
+export async function getResumenPanel(data?: unknown) {
+  try {
+    const auth = await requireAdmin();
+    if (!auth.ok) return { success: false as const, error: auth.error };
+
+    const validated = panelSchema.parse(data ?? {});
+    const { branchId } = validated;
+    const branchWhere = branchId ? { branchId } : {};
+
+    const rango = await rangoDelPeriodo(validated);
+    if (!rango.success) {
+      return { success: false as const, error: rango.error };
+    }
+
+    const esCierre = validated.type === "cierre";
+    const { porFecha } = esCierre
+      ? await pisosDeCaja(branchId)
+      : { porFecha: {} };
+    const deVentas = {
+      AND: [{ date: { gte: rango.desde, lte: rango.hasta } }, branchWhere, porFecha],
+    };
+
+    // El canal sale del pedido que cobró la venta; la venta directa de mostrador
+    // no tiene pedido y cae en «Mostrador».
+    const ventaSelect = {
+      id: true,
+      date: true,
+      totalAmount: true,
+      customer: { select: { name: true, surname: true } },
+      pedido: { select: { canal: { select: { name: true } } } },
+      items: { select: { quantity: true, product: { select: { name: true } } } },
+    } as const;
+
+    const hoy = toLocalDateKey(new Date());
+    const hoyDesde = inicioDelDia(hoy);
+    const hoyHasta = finDelDia(hoy);
+    const dePedidosDe = (id: number) => ({ items: { some: { branchId: id } } });
+    const pedidosDeSucursal = branchId ? dePedidosDe(branchId) : {};
+
+    const [ventas, ultimasVentas, disponibles, reservas, envios, enviosHoy, enviosLista] =
+      await Promise.all([
+        prisma.sale.findMany({ where: deVentas, select: ventaSelect }),
+        prisma.sale.findMany({
+          where: deVentas,
+          orderBy: { date: "desc" },
+          take: 5,
+          select: ventaSelect,
+        }),
+        prisma.branchInventory.aggregate({
+          _sum: { stock: true },
+          where: { stock: { gt: 0 }, ...branchWhere, product: { kind: "PRENDA" } },
+        }),
+        prisma.pedido.findMany({
+          where: { estado: "RESERVADO", ...pedidosDeSucursal },
+          orderBy: [{ venceEl: { sort: "asc", nulls: "last" } }],
+          select: {
+            id: true,
+            numero: true,
+            total: true,
+            venceEl: true,
+            customer: { select: { name: true, surname: true } },
+            items: {
+              take: 1,
+              select: { cantidad: true, product: { select: { name: true } } },
+            },
+            pagos: { select: { monto: true } },
+          },
+        }),
+        prisma.pedido.count({ where: { estado: "PARA_ENVIAR", ...pedidosDeSucursal } }),
+        // «Salen hoy» se mide con el único vencimiento que el pedido declara.
+        prisma.pedido.count({
+          where: {
+            estado: "PARA_ENVIAR",
+            venceEl: { gte: hoyDesde, lte: hoyHasta },
+            ...pedidosDeSucursal,
+          },
+        }),
+        prisma.pedido.findMany({
+          where: { estado: "PARA_ENVIAR", ...pedidosDeSucursal },
+          orderBy: [{ envioEstado: "asc" }, { pagadoAt: "asc" }],
+          take: 5,
+          select: {
+            id: true,
+            numero: true,
+            envioEstado: true,
+            customer: { select: { name: true, surname: true } },
+            items: {
+              take: 1,
+              select: { cantidad: true, product: { select: { name: true } } },
+            },
+          },
+        }),
+      ]);
+
+    const monto = ventas.reduce((suma, v) => suma + Number(v.totalAmount), 0);
+    const unidades = ventas.reduce(
+      (suma, v) => suma + v.items.reduce((s, i) => s + i.quantity, 0),
+      0
+    );
+
+    const canales = new Map<string, number>();
+    for (const venta of ventas) {
+      const canal = venta.pedido?.canal.name ?? "Mostrador";
+      canales.set(canal, (canales.get(canal) ?? 0) + Number(venta.totalAmount));
+    }
+    const porCanal = [...canales.entries()]
+      .map(([canal, total]) => ({
+        canal,
+        monto: dosDecimales(total),
+        porcentaje: monto > 0 ? dosDecimales((total / monto) * 100) : 0,
+      }))
+      .sort((a, b) => b.monto - a.monto);
+
+    // El saldo de una reserva no está en la base: es total menos sus señas.
+    const conSaldo = reservas
+      .map((p) => ({
+        ...p,
+        saldo:
+          Number(p.total) - p.pagos.reduce((suma, pago) => suma + Number(pago.monto), 0),
+      }))
+      .filter((p) => p.saldo > 0);
+    const venceHoy = (fecha: Date | null) =>
+      !!fecha && fecha >= hoyDesde && fecha <= hoyHasta;
+
+    return {
+      success: true as const,
+      data: {
+        ventas: { monto: dosDecimales(monto), unidades, cantidad: ventas.length },
+        prendasDisponibles: Number(disponibles._sum.stock ?? 0),
+        reservas: {
+          cantidad: conSaldo.length,
+          saldo: dosDecimales(conSaldo.reduce((suma, p) => suma + p.saldo, 0)),
+          vencenHoy: conSaldo.filter((p) => venceHoy(p.venceEl)).length,
+        },
+        paraEnviar: { cantidad: envios, salenHoy: enviosHoy },
+        porCanal,
+        // La tarjeta es un resumen: muestra la primera prenda del pedido.
+        reservasPorCobrar: conSaldo.slice(0, 5).map((p) => ({
+          id: p.id,
+          numero: p.numero,
+          cliente: nombreCliente(p.customer),
+          prenda: p.items[0]?.product.name ?? "—",
+          venceEl: p.venceEl ? toLocalDateKey(p.venceEl) : null,
+          saldo: dosDecimales(p.saldo),
+        })),
+        ultimasVentas: ultimasVentas.map((v) => ({
+          id: v.id,
+          fecha: toLocalDateKey(v.date),
+          cliente: nombreCliente(v.customer),
+          prenda: v.items[0]?.product.name ?? "—",
+          canal: v.pedido?.canal.name ?? "Mostrador",
+          monto: Number(v.totalAmount),
+        })),
+        paraEnviarLista: enviosLista.map((p) => ({
+          id: p.id,
+          numero: p.numero,
+          cliente: nombreCliente(p.customer),
+          prenda: p.items[0]?.product.name ?? "—",
+          envioEstado: p.envioEstado,
+        })),
+      },
+    };
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return { success: false as const, error: "Parámetros del panel inválidos" };
+    }
+    console.error("Error fetching resumen del panel:", error);
+    return { success: false as const, error: "Error al obtener el resumen del panel" };
+  }
+}
+
 // Get analytics for a specific product
 export async function getProductAnalytics(productId: number) {
   try {
