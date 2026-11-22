@@ -4,36 +4,35 @@ import { Marca } from "./Marca";
 
 /**
  * Las cuatro tarjetas de categoría de la home (`grid-cat` de `web/index.html`):
- * crema, cacao, rosa y crema, con la frutilla de la marca y el copy del mockup.
- * Links fijos por slug, igual que el nav del header; «Accesorios» no existe en
- * la tienda, así que la cuarta tarjeta es «Nuevo». No dependen de la base.
+ * crema, cacao, rosa y crema, con la frutilla de la marca. Son los cuatro grupos
+ * del pedido del dueño y cada una lleva a su ruta, igual que el nav del header.
  */
 const CATEGORIAS = [
   {
-    nombre: "Second hand",
+    nombre: "Ropa",
     texto: "Prendas elegidas una por una",
-    slug: "second-hand",
+    slug: "ropa",
     clases: "border-hairline bg-surface text-ink",
     corona: "cacao",
   },
   {
-    nombre: "Intervenido",
-    texto: "Detalles hechos a mano",
-    slug: "intervenido",
+    nombre: "Peluches",
+    texto: "Blanditos para abrazar",
+    slug: "peluches",
     clases: "border-ink bg-ink text-background",
     corona: "rosa",
   },
   {
-    nombre: "Cositas",
-    texto: "Llaveros, peluches y librería",
-    slug: "cositas",
+    nombre: "Accesorios",
+    texto: "El detalle que faltaba",
+    slug: "accesorios",
     clases: "border-accent-soft bg-accent-soft text-ink",
     corona: "cacao",
   },
   {
-    nombre: "Nuevo",
-    texto: "Lo último que llegó",
-    slug: "nuevo",
+    nombre: "Otros productos",
+    texto: "Llaveros, stickers y más",
+    slug: "otros",
     clases: "border-hairline bg-surface text-ink",
     corona: "cacao",
   },
@@ -47,11 +46,7 @@ export function HomeCategorias() {
         {CATEGORIAS.map((categoria) => (
           <li key={categoria.slug} className="min-w-0">
             <Link
-              href={
-                categoria.slug === "cositas"
-                  ? "/polkalinas/cositas"
-                  : `/polkalinas/catalogo?categoria=${categoria.slug}`
-              }
+              href={`/polkalinas/${categoria.slug}`}
               className={`flex min-h-[160px] flex-col justify-between gap-3 rounded-[18px] border p-5 ${categoria.clases}`}
             >
               <Marca size={40} corona={categoria.corona} wordmark={false} />

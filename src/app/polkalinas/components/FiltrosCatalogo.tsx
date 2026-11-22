@@ -2,28 +2,14 @@
 
 import Link from "next/link";
 
+import type { GrupoVidriera } from "@/lib/grupos-vidriera";
+
 /**
  * Filtros del catálogo (`aside.filtros` de `web/catalogo.html`): columna fija de
  * 260px en escritorio y bottom-sheet en el celu, que abre el botón «Filtrar».
  * El formulario es un GET contra la misma ruta, así el estado vive en la URL y
  * el catálogo filtrado es un link compartible.
  */
-
-/** Las categorías del mockup que son slug en la URL, no id. «Accesorios» no existe. */
-export const NOMBRE_CATEGORIA = {
-  nuevo: "Nuevo",
-  "second-hand": "Second hand",
-  intervenido: "Intervenido",
-  cositas: "Cositas",
-} as const;
-
-export type CategoriaSlug = keyof typeof NOMBRE_CATEGORIA;
-
-/** Slug de una categoría de prenda; las que no son del mockup van por id. */
-export const slugDe = (nombre: string): string | undefined =>
-  (Object.keys(NOMBRE_CATEGORIA) as CategoriaSlug[]).find(
-    (slug) => NOMBRE_CATEGORIA[slug] === nombre
-  );
 
 export type ValoresFiltros = {
   categoria: string[];
@@ -52,7 +38,7 @@ export function FiltrosCatalogo({
   talles,
   estilos,
   rutaBase,
-  categoriaFija,
+  grupoFijo,
   abierto,
   onCerrar,
 }: {
@@ -61,7 +47,7 @@ export function FiltrosCatalogo({
   talles: string[];
   estilos: string[];
   rutaBase: string;
-  categoriaFija?: CategoriaSlug;
+  grupoFijo?: GrupoVidriera;
   abierto: boolean;
   onCerrar: () => void;
 }) {
@@ -124,8 +110,8 @@ export function FiltrosCatalogo({
                 name="categoria"
                 value={opcion.valor}
                 defaultChecked={valores.categoria.includes(opcion.valor)}
-                // La ruta filtrada ya trae su categoría: sacarla es cambiar de página.
-                disabled={opcion.valor === categoriaFija}
+                // La ruta filtrada ya trae su grupo: sacarlo es cambiar de página.
+                disabled={opcion.valor === grupoFijo}
                 className="size-4.5 accent-ink"
               />
               {opcion.nombre}
@@ -134,8 +120,8 @@ export function FiltrosCatalogo({
           ))}
         </fieldset>
 
-        {/* Cositas son productos: no tienen talle, así que el filtro no aplica. */}
-        {categoriaFija !== "cositas" && (
+        {/* Solo la ropa tiene talle: en Peluches, Accesorios y Otros no aplica. */}
+        {(grupoFijo === undefined || grupoFijo === "ropa") && (
           <fieldset className={GRUPO}>
             <legend className={LEYENDA}>Talle</legend>
             {talles.length === 0 ? (

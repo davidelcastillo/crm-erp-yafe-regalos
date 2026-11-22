@@ -4,12 +4,10 @@ import Link from "next/link";
 import { useState } from "react";
 
 import type { VidrieraItem } from "@/app/actions/vidriera";
+import { GRUPOS, NOMBRE_GRUPO, grupoDe, type GrupoVidriera } from "@/lib/grupos-vidriera";
 import {
   FiltrosCatalogo,
-  NOMBRE_CATEGORIA,
   SelectorOrden,
-  slugDe,
-  type CategoriaSlug,
   type OpcionCategoria,
   type ValoresFiltros,
 } from "./FiltrosCatalogo";
@@ -21,24 +19,16 @@ import { ProductoCard } from "./ProductoCard";
  * activos, el `<select>` de orden y la grilla con la tarjeta compartida.
  *
  * Es cliente porque el sheet y el «Ver más prendas» se abren sin navegar; el
- * filtrado en sí sale de la URL, que arma el formulario. El único filtro que
- * resuelve la action es la categoría numérica y la búsqueda: el resto se
- * aplica acá sobre lo que ya devolvió `getVidriera`.
+ * filtrado en sí sale de la URL, que arma el formulario. La búsqueda la
+ * resuelve la action; el grupo, el talle, el estilo, el precio y las vendidas se
+ * aplican acá sobre lo que ya devolvió `getVidriera`.
  */
 
 /** Cuántas piezas se ven antes del «Ver más prendas» del mockup. */
 const VISIBLES = 12;
 
-/**
- * Categorías públicas del ítem: todas las del producto (son equivalentes), con la
- * principal como respaldo para los ítems que todavía no traen la lista.
- */
-const categoriasDe = (item: VidrieraItem) =>
-  item.categorias ?? (item.categoria ? [item.categoria] : []);
-
-/** Ids de esas categorías: el filtro `?categoria=7` coincide con cualquiera. */
-const categoriaIdsDe = (item: VidrieraItem) =>
-  item.categoriaIds ?? (item.categoriaId ? [item.categoriaId] : []);
+/** Grupo público del ítem: lo manda la action; los fixtures lo calculan. */
+const grupoDeItem = (item: VidrieraItem) => item.grupo ?? grupoDe(item);
 
 const ORDEN_TALLES = ["XS", "S", "M", "L", "XL", "XXL", "Único"];
 
@@ -93,46 +83,32 @@ export function CatalogoVista({
   items,
   valores,
   rutaBase,
-  categoriaFija,
+  grupoFijo,
 }: {
   titulo: string;
   items: VidrieraItem[];
   valores: ValoresFiltros;
   rutaBase: string;
-  categoriaFija?: CategoriaSlug;
+  grupoFijo?: GrupoVidriera;
 }) {
   const [sheetAbierto, setSheetAbierto] = useState(false);
   const [verTodas, setVerTodas] = useState(false);
 
-  const categoriasActivas = [
-    ...valores.categoria,
-    // En su propia ruta «Cositas» ya acota la vista: no entra al OR de categorías.
-    ...(categoriaFija && categoriaFija !== "cositas" ? [categoriaFija] : []),
-  ];
+  // El grupo de la ruta entra como uno más del OR: elegir otro en el filtro
+  // suma, nunca esconde lo que la página ya estaba mostrando.
+  const gruposActivos = [...valores.categoria, ...(grupoFijo ? [grupoFijo] : [])];
 
-  const coincideCategoria = (item: VidrieraItem) => {
-    if (categoriaFija === "cositas" && item.kind !== "PRODUCT") return false;
-    if (categoriasActivas.length === 0) return true;
-    return categoriasActivas.some((valor) => {
-      if (valor === "cositas") return item.kind === "PRODUCT";
-      const id = Number(valor);
-      if (Number.isInteger(id) && id > 0) return categoriaIdsDe(item).includes(id);
-      return categoriasDe(item).includes(NOMBRE_CATEGORIA[valor as CategoriaSlug] ?? valor);
-    });
-  };
+  const coincideGrupo = (item: VidrieraItem) =>
+    gruposActivos.length === 0 || gruposActivos.includes(grupoDeItem(item));
 
-  /** Ítem que la ruta ya deja fijo: «Cositas» son los productos, el slug es la prenda. */
-  const deLaRuta = (item: VidrieraItem) =>
-    !categoriaFija ||
-    (categoriaFija === "cositas"
-      ? item.kind === "PRODUCT"
-      : categoriasDe(item).includes(NOMBRE_CATEGORIA[categoriaFija]));
+  /** Ítem que la ruta ya deja fijo (en el catálogo completo, todos). */
+  const deLaRuta = (item: VidrieraItem) => !grupoFijo || grupoDeItem(item) === grupoFijo;
 
   const desde = Number(valores.desde) || 0;
   const hasta = Number(valores.hasta) || 0;
   const filtrados = items.filter(
     (item) =>
-      coincideCategoria(item) &&
+      coincideGrupo(item) &&
       (!valores.talle || item.talles?.includes(valores.talle)) &&
       (valores.estilo.length === 0 ||
         valores.estilo.some((estilo) => item.estilos?.includes(estilo))) &&
@@ -147,30 +123,13 @@ export function CatalogoVista({
 
   const visibles = verTodas ? ordenados : ordenados.slice(0, VISIBLES);
 
-  // Las opciones son las categorías del tipo que lista la vista: la de prenda
-  // (`CategoriaPrenda`) en el catálogo y en las rutas de prendas, la de producto
-  // (`Category`) en Cositas. Un producto en el catálogo general muestra su
-  // categoría en la card, pero no agrega opción de filtro.
-  const kindDeOpciones = categoriaFija === "cositas" ? "PRODUCT" : "PRENDA";
-  const conteosCategoria = new Map<string, number>();
-  for (const item of items) {
-    if (item.kind !== kindDeOpciones || !deLaRuta(item)) continue;
-    // Un producto puede estar en varias: cuenta una vez en cada una (sin repetir).
-    for (const nombre of new Set(categoriasDe(item))) {
-      conteosCategoria.set(nombre, (conteosCategoria.get(nombre) ?? 0) + 1);
-    }
-  }
-
-  const opciones: OpcionCategoria[] = [
-    ...[...conteosCategoria]
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([nombre, conteo]) => ({ valor: slugDe(nombre) ?? nombre, nombre, conteo })),
-    {
-      valor: "cositas",
-      nombre: "Cositas",
-      conteo: items.filter((item) => item.kind === "PRODUCT").length,
-    },
-  ];
+  // El filtro ofrece los cuatro grupos del pedido, no las taxonomías de prenda
+  // ni de producto: el conteo mira solo lo que la ruta ya dejó a la vista.
+  const opciones: OpcionCategoria[] = GRUPOS.map((grupo) => ({
+    valor: grupo,
+    nombre: NOMBRE_GRUPO[grupo],
+    conteo: items.filter((item) => deLaRuta(item) && grupoDeItem(item) === grupo).length,
+  }));
 
   const talles = [...new Set(items.flatMap((item) => item.talles ?? []))].sort(compararTalles);
 
@@ -181,7 +140,7 @@ export function CatalogoVista({
   const chips: { etiqueta: string; href: string }[] = [
     ...(valores.q ? [{ etiqueta: valores.q, href: url(rutaBase, valores, { campo: "q" }) }] : []),
     ...valores.categoria.map((valor) => ({
-      etiqueta: NOMBRE_CATEGORIA[valor as CategoriaSlug] ?? valor,
+      etiqueta: NOMBRE_GRUPO[valor as GrupoVidriera] ?? valor,
       href: url(rutaBase, valores, { campo: "categoria", valor }),
     })),
     ...(valores.talle
@@ -291,7 +250,7 @@ export function CatalogoVista({
           talles={talles}
           estilos={estilos}
           rutaBase={rutaBase}
-          categoriaFija={categoriaFija}
+          grupoFijo={grupoFijo}
           abierto={sheetAbierto}
           onCerrar={() => setSheetAbierto(false)}
         />

@@ -11,12 +11,12 @@ import { Piano } from "@/app/polkalinas/components/Piano";
 import { TiendaFooter, TiendaHeader } from "@/app/polkalinas/components/TiendaHeader";
 import { WHATSAPP_VIDRIERA } from "@/app/polkalinas/components/whatsapp";
 
-/** El nav del mockup sin «Accesorios»: el dueño la sacó. */
+/** El nav del pedido del dueño: los cuatro grupos de la tienda. */
 const NAV = [
-  ["Nuevo", "/polkalinas/catalogo?categoria=nuevo"],
-  ["Second hand", "/polkalinas/catalogo?categoria=second-hand"],
-  ["Intervenido", "/polkalinas/catalogo?categoria=intervenido"],
-  ["Cositas", "/polkalinas/cositas"],
+  ["Ropa", "/polkalinas/ropa"],
+  ["Peluches", "/polkalinas/peluches"],
+  ["Accesorios", "/polkalinas/accesorios"],
+  ["Otros productos", "/polkalinas/otros"],
   ["Cómo comprar", "/polkalinas/ayuda/como-comprar"],
 ];
 
@@ -37,7 +37,6 @@ describe("barra de la tienda", () => {
         .getAllByRole("link")
         .map((link) => [link.textContent, link.getAttribute("href")])
     ).toEqual(NAV);
-    expect(within(nav).queryByRole("link", { name: "Accesorios" })).toBeNull();
   });
 
   it("el buscador se despliega y manda la búsqueda al catálogo con ?q=", () => {

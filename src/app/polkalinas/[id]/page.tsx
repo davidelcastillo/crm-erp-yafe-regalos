@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import { getVidriera, getVidrieraItem } from "@/app/actions/vidriera";
 import type { VidrieraFicha, VidrieraItem } from "@/app/actions/vidriera";
+import { NOMBRE_GRUPO } from "@/lib/grupos-vidriera";
 import { formatPrice } from "@/lib/label-layout";
 import { EstadoVidrieraBadge } from "../components/EstadoVidrieraBadge";
 import { GaleriaFotos } from "../components/GaleriaFotos";
@@ -71,17 +72,14 @@ export default async function FichaVidrieraPage({
             Inicio
           </Link>
           <span aria-hidden="true">/</span>
-          {item.categoria && (
-            <>
-              <Link
-                href={`/polkalinas/catalogo?categoria=${item.categoriaId ?? ""}`}
-                className="hover:text-ink"
-              >
-                {item.categoria}
-              </Link>
-              <span aria-hidden="true">/</span>
-            </>
-          )}
+          {/* La miga lleva al grupo de la tienda, que es lo que filtra el catálogo. */}
+          <Link
+            href={item.grupo ? `/polkalinas/${item.grupo}` : "/polkalinas/catalogo"}
+            className="hover:text-ink"
+          >
+            {item.grupo ? NOMBRE_GRUPO[item.grupo] : (item.categoria ?? "Catálogo")}
+          </Link>
+          <span aria-hidden="true">/</span>
           <span className="text-ink">{item.name}</span>
         </nav>
 

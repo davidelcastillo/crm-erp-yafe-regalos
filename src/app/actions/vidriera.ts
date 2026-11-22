@@ -15,6 +15,7 @@
  * El stock y las ventas se usan **solo para derivar el estado**; el número no
  * sale de acá.
  */
+import { grupoDe, type GrupoVidriera } from "@/lib/grupos-vidriera";
 import { prisma } from "@/lib/prisma";
 import { PRODUCT_IMAGES_BUCKET, nombreFoto, type TamanoFoto } from "@/lib/storage";
 import { z } from "zod";
@@ -31,6 +32,11 @@ export type VidrieraItem = {
   /** Precio público ya convertido: la acción devuelve `Decimal` como `number`. */
   price: number;
   kind: "PRENDA" | "PRODUCT";
+  /** Grupo de la tienda (Ropa / Peluches / Accesorios / Otros productos): lo
+   * calcula la action con el mismo criterio que el header y la home.
+   * Opcional en el tipo para no romper los fixtures de las páginas en rediseño;
+   * la action lo manda siempre. */
+  grupo?: GrupoVidriera;
   estado: EstadoVidriera;
   /** Portada (posición 0) en miniatura, o `null` si el producto no tiene fotos. */
   portada: string | null;
@@ -191,6 +197,11 @@ const aPublico = (
     name: fila.name,
     price: Number(fila.price),
     kind: fila.kind,
+    grupo: grupoDe({
+      kind: fila.kind,
+      categoria: categorias[0]?.name ?? null,
+      categorias: categorias.map((categoria) => categoria.name),
+    }),
     estado: estadoDe(fila, stock, reservado, vendido),
     portada: fila.images[0] ? urlFoto(fila.id, fila.images[0].path, "sm") : null,
     categoria: categorias[0]?.name ?? null,

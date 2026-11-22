@@ -13,14 +13,14 @@ import { WHATSAPP_VIDRIERA } from "./whatsapp";
  * footer de contacto.
  *
  * Es client porque el menú y el buscador se abren y cierran; el HTML sale
- * igual del servidor. El nav del mockup traía «Accesorios» y el dueño lo sacó,
- * así que no está ni arriba ni en el footer.
+ * igual del servidor. El nav son los cuatro grupos del pedido del dueño (Ropa,
+ * Peluches, Accesorios, Otros productos), cada uno con su ruta, más la ayuda.
  */
 const NAV = [
-  { etiqueta: "Nuevo", href: "/polkalinas/catalogo?categoria=nuevo" },
-  { etiqueta: "Second hand", href: "/polkalinas/catalogo?categoria=second-hand" },
-  { etiqueta: "Intervenido", href: "/polkalinas/catalogo?categoria=intervenido" },
-  { etiqueta: "Cositas", href: "/polkalinas/cositas" },
+  { etiqueta: "Ropa", href: "/polkalinas/ropa" },
+  { etiqueta: "Peluches", href: "/polkalinas/peluches" },
+  { etiqueta: "Accesorios", href: "/polkalinas/accesorios" },
+  { etiqueta: "Otros productos", href: "/polkalinas/otros" },
   { etiqueta: "Cómo comprar", href: "/polkalinas/ayuda/como-comprar" },
 ];
 
@@ -255,7 +255,7 @@ export function TiendaFooter() {
             <Marca size={44} corona="rosa" />
           </Link>
           <p className="mt-2 max-w-[34ch] text-[15px] text-accent-soft">
-            Ropa second hand e intervenida y cositas cute. Salta · envíos a todo el país.
+            Ropa, peluches, accesorios y otros productos. Salta · envíos a todo el país.
           </p>
         </div>
 

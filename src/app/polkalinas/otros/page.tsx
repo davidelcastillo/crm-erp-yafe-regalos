@@ -1,17 +1,17 @@
 import { CatalogoCuerpo, type ParamsBusqueda } from "../components/CatalogoCuerpo";
 
-/** Catálogo ya filtrado en «Cositas»: los productos normales, no las prendas. */
+/** Catálogo ya filtrado en «Otros productos»: todo lo que no es prenda, peluche ni accesorio. */
 export const dynamic = "force-dynamic";
 
-export default async function CositasPage({
+export default async function OtrosPage({
   searchParams,
 }: {
   searchParams: Promise<ParamsBusqueda>;
 }) {
   return CatalogoCuerpo({
     searchParams,
-    titulo: "Cositas",
-    rutaBase: "/polkalinas/cositas",
-    categoriaFija: "cositas",
+    titulo: "Otros productos",
+    rutaBase: "/polkalinas/otros",
+    grupoFijo: "otros",
   });
 }

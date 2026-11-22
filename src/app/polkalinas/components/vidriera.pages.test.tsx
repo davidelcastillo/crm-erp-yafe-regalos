@@ -10,12 +10,12 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 
 import FichaPage from "@/app/polkalinas/[id]/page";
+import AccesoriosPage from "@/app/polkalinas/accesorios/page";
 import CatalogoPage from "@/app/polkalinas/catalogo/page";
-import CositasPage from "@/app/polkalinas/cositas/page";
-import IntervenidoPage from "@/app/polkalinas/intervenido/page";
-import NuevoPage from "@/app/polkalinas/nuevo/page";
 import HomePage from "@/app/polkalinas/page";
-import SecondHandPage from "@/app/polkalinas/second-hand/page";
+import OtrosPage from "@/app/polkalinas/otros/page";
+import PeluchesPage from "@/app/polkalinas/peluches/page";
+import RopaPage from "@/app/polkalinas/ropa/page";
 import { EstadoVidrieraBadge } from "@/app/polkalinas/components/EstadoVidrieraBadge";
 import { ProductoCard } from "@/app/polkalinas/components/ProductoCard";
 import type { VidrieraFicha, VidrieraItem } from "@/app/actions/vidriera";
@@ -81,6 +81,7 @@ const CATALOGO: VidrieraItem[] = [
     portada: null,
     categoria: "Intervenido",
     categoriaId: 2,
+    grupo: "ropa",
     talles: ["M"],
     estilos: ["Vintage", "Coquette"],
   },
@@ -165,6 +166,28 @@ const PRODUCTOS: VidrieraItem[] = [
   },
   // Una prenda publicada: en Cositas no entra y tampoco aporta categorías.
   CATALOGO[0],
+];
+
+/** Los cuatro grupos del pedido: una prenda, un peluche, un accesorio y un producto suelto. */
+const GRUPOS_ITEMS: VidrieraItem[] = [
+  { ...CATALOGO[0], code: "RP-31", name: "Campera de jean" },
+  {
+    ...PRODUCTOS[0],
+    id: 32,
+    code: "AR-32",
+    name: "Peluche osito",
+    categoria: "PELUCHES",
+    categoriaId: 32,
+  },
+  {
+    ...PRODUCTOS[0],
+    id: 33,
+    code: "AR-33",
+    name: "Arito corazón",
+    categoria: "Accesorios",
+    categoriaId: 33,
+  },
+  { ...PRODUCTOS[2], id: 34, code: "AR-34", name: "Sticker suelto" },
 ];
 
 const FICHA: VidrieraFicha = {
@@ -332,31 +355,30 @@ describe("home /polkalinas", () => {
     );
   });
 
-  it("ofrece las cuatro categorías del mockup, cada una con su link al catálogo", async () => {
+  it("ofrece las cuatro categorías del pedido, cada una con su link a su ruta", async () => {
     render(await HomePage());
 
     // El nav de la tienda también lista categorías: las tarjetas están en el main.
     const main = within(screen.getByRole("main"));
     expect(main.getByRole("heading", { name: "Categorías" })).toBeInTheDocument();
 
-    expect(main.getByRole("link", { name: /second hand/i })).toHaveAttribute(
+    expect(main.getByRole("link", { name: /ropa/i })).toHaveAttribute("href", "/polkalinas/ropa");
+    expect(main.getByRole("link", { name: /peluches/i })).toHaveAttribute(
       "href",
-      "/polkalinas/catalogo?categoria=second-hand"
+      "/polkalinas/peluches"
     );
-    expect(main.getByRole("link", { name: /intervenido/i })).toHaveAttribute(
+    expect(main.getByRole("link", { name: /accesorios/i })).toHaveAttribute(
       "href",
-      "/polkalinas/catalogo?categoria=intervenido"
+      "/polkalinas/accesorios"
     );
-    expect(main.getByRole("link", { name: /cositas/i })).toHaveAttribute(
+    expect(main.getByRole("link", { name: /otros productos/i })).toHaveAttribute(
       "href",
-      "/polkalinas/cositas"
+      "/polkalinas/otros"
     );
-    expect(main.getByRole("link", { name: /nuevo/i })).toHaveAttribute(
-      "href",
-      "/polkalinas/catalogo?categoria=nuevo"
-    );
-    // La cuarta tarjeta del mockup (Accesorios) no existe en la tienda.
-    expect(main.queryByRole("link", { name: /accesorios/i })).not.toBeInTheDocument();
+    // Las categorías viejas del mockup ya no están.
+    for (const vieja of [/second hand/i, /intervenido/i, /cositas/i, /^nuevo$/i]) {
+      expect(main.queryByRole("link", { name: vieja })).toBeNull();
+    }
   });
 
   it("no repite claves entre hermanos: la frutilla de la marca dibuja cada lunar una vez", async () => {
@@ -411,10 +433,11 @@ describe("catálogo /polkalinas/catalogo", () => {
     expect(within(filtros).getByRole("group", { name: "Estilo" })).toBeInTheDocument();
     expect(within(filtros).getByRole("group", { name: "Precio" })).toBeInTheDocument();
     expect(within(filtros).getByRole("checkbox", { name: /ocultar vendidas/i })).not.toBeChecked();
-    // El conteo del mockup: cuántas piezas hay en cada categoría.
-    expect(
-      within(filtros).getByRole("checkbox", { name: /segunda|second hand/i })
-    ).toHaveAccessibleName(/1/);
+    // El conteo del mockup: cuántas piezas hay en cada grupo.
+    expect(within(filtros).getByRole("checkbox", { name: /^ropa/i })).toHaveAccessibleName(/3/);
+    expect(within(filtros).getByRole("checkbox", { name: /otros productos/i })).toHaveAccessibleName(
+      /1/
+    );
   });
 
   it("elige el orden con el select del mockup, al lado de la grilla", async () => {
@@ -431,39 +454,37 @@ describe("catálogo /polkalinas/catalogo", () => {
   it("busca por texto con ?q= y deja la búsqueda como filtro activo", async () => {
     render(await CatalogoPage({ searchParams: Promise.resolve({ q: "campera" }) }));
 
-    expect(getVidriera).toHaveBeenCalledWith({ categoriaId: undefined, q: "campera" });
+    expect(getVidriera).toHaveBeenCalledWith({ q: "campera" });
     const activos = screen.getByRole("group", { name: /filtros activos/i });
     expect(
       within(activos).getByRole("link", { name: /quitar filtro campera/i })
     ).toBeInTheDocument();
   });
 
-  it("filtra por el slug de la categoría, como los links del header", async () => {
-    render(
-      await CatalogoPage({ searchParams: Promise.resolve({ categoria: "second-hand" }) })
-    );
-
-    expect(screen.getByRole("link", { name: /Pollera vintage/ })).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: /Remera baby tee/ })).toBeNull();
-  });
-
-  it("«cositas» lista los productos normales, no las prendas", async () => {
-    render(await CatalogoPage({ searchParams: Promise.resolve({ categoria: "cositas" }) }));
+  it("filtra por el slug del grupo, como los links del header", async () => {
+    render(await CatalogoPage({ searchParams: Promise.resolve({ categoria: "otros" }) }));
 
     expect(screen.getByRole("link", { name: /Llavero frutilla/ })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /Pollera vintage/ })).toBeNull();
   });
 
+  it("«ropa» deja las prendas y saca los productos", async () => {
+    render(await CatalogoPage({ searchParams: Promise.resolve({ categoria: "ropa" }) }));
+
+    expect(screen.getByRole("link", { name: /Pollera vintage/ })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Llavero frutilla/ })).toBeNull();
+  });
+
   it("muestra los filtros activos con su X, y solo cuando hay alguno", async () => {
     const { unmount } = render(
       await CatalogoPage({
-        searchParams: Promise.resolve({ categoria: "second-hand", talle: "S" }),
+        searchParams: Promise.resolve({ categoria: "ropa", talle: "S" }),
       })
     );
 
     const activos = screen.getByRole("group", { name: /filtros activos/i });
     expect(
-      within(activos).getByRole("link", { name: /quitar filtro second hand/i })
+      within(activos).getByRole("link", { name: /quitar filtro ropa/i })
     ).toHaveAttribute("href", "/polkalinas/catalogo?talle=S");
     expect(
       within(activos).getByRole("link", { name: /quitar filtro talle s/i })
@@ -507,19 +528,19 @@ describe("catálogo /polkalinas/catalogo", () => {
   it("combina el estilo con la categoría sin perder ninguna de las dos", async () => {
     render(
       await CatalogoPage({
-        searchParams: Promise.resolve({ categoria: "cositas", estilo: "Vintage" }),
+        searchParams: Promise.resolve({ categoria: "otros", estilo: "Vintage" }),
       })
     );
 
-    // «Cositas» no tiene estilos: el filtro no rompe, solo deja la grilla vacía.
+    // «Otros productos» no tiene estilos: el filtro no rompe, solo deja la grilla vacía.
     expect(screen.getByText(/no hay prendas con esos filtros/i)).toBeInTheDocument();
     const activos = screen.getByRole("group", { name: /filtros activos/i });
     expect(
-      within(activos).getByRole("link", { name: /quitar filtro cositas/i })
+      within(activos).getByRole("link", { name: /quitar filtro otros productos/i })
     ).toBeInTheDocument();
     expect(
       within(activos).getByRole("link", { name: /quitar filtro vintage/i })
-    ).toHaveAttribute("href", "/polkalinas/catalogo?categoria=cositas");
+    ).toHaveAttribute("href", "/polkalinas/catalogo?categoria=otros");
   });
 
   it("sin estilos cargados no muestra el filtro «Estilo»", async () => {
@@ -587,218 +608,152 @@ describe("catálogo /polkalinas/catalogo", () => {
   });
 });
 
-describe("categorías del aside según lo que muestra la vista", () => {
+describe("el filtro «Categoría» ofrece los cuatro grupos", () => {
   const grupoCategoria = () =>
     within(screen.getByRole("complementary", { name: /filtros/i })).getByRole("group", {
       name: "Categoría",
     });
 
-  it("en el catálogo general sigue ofreciendo las categorías de prenda", async () => {
+  const conGrupos = () =>
     getVidriera.mockResolvedValue({
       success: true,
-      data: { items: CATALOGO, categorias: CATEGORIAS },
+      data: { items: GRUPOS_ITEMS, categorias: CATEGORIAS },
     });
+
+  it("en el catálogo general salen los cuatro grupos con su conteo", async () => {
+    conGrupos();
 
     render(await CatalogoPage({ searchParams: Promise.resolve({}) }));
 
     const categoria = grupoCategoria();
-    expect(within(categoria).getByRole("checkbox", { name: /intervenido/i })).toHaveAccessibleName(
+    expect(within(categoria).getByRole("checkbox", { name: /^ropa/i })).toHaveAccessibleName(/1/);
+    expect(within(categoria).getByRole("checkbox", { name: /peluches/i })).toHaveAccessibleName(
+      /1/
+    );
+    expect(within(categoria).getByRole("checkbox", { name: /accesorios/i })).toHaveAccessibleName(
       /1/
     );
     expect(
-      within(categoria).getByRole("checkbox", { name: /segunda|second hand/i })
+      within(categoria).getByRole("checkbox", { name: /otros productos/i })
     ).toHaveAccessibleName(/1/);
-    expect(within(categoria).getByRole("checkbox", { name: /nuevo/i })).toHaveAccessibleName(/1/);
-  });
-
-  it("en Cositas ofrece las categorías de producto, no las de prenda", async () => {
-    getVidriera.mockResolvedValue({
-      success: true,
-      data: { items: PRODUCTOS, categorias: CATEGORIAS },
-    });
-
-    render(await CositasPage({ searchParams: Promise.resolve({}) }));
-
-    const categoria = grupoCategoria();
-    expect(within(categoria).getByRole("checkbox", { name: /aritos/i })).toHaveAccessibleName(/1/);
-    expect(within(categoria).getByRole("checkbox", { name: /perfumes/i })).toHaveAccessibleName(
-      /1/
-    );
+    // Las taxonomías de prenda y de producto ya no son opciones del filtro.
     expect(within(categoria).queryByRole("checkbox", { name: /intervenido/i })).toBeNull();
-    // Aritos, Perfumes y el agregado «Cositas»: el producto sin categoría no
-    // agrega una opción vacía.
-    expect(within(categoria).getAllByRole("checkbox")).toHaveLength(3);
-  });
-
-  it("en Cositas elegir una categoría filtra la grilla y deja el chip", async () => {
-    getVidriera.mockResolvedValue({
-      success: true,
-      data: { items: PRODUCTOS, categorias: CATEGORIAS },
-    });
-
-    render(await CositasPage({ searchParams: Promise.resolve({ categoria: "Perfumes" }) }));
-
-    expect(screen.getByRole("link", { name: /Perfume floral/ })).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: /Arito corazón/ })).toBeNull();
-    expect(screen.queryByRole("link", { name: /Sticker suelto/ })).toBeNull();
-
-    const activos = screen.getByRole("group", { name: /filtros activos/i });
-    expect(
-      within(activos).getByRole("link", { name: /quitar filtro perfumes/i })
-    ).toHaveAttribute("href", "/polkalinas/cositas");
-  });
-
-  it("un producto sin categoría se muestra y no rompe el aside", async () => {
-    getVidriera.mockResolvedValue({
-      success: true,
-      data: { items: PRODUCTOS, categorias: CATEGORIAS },
-    });
-
-    render(await CositasPage({ searchParams: Promise.resolve({}) }));
-
-    expect(screen.getByRole("link", { name: /Sticker suelto/ })).toBeInTheDocument();
-    expect(grupoCategoria()).toBeInTheDocument();
-  });
-
-  it("una categoría que no es de las cuatro del header también filtra, por nombre", async () => {
-    getVidriera.mockResolvedValue({
-      success: true,
-      data: { items: ITEMS, categorias: [{ id: 7, name: "Camperas" }] },
-    });
-
-    render(await CatalogoPage({ searchParams: Promise.resolve({ categoria: "Polleras" }) }));
-
-    expect(screen.getByRole("link", { name: /Pollera escocesa/ })).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: /Campera de jean/ })).toBeNull();
-    expect(
-      within(screen.getByRole("group", { name: /filtros activos/i })).getByRole("link", {
-        name: /quitar filtro polleras/i,
-      })
-    ).toBeInTheDocument();
-  });
-
-  it("cuando la vista mezcla prendas y productos, el aside ofrece solo las de prenda", async () => {
-    getVidriera.mockResolvedValue({
-      success: true,
-      data: { items: [...CATALOGO, PRODUCTOS[0]], categorias: CATEGORIAS },
-    });
-
-    render(await CatalogoPage({ searchParams: Promise.resolve({}) }));
-
-    const categoria = grupoCategoria();
-    // La card del producto muestra su categoría, pero no crea opción de filtro.
-    expect(screen.getByRole("link", { name: /Arito corazón/ })).toBeInTheDocument();
-    expect(within(categoria).getByRole("checkbox", { name: /intervenido/i })).toBeInTheDocument();
     expect(within(categoria).queryByRole("checkbox", { name: /aritos/i })).toBeNull();
+    expect(within(categoria).getAllByRole("checkbox")).toHaveLength(4);
   });
 
   it.each([
-    ["Nuevo", NuevoPage],
-    ["Second hand", SecondHandPage],
-    ["Intervenido", IntervenidoPage],
-  ] as const)(
-    "en la ruta %s el conteo de la categoría suma solo prendas",
-    async (nombre, Pagina) => {
-      // Un producto cuya `Category` se llama igual que la categoría de la ruta.
-      const producto = { ...PRODUCTOS[0], id: 40, categoria: nombre };
-      getVidriera.mockResolvedValue({
-        success: true,
-        data: { items: [...CATALOGO, producto], categorias: CATEGORIAS },
-      });
+    ["ropa", /Campera de jean/, /Peluche osito/],
+    ["peluches", /Peluche osito/, /Campera de jean/],
+    ["accesorios", /Arito corazón/, /Sticker suelto/],
+    ["otros", /Sticker suelto/, /Arito corazón/],
+  ])("?categoria=%s deja solo los ítems de ese grupo", async (grupo, presente, ausente) => {
+    conGrupos();
 
-      render(await Pagina({ searchParams: Promise.resolve({}) }));
+    render(await CatalogoPage({ searchParams: Promise.resolve({ categoria: grupo }) }));
 
-      expect(within(grupoCategoria()).getByRole("checkbox", { name: `${nombre} 1` })).toBeInTheDocument();
-    }
-  );
+    expect(screen.getByRole("link", { name: presente })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: ausente })).toBeNull();
+  });
 
-  it("en Cositas no ofrece el filtro «Talle», que sí está en las rutas de prendas", async () => {
+  it("una prenda con categoría «Peluches» sigue siendo Ropa", async () => {
+    const prenda: VidrieraItem = {
+      ...CATALOGO[0],
+      id: 50,
+      code: "RP-50",
+      name: "Campera osito",
+      categoria: "Peluches",
+    };
     getVidriera.mockResolvedValue({
       success: true,
-      data: { items: PRODUCTOS, categorias: CATEGORIAS },
+      data: { items: [prenda, ...GRUPOS_ITEMS], categorias: CATEGORIAS },
     });
 
-    const { unmount } = render(await CositasPage({ searchParams: Promise.resolve({}) }));
+    const { unmount } = render(await PeluchesPage({ searchParams: Promise.resolve({}) }));
+    expect(screen.queryByRole("link", { name: /Campera osito/ })).toBeNull();
+
+    unmount();
+    render(await RopaPage({ searchParams: Promise.resolve({}) }));
+    expect(screen.getByRole("link", { name: /Campera osito/ })).toBeInTheDocument();
+  });
+
+  it("en la ruta Peluches el conteo del aside suma solo los peluches", async () => {
+    conGrupos();
+
+    render(await PeluchesPage({ searchParams: Promise.resolve({}) }));
+
+    expect(within(grupoCategoria()).getByRole("checkbox", { name: "Peluches 1" })).toBeDisabled();
+    expect(within(grupoCategoria()).getByRole("checkbox", { name: "Ropa 0" })).toBeInTheDocument();
+  });
+
+  it.each([
+    ["Peluches", PeluchesPage],
+    ["Accesorios", AccesoriosPage],
+    ["Otros productos", OtrosPage],
+  ] as const)("en %s no aparece el filtro «Talle»", async (_nombre, Pagina) => {
+    conGrupos();
+
+    render(await Pagina({ searchParams: Promise.resolve({}) }));
+
     const filtros = screen.getByRole("complementary", { name: /filtros/i });
     expect(within(filtros).queryByRole("group", { name: "Talle" })).toBeNull();
-    // El resto de los filtros de Cositas se mantiene.
+    // El resto de los filtros se mantiene en todas las rutas.
     expect(within(filtros).getByRole("group", { name: "Categoría" })).toBeInTheDocument();
     expect(within(filtros).getByRole("group", { name: "Precio" })).toBeInTheDocument();
     expect(within(filtros).getByRole("group", { name: "Disponibilidad" })).toBeInTheDocument();
+  });
 
-    unmount();
-    render(await NuevoPage({ searchParams: Promise.resolve({}) }));
+  it.each([
+    ["Ropa", RopaPage],
+    ["el catálogo completo", CatalogoPage],
+  ] as const)("en %s sí está el filtro «Talle»", async (_nombre, Pagina) => {
+    conGrupos();
+
+    render(await Pagina({ searchParams: Promise.resolve({}) }));
+
     expect(
       within(screen.getByRole("complementary", { name: /filtros/i })).getByRole("group", {
         name: "Talle",
       })
     ).toBeInTheDocument();
   });
-
-  it("en Cositas una prenda con la misma categoría no suma a la opción de producto", async () => {
-    const prenda: VidrieraItem = { ...CATALOGO[0], id: 41, categoria: "Aritos" };
-    getVidriera.mockResolvedValue({
-      success: true,
-      data: { items: [PRODUCTOS[0], prenda], categorias: CATEGORIAS },
-    });
-
-    render(await CositasPage({ searchParams: Promise.resolve({}) }));
-
-    const categoria = grupoCategoria();
-    expect(within(categoria).getByRole("checkbox", { name: "Aritos 1" })).toBeInTheDocument();
-    expect(within(categoria).queryByRole("checkbox", { name: /intervenido/i })).toBeNull();
-  });
-
-  it("la categoría de producto también filtra en el catálogo general", async () => {
-    getVidriera.mockResolvedValue({
-      success: true,
-      data: { items: [...CATALOGO, PRODUCTOS[0]], categorias: CATEGORIAS },
-    });
-
-    render(await CatalogoPage({ searchParams: Promise.resolve({ categoria: "Aritos" }) }));
-
-    expect(screen.getByRole("link", { name: /Arito corazón/ })).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: /Campera intervenida/ })).toBeNull();
-    expect(
-      within(screen.getByRole("group", { name: /filtros activos/i })).getByRole("link", {
-        name: /quitar filtro aritos/i,
-      })
-    ).toBeInTheDocument();
-  });
 });
 
-describe("rutas filtradas del catálogo", () => {
+describe("rutas de grupo del catálogo", () => {
   beforeEach(() => {
     getVidriera.mockResolvedValue({
       success: true,
-      data: { items: CATALOGO, categorias: CATEGORIAS },
+      data: { items: GRUPOS_ITEMS, categorias: CATEGORIAS },
     });
   });
 
   it.each([
-    ["Nuevo", NuevoPage, /Remera baby tee/, /Pollera vintage/],
-    ["Second hand", SecondHandPage, /Pollera vintage/, /Remera baby tee/],
-    ["Intervenido", IntervenidoPage, /Campera intervenida/, /Remera baby tee/],
-    ["Cositas", CositasPage, /Llavero frutilla/, /Campera intervenida/],
-  ])("la ruta %s muestra su título y el catálogo ya filtrado", async (titulo, Pagina, presente, ausente) => {
-    render(await Pagina({ searchParams: Promise.resolve({}) }));
+    ["Ropa", RopaPage, /Campera de jean/, /Llavero frutilla/],
+    ["Peluches", PeluchesPage, /Peluche osito/, /Campera de jean/],
+    ["Accesorios", AccesoriosPage, /Arito corazón/, /Peluche osito/],
+    ["Otros productos", OtrosPage, /Sticker suelto/, /Arito corazón/],
+  ])(
+    "la ruta %s muestra su título y el catálogo ya filtrado",
+    async (titulo, Pagina, presente, ausente) => {
+      render(await Pagina({ searchParams: Promise.resolve({}) }));
 
-    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(titulo);
-    expect(screen.getByRole("link", { name: presente })).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: ausente })).toBeNull();
-    expect(screen.getByRole("complementary", { name: /filtros/i })).toBeInTheDocument();
-  });
+      expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(titulo);
+      expect(screen.getByRole("link", { name: presente })).toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: ausente })).toBeNull();
+      expect(screen.getByRole("complementary", { name: /filtros/i })).toBeInTheDocument();
+    }
+  );
 
-  it("el filtro «Estilo» convive con la categoría fija de la ruta", async () => {
+  it("el filtro «Estilo» convive con el grupo fijo de la ruta", async () => {
     const { unmount } = render(
-      await NuevoPage({ searchParams: Promise.resolve({ estilo: "Y2K" }) })
+      await RopaPage({ searchParams: Promise.resolve({ estilo: "Vintage" }) })
     );
-    expect(screen.getByRole("link", { name: /Remera baby tee/ })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Campera de jean/ })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Sticker suelto/ })).toBeNull();
 
     unmount();
-    render(await NuevoPage({ searchParams: Promise.resolve({ estilo: "Coquette" }) }));
-    expect(screen.queryByRole("link", { name: /Remera baby tee/ })).toBeNull();
-    expect(screen.queryByRole("link", { name: /Campera intervenida/ })).toBeNull();
+    render(await RopaPage({ searchParams: Promise.resolve({ estilo: "Y2K" }) }));
+    expect(screen.queryByRole("link", { name: /Campera de jean/ })).toBeNull();
   });
 });
 
@@ -835,9 +790,9 @@ describe("ficha /polkalinas/[id]", () => {
       "href",
       "/polkalinas"
     );
-    expect(within(migas).getByRole("link", { name: "Intervenido" })).toHaveAttribute(
+    expect(within(migas).getByRole("link", { name: "Ropa" })).toHaveAttribute(
       "href",
-      "/polkalinas/catalogo?categoria=2"
+      "/polkalinas/ropa"
     );
 
     const h1 = screen.getByRole("heading", { level: 1 });
