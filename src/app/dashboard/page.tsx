@@ -109,8 +109,11 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-surface-strong pb-24">
-      <PageHeader
+    <div className="min-h-screen bg-surface pb-24">
+      {/* Banda de marca y hoja glass: el mismo encabezado que el resto del sistema. */}
+      <div className="relative isolate pb-16">
+        <div className="brand-gradient pointer-events-none absolute inset-0" aria-hidden="true" />
+        <PageHeader
         title="Hola ♡"
         right={
           <div className="flex items-center gap-2">
@@ -123,9 +126,10 @@ export default function DashboardPage() {
             </Link>
           </div>
         }
-      />
+        />
+      </div>
 
-      <main className="flex flex-col gap-3 px-4 pt-4 md:gap-5 md:px-8 md:pt-6">
+      <main className="glass -mt-12 flex flex-col gap-3 rounded-t-[2.5rem] px-4 pt-6 pb-8 md:gap-5 md:px-8 md:pt-8">
         <p className="-mt-1 text-sm text-ink-muted">Así viene el negocio en este período</p>
 
         <ResumenPanel data={resumen} />
