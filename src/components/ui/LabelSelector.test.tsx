@@ -195,6 +195,9 @@ describe("LabelSelector — paso 2: productos y cantidades", () => {
     fireEvent.click(screen.getByRole("checkbox", { name: "Seleccionar Shampoo Solido" }));
 
     fireEvent.click(screen.getByRole("button", { name: /descargar pdf/i }));
+    // Todo producto normal pasa por el paso de peluches antes de imprimir.
+    await screen.findByText(/¿lleva peluches\?/i);
+    fireEvent.click(screen.getByRole("button", { name: /descargar pdf/i }));
 
     await waitFor(() => {
       expect(mockGenerateProductLabels).toHaveBeenCalledWith({
@@ -249,12 +252,16 @@ describe("LabelSelector — paso 2: productos y cantidades", () => {
     await irAlPaso2();
     fireEvent.click(screen.getByRole("checkbox", { name: "Todos" }));
     fireEvent.click(screen.getByRole("button", { name: /descargar pdf/i }));
+    await screen.findByText(/¿lleva peluches\?/i);
+    fireEvent.click(screen.getByRole("button", { name: /descargar pdf/i }));
 
     expect(
       await screen.findByText(/hay productos inactivos o sin stock/i)
     ).toBeInTheDocument();
-    expect(screen.getByRole("checkbox", { name: "Todos" })).toBeChecked();
     expect(descarga).toBeNull();
+    // Volver al paso 2 no pierde la selección.
+    fireEvent.click(screen.getByRole("button", { name: "Volver" }));
+    expect(screen.getByRole("checkbox", { name: "Todos" })).toBeChecked();
   });
 });
 
@@ -315,16 +322,17 @@ describe("LabelSelector — pasos extra cuando hay prendas", () => {
     await waitFor(() => expect(descarga).toBe("etiquetas-PR001-20260101.pdf"));
   });
 
-  it("sin peluches marcados el PDF va solo con el tamaño de la prenda", async () => {
+  it("solo prendas: el tamaño va derecho al PDF, sin paso de peluches", async () => {
     await irAlPaso2ConPrenda();
 
     fireEvent.click(screen.getByRole("checkbox", { name: "Seleccionar Body Rosa" }));
     fireEvent.click(screen.getByRole("button", { name: /descargar pdf/i }));
     await screen.findByText(/tamaño de la etiqueta de prenda/i);
+    // Sin productos normales no hay nada que marcar como peluche.
+    expect(screen.getByText(/paso 3 de 3/i)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /grande 50 × 80 mm/i }));
     fireEvent.click(screen.getByRole("button", { name: /^siguiente$/i }));
-    fireEvent.click(await screen.findByRole("button", { name: /descargar pdf/i }));
 
     await waitFor(() => {
       expect(mockGenerateProductLabels).toHaveBeenCalledWith({
@@ -333,6 +341,7 @@ describe("LabelSelector — pasos extra cuando hay prendas", () => {
         prendaTamano: "grande",
       });
     });
+    expect(screen.queryByText(/¿lleva peluches\?/i)).toBeNull();
   });
 
   it("cancelar el paso del tamaño cancela la impresión, sin error y sin generar", async () => {
@@ -349,6 +358,46 @@ describe("LabelSelector — pasos extra cuando hay prendas", () => {
     expect(screen.queryByRole("alert")).toBeNull();
     // Vuelve al paso 1, lista para empezar de nuevo.
     expect(screen.getByText(/paso 1 de 2/i)).toBeInTheDocument();
+  });
+
+  it("una selección de solo peluches muestra el paso y los marca", async () => {
+    await irAlPaso2();
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Seleccionar Jabón de Avena" }));
+    fireEvent.click(screen.getByRole("button", { name: /descargar pdf/i }));
+
+    await waitFor(() => {
+      expect(mockDetectPrendaProducts).toHaveBeenCalledWith({ productIds: [11] });
+    });
+    // Sin prendas el paso de peluches es el último y no hay paso de tamaño.
+    expect(await screen.findByText(/¿lleva peluches\?/i)).toBeInTheDocument();
+    expect(screen.getByText(/paso 3 de 3/i)).toBeInTheDocument();
+    expect(screen.queryByText(/tamaño de la etiqueta de prenda/i)).toBeNull();
+    expect(mockGenerateProductLabels).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("checkbox", { name: /jabón de avena.*peluche/i }));
+    fireEvent.click(screen.getByRole("button", { name: /descargar pdf/i }));
+
+    await waitFor(() => {
+      expect(mockGenerateProductLabels).toHaveBeenCalledWith({
+        branchId: 1,
+        selections: [{ productId: 11, quantity: 5 }],
+        pelucheIds: [11],
+      });
+    });
+    await waitFor(() => expect(descarga).toBe("etiquetas-PR001-20260101.pdf"));
+  });
+
+  it("una selección vacía no abre ningún paso extra", async () => {
+    await irAlPaso2();
+
+    expect(screen.getByText(/paso 2 de 2/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /descargar pdf/i })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: /descargar pdf/i }));
+
+    expect(mockDetectPrendaProducts).not.toHaveBeenCalled();
+    expect(screen.queryByText(/¿lleva peluches\?/i)).toBeNull();
+    expect(screen.queryByText(/tamaño de la etiqueta de prenda/i)).toBeNull();
   });
 
   it("si la detección falla lo avisa y no imprime", async () => {

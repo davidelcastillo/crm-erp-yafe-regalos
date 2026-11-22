@@ -10,7 +10,12 @@ import { PDFArray, PDFDocument, PDFStream } from 'pdf-lib';
 import zlib from 'zlib';
 import { requireAdmin } from '@/lib/auth-guard';
 import { readPdfContent } from '@/lib/fonts/pdf-test-reader';
-import { detectPrendaProducts, generatePrendaLabels, generateProductLabels } from './label-print';
+import {
+  detectPrendaProducts,
+  generateEntryReceiptWithLabels,
+  generatePrendaLabels,
+  generateProductLabels,
+} from './label-print';
 import { prisma } from '@/lib/prisma';
 
 jest.mock('@/lib/prisma', () => ({
@@ -465,5 +470,62 @@ describe('generatePrendaLabels — validación en el servidor', () => {
     });
 
     expect(result).toEqual({ success: false, error: 'Prenda no encontrada' });
+  });
+});
+
+// El comprobante con etiquetas no es solo del ingreso: el egreso y el traslado
+// (lado que recibe) llevan las mismas etiquetas de lo que se movió.
+describe('generateEntryReceiptWithLabels — egreso y traslado también llevan etiquetas', () => {
+  const comprobante = {
+    branchId: 3,
+    date: '2026-08-06T18:30:00.000Z',
+    branchName: 'Centro',
+    branchCode: 'CEN',
+    reference: 'Rotura',
+    rows: [
+      { productId: 1, code: 'AAA001', name: 'Jabón de Avena', quantity: 2, stock: 4, price: 1250 },
+    ],
+  };
+
+  beforeEach(() => {
+    mockBranchFindUnique.mockResolvedValue({ code: 'CEN' });
+    mockCatalogo([jabon]);
+  });
+
+  test('acepta un egreso y arma su comprobante con etiquetas', async () => {
+    const result = await generateEntryReceiptWithLabels({
+      ...comprobante,
+      movementType: 'EXIT',
+    });
+
+    if (!result.success) throw new Error(result.error);
+    expect(result.data.filename).toBe('comprobante-egreso-CEN-20260806-etiquetas.pdf');
+    expect(count(winAnsiText(result.data.pdfBase64), 'AAA001')).toBe(2);
+  });
+
+  test('acepta un traslado y arma el comprobante del lado que recibe', async () => {
+    const result = await generateEntryReceiptWithLabels({
+      ...comprobante,
+      movementType: 'TRANSFER',
+      sourceBranchName: 'Depósito',
+      sourceBranchCode: 'DEP',
+    });
+
+    if (!result.success) throw new Error(result.error);
+    expect(result.data.filename).toBe('comprobante-traslado-destino-CEN-20260806-etiquetas.pdf');
+    expect(count(winAnsiText(result.data.pdfBase64), 'AAA001')).toBe(2);
+  });
+
+  test('sin sesión admin no consulta Prisma', async () => {
+    mockRequireAdmin.mockResolvedValueOnce({ ok: false, error: 'No autorizado' });
+
+    const resultado = await generateEntryReceiptWithLabels({
+      ...comprobante,
+      movementType: 'EXIT',
+    });
+
+    expect(resultado).toEqual({ success: false, error: 'No autorizado' });
+    expect(mockBranchFindUnique).not.toHaveBeenCalled();
+    expect(mockProductFindMany).not.toHaveBeenCalled();
   });
 });

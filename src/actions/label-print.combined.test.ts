@@ -114,18 +114,16 @@ describe('generateEntryReceiptWithLabels — comprobante + etiquetas (S2)', () =
     expect(result.data.filename).toBe('comprobante-ingreso-CEN-20260806-etiquetas.pdf');
   });
 
-  test('rechaza un comprobante que no es un ingreso (S3)', async () => {
+  test('acepta un egreso: el comprobante combinado ya no es exclusivo del ingreso', async () => {
     const result = await generateEntryReceiptWithLabels({
       ...receipt,
       movementType: 'EXIT',
     });
 
-    expect(result).toEqual({
-      success: false,
-      error: 'Solo el comprobante de un ingreso lleva etiquetas',
-    });
-    expect(mockBranchFindUnique).not.toHaveBeenCalled();
-    expect(mockProductFindMany).not.toHaveBeenCalled();
+    // El dueño pidió etiquetas también en egreso y traslado: el comprobante se
+    // arma igual y se consulta la sucursal del movimiento.
+    expect(result.success).toBe(true);
+    expect(mockBranchFindUnique).toHaveBeenCalled();
   });
 
   test('rechaza un comprobante sin sucursal y no consulta Prisma', async () => {

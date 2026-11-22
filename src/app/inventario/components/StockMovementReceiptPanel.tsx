@@ -24,6 +24,10 @@ export function StockMovementReceiptPanel({
   const label = { ENTRY: "Ingreso", EXIT: "Egreso", TRANSFER: "Movimiento de sucursal" }[receipt.movementType];
   const isTransfer = receipt.movementType === "TRANSFER";
   const isEntry = receipt.movementType === "ENTRY";
+  // El traslado lleva etiquetas del lado que recibe: es el que ingresa mercadería.
+  const labelsButtonLabel = isTransfer
+    ? "Comprobante de la sucursal que recibe + etiquetas"
+    : "Comprobante + etiquetas";
   const downloadError = "El movimiento ya se registró, pero no se pudo generar el PDF. Reintentá la descarga sin repetir la operación.";
 
   /** Único lugar que crea el Blob y el enlace de descarga. */
@@ -56,7 +60,7 @@ export function StockMovementReceiptPanel({
     }
   };
 
-  /** S2: el comprobante y las etiquetas de lo ingresado salen en un solo PDF. */
+  /** S2: el comprobante y las etiquetas de lo movido salen en un solo PDF. */
   const runWithLabels = async (extra: {
     prendaTamano?: PrendaTamano;
     pelucheIds?: number[];
@@ -81,8 +85,8 @@ export function StockMovementReceiptPanel({
   };
 
   /**
-   * Antes de imprimir pregunta lo mismo que el wizard de etiquetas: si lo
-   * ingresado trae prendas, el tamaño de su etiqueta y cuáles son peluches. Sin
+   * Antes de imprimir pregunta lo mismo que el wizard de etiquetas: si el
+   * movimiento trae prendas, el tamaño de su etiqueta y cuáles son peluches. Sin
    * prendas va derecho al PDF combinado, como siempre.
    */
   const requestLabels = async () => {
@@ -147,9 +151,8 @@ export function StockMovementReceiptPanel({
           {isTransfer ? `${receipt.sourceBranchName} → ${receipt.branchName}` : receipt.branchName}
         </p>
         <p className="mt-2 text-sm text-ink-muted">
-          El stock ya se actualizó. Podés descargar el comprobante
-          {isEntry ? ", con o sin las etiquetas de lo ingresado, " : " "}antes de cerrar.
-          Descargarlo no vuelve a registrar el movimiento.
+          El stock ya se actualizó. Podés descargar el comprobante, con o sin etiquetas,
+          antes de cerrar. Descargarlo no vuelve a registrar el movimiento.
         </p>
         {error && <p role="alert" className="mt-4 text-sm text-error">{error}</p>}
 
@@ -158,7 +161,7 @@ export function StockMovementReceiptPanel({
           <div className="mt-6">
             <h3 className="text-base font-semibold text-ink">Tamaño de la etiqueta de prenda</h3>
             <p className="mt-1 mb-3 text-sm text-ink-muted">
-              Las prendas de lo ingresado salen con la etiqueta de ropa, una por talle y por
+              Las prendas del movimiento salen con la etiqueta de ropa, una por talle y por
               cantidad.
             </p>
             <div role="group" aria-label="Tamaño de la etiqueta de prenda" className="space-y-2">
@@ -212,9 +215,15 @@ export function StockMovementReceiptPanel({
           </div>
         )}
 
-        <div className={`mt-6 flex flex-col gap-3 md:flex-row md:justify-center md:flex-wrap ${showExtras ? "hidden" : ""}`}>          {isTransfer && (
+        <div className={`mt-6 flex flex-col gap-3 md:flex-row md:justify-center md:flex-wrap ${showExtras ? "hidden" : ""}`}>
+          {/* S16: con etiquetas disponibles el combinado es el principal y va primero. */}
+          <button type="button" className="btn btn-primary min-h-12" autoFocus
+            onClick={requestLabels} disabled={generating}>
+            {generating ? "Generando PDF…" : labelsButtonLabel}
+          </button>
+          {isTransfer && (
             <>
-              <button type="button" className="btn btn-primary min-h-12" autoFocus
+              <button type="button" className="btn btn-secondary min-h-12"
                 onClick={() => download("DESTINATION")} disabled={generating}>
                 {generating ? "Generando PDF…" : "Comprobante de la sucursal que recibe"}
               </button>
@@ -225,20 +234,10 @@ export function StockMovementReceiptPanel({
             </>
           )}
           {!isTransfer && (
-            <>
-              {/* S16: con etiquetas disponibles (ENTRY) el combinado es el principal y va primero;
-                  sin ellas (EXIT) el principal sigue siendo el comprobante suelto. */}
-              {isEntry && (
-                <button type="button" className="btn btn-primary min-h-12" autoFocus
-                  onClick={requestLabels} disabled={generating}>
-                  {generating ? "Generando PDF…" : "Comprobante + etiquetas"}
-                </button>
-              )}
-              <button type="button" className={`btn ${isEntry ? "btn-secondary" : "btn-primary"} min-h-12`}
-                autoFocus={!isEntry} onClick={() => download("DESTINATION")} disabled={generating}>
-                {generating ? "Generando PDF…" : "Descargar comprobante"}
-              </button>
-            </>
+            <button type="button" className="btn btn-secondary min-h-12"
+              onClick={() => download("DESTINATION")} disabled={generating}>
+              {generating ? "Generando PDF…" : "Descargar comprobante"}
+            </button>
           )}
           <button type="button" className="btn btn-secondary min-h-12" onClick={onClose} disabled={generating}>
             Cerrar comprobante

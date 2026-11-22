@@ -35,10 +35,11 @@ export interface LabelSelectorProps {
  *      lo escrito a mano manda sobre el stock. El resumen muestra en vivo
  *      cuántas etiquetas y hojas A4 salen.
  *   3. **Solo si la selección trae prendas**: el tamaño de la etiqueta de ropa.
- *   4. **Solo si hay prendas**: si lleva peluches y cuáles, para la etiqueta chica.
+ *   4. **Solo si hay al menos un producto normal** (haya o no prendas): si lleva
+ *      peluches y cuáles, para la etiqueta chica.
  *
- * Con puros productos normales el wizard sigue teniendo dos pasos: la detección
- * de prendas ocurre al pedir el PDF y no agrega preguntas.
+ * Con puros productos normales el wizard suma el paso de los peluches y nada más:
+ * el resto imprime su etiqueta de producto sin preguntas.
  */
 export function LabelSelector({ isOpen, onClose, branches }: LabelSelectorProps) {
   const [step, setStep] = useState<Step>(1);
@@ -161,7 +162,11 @@ export function LabelSelector({ isOpen, onClose, branches }: LabelSelectorProps)
   const seleccionados = rows.filter((row) => selectedIds.includes(row.id));
   // Las prendas ya se imprimen con su propia etiqueta: no se ofrecen como peluche.
   const pelucheCandidatos = seleccionados.filter((row) => !prendaIds.includes(row.id));
-  const totalSteps = prendaIds.length > 0 ? 4 : 2;
+  // El paso de peluches es de los productos normales: con o sin prendas, si hay
+  // al menos uno, se ofrece marcar. El de tamaño sigue siendo solo de la ropa.
+  const pasoPeluches = pelucheCandidatos.length > 0;
+  const pelucheStep: Step = prendaIds.length > 0 ? 4 : 3;
+  const totalSteps = 2 + (prendaIds.length > 0 ? 1 : 0) + (pasoPeluches ? 1 : 0);
 
   const downloadPdf = (pdfBase64: string, filename: string) => {
     const byteCharacters = atob(pdfBase64);
@@ -208,8 +213,9 @@ export function LabelSelector({ isOpen, onClose, branches }: LabelSelectorProps)
   };
 
   /**
-   * Detecta si la selección trae prendas: si trae, suma los pasos del tamaño y
-   * de los peluches antes de imprimir; si no, imprime como siempre.
+   * Detecta si la selección trae prendas: si trae, suma el paso del tamaño antes
+   * del de peluches. El paso de peluches se pregunta siempre que haya al menos un
+   * producto normal, haya o no prendas.
    */
   const handleGenerate = async () => {
     if (branchId === null || totalLabels === 0 || generating) return;
@@ -223,10 +229,6 @@ export function LabelSelector({ isOpen, onClose, branches }: LabelSelectorProps)
 
     if (!deteccion.success) {
       setGenerateError(deteccion.error);
-      return;
-    }
-    if (deteccion.data.prendaIds.length === 0) {
-      await generarPdf();
       return;
     }
 
@@ -426,7 +428,7 @@ export function LabelSelector({ isOpen, onClose, branches }: LabelSelectorProps)
         )}
 
         {/* Paso extra: la ropa se imprime con la etiqueta de prenda, en su medida. */}
-        {step === 3 && (
+        {step === 3 && prendaIds.length > 0 && (
           <div>
             <h3 className="text-base font-semibold text-ink mb-2">
               Tamaño de la etiqueta de prenda
@@ -464,8 +466,12 @@ export function LabelSelector({ isOpen, onClose, branches }: LabelSelectorProps)
               </button>
               <button
                 type="button"
-                onClick={() => setStep(4)}
-                disabled={prendaTamano === null}
+                onClick={() =>
+                  pasoPeluches
+                    ? setStep(4)
+                    : void generarPdf({ prendaTamano: prendaTamano ?? undefined })
+                }
+                disabled={prendaTamano === null || generating}
                 className="btn btn-primary flex-1 md:flex-none"
               >
                 Siguiente
@@ -475,7 +481,7 @@ export function LabelSelector({ isOpen, onClose, branches }: LabelSelectorProps)
         )}
 
         {/* Paso extra: los peluches marcados salen con la etiqueta chica. */}
-        {step === 4 && (
+        {step === pelucheStep && pasoPeluches && (
           <div>
             <h3 className="text-base font-semibold text-ink mb-2">¿Lleva peluches?</h3>
             <p className="mb-3 text-sm text-ink-muted">
@@ -523,7 +529,7 @@ export function LabelSelector({ isOpen, onClose, branches }: LabelSelectorProps)
             <div className="mt-6 flex items-center justify-between gap-3">
               <button
                 type="button"
-                onClick={() => setStep(3)}
+                onClick={() => setStep(prendaIds.length > 0 ? 3 : 2)}
                 disabled={generating}
                 className="btn btn-secondary"
               >

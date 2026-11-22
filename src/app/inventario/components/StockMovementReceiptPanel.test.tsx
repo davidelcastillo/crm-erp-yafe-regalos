@@ -61,9 +61,10 @@ it('descarga solo al pedirlo y permite cerrar sin acciones de stock', async () =
   expect(onClose).toHaveBeenCalledTimes(1);
 });
 
-it('sin etiquetas disponibles, el botón principal sigue siendo descargar el comprobante', () => {
+it('con etiquetas disponibles el comprobante combinado es la acción principal', () => {
   render(<StockMovementReceiptPanel receipt={receipt} onClose={jest.fn()} />);
-  expect(screen.getByRole('button', { name: 'Descargar comprobante' })).toHaveClass('btn-primary');
+  expect(screen.getByRole('button', { name: 'Comprobante + etiquetas' })).toHaveClass('btn-primary');
+  expect(screen.getByRole('button', { name: 'Descargar comprobante' })).toHaveClass('btn-secondary');
   expect(screen.getByRole('button', { name: 'Cerrar comprobante' })).toHaveClass('btn-secondary');
 });
 
@@ -141,15 +142,60 @@ describe('ingreso registrado', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
-  it('el egreso y el traslado no ofrecen etiquetas', () => {
-    const { unmount } = render(<StockMovementReceiptPanel receipt={receipt} onClose={jest.fn()} />);
-    expect(screen.queryByRole('button', { name: 'Comprobante + etiquetas' })).toBeNull();
-    unmount();
+  it('el egreso ofrece comprobante con etiquetas como acción principal', () => {
+    render(<StockMovementReceiptPanel receipt={receipt} onClose={jest.fn()} />);
 
+    expect(screen.getAllByRole('button').map((button) => button.textContent)).toEqual([
+      'Comprobante + etiquetas',
+      'Descargar comprobante',
+      'Cerrar comprobante',
+    ]);
+  });
+
+  it('el egreso con prendas pregunta el tamaño y descarga el PDF combinado', async () => {
+    const egresoConPrenda: StockMovementReceipt = {
+      ...receipt,
+      rows: [
+        { productId: 1, code: 'AAA001', name: 'Jabón de Avena', quantity: 2, stock: 4, price: 1250 },
+        { productId: 7, code: 'RPH014', name: 'Body Rosa', quantity: 1, stock: 3, price: 24000 },
+      ],
+    };
+    detect.mockResolvedValue({ success: true, data: { prendaIds: [7] } });
+    render(<StockMovementReceiptPanel receipt={egresoConPrenda} onClose={jest.fn()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Comprobante + etiquetas' }));
+
+    await waitFor(() => expect(detect).toHaveBeenCalledWith({ productIds: [1, 7] }));
+    expect(await screen.findByText(/tamaño de la etiqueta de prenda/i)).toBeInTheDocument();
+    expect(combined).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: /mediana 35 × 58 mm/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Generar PDF con etiquetas' }));
+
+    await waitFor(() => expect(click).toHaveBeenCalledTimes(1));
+    expect(combined).toHaveBeenCalledWith({ ...egresoConPrenda, prendaTamano: 'mediana' });
+  });
+
+  it('el traslado ofrece las etiquetas del lado que recibe y las genera con la detección', async () => {
     render(<StockMovementReceiptPanel receipt={transfer} onClose={jest.fn()} />);
-    expect(screen.queryByRole('button', { name: 'Comprobante + etiquetas' })).toBeNull();
-    // Sin camino de etiquetas tampoco hay detección que preguntar.
-    expect(detect).not.toHaveBeenCalled();
+
+    // El traslado sigue teniendo dos comprobantes: recibe, envía (y el combinado del que recibe).
+    expect(screen.getAllByRole('button').map((button) => button.textContent)).toEqual([
+      'Comprobante de la sucursal que recibe + etiquetas',
+      'Comprobante de la sucursal que recibe',
+      'Comprobante de la sucursal que envía',
+      'Cerrar comprobante',
+    ]);
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Comprobante de la sucursal que recibe + etiquetas' })
+    );
+
+    await waitFor(() => expect(detect).toHaveBeenCalledWith({ productIds: [1] }));
+    await waitFor(() => expect(click).toHaveBeenCalledTimes(1));
+    // Sin prendas va derecho al combinado, que es el comprobante del lado que recibe.
+    expect(combined).toHaveBeenCalledWith(transfer);
+    expect(generate).not.toHaveBeenCalled();
   });
 });
 

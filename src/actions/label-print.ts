@@ -402,9 +402,18 @@ const buildLabelsFileName = (branchCode: string, date: Date) => {
   return `etiquetas-${branchCode}-${yyyy}${month}${day}.pdf`;
 };
 
-/** `comprobante-ingreso-<código de sucursal>-<AAAAMMDD>-etiquetas.pdf` */
-const buildEntryReceiptFileName = (branchCode: string, date: string) =>
-  `comprobante-ingreso-${branchCode}-${date.replace(/[^0-9]/g, '').slice(0, 8)}-etiquetas.pdf`;
+/**
+ * `comprobante-<ingreso|egreso|traslado-destino>-<código>-<AAAAMMDD>-etiquetas.pdf`.
+ * El traslado va por el lado que recibe, que es el comprobante que se dibuja.
+ */
+const buildReceiptWithLabelsFileName = (
+  movementType: 'ENTRY' | 'EXIT' | 'TRANSFER',
+  branchCode: string,
+  date: string
+) => {
+  const kind = { ENTRY: 'ingreso', EXIT: 'egreso', TRANSFER: 'traslado-destino' }[movementType];
+  return `comprobante-${kind}-${branchCode}-${date.replace(/[^0-9]/g, '').slice(0, 8)}-etiquetas.pdf`;
+};
 
 /** Hojas de etiquetas como bytes: el comprobante de ingreso necesita las mismas. */
 const renderLabelsPdf = async (
@@ -1137,7 +1146,7 @@ export type GenerateEntryReceiptWithLabelsResult =
   | { success: true; data: { pdfBase64: string; filename: string } }
   | { success: false; error: string };
 
-/** Snapshot del comprobante de un ingreso: lo único que se dibuja y etiqueta. */
+/** Snapshot del comprobante de un movimiento: lo único que se dibuja y etiqueta. */
 const entryReceiptSchema = z.object({
   movementType: z.enum(['ENTRY', 'EXIT', 'TRANSFER']),
   branchId: z.number().int().positive('Sucursal inválida'),
@@ -1167,11 +1176,13 @@ const entryReceiptSchema = z.object({
 });
 
 /**
- * Un único PDF con el comprobante de un ingreso **y** las etiquetas de lo
- * ingresado (S2): primero las páginas del comprobante, después una hoja con una
+ * Un único PDF con el comprobante de un movimiento **y** las etiquetas de lo que
+ * se movió (S2): primero las páginas del comprobante, después una hoja con una
  * etiqueta por unidad y la última rellena para escribir a mano (S4, S5).
  *
- * No vuelve a registrar nada (S6): re-lee lo confirmado y sólo dibuja.
+ * Vale para el ingreso, el egreso y el traslado (lado que recibe, que es el
+ * comprobante que dibuja el PDF). No vuelve a registrar nada (S6): re-lee lo
+ * confirmado y sólo dibuja.
  */
 export async function generateEntryReceiptWithLabels(
   data: unknown
@@ -1181,9 +1192,6 @@ export async function generateEntryReceiptWithLabels(
     if (!auth.ok) return { success: false as const, error: auth.error };
 
     const receipt = entryReceiptSchema.parse(data);
-    if (receipt.movementType !== 'ENTRY') {
-      return { success: false, error: 'Solo el comprobante de un ingreso lleva etiquetas' };
-    }
 
     const sheets = await resolveLabelSheets(
       receipt.branchId,
@@ -1210,7 +1218,11 @@ export async function generateEntryReceiptWithLabels(
       success: true,
       data: {
         pdfBase64: Buffer.from(pdfBytes).toString('base64'),
-        filename: buildEntryReceiptFileName(receipt.branchCode, receipt.date),
+        filename: buildReceiptWithLabelsFileName(
+          receipt.movementType,
+          receipt.branchCode,
+          receipt.date
+        ),
       },
     };
   } catch (error) {
