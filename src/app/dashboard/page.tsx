@@ -109,6 +109,9 @@ export default function DashboardPage() {
             <Link href="/reportes" className="btn btn-secondary whitespace-nowrap">
               Reportes
             </Link>
+            <Link href="/sucursales" className="btn btn-secondary whitespace-nowrap">
+              Sucursales
+            </Link>
             <Link href="/ventas" className="btn btn-primary whitespace-nowrap">
               Nueva venta
             </Link>

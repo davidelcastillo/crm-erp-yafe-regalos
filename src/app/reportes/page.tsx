@@ -249,13 +249,23 @@ export default async function ReportesPage({
         header={
           <PageHeader
             title="Clientas y reportes"
-            right={<FiltrosReporte periodo={periodo} sucursal={sucursal} />}
+            right={
+              /* Bloque propio y separado del título: en el celular baja a su
+                 línea con un separador, y en escritorio la fila se alinea abajo
+                 para que el label del selector no deje los tabs colgando. */
+              <div
+                data-testid="reportes-filtros"
+                className="flex w-full flex-col gap-2 border-t border-hairline-soft pt-3 md:w-auto md:border-0 md:pt-0 [&>div]:w-full [&>div]:justify-center md:[&>div]:w-auto md:[&>div]:items-end md:[&>div]:gap-3"
+              >
+                <FiltrosReporte periodo={periodo} sucursal={sucursal} />
+              </div>
+            }
           />
         }
       />
 
       <main className="glass -mt-12 flex flex-col gap-3 rounded-t-[2.5rem] px-4 pt-6 pb-8 md:gap-5 md:px-8 md:pt-8">
-        <p className="-mt-1 text-sm text-ink-muted">Solo la dueña ve costos y ganancias</p>
+        <p className="mt-1 text-sm text-ink-muted">Solo la dueña ve costos y ganancias</p>
 
         {!reportes ? (
           <p className="text-sm text-ink-muted">

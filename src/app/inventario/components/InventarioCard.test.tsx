@@ -227,15 +227,87 @@ describe("InventarioCard — el stock no se edita a mano (S20)", () => {
 });
 
 describe("InventarioCard — el nombre largo no rompe la card", () => {
-  it("el título puede encoger dentro de su fila flex junto al chip del código", () => {
+  it("el título puede encoger dentro de su columna y envolver", () => {
     renderCard();
 
-    // El título comparte una fila flex con el chip `shrink-0` del código: sin
-    // `min-w-0` el `break-words` nunca actúa y un nombre largo empuja el chip
-    // y desborda la card (reporte del dueño con nombres grandes).
+    // El nombre vive en una columna `min-w-0`: sin eso el `break-words` nunca
+    // actúa y un nombre largo desborda la card (reporte del dueño).
     const titulo = screen.getByRole("heading", { name: "Jabón de Avena" });
-    expect(titulo.className).toContain("min-w-0");
+    expect(titulo.parentElement?.className).toContain("min-w-0");
     expect(titulo.className).toContain("break-words");
+  });
+});
+
+describe("InventarioCard — nombres largos y sin descripción (celular)", () => {
+  const NOMBRE_LARGO = "Peluche Cosplay Piyama Sanrio My Melody Estrellas Moño Party";
+  const largo = { ...producto, name: NOMBRE_LARGO } as unknown as Product;
+
+  it("recorta el nombre a 2 líneas y deja el completo en el title", () => {
+    renderCard(largo);
+
+    const titulo = screen.getByRole("heading", { name: NOMBRE_LARGO });
+    expect(titulo.className).toContain("line-clamp-2");
+    expect(titulo.className).toContain("break-words");
+    expect(titulo).toHaveAttribute("title", NOMBRE_LARGO);
+  });
+
+  it("muestra el código debajo del nombre, en su propia línea", () => {
+    renderCard(largo);
+
+    const titulo = screen.getByRole("heading", { name: NOMBRE_LARGO });
+    const codigo = screen.getByText("JA000");
+
+    // Orden en el DOM: primero el nombre, después el código.
+    expect(
+      titulo.compareDocumentPosition(codigo) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    // Mismo bloque de texto: el código no compite con el stock en la fila alta.
+    expect(codigo.parentElement).toBe(titulo.parentElement);
+    expect(codigo.className).toContain("block");
+    expect(codigo.className).toContain("font-mono");
+  });
+
+  it.each([null, "", "-", "   ", "\n\t-"])(
+    "sin descripción real (%p) no muestra ni placeholder",
+    (descripcion) => {
+      const { container } = render(
+        <InventarioCard
+          product={{ ...largo, description: descripcion } as unknown as Product}
+          categories={[]}
+        />
+      );
+
+      // La card no tiene otro párrafo: si aparece uno, es el de descripción.
+      expect(container.querySelector("p")).toBeNull();
+    }
+  );
+
+  it("con descripción real la sigue mostrando", () => {
+    const { container } = render(
+      <InventarioCard
+        product={{ ...producto, description: "Jabón artesanal de avena" } as unknown as Product}
+        categories={[]}
+      />
+    );
+
+    expect(container.querySelector("p")).toHaveTextContent("Jabón artesanal de avena");
+  });
+
+  it("la tarjeta sigue completa con foto, chips, stock y botones", () => {
+    renderCard({
+      ...largo,
+      description: null,
+      images: [{ position: 0, path: "hash-portada" }],
+      categorias: [{ category: { id: 1, name: "Peluches" } }],
+    } as unknown as Product);
+
+    expect(screen.getByRole("img", { name: NOMBRE_LARGO })).toBeInTheDocument();
+    expect(screen.getByLabelText("Categorías")).toHaveTextContent("Peluches");
+    expect(screen.getByLabelText("Stock en Salta: 10 unidades")).toHaveTextContent("Salta · 10");
+    expect(screen.getByText("10 uds")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Editar" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Ver Movimientos" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Desactivar" })).toBeInTheDocument();
   });
 });
 

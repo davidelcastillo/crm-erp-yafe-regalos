@@ -314,6 +314,8 @@ export function InventarioCard({ product, dataProductId, isHighlighted, onViewMo
   const visibleBranches = stockBranches.slice(0, MAX_SUCURSALES_VISIBLES);
   const hiddenBranches = stockBranches.length - visibleBranches.length;
   const extra = product as unknown as ProductExtra;
+  // Descripción real: vacía, solo espacios o «-» no muestran nada (reporte del dueño).
+  const descripcion = product.description?.trim();
   // La primera foto por posición es la portada: la card la muestra en miniatura.
   const portada = extra.images?.[0]?.path ?? null;
   const variantes = extra.variantes ?? [];
@@ -332,15 +334,21 @@ export function InventarioCard({ product, dataProductId, isHighlighted, onViewMo
              />
            )}
          <div className="min-w-0 flex-1">
-           <div className="flex items-center gap-2 mb-1">
-             <h3 className="min-w-0 text-base font-semibold text-ink break-words">{product.name}</h3>
-             <code className="shrink-0 px-2 py-0.5 bg-surface-strong rounded text-xs font-mono text-ink-muted">
+           {/* Dos líneas y el nombre completo en `title`: un nombre largo no aplasta la card. */}
+           <h3
+             title={product.name}
+             className="line-clamp-2 break-words text-base font-semibold text-ink"
+           >
+             {product.name}
+           </h3>
+           {product.code && (
+             <code className="mt-1 block max-w-full truncate rounded bg-surface-strong px-2 py-0.5 font-mono text-xs text-ink-muted">
                {product.code}
              </code>
-           </div>
-           {product.description && product.description !== "-" && (
-             <p className="text-sm text-ink-muted mt-1 line-clamp-2">
-               {product.description}
+           )}
+           {descripcion && descripcion !== "-" && (
+             <p className="mt-1 line-clamp-2 text-sm text-ink-muted">
+               {descripcion}
              </p>
            )}
            {categorias.length > 0 && (

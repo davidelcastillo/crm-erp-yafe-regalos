@@ -1,8 +1,9 @@
 import { notFound } from "next/navigation";
 
 import { getVidriera } from "@/app/actions/vidriera";
+import type { GrupoVidriera } from "@/lib/grupos-vidriera";
 import { CatalogoVista } from "./CatalogoVista";
-import type { CategoriaSlug, ValoresFiltros } from "./FiltrosCatalogo";
+import type { ValoresFiltros } from "./FiltrosCatalogo";
 import { TiendaFooter, TiendaHeader } from "./TiendaHeader";
 
 /**
@@ -10,10 +11,10 @@ import { TiendaFooter, TiendaHeader } from "./TiendaHeader";
  * productos publicados en el canal «Web», sin login y de solo lectura. Filtros
  * a la izquierda, chips de los filtros activos y la grilla con la tarjeta.
  *
- * Lo comparten la página del catálogo y las rutas filtradas (`nuevo`,
- * `second-hand`, …), que solo cambian el título, la ruta y la categoría fija.
+ * Lo comparten la página del catálogo y las rutas de grupo (`ropa`, `peluches`,
+ * `accesorios`, `otros`), que solo cambian el título, la ruta y el grupo fijo.
  * El estado de los filtros vive en la URL (`?categoria=`, `?talle=`, `?orden=`,
- * …); `?categoria=` acepta el id numérico y el slug del header.
+ * …); `?categoria=` acepta el slug del grupo.
  */
 
 /** `searchParams` de Next, tal como llega a cualquier página. */
@@ -35,28 +36,19 @@ const leerFiltros = (params: ParamsBusqueda): ValoresFiltros => ({
   q: uno(params.q),
 });
 
-/** Id numérico de `?categoria=7`: la action filtra por id; el slug se filtra acá. */
-const categoriaIdDe = (categorias: string[]) => {
-  const id = Number(categorias.find((valor) => Number(valor) > 0));
-  return Number.isInteger(id) && id > 0 ? id : undefined;
-};
-
 export async function CatalogoCuerpo({
   searchParams,
   titulo,
   rutaBase,
-  categoriaFija,
+  grupoFijo,
 }: {
   searchParams: Promise<ParamsBusqueda>;
   titulo: string;
   rutaBase: string;
-  categoriaFija?: CategoriaSlug;
+  grupoFijo?: GrupoVidriera;
 }) {
   const valores = leerFiltros(await searchParams);
-  const resultado = await getVidriera({
-    categoriaId: categoriaIdDe(valores.categoria),
-    q: valores.q || undefined,
-  });
+  const resultado = await getVidriera({ q: valores.q || undefined });
   if (!resultado.success) notFound();
 
   return (
@@ -69,7 +61,7 @@ export async function CatalogoCuerpo({
           items={resultado.data.items}
           valores={valores}
           rutaBase={rutaBase}
-          categoriaFija={categoriaFija}
+          grupoFijo={grupoFijo}
         />
       </main>
 

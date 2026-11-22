@@ -73,7 +73,7 @@ export default async function PolkalinasPage() {
                 <span className="text-accent italic">oportunidades</span> para prendas hermosas.
               </h1>
               <p className="max-w-[52ch] text-base text-ink-body md:text-lg">
-                Ropa second hand e intervenida, elegida una por una, y cositas cute para tu cuarto
+                Ropa second hand e intervenida, peluches, accesorios y cositas lindas para tu casa
                 y tu mochila.
               </p>
               <div className="flex flex-wrap gap-3">

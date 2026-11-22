@@ -177,6 +177,41 @@ describe('Reportes — encabezado', () => {
   });
 });
 
+describe('Reportes — el encabezado respira (dueño: amontonado en celular y PC)', () => {
+  it('separa el bloque de título del de filtros y lo deja apilar en celular', async () => {
+    await abrir();
+
+    const titulo = screen.getByRole('heading', { level: 1, name: 'Clientas y reportes' });
+    const filtros = screen.getByTestId('reportes-filtros');
+
+    // Bloques distintos: el título no envuelve a los filtros ni al revés.
+    expect(titulo).not.toContainElement(filtros);
+    expect(filtros).not.toContainElement(titulo);
+    // En celular los filtros bajan a su propia línea, con separador y aire.
+    expect(filtros.className).toContain('flex-col');
+    expect(filtros.className).toContain('border-t');
+    expect(filtros.className).toContain('pt-3');
+    // En escritorio la fila se alinea abajo (el label del selector ya no deja
+    // los tabs colgando) y el conjunto se centra: ningún control huérfano.
+    expect(filtros.className).toContain('md:[&>div]:items-end');
+    expect(filtros.className).toContain('[&>div]:justify-center');
+
+    // El selector y los tres tabs viven en el bloque de filtros.
+    expect(within(filtros).getByRole('button', { name: 'Todas las sucursales' })).toBeInTheDocument();
+    for (const tab of ['Este mes', 'Mes anterior', 'Últimos 3 meses']) {
+      expect(within(filtros).getByRole('button', { name: tab })).toBeInTheDocument();
+    }
+  });
+
+  it('el subtítulo no se pega al encabezado (sin márgenes negativos)', async () => {
+    await abrir();
+
+    const subtitulo = screen.getByText('Solo la dueña ve costos y ganancias');
+    expect(subtitulo.className).not.toContain('-mt-1');
+    expect(subtitulo.className).toContain('mt-1');
+  });
+});
+
 describe('Reportes — KPIs', () => {
   it('muestra los cuatro KPIs con sus valores y el margen', async () => {
     await abrir();

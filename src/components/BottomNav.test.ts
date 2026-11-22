@@ -19,9 +19,9 @@ describe("BottomNav", () => {
     (usePathname as jest.Mock).mockReturnValue("/dashboard");
     render(React.createElement(BottomNav));
 
-    // 6 destinos: «Reportes» se entra desde el botón del dashboard.
+    // 5 destinos: «Reportes» y «Sucursales» se entran desde el dashboard.
     const navLinks = screen.getAllByRole("link");
-    expect(navLinks).toHaveLength(6);
+    expect(navLinks).toHaveLength(5);
     expect(navLinks.map((l) => l.textContent)).toEqual(
       expect.arrayContaining([
         "Dashboard",
@@ -29,7 +29,6 @@ describe("BottomNav", () => {
         "Ventas",
         "Pedidos",
         "Inventario",
-        "Sucursales",
       ])
     );
     expect(screen.queryByRole("link", { name: /reportes/i })).not.toBeInTheDocument();

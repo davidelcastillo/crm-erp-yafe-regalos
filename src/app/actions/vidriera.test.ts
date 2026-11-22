@@ -392,6 +392,7 @@ describe("getVidriera — qué se publica (S2)", () => {
       price: 45000,
       kind: "PRENDA",
       estado: "DISPONIBLE",
+      grupo: "ropa",
       portada: expect.stringMatching(/\/product-images\/1\/hash-portada_sm\.webp$/),
       categoria: "Camperas",
       categoriaId: 7,
@@ -442,6 +443,26 @@ describe("getVidriera — qué se publica (S2)", () => {
       // La principal sigue siendo la primera: los consumidores viejos no cambian.
       expect(perfume?.categoria).toBe("Perfumes");
       expect(perfume?.categoriaId).toBe(9);
+    } finally {
+      delete PERFUME.categorias;
+    }
+  });
+
+  it("cada ítem llega con su grupo público de la tienda", async () => {
+    PERFUME.categorias = [
+      { category: { id: 9, name: "Perfumes" } },
+      { category: { id: 12, name: "PELUCHES" } },
+    ];
+    try {
+      const resultado = await getVidriera();
+      if (!resultado.success) throw new Error("la vidriera tendría que responder");
+
+      const porCodigo = (code: string) =>
+        resultado.data.items.find((item) => item.code === code)?.grupo;
+      // La prenda siempre es Ropa; el producto cae en Peluches por su categoría,
+      // sin distinguir mayúsculas.
+      expect(porCodigo("PK-1")).toBe("ropa");
+      expect(porCodigo("AR-1")).toBe("peluches");
     } finally {
       delete PERFUME.categorias;
     }
@@ -600,6 +621,7 @@ describe("getVidrieraItem — ficha pública (T5)", () => {
       price: 45000,
       kind: "PRENDA",
       estado: "DISPONIBLE",
+      grupo: "ropa",
       portada: expect.stringMatching(/\/hash-portada_sm\.webp$/),
       categoria: "Camperas",
       categoriaId: 7,
@@ -667,6 +689,7 @@ describe("getVidrieraItem — ficha pública (T5)", () => {
       price: 30000,
       kind: "PRODUCT",
       estado: "AGOTADO",
+      grupo: "otros",
       portada: expect.stringMatching(/\/hash-perfume_sm\.webp$/),
       categoria: "Perfumes",
       categoriaId: 9,
