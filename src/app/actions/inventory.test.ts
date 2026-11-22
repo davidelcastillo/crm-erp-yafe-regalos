@@ -852,3 +852,27 @@ describe("ajustes de stock respetan lo reservado (R1)", () => {
     expect(mockBranchMovementCreate).not.toHaveBeenCalled();
   });
 });
+
+// ===========================================================================
+// getProductsWithBranchStock - fotos y variantes para la card del inventario
+// ===========================================================================
+describe("getProductsWithBranchStock (portada y variantes)", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("pide la portada y los nombres de las variantes para la card", async () => {
+    mockProductFindMany.mockResolvedValue([]);
+
+    await getProductsWithBranchStock({});
+
+    expect(mockProductFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        include: expect.objectContaining({
+          images: { orderBy: { position: "asc" }, take: 1, select: { path: true } },
+          variantes: { orderBy: { id: "asc" }, select: { nombre: true } },
+        }),
+      })
+    );
+  });
+});

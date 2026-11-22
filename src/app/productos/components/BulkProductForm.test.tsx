@@ -1001,3 +1001,51 @@ describe("BulkProductForm · estilos por fila", () => {
     expect(grunge[1]).toHaveAttribute("aria-pressed", "false");
   });
 });
+
+describe("BulkProductForm · variantes", () => {
+  // Igual que los otros bloques: el envío tiene que devolver el lote creado.
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCreateProductsBatch.mockResolvedValue({
+      success: true,
+      data: { products: [{ id: 1, code: "AA000", name: "Camisa" }], receipt: null },
+    } as never);
+  });
+
+  it("manda las variantes de la fila y esconde el stock inicial", async () => {
+    await renderForm();
+    elegirSucursal();
+    await continuar();
+    llenarFila(0, "Camisa");
+    expect(stocks()).toHaveLength(1);
+
+    fireEvent.click(screen.getByLabelText("Agregar variante al producto 1"));
+    fireEvent.change(screen.getByLabelText("Variante 1 del producto 1"), {
+      target: { value: "Roja" },
+    });
+    fireEvent.change(screen.getByLabelText("Cantidad de la variante 1 del producto 1"), {
+      target: { value: "2" },
+    });
+
+    // Con variantes el stock sale de la suma: el campo simple desaparece.
+    expect(stocks()).toHaveLength(0);
+
+    fireEvent.click(screen.getByRole("button", { name: /crear 1 producto/i }));
+
+    await waitFor(() => expect(mockCreateProductsBatch).toHaveBeenCalled());
+    expect((mockCreateProductsBatch.mock.calls[0][0] as { rows: unknown[] }).rows[0]).toEqual(
+      expect.objectContaining({ name: "Camisa", variantes: [{ nombre: "Roja", cantidad: 2 }] })
+    );
+  });
+
+  it("sin variantes la fila viaja como antes", async () => {
+    await renderForm();
+    await continuar();
+    llenarFila(0, "Producto único");
+
+    fireEvent.click(screen.getByRole("button", { name: /crear 1 producto/i }));
+
+    await waitFor(() => expect(mockCreateProductsBatch).toHaveBeenCalled());
+    expect((mockCreateProductsBatch.mock.calls[0][0] as { rows: unknown[] }).rows[0]).not.toHaveProperty("variantes");
+  });
+});

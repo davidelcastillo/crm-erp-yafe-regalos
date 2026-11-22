@@ -32,6 +32,8 @@ type Fila = {
   costo: string;
   /** Estilos de la fila (misma taxonomía que la prenda); vacío son ninguno. */
   estilos: number[];
+  /** Variantes de la fila (nombre + cantidad): con ellas el stock es la suma. */
+  variantes: { nombre: string; cantidad: string }[];
   /** Fotos pendientes (U2): no viajan en el lote, se suben con el producto creado. */
   fotos: File[];
 };
@@ -214,6 +216,7 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
       initialStock: "",
       costo: "",
       estilos: [],
+      variantes: [],
       fotos: [],
     },
   ]);
@@ -323,6 +326,7 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
       initialStock: "",
       costo: "",
       estilos: [],
+      variantes: [],
       fotos: [],
     };
     idParaEnfocar.current = nueva.id;
@@ -339,6 +343,7 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
       fila.initialStock.trim() ||
       fila.costo.trim() ||
       fila.estilos.length > 0 ||
+      fila.variantes.length > 0 ||
       fila.fotos.length > 0;
     if (conDatos) {
       const confirmacion = await Swal.fire({
@@ -365,6 +370,28 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
   const actualizarFila = <K extends keyof Omit<Fila, "id">>(id: string, campo: K, valor: Fila[K]) =>
     setFilas((prev) => prev.map((f) => (f.id === id ? { ...f, [campo]: valor } : f)));
 
+  /** Variantes de la fila: un solo punto de cambio, con la fila siempre fresca. */
+  const actualizarVariantes = (
+    id: string,
+    cambio: (variantes: Fila["variantes"]) => Fila["variantes"]
+  ) =>
+    setFilas((prev) =>
+      prev.map((f) => (f.id === id ? { ...f, variantes: cambio(f.variantes) } : f))
+    );
+  const agregarVariante = (id: string) =>
+    actualizarVariantes(id, (variantes) => [...variantes, { nombre: "", cantidad: "" }]);
+  const quitarVariante = (id: string, indice: number) =>
+    actualizarVariantes(id, (variantes) => variantes.filter((_, i) => i !== indice));
+  const cambiarVariante = (
+    id: string,
+    indice: number,
+    campo: "nombre" | "cantidad",
+    valor: string
+  ) =>
+    actualizarVariantes(id, (variantes) =>
+      variantes.map((variante, i) => (i === indice ? { ...variante, [campo]: valor } : variante))
+    );
+
   /** Enter pasa al campo siguiente; en el último campo de la última fila agrega una fila. */
   const alPresionarEnter = (evento: React.KeyboardEvent<HTMLInputElement>) => {
     if (evento.key !== "Enter") return;
@@ -390,6 +417,7 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
         f.initialStock.trim() ||
         f.costo.trim() ||
         f.estilos.length > 0 ||
+        f.variantes.length > 0 ||
         f.fotos.length > 0
     );
     if (!conDatos) {
@@ -472,6 +500,15 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
         categoryId: f.categoryId,
         // Estilos de la fila: sin elegir ninguno no viaja (el esquema lo deja vacío).
         ...(f.estilos.length > 0 ? { estilos: f.estilos } : {}),
+        // Variantes de la fila: con ellas el stock es la suma, no `initialStock`.
+        ...(f.variantes.length > 0
+          ? {
+              variantes: f.variantes.map((variante) => ({
+                nombre: variante.nombre,
+                cantidad: variante.cantidad.trim() === "" ? 0 : Number(variante.cantidad),
+              })),
+            }
+          : {}),
         // Vacío es 0: el producto igual queda en la vista por sucursal (S11).
         ...(branchId !== null
           ? { initialStock: f.initialStock.trim() === "" ? 0 : Number(f.initialStock) }
@@ -810,8 +847,90 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
                           )}
                         </div>
 
-                        {/* Stock inicial: solo tiene sentido con una sucursal elegida (D8). */}
-                        {branchId !== null && (
+                        {/* Variantes de la fila: con alguna, el stock es su suma y el
+                            campo simple de stock inicial no se muestra. */}
+                        <div className="space-y-2">
+                          {fila.variantes.map((variante, indiceVariante) => {
+                            const numero = indiceVariante + 1;
+                            const idNombre = `${base}-variante-${numero}-nombre`;
+                            const idCantidad = `${base}-variante-${numero}-cantidad`;
+                            return (
+                              <div
+                                key={numero}
+                                className="space-y-2 rounded-xl border border-hairline bg-surface p-3"
+                              >
+                                <div>
+                                  <label htmlFor={idNombre} className={labelClass}>
+                                    Variante {numero} del producto {index + 1}
+                                  </label>
+                                  <input
+                                    id={idNombre}
+                                    data-bulk-field="variante"
+                                    type="text"
+                                    value={variante.nombre}
+                                    onChange={(e) =>
+                                      cambiarVariante(fila.id, indiceVariante, "nombre", e.target.value)
+                                    }
+                                    onKeyDown={alPresionarEnter}
+                                    enterKeyHint="next"
+                                    maxLength={40}
+                                    placeholder="Ej: Roja"
+                                    className={inputClass}
+                                  />
+                                </div>
+                                <div>
+                                  <label htmlFor={idCantidad} className={labelClass}>
+                                    Cantidad de la variante {numero} del producto {index + 1}
+                                  </label>
+                                  <input
+                                    id={idCantidad}
+                                    data-bulk-field="variante"
+                                    type="number"
+                                    inputMode="numeric"
+                                    step="1"
+                                    min="0"
+                                    max="999"
+                                    value={variante.cantidad}
+                                    onChange={(e) =>
+                                      cambiarVariante(
+                                        fila.id,
+                                        indiceVariante,
+                                        "cantidad",
+                                        e.target.value
+                                      )
+                                    }
+                                    onKeyDown={alPresionarEnter}
+                                    enterKeyHint="next"
+                                    placeholder="0"
+                                    className={inputClass}
+                                  />
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => quitarVariante(fila.id, indiceVariante)}
+                                  disabled={loading}
+                                  aria-label={`Quitar variante ${numero} del producto ${index + 1}`}
+                                  className="btn btn-ghost w-full"
+                                >
+                                  Quitar variante
+                                </button>
+                              </div>
+                            );
+                          })}
+                          <button
+                            type="button"
+                            onClick={() => agregarVariante(fila.id)}
+                            disabled={loading}
+                            aria-label={`Agregar variante al producto ${index + 1}`}
+                            className="btn btn-secondary w-full"
+                          >
+                            + Agregar variante
+                          </button>
+                        </div>
+
+                        {/* Stock inicial: solo tiene sentido con una sucursal elegida (D8)
+                            y sin variantes, porque ahí el stock es la suma. */}
+                        {branchId !== null && fila.variantes.length === 0 && (
                           <div>
                             <label htmlFor={`${base}-initialStock`} className={labelClass}>
                               Stock inicial

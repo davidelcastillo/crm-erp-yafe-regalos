@@ -27,6 +27,50 @@ const publicadaEnAlta = z
 const publicadaEnEdicion = z.array(z.string()).transform(filtrarCanales).optional();
 
 /**
+ * Variantes del producto (pedido del dueño): nombre libre + cantidad, opcional
+ * como los talles de la prenda. `fotoPosition` guarda la `position` de una foto
+ * existente del producto; el alta no tiene fotos todavía, así que ahí se ignora.
+ */
+const varianteSchema = z.object({
+  nombre: z
+    .string()
+    .trim()
+    .min(1, "La variante necesita un nombre")
+    .max(40, "El nombre de la variante es muy largo"),
+  cantidad: z
+    .number()
+    .int("La cantidad de la variante debe ser un número entero")
+    .min(0, "La cantidad de la variante no puede ser negativa")
+    .max(999, "La cantidad de la variante no puede superar 999"),
+  fotoPosition: z
+    .number()
+    .int("La foto de la variante es inválida")
+    .min(0, "La foto de la variante es inválida")
+    .max(3, "La foto de la variante es inválida")
+    .optional(),
+});
+
+const variantesSchema = z.array(varianteSchema).superRefine((filas, ctx) => {
+  const vistos = new Set<string>();
+  filas.forEach((fila, indice) => {
+    const clave = fila.nombre.toLowerCase();
+    if (vistos.has(clave)) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Nombre de variante repetido",
+        path: [indice, "nombre"],
+      });
+      return;
+    }
+    vistos.add(clave);
+  });
+});
+
+/** Unidades del alta: con variantes manda la suma (como los talles de prenda). */
+export const sumaVariantes = (variantes?: { cantidad: number }[]) =>
+  (variantes ?? []).reduce((total, variante) => total + variante.cantidad, 0);
+
+/**
  * Schema de creación de producto. Vive acá para que el alta masiva use la
  * misma regla por fila que el alta individual.
  * `categoryId` es opcional y nullable (H2): sin categoría elegida queda en null.
@@ -34,7 +78,10 @@ const publicadaEnEdicion = z.array(z.string()).transform(filtrarCanales).optiona
  */
 const productFields = {
   name: z.string().min(1, "El nombre es requerido").max(255, "El nombre es muy largo"),
-  description: z.string().max(500, "La descripción es muy larga").optional(),
+  description: z
+    .string()
+    .max(2000, "Máximo 2000 caracteres")
+    .optional(),
   prefix: z.string().regex(/^[A-Za-z]{2,4}$/, "Prefijo: 2-4 letras (A-Z)").transform(v => v.toUpperCase()),
   price: z.number().min(0, "El precio no puede ser negativo"),
   categoryId: z.number().int().positive("Categoría inválida").nullable().optional(),
@@ -65,16 +112,17 @@ export const createProductSchema = z
       .optional(),
     costoUnitario: z.number().min(0, "El costo no puede ser negativo").optional(),
     publicadaEn: publicadaEnAlta,
+    // Sin variantes el alta queda como siempre (`cantidadInicial`).
+    variantes: variantesSchema.optional(),
   })
   .superRefine((data, ctx) => {
     if ((data.costoUnitario ?? 0) <= 0) return;
-    if ((data.cantidadInicial ?? 0) < 1) {
-      ctx.addIssue({
-        code: "custom",
-        message: "Para registrar el costo cargá la cantidad inicial (1 o más)",
-        path: ["cantidadInicial"],
-      });
-    }
+    if ((data.cantidadInicial ?? 0) >= 1 || sumaVariantes(data.variantes) >= 1) return;
+    ctx.addIssue({
+      code: "custom",
+      message: "Para registrar el costo cargá la cantidad inicial (1 o más)",
+      path: ["cantidadInicial"],
+    });
   });
 
 /**
@@ -86,6 +134,8 @@ const createProductsBatchRowSchema = z.object({
   ...productFields,
   initialStock: z.number().int().min(0, "El stock no puede ser negativo").optional(),
   costo: z.number().min(0, "El costo no puede ser negativo").optional(),
+  // Variantes opcionales de la fila: con ellas su stock es la suma.
+  variantes: variantesSchema.optional(),
 });
 
 /**
@@ -124,7 +174,11 @@ export const createProductsBatchSchema = z
     // fuente de unidades de la compra: sin ella el costo se perdería.
     if (data.branchId !== undefined) return;
     data.rows.forEach((row, rowIndex) => {
-      if ((row.costo ?? 0) > 0 && (row.initialStock ?? 0) < 1) {
+      if (
+        (row.costo ?? 0) > 0 &&
+        (row.initialStock ?? 0) < 1 &&
+        sumaVariantes(row.variantes) < 1
+      ) {
         ctx.addIssue({
           code: "custom",
           message: "Para registrar el costo cargá el stock inicial de esa fila (1 o más)",
@@ -149,7 +203,7 @@ export type CreateProductsBatchValues = z.infer<typeof createProductsBatchSchema
 export const updateProductExtendedSchema = z.object({
   id: z.number().int().positive("ID inválido"),
   name: z.string().min(1, "El nombre es requerido").max(255).optional(),
-  description: z.string().max(500).optional().nullable(),
+  description: z.string().max(2000, "Máximo 2000 caracteres").optional().nullable(),
   price: z.number().min(0, "El precio no puede ser negativo").optional(),
   categoryId: z.number().int().positive("Categoría inválida").nullable().optional(),
   active: z.boolean().optional(),
@@ -160,6 +214,8 @@ export const updateProductExtendedSchema = z.object({
     .array(z.number().int().positive("Estilo inválido"))
     .transform((ids) => [...new Set(ids)])
     .optional(),
+  // Presente = reemplaza las variantes; ausente = no las toca (misma regla).
+  variantes: variantesSchema.optional(),
 });
 
 export type UpdateProductExtendedValues = z.infer<typeof updateProductExtendedSchema>;

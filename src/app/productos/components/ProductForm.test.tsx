@@ -1059,3 +1059,163 @@ describe("ProductForm · nuevo estilo", () => {
     );
   });
 });
+
+/**
+ * Variantes del producto (pedido del dueño): opcionales, como los talles de la
+ * prenda. Con variantes la cantidad total se deriva de las filas; sin
+ * variantes el formulario queda como siempre.
+ */
+describe("ProductForm · variantes", () => {
+  const producto = {
+    id: 7,
+    name: "Camisa",
+    description: "-",
+    categoryId: null,
+    active: true,
+    price: 100,
+    code: "CA001",
+    codePrefix: "CA",
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  } as unknown as Product;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (getFotosProducto as jest.Mock).mockResolvedValue({ success: true, data: [] });
+    mockGetProductById.mockResolvedValue({ success: true, data: { publicadaEn: [] } } as never);
+    mockCreateProduct.mockResolvedValue({ success: true, data: { id: 1 } } as never);
+    mockUpdateProductExtended.mockResolvedValue({ success: true, data: { id: 1 } } as never);
+  });
+
+  const llenarAlta = async () => {
+    await irAlPaso2();
+    fireEvent.change(screen.getByLabelText(/nombre/i), { target: { value: "Camisa" } });
+    fireEvent.change(screen.getByLabelText(/prefijo.*2-4 letras/i), { target: { value: "CA" } });
+    fireEvent.change(screen.getByLabelText(/precio de venta/i), { target: { value: "100" } });
+  };
+
+  const activarVariantes = () =>
+    fireEvent.click(screen.getByLabelText("Este producto tiene variantes"));
+
+  it("el alta ofrece el interruptor y sin activarlo no muestra filas", async () => {
+    render(<ProductForm product={null} onClose={() => {}} />);
+    await irAlPaso2();
+
+    expect(screen.getByLabelText("Este producto tiene variantes")).not.toBeChecked();
+    expect(screen.queryByLabelText("Variante 1")).not.toBeInTheDocument();
+    // Sin variantes sigue estando la cantidad simple de siempre.
+    expect(screen.getByLabelText(/cantidad inicial/i)).toBeInTheDocument();
+  });
+
+  it("al activarlo aparecen las filas y el total derivado reemplaza la cantidad", async () => {
+    render(<ProductForm product={null} onClose={() => {}} />);
+    await irAlPaso2();
+
+    activarVariantes();
+
+    expect(screen.getByLabelText("Variante 1")).toBeInTheDocument();
+    expect(screen.getByLabelText("Cantidad de la variante 1")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Variante 1"), { target: { value: "Roja" } });
+    fireEvent.change(screen.getByLabelText("Cantidad de la variante 1"), {
+      target: { value: "2" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /agregar variante/i }));
+    fireEvent.change(screen.getByLabelText("Variante 2"), { target: { value: "Azul" } });
+    fireEvent.change(screen.getByLabelText("Cantidad de la variante 2"), {
+      target: { value: "3" },
+    });
+
+    expect(screen.getByTestId("product-cantidad-total")).toHaveTextContent("5 unidades");
+    expect(screen.queryByLabelText(/cantidad inicial/i)).not.toBeInTheDocument();
+  });
+
+  it("el alta manda las variantes y la suma como cantidad", async () => {
+    render(<ProductForm product={null} onClose={() => {}} />);
+    await llenarAlta();
+    activarVariantes();
+
+    fireEvent.change(screen.getByLabelText("Variante 1"), { target: { value: "Roja" } });
+    fireEvent.change(screen.getByLabelText("Cantidad de la variante 1"), {
+      target: { value: "2" },
+    });
+    fireEvent.change(screen.getByLabelText(/^costo/i), { target: { value: "40" } });
+
+    fireEvent.click(screen.getByRole("button", { name: /crear producto/i }));
+
+    await waitFor(() => expect(mockCreateProduct).toHaveBeenCalled());
+    const payload = mockCreateProduct.mock.calls[0][0] as Record<string, unknown>;
+    expect(payload).toEqual(
+      expect.objectContaining({
+        variantes: [{ nombre: "Roja", cantidad: 2 }],
+        cantidadInicial: 2,
+      })
+    );
+    expect(createProductSchema.safeParse(payload).success).toBe(true);
+  });
+
+  it("la edición precarga las variantes guardadas con su foto", async () => {
+    mockGetProductById.mockResolvedValue({
+      success: true,
+      data: {
+        publicadaEn: [],
+        estilos: [],
+        variantes: [{ nombre: "Roja", cantidad: 2, fotoPosition: 0 }],
+      },
+    } as never);
+    (getFotosProducto as jest.Mock).mockResolvedValue({
+      success: true,
+      data: [{ position: 0, path: "hash", alt: null }],
+    });
+
+    render(<ProductForm product={producto} onClose={() => {}} />);
+
+    expect(await screen.findByLabelText("Variante 1")).toHaveValue("Roja");
+    expect(screen.getByLabelText("Cantidad de la variante 1")).toHaveValue(2);
+    expect(await screen.findByLabelText("Foto de la variante 1")).toHaveValue("0");
+    expect(screen.getByLabelText("Este producto tiene variantes")).toBeChecked();
+  });
+
+  it("la edición manda las variantes editadas y la posición de la foto", async () => {
+    render(<ProductForm product={producto} onClose={() => {}} />);
+    activarVariantes();
+    fireEvent.change(screen.getByLabelText("Variante 1"), { target: { value: "Roja" } });
+    fireEvent.change(screen.getByLabelText("Cantidad de la variante 1"), {
+      target: { value: "4" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /actualizar producto/i }));
+
+    await waitFor(() => expect(mockUpdateProductExtended).toHaveBeenCalled());
+    expect(mockUpdateProductExtended.mock.calls[0][0]).toEqual(
+      expect.objectContaining({ id: 7, variantes: [{ nombre: "Roja", cantidad: 4 }] })
+    );
+  });
+});
+
+/**
+ * Descripción del producto (pedido del dueño: «Hagamos mas largas las
+descripciones de productos»): el tope sube de 500 a 2000 caracteres. La
+descripción de la prenda tiene su propio esquema y no cambia.
+ */
+describe("createProductSchema · largo de la descripción", () => {
+  const conDescripcion = (largo: number) =>
+    createProductSchema.safeParse({
+      name: "Producto",
+      prefix: "AA",
+      price: 100,
+      description: "a".repeat(largo),
+    });
+
+  it("acepta 1500 caracteres", () => {
+    expect(conDescripcion(1500).success).toBe(true);
+  });
+
+  it("rechaza 2001 caracteres con el mensaje nuevo", () => {
+    const resultado = conDescripcion(2001);
+
+    expect(resultado.success).toBe(false);
+    if (resultado.success) return;
+    expect(resultado.error.issues[0]?.message).toBe("Máximo 2000 caracteres");
+  });
+});

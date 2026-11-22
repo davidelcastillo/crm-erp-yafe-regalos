@@ -46,6 +46,8 @@ type Fila = {
   name: string;
   description: string | null;
   price: number;
+  /** Orden por defecto de la vidriera: lo modificado más recientemente primero. */
+  updatedAt: Date;
   kind: "PRENDA" | "PRODUCT";
   active: boolean;
   /** Destacado de la portada (`Product.destacado`): dato público del ítem. */
@@ -55,6 +57,8 @@ type Fila = {
   /** Canales de `PrendaPublicacion`: la vidriera solo muestra «Web». */
   canales: string[];
   images: { path: string; alt: string | null }[];
+  /** Variantes del producto (opcional): nombre y si tiene foto propia. */
+  variantes?: { nombre: string; fotoPosition: number | null }[];
   prenda: {
     categoria: { id: number; name: string } | null;
     condicion: { name: string } | null;
@@ -70,6 +74,7 @@ const CAMPERA: Fila = {
   // Placeholder heredado: la ficha pública lo devuelve vacío.
   description: "-",
   price: 45000,
+  updatedAt: new Date("2026-03-01T00:00:00.000Z"),
   kind: "PRENDA",
   active: true,
   destacado: false,
@@ -93,6 +98,7 @@ const REMERA: Fila = {
   name: "Remera lisa",
   description: "Remera de algodón",
   price: 12000,
+  updatedAt: new Date("2026-02-01T00:00:00.000Z"),
   kind: "PRENDA",
   active: true,
   destacado: false,
@@ -113,12 +119,17 @@ const PERFUME: Fila = {
   name: "Perfume floral",
   description: "Perfume floral 100 ml",
   price: 30000,
+  updatedAt: new Date("2026-01-01T00:00:00.000Z"),
   kind: "PRODUCT",
   active: true,
   destacado: false,
   category: { id: 9, name: "Perfumes" },
   canales: ["Web"],
   images: [{ path: "hash-perfume", alt: null }],
+  variantes: [
+    { nombre: "Floral", fotoPosition: null },
+    { nombre: "Cítrico", fotoPosition: 0 },
+  ],
   prenda: null,
 };
 
@@ -149,6 +160,28 @@ type Where = {
   OR?: { name?: { contains?: string }; code?: { contains?: string } }[];
 };
 
+/** Orden pedido a la base: la misma forma que acepta Prisma. */
+type Orden = { id?: "asc" | "desc"; updatedAt?: "asc" | "desc"; name?: "asc" | "desc" };
+
+/** Valor comparable de cada campo que la acción puede pedir. */
+const valorOrden = (fila: Fila, campo: keyof Orden): number | string => {
+  if (campo === "id") return fila.id;
+  if (campo === "name") return fila.name.toLowerCase();
+  return fila.updatedAt.getTime();
+};
+
+/** Aplica el `orderBy` como la base real, para probar el orden que arma la acción. */
+const comparar = (a: Fila, b: Fila, orden: Orden | Orden[]): number => {
+  for (const criterio of Array.isArray(orden) ? orden : [orden]) {
+    const [campo, direccion] = Object.entries(criterio)[0] as [keyof Orden, "asc" | "desc"];
+    const signo = direccion === "desc" ? -1 : 1;
+    const izq = valorOrden(a, campo);
+    const der = valorOrden(b, campo);
+    if (izq !== der) return (izq < der ? -1 : 1) * signo;
+  }
+  return 0;
+};
+
 const coincide = (fila: Fila, where: Where | undefined): boolean => {
   if (!where) return true;
   if (where.active !== undefined && fila.active !== where.active) return false;
@@ -177,8 +210,11 @@ beforeEach(() => {
   RESERVADOS = [];
   VENDIDOS = [];
 
-  mockProductFindMany.mockImplementation(async (args: { where?: Where }) =>
-    PUBLICADAS.filter((fila) => coincide(fila, args?.where))
+  mockProductFindMany.mockImplementation(
+    async (args: { where?: Where; orderBy?: Orden | Orden[] }) =>
+      PUBLICADAS.filter((fila) => coincide(fila, args?.where)).sort((a, b) =>
+        comparar(a, b, args?.orderBy ?? [])
+      )
   );
   mockProductFindFirst.mockImplementation(
     async (args: { where?: { id?: number } & Where }) =>
@@ -247,7 +283,21 @@ describe("getVidriera — qué se publica (S2)", () => {
     };
     expect(consulta.where?.active).toBe(true);
     expect(consulta.where?.publicaciones).toEqual({ some: { canal: "Web" } });
-    expect(consulta.orderBy).toEqual({ name: "asc" });
+    // Orden por defecto: lo modificado más recientemente, con `id` de desempate.
+    expect(consulta.orderBy).toEqual([{ updatedAt: "desc" }, { id: "desc" }]);
+  });
+
+  it("ordena por fecha de modificación: el más nuevo primero", async () => {
+    const perfumeOriginal = PERFUME.updatedAt;
+    PERFUME.updatedAt = new Date("2026-04-01T00:00:00.000Z");
+    try {
+      const resultado = await getVidriera();
+      if (!resultado.success) throw new Error("la vidriera tendría que responder");
+
+      expect(resultado.data.items.map((item) => item.code)).toEqual(["AR-1", "PK-1"]);
+    } finally {
+      PERFUME.updatedAt = perfumeOriginal;
+    }
   });
 
   it("el select no pide ningún dato interno (costo, sucursales, clientes)", async () => {
@@ -270,6 +320,11 @@ describe("getVidriera — qué se publica (S2)", () => {
       images: {
         orderBy: { position: "asc" },
         select: { path: true, alt: true },
+      },
+      // Variantes: nombre y si tiene foto propia (nunca la cantidad ni el stock).
+      variantes: {
+        orderBy: { id: "asc" },
+        select: { nombre: true, fotoPosition: true },
       },
       prenda: {
         select: {
@@ -302,6 +357,8 @@ describe("getVidriera — qué se publica (S2)", () => {
       categoriaId: 7,
       talles: ["M", "S"],
       estilos: [],
+      // Una prenda no tiene variantes: el campo viene vacío.
+      variantes: [],
       destacado: false,
     });
   });
@@ -467,6 +524,8 @@ describe("getVidrieraItem — ficha pública (T5)", () => {
       condicion: "Muy bueno",
       detalleCondicion: "Con marcas en el ruedo",
       talles: ["M", "S"],
+      // Una prenda no tiene variantes: la ficha las manda vacías.
+      variantes: [],
       estilos: [],
       destacado: false,
       fotos: [
@@ -532,6 +591,11 @@ describe("getVidrieraItem — ficha pública (T5)", () => {
       detalleCondicion: null,
       talles: [],
       estilos: [],
+      // Variantes públicas: nombre + si tiene foto propia, sin cantidades.
+      variantes: [
+        { nombre: "Floral", conFoto: false },
+        { nombre: "Cítrico", conFoto: true },
+      ],
       destacado: false,
       fotos: [
         {
@@ -540,6 +604,17 @@ describe("getVidrieraItem — ficha pública (T5)", () => {
         },
       ],
     });
+  });
+
+  it("la ficha publica las variantes del producto sin cantidades ni stock", async () => {
+    const resultado = await getVidrieraItem({ id: 3 });
+
+    if (!resultado.success) throw new Error("la ficha tendría que responder");
+    expect(resultado.data.variantes).toEqual([
+      { nombre: "Floral", conFoto: false },
+      { nombre: "Cítrico", conFoto: true },
+    ]);
+    expect(JSON.stringify(resultado.data.variantes)).not.toContain("cantidad");
   });
 
   it("un producto con stock muestra las sucursales donde retirarlo, sin el stock", async () => {

@@ -30,6 +30,9 @@ model Product {
   estilosProducto   ProductEstilo[]
   // Variantes libres (color, tamaño, sabor…). Sin filas = sin variantes.
   variantes         ProductVariante[]
+  // Categorías del producto (varias, todas equivalentes). `categoryId` queda
+  // como principal heredada para no romper consumidores viejos.
+  categorias        ProductCategory[]
   publicaciones     PrendaPublicacion[]
   images            ProductImage[]
   purchaseItems     PurchaseItem[]
@@ -174,9 +177,10 @@ enum PaymentMethod {
 }
 
 model Category {
-  id       Int       @id @default(autoincrement())
-  name     String    @unique
-  products Product[]
+  id         Int               @id @default(autoincrement())
+  name       String            @unique
+  products   Product[]
+  productos  ProductCategory[]
 }
 
 model BranchMovement {
@@ -532,8 +536,22 @@ model ProductVariante {
   product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
   nombre    String
   cantidad  Int     @default(0)
+  // Foto de la variante (opcional): posición de ProductImage del mismo producto.
+  fotoPosition Int?
   createdAt DateTime @default(now())
 
   @@unique([productId, nombre])
   @@index([productId])
+}
+
+// Categorías de un producto normal: todas equivalentes (el producto aparece al
+// filtrar por cualquiera). Las prendas siguen con su única categoriaId.
+model ProductCategory {
+  productId  Int
+  categoryId Int
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([productId, categoryId])
+  @@index([categoryId])
 }

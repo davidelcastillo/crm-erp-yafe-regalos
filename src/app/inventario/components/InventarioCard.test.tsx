@@ -37,6 +37,12 @@ jest.mock("@/app/actions/inventory", () => ({
 }));
 
 // Una prenda se edita con su propia ficha (U3): `PrendaForm` vive en la card.
+// El panel de etiquetas de la prenda arma el PDF en el servidor con `pdf-lib`,
+// que no corre en jsdom: se mockea la action, igual que en `PrendaForm.test`.
+jest.mock("@/actions/label-print", () => ({
+  generatePrendaLabels: jest.fn(),
+}));
+
 jest.mock("@/app/actions/prenda", () => ({
   createPrenda: jest.fn(),
   updatePrenda: jest.fn(),
@@ -290,5 +296,39 @@ describe("InventarioCard — la prenda se edita con su ficha (U3)", () => {
     // El modo edición propio de la card (producto normal) no se abrió.
     expect(screen.queryByRole("button", { name: "Guardar" })).not.toBeInTheDocument();
     expect(screen.queryByRole("dialog", { name: "Editar Producto" })).not.toBeInTheDocument();
+  });
+});
+
+describe("InventarioCard — foto de portada y variantes", () => {
+  const conFotosYVariantes = {
+    ...producto,
+    images: [{ position: 0, path: "hash-portada", alt: null }],
+    variantes: [{ nombre: "Roja" }, { nombre: "Azul" }],
+  } as unknown as Product;
+
+  it("muestra la miniatura de la portada del producto", () => {
+    renderCard(conFotosYVariantes);
+
+    const foto = screen.getByRole("img", { name: /jabón de avena/i });
+    expect(foto.getAttribute("src")).toContain("hash-portada_sm.webp");
+  });
+
+  it("sin fotos no renderiza imagen", () => {
+    renderCard();
+
+    expect(screen.queryByRole("img", { name: /jabón de avena/i })).not.toBeInTheDocument();
+  });
+
+  it("muestra las variantes como chips bajo el nombre", () => {
+    renderCard(conFotosYVariantes);
+
+    expect(screen.getByText("Roja")).toBeInTheDocument();
+    expect(screen.getByText("Azul")).toBeInTheDocument();
+  });
+
+  it("sin variantes no hay chips", () => {
+    renderCard();
+
+    expect(screen.queryByLabelText("Variantes")).not.toBeInTheDocument();
   });
 });

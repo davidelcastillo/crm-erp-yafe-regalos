@@ -298,6 +298,10 @@ export async function getProductsWithBranchStock(filters?: unknown) {
           },
           ...(opts.branchId ? { where: { branchId: opts.branchId } } : {}),
         },
+        // Portada de la card (posición 0) y variantes: la tarjeta muestra la
+        // miniatura y los chips sin una consulta por producto.
+        images: { orderBy: { position: "asc" }, take: 1, select: { path: true } },
+        variantes: { orderBy: { id: "asc" }, select: { nombre: true } },
       },
     });
 

@@ -11,7 +11,7 @@ import { z } from "zod";
 import { getNextCode, prefixLockKey } from "@/lib/utils/product-code";
 import { registrarCompraDelAlta } from "@/lib/compra-alta";
 import type { StockMovementReceipt } from "@/lib/stock-movement-receipt";
-import { createProductSchema, createProductsBatchSchema, updateProductExtendedSchema } from "@/lib/validations/product";
+import { createProductSchema, createProductsBatchSchema, updateProductExtendedSchema, sumaVariantes } from "@/lib/validations/product";
 
 /** Motivo del ingreso inicial en el movimiento y en el comprobante (D9). */
 const BATCH_ENTRY_REFERENCE = "ALTA DE PRODUCTOS";
@@ -89,7 +89,10 @@ export async function createProduct(data: unknown) {
     if (validatedData.branchId !== undefined && !branch) {
       return { success: false as const, error: "Sucursal inválida o inactiva" };
     }
-    const cantidadInicial = validatedData.cantidadInicial ?? 0;
+    const cantidadInicial =
+      (validatedData.variantes?.length ?? 0) > 0
+        ? sumaVariantes(validatedData.variantes)
+        : (validatedData.cantidadInicial ?? 0);
 
     // Retry logic with advisory lock to handle race conditions
     const maxRetries = 3;
@@ -136,6 +139,18 @@ export async function createProduct(data: unknown) {
           if (validatedData.estilos.length > 0) {
             await tx.productEstilo.createMany({
               data: validatedData.estilos.map((estiloId) => ({ productId: creado.id, estiloId })),
+            });
+          }
+
+          // Variantes: en el alta todavía no hay fotos, así que la posición se
+          // elige después, en la edición.
+          if (validatedData.variantes && validatedData.variantes.length > 0) {
+            await tx.productVariante.createMany({
+              data: validatedData.variantes.map((variante) => ({
+                productId: creado.id,
+                nombre: variante.nombre,
+                cantidad: variante.cantidad,
+              })),
             });
           }
 
@@ -388,7 +403,11 @@ export async function createProductsBatch(data: unknown) {
               if (!creado) throw new Error("No se pudo leer uno de los productos creados");
               return {
                 producto: creado,
-                stockInicial: row.initialStock ?? 0,
+                // Con variantes el stock es la suma, igual que en el alta individual.
+                stockInicial:
+                  (row.variantes?.length ?? 0) > 0
+                    ? sumaVariantes(row.variantes)
+                    : (row.initialStock ?? 0),
                 costo: row.costo ?? 0,
               };
             });
@@ -405,6 +424,19 @@ export async function createProductsBatch(data: unknown) {
             );
             if (estilosDelLote.length > 0) {
               await tx.productEstilo.createMany({ data: estilosDelLote });
+            }
+
+            // Variantes: una sola `createMany` para todo el lote (sin fotos:
+            // el producto recién se está creando).
+            const variantesDelLote = rows.flatMap((row, i) =>
+              (row.variantes ?? []).map((variante) => ({
+                productId: filasCreadas[i].producto.id,
+                nombre: variante.nombre,
+                cantidad: variante.cantidad,
+              }))
+            );
+            if (variantesDelLote.length > 0) {
+              await tx.productVariante.createMany({ data: variantesDelLote });
             }
 
             // T4: UNA sola compra del lote, solo con las filas que tienen costo y
@@ -566,23 +598,28 @@ export async function getProductById(id: number) {
 
     const product = await prisma.product.findUnique({
       where: { id },
-      // La edición necesita los canales ya publicados (S3) y los estilos
-      // guardados, para precargarlos sin borrarlos.
+      // La edición necesita los canales ya publicados (S3), los estilos
+      // guardados y las variantes, para precargarlos sin borrarlos.
       include: {
         publicaciones: { select: { canal: true } },
         estilosProducto: { select: { estiloId: true } },
+        variantes: {
+          orderBy: { id: "asc" },
+          select: { nombre: true, cantidad: true, fotoPosition: true },
+        },
       },
     });
     if (!product) {
       return { success: false, error: "Producto no encontrado" };
     }
-    const { publicaciones, estilosProducto, ...ficha } = product;
+    const { publicaciones, estilosProducto, variantes, ...ficha } = product;
     return {
       success: true,
       data: parseObject({
         ...ficha,
         publicadaEn: publicaciones.map((publicacion) => publicacion.canal),
         estilos: estilosProducto.map((estilo) => estilo.estiloId),
+        variantes,
       }),
     };
   } catch (error) {
@@ -933,6 +970,26 @@ export async function updateProductExtended(data: unknown) {
     const estilosMalos = await estilosInvalidos(validatedData.estilos ?? []);
     if (estilosMalos) return { success: false as const, error: estilosMalos };
 
+    // La foto de la variante tiene que existir: guarda la `position` de una foto
+    // del propio producto. En el alta se ignora porque todavía no hay ninguna.
+    const tocaVariantes = validatedData.variantes !== undefined;
+    if (tocaVariantes && (validatedData.variantes?.length ?? 0) > 0) {
+      const posiciones = new Set(
+        (
+          await prisma.productImage.findMany({
+            where: { productId: validatedData.id },
+            select: { position: true },
+          })
+        ).map((foto) => foto.position)
+      );
+      const fotoInexistente = (validatedData.variantes ?? []).some(
+        (variante) => variante.fotoPosition !== undefined && !posiciones.has(variante.fotoPosition)
+      );
+      if (fotoInexistente) {
+        return { success: false as const, error: "La foto de la variante no existe" };
+      }
+    }
+
     const cambios = {
       ...(validatedData.name && { name: validatedData.name }),
       ...(validatedData.description !== undefined && {
@@ -951,7 +1008,7 @@ export async function updateProductExtended(data: unknown) {
     const tocaPublicaciones = validatedData.publicadaEn !== undefined;
     const tocaEstilos = validatedData.estilos !== undefined;
     const product =
-      !tocaPublicaciones && !tocaEstilos
+      !tocaPublicaciones && !tocaEstilos && !tocaVariantes
         ? await prisma.product.update({ where: { id: validatedData.id }, data: cambios })
         : await prisma.$transaction(async (tx) => {
             const actualizado = await tx.product.update({
@@ -977,6 +1034,19 @@ export async function updateProductExtended(data: unknown) {
                   data: validatedData.estilos.map((estiloId) => ({
                     productId: validatedData.id,
                     estiloId,
+                  })),
+                });
+              }
+            }
+            if (tocaVariantes) {
+              await tx.productVariante.deleteMany({ where: { productId: validatedData.id } });
+              if (validatedData.variantes && validatedData.variantes.length > 0) {
+                await tx.productVariante.createMany({
+                  data: validatedData.variantes.map((variante) => ({
+                    productId: validatedData.id,
+                    nombre: variante.nombre,
+                    cantidad: variante.cantidad,
+                    fotoPosition: variante.fotoPosition ?? null,
                   })),
                 });
               }

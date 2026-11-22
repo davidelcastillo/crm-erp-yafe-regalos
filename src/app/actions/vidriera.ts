@@ -41,6 +41,9 @@ export type VidrieraItem = {
   categoriaId?: number | null;
   /** Talles disponibles de una prenda (vacío en productos normales). */
   talles?: string[];
+  /** Variantes del producto (opcional): nombre y si tiene foto propia. Sin
+   * cantidades: el stock exacto no se publica. */
+  variantes?: { nombre: string; conFoto: boolean }[];
   /** Estilos de la prenda; alimenta el filtro «Estilo» del catálogo. */
   estilos?: string[];
   /** Destacado de la portada (`Product.destacado`): lo elige el dueño desde la
@@ -80,6 +83,9 @@ const SELECT_LISTA = {
   // Categoría del producto normal (`Category`): la prenda trae la suya.
   category: { select: { id: true, name: true } },
   images: { orderBy: { position: "asc" }, select: { path: true, alt: true } },
+  // Variantes del producto: la ficha las lista como opciones (nombre + si
+  // tiene foto), nunca con la cantidad.
+  variantes: { orderBy: { id: "asc" }, select: { nombre: true, fotoPosition: true } },
   prenda: {
     select: {
       categoria: { select: { id: true, name: true } },
@@ -113,6 +119,8 @@ type FilaPublica = {
   kind: "PRENDA" | "PRODUCT";
   destacado: boolean;
   images: { path: string; alt: string | null }[];
+  /** Solo los productos normales tienen variantes; las prendas usan talles. */
+  variantes?: { nombre: string; fotoPosition: number | null }[];
   /** Solo lo pide `SELECT_FICHA`. */
   description?: string | null;
   /** Categoría propia de los productos normales (las prendas usan la de prenda). */
@@ -164,6 +172,11 @@ const aPublico = (
     categoriaId: categoria?.id ?? null,
     // Talles disponibles (solo prendas): la card los muestra en lugar del código.
     talles: fila.prenda?.talles?.map((filaTalle) => filaTalle.talle) ?? [],
+    // Variantes (solo productos): nombre y si tiene foto propia.
+    variantes: (fila.variantes ?? []).map((variante) => ({
+      nombre: variante.nombre,
+      conFoto: variante.fotoPosition !== null,
+    })),
     // Estilos de la prenda (filtro del catálogo).
     estilos: fila.prenda?.estilos?.map((filaEstilo) => filaEstilo.estilo.name) ?? [],
     destacado: fila.destacado,
@@ -246,7 +259,9 @@ export async function getVidriera(filtros?: unknown) {
           : {}),
       },
       select: SELECT_LISTA,
-      orderBy: { name: "asc" },
+      // «Recién llegado» (pedido del dueño): lo modificado más recientemente
+      // primero; `id` desempata para que el orden sea estable.
+      orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
     });
 
     const ids = productos.map((producto) => producto.id);

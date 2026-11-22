@@ -33,6 +33,11 @@ jest.mock("@/lib/prisma", () => {
   const mockEstiloFindMany = jest.fn();
   const mockProductEstiloCreateMany = jest.fn();
   const mockProductEstiloDeleteMany = jest.fn();
+  // Variantes del producto (`ProductVariante`).
+  const mockVarianteCreateMany = jest.fn();
+  const mockVarianteDeleteMany = jest.fn();
+  // Fotos del producto: la variante guarda la `position` de una existente.
+  const mockImageFindMany = jest.fn();
   const mockTransaction = jest.fn(async (callback: (tx: unknown) => Promise<unknown>) => {
     const tx = {
       product: {
@@ -57,6 +62,11 @@ jest.mock("@/lib/prisma", () => {
         createMany: mockProductEstiloCreateMany,
         deleteMany: mockProductEstiloDeleteMany,
       },
+      productVariante: {
+        createMany: mockVarianteCreateMany,
+        deleteMany: mockVarianteDeleteMany,
+      },
+      productImage: { findMany: mockImageFindMany },
       estiloPrenda: { findMany: mockEstiloFindMany },
       purchase: { create: mockPurchaseCreate },
       purchaseItem: { createMany: mockPurchaseItemCreateMany },
@@ -100,6 +110,11 @@ jest.mock("@/lib/prisma", () => {
         createMany: mockProductEstiloCreateMany,
         deleteMany: mockProductEstiloDeleteMany,
       },
+      productVariante: {
+        createMany: mockVarianteCreateMany,
+        deleteMany: mockVarianteDeleteMany,
+      },
+      productImage: { findMany: mockImageFindMany },
       estiloPrenda: { findMany: mockEstiloFindMany },
     },
   };
@@ -1297,5 +1312,233 @@ describe("productos: estilos (ProductEstilo)", () => {
     ]);
     expect(prisma.product.createManyAndReturn).not.toHaveBeenCalled();
     expect(filasEstilo().createMany).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Variantes del producto (pedido del dueño): nombre libre + cantidad, opcional
+ * como los talles de la prenda. Con variantes el stock inicial del alta es la
+ * suma; sin variantes manda `cantidadInicial`. La foto de la variante guarda la
+ * `position` de una foto existente del producto.
+ */
+describe("productos: variantes (ProductVariante)", () => {
+  const variantes = () =>
+    prisma.productVariante as unknown as { createMany: jest.Mock; deleteMany: jest.Mock };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (prisma.product.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.product.create as jest.Mock).mockResolvedValue({
+      id: 12,
+      code: "AA000",
+      name: "Camisa",
+      price: 100,
+    });
+  });
+
+  it("el esquema valida nombre, cantidad y unicidad de nombre", () => {
+    const base = { name: "Camisa", prefix: "AA", price: 100 };
+
+    expect(
+      createProductSchema.safeParse({
+        ...base,
+        variantes: [
+          { nombre: "Roja", cantidad: 2 },
+          { nombre: "Azul", cantidad: 3, fotoPosition: 1 },
+        ],
+      }).success
+    ).toBe(true);
+
+    // Nombre repetido (sin importar mayúsculas ni espacios).
+    expect(
+      createProductSchema.safeParse({
+        ...base,
+        variantes: [
+          { nombre: "Roja", cantidad: 1 },
+          { nombre: " roja ", cantidad: 1 },
+        ],
+      }).success
+    ).toBe(false);
+
+    expect(
+      createProductSchema.safeParse({ ...base, variantes: [{ nombre: "Roja", cantidad: 1000 }] })
+        .success
+    ).toBe(false);
+    expect(
+      createProductSchema.safeParse({ ...base, variantes: [{ nombre: "", cantidad: 1 }] }).success
+    ).toBe(false);
+    expect(
+      createProductSchema.safeParse({
+        ...base,
+        variantes: [{ nombre: "Roja", cantidad: 1, fotoPosition: 4 }],
+      }).success
+    ).toBe(false);
+  });
+
+  it("el alta escribe una fila por variante y usa la suma como stock inicial", async () => {
+    (prisma.branch.findFirst as jest.Mock).mockResolvedValue({ id: 3 });
+    (prisma.branchInventory.create as jest.Mock).mockResolvedValue({ stock: 10 });
+
+    const result = await createProduct({
+      name: "Camisa",
+      prefix: "AA",
+      price: 100,
+      branchId: 3,
+      variantes: [
+        { nombre: "Roja", cantidad: 2 },
+        { nombre: "Azul", cantidad: 3, fotoPosition: 1 },
+        { nombre: "Negra", cantidad: 5 },
+      ],
+    });
+
+    expect(result.success).toBe(true);
+    // En el alta todavía no hay fotos: la posición se elige en la edición.
+    expect(variantes().createMany).toHaveBeenCalledWith({
+      data: [
+        { productId: 12, nombre: "Roja", cantidad: 2 },
+        { productId: 12, nombre: "Azul", cantidad: 3 },
+        { productId: 12, nombre: "Negra", cantidad: 5 },
+      ],
+    });
+    expect((prisma.branchInventory.create as jest.Mock).mock.calls[0][0].data).toEqual({
+      branchId: 3,
+      productId: 12,
+      stock: 10,
+    });
+  });
+
+  it("sin variantes el alta usa la cantidad inicial y no escribe variantes", async () => {
+    (prisma.branch.findFirst as jest.Mock).mockResolvedValue({ id: 3 });
+    (prisma.branchInventory.create as jest.Mock).mockResolvedValue({ stock: 7 });
+
+    const result = await createProduct({
+      name: "Camisa",
+      prefix: "AA",
+      price: 100,
+      branchId: 3,
+      cantidadInicial: 7,
+    });
+
+    expect(result.success).toBe(true);
+    expect(variantes().createMany).not.toHaveBeenCalled();
+    expect((prisma.branchInventory.create as jest.Mock).mock.calls[0][0].data.stock).toBe(7);
+  });
+
+  it("la compra del alta usa la misma cantidad que el stock ingresado", async () => {
+    (prisma.purchase.create as jest.Mock).mockResolvedValue({ id: 5 });
+
+    const result = await createProduct({
+      name: "Camisa",
+      prefix: "AA",
+      price: 100,
+      costoUnitario: 40,
+      variantes: [
+        { nombre: "Roja", cantidad: 2 },
+        { nombre: "Azul", cantidad: 8 },
+      ],
+    });
+
+    expect(result.success).toBe(true);
+    expect(prisma.purchaseItem.createMany).toHaveBeenCalledWith({
+      data: [{ purchaseId: 5, productId: 12, price: 40, quantity: 10, subtotal: 400 }],
+    });
+  });
+
+  it("la edición reemplaza las variantes y sin el campo no las toca", async () => {
+    (prisma.product.update as jest.Mock).mockResolvedValue({ id: 12 });
+    (prisma.productImage.findMany as jest.Mock).mockResolvedValue([{ position: 0 }]);
+
+    await updateProductExtended({
+      id: 12,
+      variantes: [{ nombre: "Roja", cantidad: 2, fotoPosition: 0 }],
+    });
+
+    expect(variantes().deleteMany).toHaveBeenCalledWith({ where: { productId: 12 } });
+    expect(variantes().createMany).toHaveBeenCalledWith({
+      data: [{ productId: 12, nombre: "Roja", cantidad: 2, fotoPosition: 0 }],
+    });
+
+    jest.clearAllMocks();
+    (prisma.product.update as jest.Mock).mockResolvedValue({ id: 12 });
+
+    await updateProductExtended({ id: 12, name: "Camisa nueva" });
+
+    expect(variantes().deleteMany).not.toHaveBeenCalled();
+    expect(variantes().createMany).not.toHaveBeenCalled();
+  });
+
+  it("la edición rechaza una foto que el producto no tiene", async () => {
+    (prisma.productImage.findMany as jest.Mock).mockResolvedValue([{ position: 0 }]);
+
+    const result = await updateProductExtended({
+      id: 12,
+      variantes: [{ nombre: "Roja", cantidad: 1, fotoPosition: 2 }],
+    });
+
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(result.error).toBe("La foto de la variante no existe");
+    expect(variantes().createMany).not.toHaveBeenCalled();
+    expect(prisma.product.update).not.toHaveBeenCalled();
+  });
+
+  it("getProductById devuelve las variantes guardadas", async () => {
+    (prisma.product.findUnique as jest.Mock).mockResolvedValue({
+      id: 12,
+      name: "Camisa",
+      price: 100,
+      publicaciones: [],
+      estilosProducto: [],
+      variantes: [{ nombre: "Roja", cantidad: 2, fotoPosition: 0 }],
+    });
+
+    const result = await getProductById(12);
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect((result.data as unknown as { variantes: unknown }).variantes).toEqual([
+      { nombre: "Roja", cantidad: 2, fotoPosition: 0 },
+    ]);
+  });
+
+  it("el lote escribe las variantes de cada fila y usa su suma como stock", async () => {
+    (prisma.branch.findFirst as jest.Mock).mockResolvedValue({
+      id: 3,
+      name: "Centro",
+      code: "CEN",
+    });
+    (prisma.product.createManyAndReturn as jest.Mock).mockResolvedValue([
+      { id: 21, code: "ZZ000", name: "Camisa", price: 100 },
+    ]);
+    (prisma.branchInventory.createManyAndReturn as jest.Mock).mockResolvedValue([
+      { productId: 21, stock: 5 },
+    ]);
+
+    const result = await createProductsBatch({
+      branchId: 3,
+      rows: [
+        {
+          name: "Camisa",
+          prefix: "ZZ",
+          price: 100,
+          initialStock: 9,
+          variantes: [
+            { nombre: "Roja", cantidad: 2 },
+            { nombre: "Azul", cantidad: 3 },
+          ],
+        },
+      ],
+    });
+
+    expect(result.success).toBe(true);
+    expect(variantes().createMany).toHaveBeenCalledWith({
+      data: [
+        { productId: 21, nombre: "Roja", cantidad: 2 },
+        { productId: 21, nombre: "Azul", cantidad: 3 },
+      ],
+    });
+    expect(
+      (prisma.branchInventory.createManyAndReturn as jest.Mock).mock.calls[0][0].data
+    ).toEqual([{ branchId: 3, productId: 21, stock: 5 }]);
   });
 });
