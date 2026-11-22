@@ -2,13 +2,17 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { StockMovementReceiptPanel } from './StockMovementReceiptPanel';
 import { generateStockMovementPdf } from '@/lib/utils/stock-movement-pdf';
-import { generateEntryReceiptWithLabels } from '@/actions/label-print';
+import { generateEntryReceiptWithLabels, detectPrendaProducts } from '@/actions/label-print';
 import type { StockMovementReceipt } from '@/lib/stock-movement-receipt';
 
 jest.mock('@/lib/utils/stock-movement-pdf', () => ({ generateStockMovementPdf: jest.fn() }));
-jest.mock('@/actions/label-print', () => ({ generateEntryReceiptWithLabels: jest.fn() }));
+jest.mock('@/actions/label-print', () => ({
+  generateEntryReceiptWithLabels: jest.fn(),
+  detectPrendaProducts: jest.fn(),
+}));
 const generate = generateStockMovementPdf as jest.MockedFunction<typeof generateStockMovementPdf>;
 const combined = generateEntryReceiptWithLabels as jest.MockedFunction<typeof generateEntryReceiptWithLabels>;
+const detect = detectPrendaProducts as jest.MockedFunction<typeof detectPrendaProducts>;
 const receipt: StockMovementReceipt = {
   movementType: 'EXIT', branchId: 3, date: '2026-08-06T18:30:00.000Z', branchName: 'Centro', branchCode: 'CEN',
   reference: 'Rotura', rows: [{ productId: 1, code: 'PR001', name: 'Producto', quantity: 3, stock: 0, price: 25 }],
@@ -33,6 +37,8 @@ beforeEach(() => {
       filename: 'comprobante-ingreso-CEN-20260806-etiquetas.pdf',
     },
   });
+  // Por defecto lo ingresado no trae prendas: el panel no suma pasos.
+  detect.mockResolvedValue({ success: true, data: { prendaIds: [] } });
   URL.createObjectURL = jest.fn().mockReturnValue('blob:receipt');
   URL.revokeObjectURL = jest.fn();
   click = jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
@@ -142,5 +148,69 @@ describe('ingreso registrado', () => {
 
     render(<StockMovementReceiptPanel receipt={transfer} onClose={jest.fn()} />);
     expect(screen.queryByRole('button', { name: 'Comprobante + etiquetas' })).toBeNull();
+    // Sin camino de etiquetas tampoco hay detección que preguntar.
+    expect(detect).not.toHaveBeenCalled();
+  });
+});
+
+// Los pasos extra del ingreso: tamaño de la etiqueta de prenda y peluches.
+describe('ingreso con prendas', () => {
+  const entryConPrenda: StockMovementReceipt = {
+    ...entry,
+    rows: [
+      { productId: 1, code: 'AAA001', name: 'Jabón de Avena', quantity: 2, stock: 17, price: 1250 },
+      { productId: 7, code: 'RPH014', name: 'Body Rosa', quantity: 1, stock: 4, price: 24000 },
+    ],
+  };
+
+  it('detecta la prenda, pregunta el tamaño y los peluches, y genera el PDF con ambos datos', async () => {
+    detect.mockResolvedValue({ success: true, data: { prendaIds: [7] } });
+    render(<StockMovementReceiptPanel receipt={entryConPrenda} onClose={jest.fn()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Comprobante + etiquetas' }));
+
+    await waitFor(() => expect(detect).toHaveBeenCalledWith({ productIds: [1, 7] }));
+    expect(await screen.findByText(/tamaño de la etiqueta de prenda/i)).toBeInTheDocument();
+    expect(combined).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: /grande 50 × 80 mm/i }));
+    // Solo los productos que no son prenda se pueden marcar como peluche.
+    expect(screen.queryByRole('checkbox', { name: /body rosa/i })).toBeNull();
+    fireEvent.click(screen.getByRole('checkbox', { name: /jabón de avena/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Generar PDF con etiquetas' }));
+
+    await waitFor(() => expect(click).toHaveBeenCalledTimes(1));
+    expect(combined).toHaveBeenCalledWith({
+      ...entryConPrenda,
+      prendaTamano: 'grande',
+      pelucheIds: [1],
+    });
+    expect((click.mock.instances[0] as HTMLAnchorElement).download).toBe(
+      'comprobante-ingreso-CEN-20260806-etiquetas.pdf'
+    );
+  });
+
+  it('volver del paso extra no imprime nada y deja reintentar', async () => {
+    detect.mockResolvedValue({ success: true, data: { prendaIds: [7] } });
+    render(<StockMovementReceiptPanel receipt={entryConPrenda} onClose={jest.fn()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Comprobante + etiquetas' }));
+    await screen.findByText(/tamaño de la etiqueta de prenda/i);
+    fireEvent.click(screen.getByRole('button', { name: 'Volver' }));
+
+    expect(combined).not.toHaveBeenCalled();
+    expect(click).not.toHaveBeenCalled();
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Comprobante + etiquetas' })).toBeInTheDocument();
+  });
+
+  it('sin prendas el panel va derecho al PDF combinado, como hoy', async () => {
+    render(<StockMovementReceiptPanel receipt={entryConPrenda} onClose={jest.fn()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Comprobante + etiquetas' }));
+
+    await waitFor(() => expect(click).toHaveBeenCalledTimes(1));
+    expect(detect).toHaveBeenCalledWith({ productIds: [1, 7] });
+    expect(combined).toHaveBeenCalledWith(entryConPrenda);
   });
 });

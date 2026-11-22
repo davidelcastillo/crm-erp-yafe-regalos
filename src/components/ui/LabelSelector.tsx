@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { getBranchProductsForExport, type ExportProductRow } from "@/app/actions/inventory";
-import { generateProductLabels } from "@/actions/label-print";
+import { generateProductLabels, detectPrendaProducts } from "@/actions/label-print";
 import { calculateSheetCount } from "@/lib/label-layout";
 import { BranchPicker } from "@/components/ui/BranchPicker";
 import { ProductSortToggle } from "@/components/ui/ProductSortToggle";
@@ -11,7 +11,14 @@ import { useProductSortMode } from "@/lib/hooks/useProductSortMode";
 import { sortProducts } from "@/lib/product-order";
 
 type BranchOption = { id: number; name: string };
-type Step = 1 | 2;
+type Step = 1 | 2 | 3 | 4;
+type PrendaTamano = "grande" | "mediana";
+
+/** Los dos tamaños de la etiqueta de prenda, con la medida que el dueño ya usa. */
+const TAMANOS_PRENDA: Array<{ id: PrendaTamano; label: string }> = [
+  { id: "grande", label: "Grande 50 × 80 mm" },
+  { id: "mediana", label: "Mediana 35 × 58 mm" },
+];
 
 export interface LabelSelectorProps {
   isOpen: boolean;
@@ -27,6 +34,11 @@ export interface LabelSelectorProps {
  *      sucursal** (es lo que se va a etiquetar) y el usuario la puede corregir;
  *      lo escrito a mano manda sobre el stock. El resumen muestra en vivo
  *      cuántas etiquetas y hojas A4 salen.
+ *   3. **Solo si la selección trae prendas**: el tamaño de la etiqueta de ropa.
+ *   4. **Solo si hay prendas**: si lleva peluches y cuáles, para la etiqueta chica.
+ *
+ * Con puros productos normales el wizard sigue teniendo dos pasos: la detección
+ * de prendas ocurre al pedir el PDF y no agrega preguntas.
  */
 export function LabelSelector({ isOpen, onClose, branches }: LabelSelectorProps) {
   const [step, setStep] = useState<Step>(1);
@@ -39,6 +51,10 @@ export function LabelSelector({ isOpen, onClose, branches }: LabelSelectorProps)
   const [quantities, setQuantities] = useState<Record<number, string>>({});
   const [generating, setGenerating] = useState(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
+  // Pasos extra: qué de la selección es prenda, el tamaño elegido y los peluches.
+  const [prendaIds, setPrendaIds] = useState<number[]>([]);
+  const [prendaTamano, setPrendaTamano] = useState<PrendaTamano | null>(null);
+  const [pelucheIds, setPelucheIds] = useState<number[]>([]);
   // Mismo control y misma memoria que el resto de las listas de productos.
   const [sortMode, setSortMode] = useProductSortMode();
 
@@ -64,6 +80,9 @@ export function LabelSelector({ isOpen, onClose, branches }: LabelSelectorProps)
     setQuantities({});
     setSearch("");
     setGenerateError(null);
+    setPrendaIds([]);
+    setPrendaTamano(null);
+    setPelucheIds([]);
     setStep(2);
     void cargarProductos(branchId);
   };
@@ -77,6 +96,9 @@ export function LabelSelector({ isOpen, onClose, branches }: LabelSelectorProps)
     setSelectedIds([]);
     setQuantities({});
     setGenerateError(null);
+    setPrendaIds([]);
+    setPrendaTamano(null);
+    setPelucheIds([]);
     onClose();
   };
 
@@ -129,6 +151,18 @@ export function LabelSelector({ isOpen, onClose, branches }: LabelSelectorProps)
     setSelectedIds(allSelected ? [] : rows.map((row) => row.id));
   };
 
+  const togglePeluche = (id: number) => {
+    setPelucheIds((prev) =>
+      prev.includes(id) ? prev.filter((marcado) => marcado !== id) : [...prev, id]
+    );
+  };
+
+  /** Selección en el orden de la lista, con su cantidad: lo que imprime el PDF. */
+  const seleccionados = rows.filter((row) => selectedIds.includes(row.id));
+  // Las prendas ya se imprimen con su propia etiqueta: no se ofrecen como peluche.
+  const pelucheCandidatos = seleccionados.filter((row) => !prendaIds.includes(row.id));
+  const totalSteps = prendaIds.length > 0 ? 4 : 2;
+
   const downloadPdf = (pdfBase64: string, filename: string) => {
     const byteCharacters = atob(pdfBase64);
     const byteNumbers = new Array(byteCharacters.length);
@@ -146,17 +180,23 @@ export function LabelSelector({ isOpen, onClose, branches }: LabelSelectorProps)
     URL.revokeObjectURL(url);
   };
 
-  const handleGenerate = async () => {
-    if (branchId === null || totalLabels === 0) return;
+  const generarPdf = async (opciones: {
+    prendaTamano?: PrendaTamano;
+    pelucheIds?: number[];
+  } = {}) => {
+    if (branchId === null) return;
     setGenerating(true);
     setGenerateError(null);
 
-    // Las selecciones van en el orden de la lista, con su cantidad.
     const result = await generateProductLabels({
       branchId,
-      selections: rows
-        .filter((row) => selectedIds.includes(row.id))
-        .map((row) => ({ productId: row.id, quantity: cantidadDe(row.id) })),
+      // Las selecciones van en el orden de la lista, con su cantidad.
+      selections: seleccionados.map((row) => ({
+        productId: row.id,
+        quantity: cantidadDe(row.id),
+      })),
+      ...(opciones.prendaTamano ? { prendaTamano: opciones.prendaTamano } : {}),
+      ...(opciones.pelucheIds?.length ? { pelucheIds: opciones.pelucheIds } : {}),
     });
 
     if (result.success) {
@@ -165,6 +205,35 @@ export function LabelSelector({ isOpen, onClose, branches }: LabelSelectorProps)
       setGenerateError(result.error);
     }
     setGenerating(false);
+  };
+
+  /**
+   * Detecta si la selección trae prendas: si trae, suma los pasos del tamaño y
+   * de los peluches antes de imprimir; si no, imprime como siempre.
+   */
+  const handleGenerate = async () => {
+    if (branchId === null || totalLabels === 0 || generating) return;
+    setGenerating(true);
+    setGenerateError(null);
+
+    const deteccion = await detectPrendaProducts({
+      productIds: seleccionados.map((row) => row.id),
+    });
+    setGenerating(false);
+
+    if (!deteccion.success) {
+      setGenerateError(deteccion.error);
+      return;
+    }
+    if (deteccion.data.prendaIds.length === 0) {
+      await generarPdf();
+      return;
+    }
+
+    setPrendaIds(deteccion.data.prendaIds);
+    setPrendaTamano(null);
+    setPelucheIds([]);
+    setStep(3);
   };
 
   if (!isOpen) return null;
@@ -197,7 +266,7 @@ export function LabelSelector({ isOpen, onClose, branches }: LabelSelectorProps)
         </div>
 
         <p className="text-xs font-medium uppercase tracking-wide text-ink-muted mb-4">
-          Paso {step} de 2
+          Paso {step} de {totalSteps}
         </p>
 
         {step === 1 && (
@@ -353,6 +422,124 @@ export function LabelSelector({ isOpen, onClose, branches }: LabelSelectorProps)
                 </button>
               </div>
             </aside>
+          </div>
+        )}
+
+        {/* Paso extra: la ropa se imprime con la etiqueta de prenda, en su medida. */}
+        {step === 3 && (
+          <div>
+            <h3 className="text-base font-semibold text-ink mb-2">
+              Tamaño de la etiqueta de prenda
+            </h3>
+            <p className="mb-3 text-sm text-ink-muted">
+              Las prendas salen con la etiqueta de ropa, una por talle y por cantidad. El
+              resto de los productos sigue con la etiqueta de siempre.
+            </p>
+
+            <div
+              role="group"
+              aria-label="Tamaño de la etiqueta de prenda"
+              className="space-y-2"
+            >
+              {TAMANOS_PRENDA.map(({ id, label }) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setPrendaTamano(id)}
+                  aria-pressed={prendaTamano === id}
+                  className={`w-full min-h-[48px] rounded-xl border px-4 py-3 text-left text-sm transition-colors touch-manipulation ${
+                    prendaTamano === id
+                      ? "border-accent bg-surface-soft font-semibold text-ink"
+                      : "border-hairline text-ink-body"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            <div className="mt-6 flex items-center justify-between gap-3">
+              <button type="button" onClick={handleClose} className="btn btn-secondary">
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => setStep(4)}
+                disabled={prendaTamano === null}
+                className="btn btn-primary flex-1 md:flex-none"
+              >
+                Siguiente
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Paso extra: los peluches marcados salen con la etiqueta chica. */}
+        {step === 4 && (
+          <div>
+            <h3 className="text-base font-semibold text-ink mb-2">¿Lleva peluches?</h3>
+            <p className="mb-3 text-sm text-ink-muted">
+              Marcá cuáles de los productos elegidos son peluches: salen con la etiqueta
+              chica. El resto de los productos sigue con la etiqueta de siempre.
+            </p>
+
+            {pelucheCandidatos.length > 0 ? (
+              <div
+                role="group"
+                aria-label="Productos que son peluche"
+                className="space-y-2 max-h-60 overflow-y-auto"
+              >
+                {pelucheCandidatos.map((row) => (
+                  <label
+                    key={row.id}
+                    className="flex items-center gap-3 p-3 min-h-[44px] rounded-xl bg-surface-soft cursor-pointer touch-manipulation"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={pelucheIds.includes(row.id)}
+                      onChange={() => togglePeluche(row.id)}
+                      aria-label={`Marcar ${row.name} como peluche`}
+                      className="w-5 h-5 accent-accent"
+                    />
+                    <span className="flex-1 min-w-0 text-sm font-medium text-ink truncate">
+                      {row.name}
+                    </span>
+                    <span className="text-xs text-ink-muted">{row.code}</span>
+                  </label>
+                ))}
+              </div>
+            ) : (
+              <p className="py-6 text-center text-sm text-ink-muted">
+                No hay productos para marcar como peluche
+              </p>
+            )}
+
+            {generateError && (
+              <p className="mt-3 text-sm text-error" role="alert">
+                {generateError}
+              </p>
+            )}
+
+            <div className="mt-6 flex items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => setStep(3)}
+                disabled={generating}
+                className="btn btn-secondary"
+              >
+                Volver
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  void generarPdf({ prendaTamano: prendaTamano ?? undefined, pelucheIds })
+                }
+                disabled={generating}
+                className="btn btn-primary flex-1 md:flex-none"
+              >
+                {generating ? "Generando..." : "Descargar PDF"}
+              </button>
+            </div>
           </div>
         )}
       </div>

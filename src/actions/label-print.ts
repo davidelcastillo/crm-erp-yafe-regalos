@@ -82,6 +82,32 @@ import {
   type PrendaLabelSize,
   type PrendaLabelSlot,
 } from '@/lib/label-prenda-layout';
+import {
+  CHICA_BRAND_FONT_SIZE_PT,
+  CHICA_BRAND_MAX_WIDTH_MM,
+  CHICA_BRAND_TOP_MM,
+  CHICA_DOLLAR_FONT_SIZE_PT,
+  CHICA_DOLLAR_INSET_MM,
+  CHICA_LABEL_BACKGROUND_COLOR,
+  CHICA_LABEL_HEIGHT_MM,
+  CHICA_LABEL_WIDTH_MM,
+  CHICA_LOGO_SIZE_MM,
+  CHICA_LOGO_TOP_MM,
+  CHICA_PRICE_BOX_COLOR,
+  CHICA_PRICE_BOX_HEIGHT_MM,
+  CHICA_PRICE_BOX_INSET_MM,
+  CHICA_PRICE_BOX_RADIUS_MM,
+  CHICA_PRICE_BOX_TOP_MM,
+  CHICA_PRICE_BOX_WIDTH_MM,
+  CHICA_PRICE_FONT_SIZE_PT,
+  CHICA_PRICE_GAP_MM,
+  CHICA_PRICE_MIN_FONT_SIZE_PT,
+  CHICA_PRICE_TEXT_COLOR,
+  CHICA_TEXT_COLOR,
+  calculateChicaLabelSlots,
+  calculateChicaSheetCount,
+  type ChicaLabelSlot,
+} from '@/lib/label-chica-layout';
 
 export type LabelSelection = {
   productId: number;
@@ -93,6 +119,17 @@ export type GenerateLabelsInput = {
   selections: LabelSelection[];
   /** Rellena la última hoja con etiquetas vacías para escribir a mano (S4). */
   fillLastSheet?: boolean;
+};
+
+/**
+ * Lo que el wizard pregunta cuando detecta prendas: el tamaño de la etiqueta de
+ * prenda y cuáles de los productos elegidos son peluches.
+ */
+export type LabelPrintOptions = {
+  /** Tamaño de la etiqueta de prenda; obligatorio si la selección trae prendas. */
+  prendaTamano?: PrendaLabelSize;
+  /** Productos de la selección marcados como peluche: salen con la etiqueta chica. */
+  pelucheIds?: number[];
 };
 
 export type GenerateLabelsResult =
@@ -114,6 +151,8 @@ const generateLabelsSchema = z.object({
     )
     .min(1, 'Seleccioná al menos un producto'),
   fillLastSheet: z.boolean().optional(),
+  prendaTamano: z.enum(['grande', 'mediana']).optional(),
+  pelucheIds: z.array(z.number().int().positive()).optional(),
 });
 
 const mm = (value: number) => value * MM_TO_PT;
@@ -190,11 +229,15 @@ const drawRoundedRect = (
  * etiquetas pegadas una al lado de la otra: sin canal, el corte a mano no tenía
  * por dónde entrar (S2). La geometría de los ticks vive en `label-layout`.
  */
-const drawCutMarks = (page: PDFPage, slots: LabelSlot[]) => {
+const drawCutMarks = (
+  page: PDFPage,
+  slots: LabelSlot[],
+  size?: { widthMm: number; heightMm: number }
+) => {
   const stroke = { color: color(CUT_MARK_COLOR), width: mm(CUT_MARK_WIDTH_MM) };
 
   for (const slot of slots) {
-    for (const mark of cutMarksForSlot(slot)) {
+    for (const mark of cutMarksForSlot(slot, size)) {
       page.drawLine({
         start: { x: mm(mark.x1), y: yFromTop(mark.y1, 0) },
         end: { x: mm(mark.x2), y: yFromTop(mark.y2, 0) },
@@ -392,19 +435,31 @@ const renderLabelsPdf = async (
   return pdfDoc.save();
 };
 
-type LabelSheetData = { branchCode: string; labels: LabelContent[] };
-
 type Resolved<T> = { ok: true; data: T } | { ok: false; error: string };
 
 /**
+ * La selección ya resuelta y separada por tipo: las prendas van con la etiqueta
+ * de prenda (una por talle), los peluches con la chica y el resto con la de
+ * producto. Cada grupo sale en sus propias hojas, en ese orden.
+ */
+type ResolvedLabels = {
+  branchCode: string;
+  products: LabelContent[];
+  prendas: PrendaLabelContent[];
+  chicas: LabelContent[];
+};
+
+/**
  * Re-valida en el servidor lo que el wizard ya filtró: sucursal existente y que
- * cada producto esté **activo con stock > 0 en esa sucursal** (S6). Devuelve una
- * etiqueta por unidad pedida, en el orden de la selección.
+ * cada producto esté **activo con stock > 0 en esa sucursal** (S6). Separa las
+ * prendas (`kind`, nunca el prefijo del código) de los peluches marcados y del
+ * resto de los productos.
  */
 const resolveLabelSheets = async (
   branchId: number,
-  selections: LabelSelection[]
-): Promise<Resolved<LabelSheetData>> => {
+  selections: LabelSelection[],
+  options: LabelPrintOptions = {}
+): Promise<Resolved<ResolvedLabels>> => {
   const branch = await prisma.branch.findUnique({
     where: { id: branchId },
     select: { code: true },
@@ -436,16 +491,248 @@ const resolveLabelSheets = async (
     };
   }
 
-  // Una etiqueta por unidad pedida, en el orden de la selección.
-  const labels: LabelContent[] = [];
+  // Qué es prenda lo dice `kind`. Va en su propia consulta para no cambiar la
+  // proyección con la que ya se valida el stock de la sucursal.
+  const prendaRows = await prisma.product.findMany({
+    where: { id: { in: productIds }, kind: 'PRENDA' },
+    select: {
+      id: true,
+      kind: true,
+      prenda: { select: { esUnica: true, talles: { select: { talle: true } } } },
+    },
+  });
+  const prendasById = new Map(
+    prendaRows.filter((row) => row.kind === 'PRENDA').map((row) => [row.id, row])
+  );
+  const pelucheIds = new Set(options.pelucheIds ?? []);
+
+  const resolved: ResolvedLabels = {
+    branchCode: branch.code,
+    products: [],
+    prendas: [],
+    chicas: [],
+  };
+
   for (const selection of selections) {
     const product = byId.get(selection.productId)!;
+    const prenda = prendasById.get(selection.productId);
+
+    if (prenda) {
+      // Un peluche que además es prenda sigue siendo prenda: la ropa lleva talle.
+      const talles = prenda.prenda?.talles.map((fila) => fila.talle) ?? [];
+      if (talles.length === 0) {
+        return {
+          ok: false,
+          error: `La prenda ${product.code} no tiene talles cargados`,
+        };
+      }
+      for (const talle of talles) {
+        for (let unit = 0; unit < selection.quantity; unit++) {
+          resolved.prendas.push({
+            code: product.code,
+            price: product.price,
+            talle,
+            esUnica: prenda.prenda!.esUnica,
+          });
+        }
+      }
+      continue;
+    }
+
     for (let unit = 0; unit < selection.quantity; unit++) {
-      labels.push(product);
+      if (pelucheIds.has(selection.productId)) {
+        resolved.chicas.push(product);
+      } else {
+        resolved.products.push(product);
+      }
     }
   }
 
-  return { ok: true, data: { branchCode: branch.code, labels } };
+  if (resolved.prendas.length > 0 && !options.prendaTamano) {
+    return { ok: false, error: 'Elegí el tamaño de las etiquetas de prenda' };
+  }
+
+  return { ok: true, data: resolved };
+};
+
+/**
+ * Una etiqueta chica (peluche): fondo crema, frutilla, «Polkalina's» y el precio.
+ * No dibuja el código a propósito (ver `label-chica-layout`).
+ */
+const drawChicaLabel = (
+  page: PDFPage,
+  slot: ChicaLabelSlot,
+  content: LabelContent,
+  fonts: { display: PDFFont; bold: PDFFont }
+) => {
+  const { display, bold } = fonts;
+  const ink = color(CHICA_TEXT_COLOR);
+
+  page.drawRectangle({
+    x: mm(slot.x),
+    y: yFromTop(slot.y, CHICA_LABEL_HEIGHT_MM),
+    width: mm(CHICA_LABEL_WIDTH_MM),
+    height: mm(CHICA_LABEL_HEIGHT_MM),
+    color: color(CHICA_LABEL_BACKGROUND_COLOR),
+  });
+
+  const centerXMm = slot.x + CHICA_LABEL_WIDTH_MM / 2;
+
+  drawBrandLogo(page, {
+    x: mm(centerXMm - CHICA_LOGO_SIZE_MM / 2),
+    y: yFromTop(slot.y + CHICA_LOGO_TOP_MM, 0),
+    size: mm(CHICA_LOGO_SIZE_MM),
+  });
+
+  const brandSize = fitFontSize(
+    display,
+    HANDLE_TEXT,
+    mm(CHICA_BRAND_MAX_WIDTH_MM),
+    CHICA_BRAND_FONT_SIZE_PT
+  );
+  const brandWidth = display.widthOfTextAtSize(HANDLE_TEXT, brandSize);
+  const brandAscent = display.heightAtSize(brandSize, { descender: false });
+  page.drawText(HANDLE_TEXT, {
+    x: mm(centerXMm) - brandWidth / 2,
+    y: yFromTop(slot.y + CHICA_BRAND_TOP_MM, 0) - brandAscent,
+    size: brandSize,
+    font: display,
+    color: ink,
+  });
+
+  // Caja del precio: es lo único que tiene que leerse a un metro del peluche.
+  const boxX = slot.x + CHICA_PRICE_BOX_INSET_MM;
+  const boxWidthPt = mm(CHICA_PRICE_BOX_WIDTH_MM);
+  const boxTop = slot.y + CHICA_PRICE_BOX_TOP_MM;
+  drawRoundedRect(page, {
+    x: mm(boxX),
+    y: yFromTop(boxTop, CHICA_PRICE_BOX_HEIGHT_MM),
+    width: boxWidthPt,
+    height: mm(CHICA_PRICE_BOX_HEIGHT_MM),
+    radius: mm(CHICA_PRICE_BOX_RADIUS_MM),
+    fill: color(CHICA_PRICE_BOX_COLOR),
+  });
+
+  const amount = formatPrice(content.price);
+  const dollarSize = CHICA_DOLLAR_FONT_SIZE_PT;
+  const dollarWidth = display.widthOfTextAtSize(CURRENCY_SYMBOL, dollarSize);
+  const dollarX = mm(boxX) + mm(CHICA_DOLLAR_INSET_MM);
+  const amountMaxWidth =
+    boxWidthPt -
+    mm(CHICA_DOLLAR_INSET_MM) -
+    dollarWidth -
+    mm(CHICA_PRICE_GAP_MM) -
+    mm(CHICA_DOLLAR_INSET_MM);
+  const centerY =
+    yFromTop(boxTop, CHICA_PRICE_BOX_HEIGHT_MM) + mm(CHICA_PRICE_BOX_HEIGHT_MM) / 2;
+
+  // Como en la etiqueta de producto: si no entra a una línea se parte, antes que
+  // bajar del mínimo legible.
+  const oneLineSize = fitFontSize(bold, amount, amountMaxWidth, CHICA_PRICE_FONT_SIZE_PT);
+  let amountLines = [amount];
+  let amountSize = Math.max(CHICA_PRICE_MIN_FONT_SIZE_PT, oneLineSize);
+  if (oneLineSize < CHICA_PRICE_MIN_FONT_SIZE_PT) {
+    amountLines = formatPriceLines(content.price);
+    amountSize = Math.min(
+      ...amountLines.map((line) =>
+        fitFontSize(
+          bold,
+          line,
+          amountMaxWidth,
+          CHICA_PRICE_FONT_SIZE_PT,
+          CHICA_PRICE_MIN_FONT_SIZE_PT
+        )
+      )
+    );
+  }
+
+  const ascent = bold.heightAtSize(amountSize, { descender: false });
+  const baselines =
+    amountLines.length === 1
+      ? [centerY - ascent / 2]
+      : [centerY + amountSize * 0.55, centerY - amountSize * 0.55];
+
+  page.drawText(CURRENCY_SYMBOL, {
+    x: dollarX,
+    y: baselines[0],
+    size: dollarSize,
+    font: display,
+    color: ink,
+  });
+
+  amountLines.forEach((line, lineIndex) => {
+    page.drawText(line, {
+      x: dollarX + dollarWidth + mm(CHICA_PRICE_GAP_MM),
+      y: baselines[lineIndex],
+      size: amountSize,
+      font: bold,
+      color: color(CHICA_PRICE_TEXT_COLOR),
+    });
+  });
+};
+
+/** Hojas A4 horizontales con las etiquetas chicas de los peluches. */
+const renderChicaLabelsPdf = async (labels: LabelContent[]): Promise<Uint8Array> => {
+  const pdfDoc = await PDFDocument.create();
+  pdfDoc.registerFontkit(fontkit);
+  const fonts = {
+    display: await pdfDoc.embedFont(Buffer.from(SHRIKHAND_TTF_BASE64, 'base64')),
+    bold: await pdfDoc.embedFont(StandardFonts.HelveticaBold),
+  };
+
+  const pages = Array.from(
+    { length: calculateChicaSheetCount(labels.length) },
+    () => pdfDoc.addPage([mm(SHEET_WIDTH_MM), mm(SHEET_HEIGHT_MM)])
+  );
+  for (const slot of calculateChicaLabelSlots(labels.length)) {
+    drawCutMarks(pages[slot.page], [slot], {
+      widthMm: CHICA_LABEL_WIDTH_MM,
+      heightMm: CHICA_LABEL_HEIGHT_MM,
+    });
+    drawChicaLabel(pages[slot.page], slot, labels[slot.index], fonts);
+  }
+
+  return pdfDoc.save();
+};
+
+/**
+ * Hojas de la selección, en el orden en que se imprimen: primero las etiquetas
+ * de producto, después las de prenda y al final las chicas de peluche. Cada
+ * grupo va en sus propias hojas porque cambia la medida.
+ */
+const renderLabelParts = async (
+  labels: ResolvedLabels,
+  options: LabelPrintOptions & { fillLastSheet?: boolean }
+): Promise<Uint8Array[]> => {
+  const parts: Uint8Array[] = [];
+
+  if (labels.products.length > 0) {
+    parts.push(await renderLabelsPdf(labels.products, options.fillLastSheet));
+  }
+  if (labels.prendas.length > 0 && options.prendaTamano) {
+    parts.push(await renderPrendaLabelsPdf(labels.prendas, options.prendaTamano));
+  }
+  if (labels.chicas.length > 0) {
+    parts.push(await renderChicaLabelsPdf(labels.chicas));
+  }
+
+  return parts;
+};
+
+/** Un solo PDF con las hojas de cada tipo, en orden (mismo criterio que S2). */
+const mergePdfParts = async (parts: Uint8Array[]): Promise<Uint8Array> => {
+  const [first, ...rest] = parts;
+  if (rest.length === 0) return first;
+
+  const pdf = await PDFDocument.load(first);
+  for (const part of rest) {
+    const doc = await PDFDocument.load(part);
+    for (const page of await pdf.copyPages(doc, doc.getPageIndices())) {
+      pdf.addPage(page);
+    }
+  }
+
+  return pdf.save();
 };
 
 /**
@@ -454,19 +741,28 @@ const resolveLabelSheets = async (
  *
  * Re-valida en el servidor lo que el wizard ya filtró: sucursal existente,
  * cantidad entre 1 y 999, al menos una selección y que cada producto esté
- * **activo con stock > 0 en esa sucursal** (S6).
+ * **activo con stock > 0 en esa sucursal** (S6). Las prendas salen con su propia
+ * etiqueta en el tamaño elegido y los peluches marcados con la etiqueta chica.
  */
 export async function generateProductLabels(data: unknown): Promise<GenerateLabelsResult> {
   try {
     const auth = await requireAdmin();
     if (!auth.ok) return { success: false as const, error: auth.error };
 
-    const { branchId, selections, fillLastSheet } = generateLabelsSchema.parse(data);
+    const { branchId, selections, fillLastSheet, prendaTamano, pelucheIds } =
+      generateLabelsSchema.parse(data);
 
-    const sheets = await resolveLabelSheets(branchId, selections);
+    const sheets = await resolveLabelSheets(branchId, selections, {
+      prendaTamano,
+      pelucheIds,
+    });
     if (!sheets.ok) return { success: false, error: sheets.error };
 
-    const pdfBytes = await renderLabelsPdf(sheets.data.labels, fillLastSheet);
+    const parts = await renderLabelParts(sheets.data, { fillLastSheet, prendaTamano });
+    if (parts.length === 0) {
+      return { success: false, error: 'No hay etiquetas para imprimir' };
+    }
+    const pdfBytes = await mergePdfParts(parts);
 
     return {
       success: true,
@@ -484,6 +780,53 @@ export async function generateProductLabels(data: unknown): Promise<GenerateLabe
     }
     console.error('Error generating product labels:', error);
     return { success: false, error: 'Error al generar las etiquetas' };
+  }
+}
+
+// --- Detección: qué de la selección es prenda ----------------------------
+
+export type DetectPrendaResult =
+  | { success: true; data: { prendaIds: number[] } }
+  | { success: false; error: string };
+
+const detectPrendaSchema = z.object({
+  productIds: z
+    .array(z.number().int().positive('Producto inválido'))
+    .min(1, 'Seleccioná al menos un producto'),
+});
+
+/**
+ * Qué de la selección es **prenda**, para que el wizard pregunte el tamaño (y los
+ * peluches) antes de generar. La decisión es `kind`, nunca el prefijo del código:
+ * así RP/RPI/RPH no quedan hardcodeados acá.
+ */
+export async function detectPrendaProducts(data: unknown): Promise<DetectPrendaResult> {
+  try {
+    const auth = await requireAdmin();
+    if (!auth.ok) return { success: false as const, error: auth.error };
+
+    const { productIds } = detectPrendaSchema.parse(data);
+
+    const rows = await prisma.product.findMany({
+      where: { id: { in: [...new Set(productIds)] }, kind: 'PRENDA' },
+      select: { id: true, kind: true },
+    });
+
+    return {
+      success: true,
+      data: {
+        prendaIds: rows.filter((row) => row.kind === 'PRENDA').map((row) => row.id),
+      },
+    };
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return {
+        success: false,
+        error: error.issues.map((issue) => issue.message).join(', '),
+      };
+    }
+    console.error('Error detecting prenda products:', error);
+    return { success: false, error: 'Error al detectar las prendas' };
   }
 }
 
@@ -688,8 +1031,7 @@ const renderPrendaLabelsPdf = async (
   return pdfDoc.save();
 };
 
-/** `etiquetas-prenda-<código o «varias»>-<tamaño>-<AAAAMMDD>.pdf` */
-const buildPrendaLabelsFileName = (code: string, tamano: PrendaLabelSize, date: Date) => {
+/** `etiquetas-prenda-<código o «varias»>-<tamaño>-<AAAAMMDD>.pdf` */const buildPrendaLabelsFileName = (code: string, tamano: PrendaLabelSize, date: Date) => {
   const yyyy = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
@@ -818,6 +1160,10 @@ const entryReceiptSchema = z.object({
       })
     )
     .min(1, 'El comprobante no tiene productos'),
+  /** Paso extra del wizard: tamaño de la etiqueta de prenda si el ingreso trae ropa. */
+  prendaTamano: z.enum(['grande', 'mediana']).optional(),
+  /** Paso extra del wizard: cuáles de lo ingresado son peluches. */
+  pelucheIds: z.array(z.number().int().positive()).optional(),
 });
 
 /**
@@ -841,7 +1187,8 @@ export async function generateEntryReceiptWithLabels(
 
     const sheets = await resolveLabelSheets(
       receipt.branchId,
-      receipt.rows.map((row) => ({ productId: row.productId, quantity: row.quantity }))
+      receipt.rows.map((row) => ({ productId: row.productId, quantity: row.quantity })),
+      { prendaTamano: receipt.prendaTamano, pelucheIds: receipt.pelucheIds }
     );
     if (!sheets.ok) return { success: false, error: sheets.error };
 
@@ -850,16 +1197,19 @@ export async function generateEntryReceiptWithLabels(
     // etiquetas se le copian como páginas: `copyPages` se lleva el recurso entero
     // y el texto de ambas partes sigue leyéndose (lo fija
     // `label-print.combined.test.ts` con el lector de PDFs).
-    const pdf = await PDFDocument.load(await generateStockMovementPdf(receipt));
-    const labelsPdf = await PDFDocument.load(await renderLabelsPdf(sheets.data.labels, true));
-    for (const page of await pdf.copyPages(labelsPdf, labelsPdf.getPageIndices())) {
-      pdf.addPage(page);
-    }
+    const parts = await renderLabelParts(sheets.data, {
+      fillLastSheet: true,
+      prendaTamano: receipt.prendaTamano,
+    });
+    const pdfBytes = await mergePdfParts([
+      await generateStockMovementPdf(receipt),
+      ...parts,
+    ]);
 
     return {
       success: true,
       data: {
-        pdfBase64: Buffer.from(await pdf.save()).toString('base64'),
+        pdfBase64: Buffer.from(pdfBytes).toString('base64'),
         filename: buildEntryReceiptFileName(receipt.branchCode, receipt.date),
       },
     };

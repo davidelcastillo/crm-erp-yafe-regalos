@@ -181,11 +181,20 @@ export function calculateLabelSlots(totalLabels: number): LabelSlot[] {
  * Marcas de corte de una etiqueta: dos ticks por esquina (uno horizontal y uno
  * vertical), separados del borde para que el corte se guíe por afuera de la
  * etiqueta. Con la grilla de 9 × 8 todos los ticks caen dentro de la hoja.
+ *
+ * La medida se puede pasar por parámetro porque la etiqueta chica del peluche
+ * usa otra grilla sobre la misma hoja (`label-chica-layout`).
  */
-export function cutMarksForSlot(slot: LabelSlot): CutMark[] {
+export function cutMarksForSlot(
+  slot: LabelSlot,
+  size: { widthMm: number; heightMm: number } = {
+    widthMm: LABEL_WIDTH_MM,
+    heightMm: LABEL_HEIGHT_MM,
+  }
+): CutMark[] {
   const { x, y } = slot;
-  const right = x + LABEL_WIDTH_MM;
-  const bottom = y + LABEL_HEIGHT_MM;
+  const right = x + size.widthMm;
+  const bottom = y + size.heightMm;
   const gap = CUT_MARK_OFFSET_MM;
   const largo = CUT_MARK_LENGTH_MM;
 
