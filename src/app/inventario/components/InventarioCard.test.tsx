@@ -10,6 +10,10 @@
  *
  * Antes había un input «Stock» en el modo edición que escribía directo en
  * `BranchInventory` con `adjustProductStock`.
+ *
+ * «Editar» en un producto normal abre el mismo modal que el alta
+ * (`ProductForm`): fotos, «Publicar en», nombre, precio, categoría y activo.
+ * El editor inline viejo de la card quedó sin uso (el dueño decide si se borra).
  */
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import type { Product } from "@prisma/client";
@@ -20,6 +24,8 @@ jest.mock("sweetalert2", () => ({
 }));
 
 jest.mock("@/app/actions/product", () => ({
+  createProduct: jest.fn(),
+  getProductById: jest.fn(),
   updateProduct: jest.fn(),
   deleteProduct: jest.fn(),
   toggleProductActive: jest.fn(),
@@ -47,7 +53,24 @@ jest.mock("@/app/actions/prendaTaxonomy", () => ({
   getMedidaTipoOptions: jest.fn(),
 }));
 
-import { updateProductExtended } from "@/app/actions/product";
+// El modal de producto trae fotos y selector de categoría: se mockean sus
+// acciones para que la suite hable solo de la card.
+jest.mock("@/app/actions/foto", () => ({
+  firmarSubidaFoto: jest.fn(),
+  confirmarFoto: jest.fn(),
+  quitarFoto: jest.fn(),
+  getFotosProducto: jest.fn(async () => ({ success: true, data: [] })),
+}));
+
+jest.mock("@/components/ui/CategorySelector", () => ({
+  CategorySelector: () => <div data-testid="category-selector" />,
+}));
+
+jest.mock("@/app/actions/branch", () => ({
+  getBranchOptions: jest.fn(async () => ({ success: true, data: [] })),
+}));
+
+import { getProductById, updateProductExtended } from "@/app/actions/product";
 import { adjustProductStock } from "@/app/actions/inventory";
 import { getPrenda } from "@/app/actions/prenda";
 import {
@@ -64,6 +87,17 @@ const mockAjustarStock = adjustProductStock as jest.MockedFunction<
   typeof adjustProductStock
 >;
 
+/** Filas de stock por sucursal tal como las devuelve `getProductsWithBranchStock`. */
+const sucursales = (...filas: Array<[string, number]>) =>
+  filas.map(([name, stock], i) => ({
+    id: i + 1,
+    branchId: i + 1,
+    productId: 7,
+    stock,
+    lastUpdated: new Date(),
+    branch: { id: i + 1, name },
+  }));
+
 const producto = {
   id: 7,
   name: "Jabón de Avena",
@@ -75,10 +109,11 @@ const producto = {
   codePrefix: "JA",
   createdAt: new Date(),
   updatedAt: new Date(),
-  inventory: [{ id: 1, branchId: 1, productId: 7, stock: 10, lastUpdated: new Date() }],
+  inventory: sucursales(["Salta", 10], ["Centro", 0]),
 } as unknown as Product;
 
-const renderCard = () => render(<InventarioCard product={producto} categories={[]} />);
+const renderCard = (p: Product = producto) =>
+  render(<InventarioCard product={p} categories={[]} />);
 
 const entrarAEditar = () => fireEvent.click(screen.getByRole("button", { name: "Editar" }));
 
@@ -86,6 +121,10 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockActualizar.mockResolvedValue({ success: true } as never);
   mockAjustarStock.mockResolvedValue({ success: true } as never);
+  (getProductById as jest.Mock).mockResolvedValue({
+    success: true,
+    data: { id: 7, publicadaEn: [] },
+  });
   (getPrenda as jest.Mock).mockResolvedValue({
     success: true,
     data: {
@@ -112,8 +151,36 @@ beforeEach(() => {
   (getMedidaTipoOptions as jest.Mock).mockResolvedValue({ success: true, data: [] });
 });
 
+describe("InventarioCard — editar un producto abre el modal", () => {
+  it("«Editar» monta el modal de producto y no el editor inline de la card", async () => {
+    renderCard();
+
+    entrarAEditar();
+
+    expect(await screen.findByRole("dialog", { name: "Editar Producto" })).toBeInTheDocument();
+    // El editor inline viejo se identificaba por su botón «Guardar».
+    expect(screen.queryByRole("button", { name: "Guardar" })).not.toBeInTheDocument();
+  });
+
+  it("el modal recibe el producto que se está editando y sus campos", async () => {
+    renderCard();
+
+    entrarAEditar();
+    await screen.findByRole("dialog", { name: "Editar Producto" });
+
+    expect(screen.getByLabelText("Nombre *")).toHaveValue("Jabón de Avena");
+    expect(screen.getByLabelText("Precio de venta *")).toHaveValue(1500);
+    expect(screen.getByLabelText("Código")).toHaveValue("JA000");
+    // Fotos, «Publicar en», categoría y activo: lo que el editor inline no tenía.
+    expect(screen.getByText("Fotos")).toBeInTheDocument();
+    expect(screen.getByText("Publicar en")).toBeInTheDocument();
+    expect(screen.getByTestId("category-selector")).toBeInTheDocument();
+    expect(screen.getByRole("switch", { name: "Activo" })).toBeInTheDocument();
+  });
+});
+
 describe("InventarioCard — el stock no se edita a mano (S20)", () => {
-  it("muestra el stock pero el modo edición no ofrece un campo de stock", () => {
+  it("muestra el stock en la card y el modal de edición no ofrece un campo de stock", async () => {
     renderCard();
 
     // Se muestra: la cantidad y el estado siguen visibles en la card.
@@ -121,19 +188,22 @@ describe("InventarioCard — el stock no se edita a mano (S20)", () => {
     expect(screen.getByText("En stock")).toBeInTheDocument();
 
     entrarAEditar();
+    await screen.findByRole("dialog", { name: "Editar Producto" });
 
-    // No se edita: no hay ningún campo de stock en el formulario.
-    expect(screen.queryByText("Stock")).not.toBeInTheDocument();
+    // No se edita: el modal no tiene ningún campo de stock.
+    expect(screen.queryByRole("spinbutton", { name: /stock/i })).not.toBeInTheDocument();
   });
 
-  it("guardar los cambios del producto no escribe stock en la sucursal", async () => {
+  it("guardar desde el modal no escribe stock en la sucursal", async () => {
     renderCard();
-    entrarAEditar();
 
-    fireEvent.change(screen.getByDisplayValue("Jabón de Avena"), {
+    entrarAEditar();
+    await screen.findByRole("dialog", { name: "Editar Producto" });
+
+    fireEvent.change(screen.getByLabelText("Nombre *"), {
       target: { value: "Jabón de Avena x2" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Guardar" }));
+    fireEvent.click(screen.getByRole("button", { name: "Actualizar Producto" }));
 
     await waitFor(() =>
       expect(mockActualizar).toHaveBeenCalledWith(
@@ -157,8 +227,57 @@ describe("InventarioCard — el nombre largo no rompe la card", () => {
   });
 });
 
+describe("InventarioCard — etiqueta de sucursales con stock", () => {
+  it("muestra una etiqueta por sucursal con stock > 0, con su cantidad", () => {
+    renderCard();
+
+    expect(screen.getByLabelText("Stock en Salta: 10 unidades")).toHaveTextContent("Salta · 10");
+    // Centro tiene fila de inventario pero stock 0: no se lista.
+    expect(screen.queryByLabelText("Stock en Centro: 0 unidades")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Centro/)).not.toBeInTheDocument();
+  });
+
+  it("no muestra etiquetas cuando ninguna sucursal tiene stock", () => {
+    renderCard({
+      ...producto,
+      inventory: sucursales(["Salta", 0], ["Centro", 0]),
+    } as unknown as Product);
+
+    expect(screen.queryByLabelText(/^Stock en /)).not.toBeInTheDocument();
+  });
+
+  it("con más de 3 sucursales muestra las 3 primeras y un chip «+N»", () => {
+    renderCard({
+      ...producto,
+      inventory: sucursales(["Salta", 1], ["Centro", 2], ["Norte", 3], ["Sur", 4], ["Oeste", 5]),
+    } as unknown as Product);
+
+    expect(screen.getByLabelText("Stock en Salta: 1 unidades")).toBeInTheDocument();
+    expect(screen.getByLabelText("Stock en Centro: 2 unidades")).toBeInTheDocument();
+    expect(screen.getByLabelText("Stock en Norte: 3 unidades")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Stock en Sur: 4 unidades")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("2 sucursales más")).toHaveTextContent("+2");
+  });
+
+  it("la prenda también muestra sus sucursales con stock", () => {
+    renderCard({
+      ...producto,
+      kind: "PRENDA",
+      name: "Campera de jean",
+      code: "PK000",
+    } as unknown as Product);
+
+    expect(screen.getByLabelText("Stock en Salta: 10 unidades")).toHaveTextContent("Salta · 10");
+  });
+});
+
 describe("InventarioCard — la prenda se edita con su ficha (U3)", () => {
-  const prenda = { ...producto, kind: "PRENDA", name: "Campera de jean", code: "PK000" } as Product;
+  const prenda = {
+    ...producto,
+    kind: "PRENDA",
+    name: "Campera de jean",
+    code: "PK000",
+  } as unknown as Product;
 
   it("«Editar» abre PrendaForm en modo edición, no el formulario de producto", async () => {
     render(<InventarioCard product={prenda} categories={[]} />);
@@ -170,14 +289,6 @@ describe("InventarioCard — la prenda se edita con su ficha (U3)", () => {
     expect(getPrenda).toHaveBeenCalledWith(7);
     // El modo edición propio de la card (producto normal) no se abrió.
     expect(screen.queryByRole("button", { name: "Guardar" })).not.toBeInTheDocument();
-  });
-
-  it("un producto normal sigue abriendo el modo edición de la card", () => {
-    renderCard();
-
-    entrarAEditar();
-
-    expect(screen.getByRole("button", { name: "Guardar" })).toBeInTheDocument();
-    expect(screen.queryByRole("dialog", { name: "Editar prenda" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "Editar Producto" })).not.toBeInTheDocument();
   });
 });

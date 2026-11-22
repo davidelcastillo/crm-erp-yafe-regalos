@@ -29,14 +29,15 @@ describe('generateStockMovementPdf', () => {
     const signed = { ENTRY: '+3', EXIT: '-3', TRANSFER: '+3' }[movementType];
     expect(text.slice(row, row + 5)).toEqual(['PR001', 'Producto de prueba', signed, '17', '$1.250,00']);
     expect(colors.get(signed)).toEqual({ ENTRY: [0.08, 0.5, 0.24], EXIT: [0.86, 0.15, 0.15], TRANSFER: [0.08, 0.5, 0.24] }[movementType]);
-    expect(colors.get('17')).toEqual([0.13, 0.13, 0.13]);
+    expect(colors.get('17')).toEqual([0.29, 0.17, 0.16]);
     expect(text.join(' ')).toContain('1 productos · 3 unidades');
     expect(text).toContain('Página 1 de 1');
+    // La frutilla se dibuja con vectores: no hay imagen embebida en el comprobante.
     const objects = doc.getPages()[0].node.Resources()?.lookup(PDFName.of('XObject'), PDFDict);
-    expect(objects?.entries().some(([, ref]) => {
+    expect((objects?.entries() ?? []).some(([, ref]) => {
       const object = doc.context.lookup(ref);
       return object instanceof PDFRawStream && String(object.dict.get(PDFName.of('Subtype'))) === '/Image';
-    })).toBe(true);
+    })).toBe(false);
   });
 
   test('pagina sin perder productos y conserva motivo largo en todas las páginas', async () => {
@@ -58,7 +59,7 @@ describe('generateStockMovementPdf', () => {
     const row = text.indexOf('PR001');
     expect(text.slice(row, row + 5)).toEqual(['PR001', 'Producto de prueba', '-3', '22', '$1.250,00']);
     expect(colors.get('-3')).toEqual([0.86, 0.15, 0.15]);
-    expect(colors.get('22')).toEqual([0.13, 0.13, 0.13]);
+    expect(colors.get('22')).toEqual([0.29, 0.17, 0.16]);
     expect(text.join(' ')).toContain('Comprobante de la sucursal que envía: Depósito (DEP)');
     expect(text.join(' ')).toContain('1 productos · 3 unidades');
   });
@@ -76,11 +77,11 @@ describe('generateStockMovementPdf', () => {
     expect(text.join(' ')).toContain('<script>alert(1)</script> ?');
   });
 
-  test('pinta el título con el rosa de marca y el encabezado de tabla en blanco', async () => {
+  test('pinta el título con el frutilla de la marca y el encabezado de tabla en blanco', async () => {
     const { colors } = await readPdf(await generateStockMovementPdf(receipt));
 
-    // #be185d = rgb(0,75 · 0,09 · 0,36): el rosa de marca del sistema; el encabezado va en blanco encima.
-    expect(colors.get('Ingreso')).toEqual([0.75, 0.09, 0.36]);
+    // #C8323C = rgb(0,78 · 0,20 · 0,24): el frutilla de la marca; el encabezado va en blanco encima.
+    expect(colors.get('Ingreso')).toEqual([0.78, 0.2, 0.24]);
     expect(colors.get('Código')).toEqual([1, 1, 1]);
   });
 

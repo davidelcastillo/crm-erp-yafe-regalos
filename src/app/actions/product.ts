@@ -53,12 +53,30 @@ function isUniqueConstraintError(error: unknown): boolean {
   return error instanceof Object && "code" in error && error.code === "P2002";
 }
 
+/**
+ * Mismo criterio que la prenda: los estilos elegidos tienen que existir y estar
+ * activos. Una fila desactivada no entra en un alta ni en una edición.
+ */
+async function estilosInvalidos(ids: number[]): Promise<string | null> {
+  if (ids.length === 0) return null;
+  const estilos = await prisma.estiloPrenda.findMany({
+    where: { id: { in: ids }, active: true },
+    select: { id: true },
+  });
+  return estilos.length === ids.length
+    ? null
+    : "Un estilo seleccionado no existe o está inactivo";
+}
+
 export async function createProduct(data: unknown) {
   try {
     const auth = await requireAdmin();
     if (!auth.ok) return { success: false as const, error: auth.error };
 
     const validatedData = createProductSchema.parse(data);
+
+    const estilosMalos = await estilosInvalidos(validatedData.estilos);
+    if (estilosMalos) return { success: false as const, error: estilosMalos };
 
     // Sucursal del stock inicial (T3): se valida antes de escribir, como el lote.
     const branch =
@@ -106,29 +124,45 @@ export async function createProduct(data: unknown) {
             },
           });
 
-          // Sin sucursal ni cantidad el alta queda como antes.
-          if (!branch || cantidadInicial < 1) return creado;
+          // S3: «Publicar en» reutiliza `PrendaPublicacion`, la misma tabla
+          // que la prenda (sin migración).
+          if (validatedData.publicadaEn.length > 0) {
+            await tx.prendaPublicacion.createMany({
+              data: validatedData.publicadaEn.map((canal) => ({ productId: creado.id, canal })),
+            });
+          }
 
-          await tx.branchInventory.create({
-            data: { branchId: branch.id, productId: creado.id, stock: cantidadInicial },
-          });
+          // Estilos: la misma taxonomía que la prenda (`ProductEstilo`).
+          if (validatedData.estilos.length > 0) {
+            await tx.productEstilo.createMany({
+              data: validatedData.estilos.map((estiloId) => ({ productId: creado.id, estiloId })),
+            });
+          }
 
-          await tx.branchMovement.create({
-            data: {
-              productId: creado.id,
-              branchId: branch.id,
-              movementType: "ENTRY",
-              quantity: cantidadInicial,
-              reference: PRODUCT_ENTRY_REFERENCE,
-              // `performedBy` es obligatorio: sin email queda un responsable explícito.
-              performedBy: auth.email || "sistema",
-            },
-          });
+          // Sin sucursal o sin cantidad no hay stock: ni inventario ni ENTRY.
+          if (branch && cantidadInicial >= 1) {
+            await tx.branchInventory.create({
+              data: { branchId: branch.id, productId: creado.id, stock: cantidadInicial },
+            });
+
+            await tx.branchMovement.create({
+              data: {
+                productId: creado.id,
+                branchId: branch.id,
+                movementType: "ENTRY",
+                quantity: cantidadInicial,
+                reference: PRODUCT_ENTRY_REFERENCE,
+                // `performedBy` es obligatorio: sin email queda un responsable explícito.
+                performedBy: auth.email || "sistema",
+              },
+            });
+          }
 
           // T3/S2: con costo > 0 la compra del alta se registra en la misma
           // transacción (solo registro: el ENTRY de arriba ya ingresó el stock).
+          // Sin sucursal la compra queda con `branchId` null.
           if ((validatedData.costoUnitario ?? 0) > 0) {
-            await registrarCompraDelAlta(tx, branch.id, [
+            await registrarCompraDelAlta(tx, branch?.id ?? null, [
               {
                 productId: creado.id,
                 price: validatedData.costoUnitario!,
@@ -257,6 +291,29 @@ export async function createProductsBatch(data: unknown) {
       }
     }
 
+    // Los estilos de todas las filas se verifican en UNA consulta, igual que las
+    // categorías: uno inactivo o inexistente marca solo las filas que lo usan.
+    const estilosPedidos = [...new Set(rows.flatMap((row) => row.estilos))];
+    if (estilosPedidos.length > 0) {
+      const estilos = await prisma.estiloPrenda.findMany({
+        where: { id: { in: estilosPedidos }, active: true },
+        select: { id: true },
+      });
+      const activos = new Set(estilos.map((estilo) => estilo.id));
+      const inactivos = new Set(estilosPedidos.filter((id) => !activos.has(id)));
+      if (inactivos.size > 0) {
+        const mensaje = "Un estilo seleccionado no existe o está inactivo";
+        return batchFailure(
+          mensaje,
+          rows.flatMap((row, rowIndex) =>
+            row.estilos.some((id) => inactivos.has(id))
+              ? [{ row: rowIndex, field: "estilos", message: mensaje }]
+              : []
+          )
+        );
+      }
+    }
+
     // Solo bloquean los nombres de productos ACTIVOS, sin distinguir mayúsculas (S3).
     const existentes = await prisma.product.findMany({
       where: {
@@ -341,8 +398,33 @@ export async function createProductsBatch(data: unknown) {
               name: producto.name,
             }));
 
-            // Sin sucursal el lote queda como antes: solo productos.
-            if (!branch) return { products, receipt: null };
+            // Estilos de cada fila: una sola `createMany` para todo el lote, con
+            // el id real de cada producto cruzado por código (mismo índice).
+            const estilosDelLote = filasCreadas.flatMap(({ producto }, i) =>
+              rows[i].estilos.map((estiloId) => ({ productId: producto.id, estiloId }))
+            );
+            if (estilosDelLote.length > 0) {
+              await tx.productEstilo.createMany({ data: estilosDelLote });
+            }
+
+            // T4: UNA sola compra del lote, solo con las filas que tienen costo y
+            // stock cargado. El ENTRY de abajo ya ingresa el stock: la compra no lo toca.
+            const itemsDeCompra = filasCreadas
+              .filter((fila) => fila.costo > 0 && fila.stockInicial > 0)
+              .map(({ producto, stockInicial, costo }) => ({
+                productId: producto.id,
+                price: costo,
+                quantity: stockInicial,
+              }));
+
+            // Sin sucursal no hay stock, pero la compra del alta se registra igual
+            // (branchId null) y el lote no crea inventario ni movimientos.
+            if (!branch) {
+              if (itemsDeCompra.length > 0) {
+                await registrarCompraDelAlta(tx, null, itemsDeCompra);
+              }
+              return { products, receipt: null };
+            }
 
             // S11: la fila de inventario se crea siempre, también con stock 0,
             // para que el producto nuevo se vea en la vista por sucursal (H1).
@@ -374,19 +456,10 @@ export async function createProductsBatch(data: unknown) {
               });
             }
 
-            // T4: UNA sola compra del lote, solo con las filas que tienen costo y
-            // stock. El ENTRY de arriba ya ingresó el stock: la compra no lo toca.
-            const conCompra = conStock.filter((fila) => fila.costo > 0);
-            if (conCompra.length > 0) {
-              await registrarCompraDelAlta(
-                tx,
-                branch.id,
-                conCompra.map(({ producto, stockInicial, costo }) => ({
-                  productId: producto.id,
-                  price: costo,
-                  quantity: stockInicial,
-                }))
-              );
+            // T4: la compra usa el mismo conjunto de filas (costo y stock); el
+            // ENTRY de arriba ya ingresó el stock, así que la compra no lo toca.
+            if (itemsDeCompra.length > 0) {
+              await registrarCompraDelAlta(tx, branch.id, itemsDeCompra);
             }
 
             const receipt: StockMovementReceipt | null =
@@ -493,11 +566,25 @@ export async function getProductById(id: number) {
 
     const product = await prisma.product.findUnique({
       where: { id },
+      // La edición necesita los canales ya publicados (S3) y los estilos
+      // guardados, para precargarlos sin borrarlos.
+      include: {
+        publicaciones: { select: { canal: true } },
+        estilosProducto: { select: { estiloId: true } },
+      },
     });
     if (!product) {
       return { success: false, error: "Producto no encontrado" };
     }
-    return { success: true, data: parseObject(product) };
+    const { publicaciones, estilosProducto, ...ficha } = product;
+    return {
+      success: true,
+      data: parseObject({
+        ...ficha,
+        publicadaEn: publicaciones.map((publicacion) => publicacion.canal),
+        estilos: estilosProducto.map((estilo) => estilo.estiloId),
+      }),
+    };
   } catch (error) {
     console.error("Error fetching product:", error);
     return { success: false, error: "Error al obtener el producto" };
@@ -843,20 +930,59 @@ export async function updateProductExtended(data: unknown) {
 
     const validatedData = updateProductExtendedSchema.parse(data);
 
-    const product = await prisma.product.update({
-      where: { id: validatedData.id },
-      data: {
-        ...(validatedData.name && { name: validatedData.name }),
-        ...(validatedData.description !== undefined && {
-          description: validatedData.description,
-        }),
-        ...(validatedData.price !== undefined && { price: validatedData.price }),
-        ...(validatedData.categoryId !== undefined && {
-          categoryId: validatedData.categoryId,
-        }),
-        ...(validatedData.active !== undefined && { active: validatedData.active }),
-      },
-    });
+    const estilosMalos = await estilosInvalidos(validatedData.estilos ?? []);
+    if (estilosMalos) return { success: false as const, error: estilosMalos };
+
+    const cambios = {
+      ...(validatedData.name && { name: validatedData.name }),
+      ...(validatedData.description !== undefined && {
+        description: validatedData.description,
+      }),
+      ...(validatedData.price !== undefined && { price: validatedData.price }),
+      ...(validatedData.categoryId !== undefined && {
+        categoryId: validatedData.categoryId,
+      }),
+      ...(validatedData.active !== undefined && { active: validatedData.active }),
+    };
+
+    // S3: «Publicar en» reemplaza las filas de `PrendaPublicacion` en la misma
+    // transacción que la ficha. Los estilos hacen lo mismo con `ProductEstilo`.
+    // Sin el campo, cada uno queda como estaba.
+    const tocaPublicaciones = validatedData.publicadaEn !== undefined;
+    const tocaEstilos = validatedData.estilos !== undefined;
+    const product =
+      !tocaPublicaciones && !tocaEstilos
+        ? await prisma.product.update({ where: { id: validatedData.id }, data: cambios })
+        : await prisma.$transaction(async (tx) => {
+            const actualizado = await tx.product.update({
+              where: { id: validatedData.id },
+              data: cambios,
+            });
+            if (tocaPublicaciones) {
+              await tx.prendaPublicacion.deleteMany({ where: { productId: validatedData.id } });
+              // `publicadaEn` no es undefined en esta rama; el chequeo es por el cierre.
+              if (validatedData.publicadaEn && validatedData.publicadaEn.length > 0) {
+                await tx.prendaPublicacion.createMany({
+                  data: validatedData.publicadaEn.map((canal) => ({
+                    productId: validatedData.id,
+                    canal,
+                  })),
+                });
+              }
+            }
+            if (tocaEstilos) {
+              await tx.productEstilo.deleteMany({ where: { productId: validatedData.id } });
+              if (validatedData.estilos && validatedData.estilos.length > 0) {
+                await tx.productEstilo.createMany({
+                  data: validatedData.estilos.map((estiloId) => ({
+                    productId: validatedData.id,
+                    estiloId,
+                  })),
+                });
+              }
+            }
+            return actualizado;
+          });
 
     revalidatePath("/productos");
     revalidatePath(`/productos/${validatedData.id}`);

@@ -2,14 +2,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Product } from "@prisma/client";
 import Swal from "sweetalert2";
 import { CategorySelector } from "@/components/ui/CategorySelector";
 import { BranchPicker } from "@/components/ui/BranchPicker";
+import { FotoUploader, subirFotos } from "@/components/ui/FotoUploader";
+import { CANALES_PUBLICACION } from "@/lib/validations/prenda";
+import type { TaxonomyOption } from "@/lib/validations/prendaTaxonomy";
 import { getBranchOptions } from "@/app/actions/branch";
+import { getEstiloPrendaOptions } from "@/app/actions/prendaTaxonomy";
 import {
   createProduct,
+  getProductById,
   updateProductExtended,
 } from "@/app/actions/product";
 
@@ -54,6 +60,87 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
   const [branchId, setBranchId] = useState<number | null>(null);
   const [cantidadInicial, setCantidadInicial] = useState("");
   const [costo, setCosto] = useState("");
+
+  /**
+   * Wizard del alta: 1 = sucursal (o sin sucursal), 2 = ficha. La edición no
+   * tiene pasos.
+   */
+  const [paso, setPaso] = useState(1);
+  const enPasoSucursal = !isEdit && paso === 1;
+  const sucursalElegida = branches.find((b) => b.id === branchId)?.name;
+
+  /**
+   * T3: «Publicar en» para productos normales (misma tabla que la prenda).
+   * En la edición arranca en `null` hasta que llegan los canales guardados, así
+   * guardar sin haber cargado no borra publicaciones.
+   */
+  const [publicadaEn, setPublicadaEn] = useState<string[] | null>(isEdit ? null : []);
+  /**
+   * Estilos del producto: la misma taxonomía que la prenda. En la edición
+   * arranca en `null` hasta leer los guardados, así guardar sin cargar no los borra.
+   */
+  const [estilos, setEstilos] = useState<number[] | null>(isEdit ? null : []);
+  const [estilosDisponibles, setEstilosDisponibles] = useState<TaxonomyOption[]>([]);
+  /** T2: fotos elegidas en el alta; se suben recién con el producto creado (id). */
+  const [fotosPendientes, setFotosPendientes] = useState<File[]>([]);
+
+  /**
+   * Con el modal abierto la página de atrás no scrollea: en el celular el gesto
+   * se escapaba del modal y movía /inventario. Es DOM, no estado de React.
+   */
+  useEffect(() => {
+    document.body.classList.add("overflow-hidden");
+    return () => document.body.classList.remove("overflow-hidden");
+  }, []);
+
+  const toggleCanal = (canal: string) =>
+    setPublicadaEn((prev) =>
+      (prev ?? []).includes(canal)
+        ? (prev ?? []).filter((actual) => actual !== canal)
+        : [...(prev ?? []), canal]
+    );
+
+  const toggleEstilo = (id: number) =>
+    setEstilos((prev) =>
+      (prev ?? []).includes(id) ? (prev ?? []).filter((actual) => actual !== id) : [...(prev ?? []), id]
+    );
+
+  // Los estilos activos se piden una vez, en el alta y en la edición.
+  useEffect(() => {
+    let cancelado = false;
+    (async () => {
+      try {
+        const resultado = await getEstiloPrendaOptions();
+        if (!cancelado && resultado.success) setEstilosDisponibles(resultado.data);
+      } catch (error) {
+        console.error("Error loading style options:", error);
+      }
+    })();
+    return () => {
+      cancelado = true;
+    };
+  }, []);
+
+  // La edición lee los canales ya publicados antes de poder guardar.
+  useEffect(() => {
+    if (!product) return;
+    let cancelado = false;
+    (async () => {
+      try {
+        const resultado = await getProductById(product.id);
+        if (cancelado || !resultado.success) return;
+        const ficha = resultado.data as { publicadaEn?: string[]; estilos?: number[] };
+        setPublicadaEn(ficha.publicadaEn ?? []);
+        setEstilos(ficha.estilos ?? []);
+      } catch (error) {
+        console.error("Error loading product publications:", error);
+        if (!cancelado) setPublicadaEn([]);
+      }
+    })();
+    return () => {
+      cancelado = true;
+    };
+  }, [product]);
 
   useEffect(() => {
     if (isEdit) return;
@@ -116,6 +203,10 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
           price: formData.price,
           categoryId: categoryId,
           active: isActive,
+          // Sin canales cargados todavía no se toca lo publicado.
+          ...(publicadaEn !== null ? { publicadaEn } : {}),
+          // Sin estilos cargados todavía no se tocan los guardados.
+          ...(estilos !== null ? { estilos } : {}),
         }
       : {
           name: formData.name,
@@ -126,15 +217,13 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
           // explícito: el esquema la acepta nullable y el producto queda igual
           // que antes (categoryId=null).
           categoryId: categoryId,
-          // Stock inicial y costo solo con sucursal (T3). Sin ella el payload
-          // queda idéntico al de antes.
-          ...(branchId !== null
-            ? {
-                branchId,
-                cantidadInicial: Number(cantidadInicial) || 0,
-                costoUnitario: Number(costo) || 0,
-              }
-            : {}),
+          publicadaEn: publicadaEn ?? [],
+          estilos: estilos ?? [],
+          // La cantidad y el costo viajan siempre: con costo se registra la
+          // compra del alta, haya o no sucursal. Sin sucursal no hay stock.
+          ...(branchId !== null ? { branchId } : {}),
+          cantidadInicial: Number(cantidadInicial) || 0,
+          costoUnitario: Number(costo) || 0,
         };
 
     const result = isEdit
@@ -142,6 +231,21 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
       : await createProduct(payload);
 
     if (result.success) {
+      const createdProduct = result.data as Product;
+
+      // T2: las fotos del alta se suben con el producto ya creado. Una que
+      // falle se avisa y no bloquea al resto ni la creación.
+      const avisoFotos = isEdit ? null : await subirFotos(createdProduct.id, fotosPendientes);
+      if (avisoFotos) {
+        await Swal.fire({
+          title: "Fotos sin subir",
+          text: `${avisoFotos}. El producto sí se creó, podés reintentar desde la edición.`,
+          icon: "warning",
+          confirmButtonColor: "var(--palette-brand-action)",
+          confirmButtonText: "Aceptar",
+        });
+      }
+
       await Swal.fire({
         title: isEdit ? "Producto actualizado" : "Producto creado",
         text: isEdit
@@ -152,8 +256,6 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
         confirmButtonText: "Aceptar",
         customClass: { confirmButton: "rounded-xl px-6 py-3 font-medium" },
       });
-
-      const createdProduct = result.data as Product;
 
       if (onSuccess) {
         onSuccess(createdProduct);
@@ -178,29 +280,79 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
     "w-full px-4 py-3 rounded-xl border border-hairline focus:border-accent focus:ring-2 focus:ring-accent/30 outline-none transition-all";
   const labelClass = "block text-sm font-medium text-ink mb-2";
 
-  return (
-    <div className="fixed inset-0 bg-scrim-strong backdrop-blur-sm z-[60] flex items-end justify-center">
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-scrim-strong p-3 backdrop-blur-sm md:p-6">
       <div
-        className="bg-surface w-full max-w-lg rounded-t-3xl p-6 animate-slide-up max-h-[90vh] overflow-y-auto"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="product-form-title"
+        className="flex max-h-[90dvh] w-full max-w-lg flex-col rounded-t-3xl bg-surface animate-slide-up md:max-w-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-semibold text-ink">
-            {isEdit ? "Editar Producto" : "Nuevo Producto"}
-          </h2>
+        {/* Cabecera fija, fuera del scroll. */}
+        <div className="flex items-start justify-between gap-3 px-6 pb-2 pt-6">
+          <div className="min-w-0">
+            <h2 id="product-form-title" className="text-xl font-semibold text-ink">
+              {isEdit ? "Editar Producto" : "Nuevo Producto"}
+            </h2>
+            {!isEdit && (
+              <p className="mt-1 text-sm text-ink-muted">
+                {enPasoSucursal
+                  ? "Paso 1 de 2 · Elegí la sucursal"
+                  : `Paso 2 de 2 · ${sucursalElegida ?? "Sin sucursal"}`}
+              </p>
+            )}
+            {!isEdit && !enPasoSucursal && (
+              <button
+                type="button"
+                onClick={() => setPaso(1)}
+                className="mt-1 text-sm text-accent underline-offset-2 hover:underline"
+              >
+                Cambiar sucursal
+              </button>
+            )}
+          </div>
           <button
             type="button"
             onClick={onClose}
-            className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full hover:bg-surface-strong transition-colors touch-manipulation"
+            className="btn btn-icon btn-round text-ink-muted hover:bg-surface-strong"
             aria-label="Cerrar"
           >
-            <svg className="w-6 h-6 text-ink-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+          {/* Área central: scrollea sola y retiene el gesto (overscroll-contain). */}
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-6 pb-4">
+          {enPasoSucursal ? (
+            <div className="space-y-3">
+              <BranchPicker
+                branches={branches}
+                value={branchId}
+                onChange={setBranchId}
+                label="Sucursal"
+                columns={2}
+                emptyLabel="No hay sucursales activas: el producto se crea sin stock"
+              />
+              {/* La sucursal es opcional: sin ella el producto nace sin stock. */}
+              <button
+                type="button"
+                aria-pressed={branchId === null}
+                onClick={() => setBranchId(null)}
+                className={`w-full min-h-[44px] rounded-2xl bg-surface px-4 py-3 text-left text-sm font-medium transition-all touch-manipulation ${
+                  branchId === null
+                    ? "border-2 border-accent ring-2 ring-accent/40 text-ink"
+                    : "border border-hairline text-ink-muted"
+                }`}
+              >
+                Sin sucursal (el producto se crea sin stock)
+              </button>
+            </div>
+          ) : (
+            <>
           <div>
             <label htmlFor="product-name" className={labelClass}>Nombre *</label>
             <input
@@ -307,24 +459,9 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
             </>
           )}
 
-          {/* T3: sucursal, cantidad inicial y costo del alta. */}
+          {/* Cantidad y costo: siempre visibles. El costo se registra como
+              compra del alta, haya o no sucursal. */}
           {!isEdit && (
-            <div>
-              <span className={labelClass}>Sucursal</span>
-              <BranchPicker
-                branches={branches}
-                value={branchId}
-                onChange={setBranchId}
-                label="Sucursal"
-                emptyLabel="No hay sucursales activas: el producto se crea sin stock"
-              />
-              <p className="text-xs text-ink-muted mt-1">
-                Sin sucursal: el producto se crea sin stock.
-              </p>
-            </div>
-          )}
-
-          {!isEdit && branchId !== null && (
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label htmlFor="product-cantidad-inicial" className={labelClass}>
@@ -358,10 +495,12 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
                   className={inputClass}
                   placeholder="0.00"
                 />
-                <p className="text-xs text-ink-muted mt-1">
-                  Con costo y cantidad se registra la compra en Compras.
-                </p>
               </div>
+              <p className="col-span-2 text-xs text-ink-muted">
+                {branchId === null
+                  ? "Sin sucursal: no se carga stock; el costo igual queda registrado como compra."
+                  : "Con costo y cantidad se registra la compra en Compras."}
+              </p>
             </div>
           )}
 
@@ -372,6 +511,65 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
               selectedId={categoryId}
               onValueChange={setCategoryId}
               label=""
+            />
+          </div>
+
+          {/* Estilos: la misma taxonomía que la prenda, con sus mismas pills. */}
+          <div>
+            <span className={labelClass}>Estilos</span>
+            <div className="flex flex-wrap gap-2">
+              {estilosDisponibles.map((estilo) => {
+                const elegido = (estilos ?? []).includes(estilo.id);
+                return (
+                  <button
+                    key={estilo.id}
+                    type="button"
+                    aria-pressed={elegido}
+                    onClick={() => toggleEstilo(estilo.id)}
+                    className={`min-h-[44px] rounded-full border px-4 py-2 text-sm transition-colors touch-manipulation ${
+                      elegido
+                        ? "border-accent bg-accent/10 font-medium text-brand-rosa-texto"
+                        : "border-hairline bg-surface text-ink"
+                    }`}
+                  >
+                    {estilo.name}
+                  </button>
+                );
+              })}
+              {estilosDisponibles.length === 0 && (
+                <p className="text-xs text-ink-muted">No hay estilos cargados</p>
+              )}
+            </div>
+          </div>
+
+          {/* T3: «Publicar en» — mismo patrón que la prenda. */}
+          <div>
+            <span className={labelClass}>Publicar en</span>
+            <div className="flex flex-wrap gap-2">
+              {CANALES_PUBLICACION.map((canal) => (
+                <label
+                  key={canal}
+                  className="inline-flex min-h-[44px] items-center gap-2 rounded-xl border border-hairline px-4 text-sm text-ink"
+                >
+                  <input
+                    type="checkbox"
+                    checked={(publicadaEn ?? []).includes(canal)}
+                    onChange={() => toggleCanal(canal)}
+                    className="h-5 w-5 accent-accent"
+                  />
+                  {canal}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* T2: en la edición se administran las que ya tiene; en el alta
+              quedan pendientes hasta que el producto exista. */}
+          <div>
+            <span className={labelClass}>Fotos</span>
+            <FotoUploader
+              productId={isEdit ? product!.id : null}
+              onPendientesChange={setFotosPendientes}
             />
           </div>
 
@@ -403,21 +601,46 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
             </div>
           )}
 
-          <div>
+          </>
+          )}
+          </div>
+
+          {/* Pie fijo, fuera del scroll: en el paso 1 se continúa; en el 2 se guarda. */}
+          <div className="border-t border-hairline bg-surface px-6 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4 md:pb-4">
+          <div className="flex gap-2">
             <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-4 min-h-[48px] bg-ink text-surface font-medium rounded-xl hover:bg-ink-body hover:text-surface transition-colors disabled:opacity-50 touch-manipulation"
+              type="button"
+              onClick={onClose}
+              className="px-5 py-4 min-h-[48px] rounded-xl border border-hairline text-ink font-medium hover:bg-surface-strong transition-colors touch-manipulation"
             >
-              {loading
-                ? "Guardando…"
-                : isEdit
-                  ? "Actualizar Producto"
-                  : "Crear Producto"}
+              Cancelar
             </button>
+            {enPasoSucursal ? (
+              <button
+                type="button"
+                onClick={() => setPaso(2)}
+                className="flex-1 py-4 min-h-[48px] bg-ink text-surface font-medium rounded-xl hover:bg-ink-body hover:text-surface transition-colors touch-manipulation"
+              >
+                Continuar
+              </button>
+            ) : (
+              <button
+                type="submit"
+                disabled={loading}
+                className="flex-1 py-4 min-h-[48px] bg-ink text-surface font-medium rounded-xl hover:bg-ink-body hover:text-surface transition-colors disabled:opacity-50 touch-manipulation"
+              >
+                {loading
+                  ? "Guardando…"
+                  : isEdit
+                    ? "Actualizar Producto"
+                    : "Crear Producto"}
+              </button>
+            )}
+          </div>
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

@@ -1,14 +1,18 @@
 // src/app/productos/components/BulkProductForm.tsx
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Swal from "sweetalert2";
 import { getCategoryOptions } from "@/app/actions/category";
+import { getEstiloPrendaOptions } from "@/app/actions/prendaTaxonomy";
+import type { TaxonomyOption } from "@/lib/validations/prendaTaxonomy";
 import { createProductsBatch } from "@/app/actions/product";
 import { createProductsBatchSchema } from "@/lib/validations/product";
 import { CategorySelector } from "@/components/ui/CategorySelector";
 import { BranchPicker } from "@/components/ui/BranchPicker";
+import { subirFoto } from "@/components/ui/FotoUploader";
+import { MAX_FOTOS } from "@/lib/storage";
 import { StockMovementReceiptPanel } from "@/app/inventario/components/StockMovementReceiptPanel";
 import type { StockMovementReceipt } from "@/lib/stock-movement-receipt";
 
@@ -25,6 +29,10 @@ type Fila = {
   initialStock: string;
   /** Costo que salió cada unidad (T4); vacío es 0 y no entra en la compra. */
   costo: string;
+  /** Estilos de la fila (misma taxonomía que la prenda); vacío son ninguno. */
+  estilos: number[];
+  /** Fotos pendientes (U2): no viajan en el lote, se suben con el producto creado. */
+  fotos: File[];
 };
 /** `row` es un mensaje que no pertenece a un campo puntual: se muestra en la card. */
 type Campo = "name" | "prefix" | "price" | "categoryId" | "initialStock" | "costo" | "row";
@@ -63,6 +71,111 @@ function erroresPorFila(
 }
 
 /**
+ * Fotos pendientes de una fila del lote (U2): hasta `MAX_FOTOS`, la primera es
+ * la portada. Se validan acá (tipo y tope, igual que `FotoUploader`) y la subida
+ * espera a que el producto exista.
+ */
+function FotosFila({
+  id,
+  etiqueta,
+  archivos,
+  onChange,
+  disabled,
+}: {
+  id: string;
+  /** Nombre de la fila o «Producto N»: el label dice de qué producto son. */
+  etiqueta: string;
+  archivos: File[];
+  onChange: (archivos: File[]) => void;
+  disabled: boolean;
+}) {
+  const [error, setError] = useState<string | null>(null);
+  // Una object URL por miniatura: se libera cuando el archivo deja la fila.
+  const urls = useMemo(() => archivos.map((archivo) => URL.createObjectURL(archivo)), [archivos]);
+  useEffect(() => () => urls.forEach((url) => URL.revokeObjectURL(url)), [urls]);
+
+  const agregar = (elegidos: File[]) => {
+    const libres = MAX_FOTOS - archivos.length;
+    if (elegidos.length > libres) {
+      setError(
+        `El máximo es ${MAX_FOTOS} fotos: ${libres === 0 ? "quitá una para agregar otra" : `elegí ${libres} o menos`}`
+      );
+      return;
+    }
+    const noImagen = elegidos.filter((archivo) => !archivo.type.startsWith("image/"));
+    if (noImagen.length > 0) {
+      setError(`${noImagen.map((archivo) => `«${archivo.name}»`).join(", ")} no es una imagen`);
+      return;
+    }
+    setError(null);
+    onChange([...archivos, ...elegidos]);
+  };
+
+  return (
+    <div className="space-y-2">
+      <input
+        id={id}
+        type="file"
+        accept="image/*"
+        multiple
+        disabled={disabled || archivos.length >= MAX_FOTOS}
+        onChange={(evento) => {
+          const elegidos = Array.from(evento.target.files ?? []);
+          evento.target.value = "";
+          agregar(elegidos);
+        }}
+        className="sr-only"
+      />
+      <label
+        htmlFor={id}
+        className="flex min-h-[44px] w-full cursor-pointer items-center justify-center rounded-xl border border-hairline bg-surface px-3 text-sm font-medium text-ink touch-manipulation"
+      >
+        ＋ Fotos de {etiqueta}
+      </label>
+      <p className="text-xs text-ink-muted">
+        {archivos.length} de {MAX_FOTOS} · la primera es la portada
+      </p>
+      {error && (
+        <p role="alert" className="text-sm text-error-ink">
+          {error}
+        </p>
+      )}
+      {archivos.length > 0 && (
+        <ul className="grid grid-cols-4 gap-2">
+          {archivos.map((archivo, indice) => (
+            <li key={`${archivo.name}-${indice}`} className="relative">
+              {/* object URL del archivo elegido: todavía no existe en el bucket. */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={urls[indice]}
+                alt={archivo.name}
+                className="aspect-square w-full rounded-lg border border-hairline object-cover"
+              />
+              {indice === 0 && (
+                <span className="absolute left-1 top-1 rounded-full bg-ink px-2 py-0.5 text-[10px] font-medium text-surface">
+                  Portada
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={() => onChange(archivos.filter((_, i) => i !== indice))}
+                disabled={disabled}
+                aria-label={`Quitar foto ${indice + 1} de ${etiqueta}`}
+                className="absolute -right-1 -top-1 flex h-11 w-11 items-center justify-center rounded-full bg-ink text-surface"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/**
  * BulkProductForm
  *
  * Alta masiva de productos (S1): muchas filas en un mismo modal y un solo
@@ -91,12 +204,24 @@ function erroresPorFila(
  */
 export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFormProps) {
   const [filas, setFilas] = useState<Fila[]>([
-    { id: "1", name: "", prefix: "", price: "", categoryId: null, initialStock: "", costo: "" },
+    {
+      id: "1",
+      name: "",
+      prefix: "",
+      price: "",
+      categoryId: null,
+      initialStock: "",
+      costo: "",
+      estilos: [],
+      fotos: [],
+    },
   ]);
   const [paso, setPaso] = useState<Paso>("sucursal");
   const [branchId, setBranchId] = useState<number | null>(null);
   const [receipt, setReceipt] = useState<StockMovementReceipt | null>(null);
   const [categorias, setCategorias] = useState<{ id: number; name: string }[]>([]);
+  // Una sola lista de estilos activos para todas las filas.
+  const [estilosDisponibles, setEstilosDisponibles] = useState<TaxonomyOption[]>([]);
   const [cargandoCategorias, setCargandoCategorias] = useState(true);
   const [errorCategorias, setErrorCategorias] = useState(false);
   const [errores, setErrores] = useState<Record<string, FilaError[]>>({});
@@ -116,6 +241,8 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
     });
   }, [branchId]);
   const [loading, setLoading] = useState(false);
+  /** Subida de las fotos pendientes después de crear el lote (U2). */
+  const [subiendoFotos, setSubiendoFotos] = useState(false);
 
   const nextId = useRef(1);
   const cuerpoRef = useRef<HTMLDivElement>(null);
@@ -138,6 +265,22 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
         if (!cancelado) setErrorCategorias(true);
       } finally {
         if (!cancelado) setCargandoCategorias(false);
+      }
+    })();
+    return () => {
+      cancelado = true;
+    };
+  }, []);
+
+  // Estilos activos: una sola lista para todas las filas, igual que las categorías.
+  useEffect(() => {
+    let cancelado = false;
+    (async () => {
+      try {
+        const resultado = await getEstiloPrendaOptions();
+        if (!cancelado && resultado.success) setEstilosDisponibles(resultado.data);
+      } catch (error) {
+        console.error("Error loading style options:", error);
       }
     })();
     return () => {
@@ -178,6 +321,8 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
       categoryId: null,
       initialStock: "",
       costo: "",
+      estilos: [],
+      fotos: [],
     };
     idParaEnfocar.current = nueva.id;
     setFilas((prev) => [...prev, nueva]);
@@ -191,7 +336,9 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
       fila.prefix.trim() ||
       fila.price.trim() ||
       fila.initialStock.trim() ||
-      fila.costo.trim();
+      fila.costo.trim() ||
+      fila.estilos.length > 0 ||
+      fila.fotos.length > 0;
     if (conDatos) {
       const confirmacion = await Swal.fire({
         title: "¿Quitar esta fila?",
@@ -240,7 +387,9 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
         f.prefix.trim() ||
         f.price.trim() ||
         f.initialStock.trim() ||
-        f.costo.trim()
+        f.costo.trim() ||
+        f.estilos.length > 0 ||
+        f.fotos.length > 0
     );
     if (!conDatos) {
       onClose();
@@ -261,6 +410,43 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
 
   const filasConError = filas.filter((f) => (errores[f.id]?.length ?? 0) > 0);
   const nombreSucursal = branches.find((b) => b.id === branchId)?.name ?? "";
+
+  /**
+   * Sube las fotos pendientes con el producto ya creado (U2). Se cruza por
+   * nombre porque el lote no devuelve el código de cada fila y la posición no
+   * sirve (`createManyAndReturn` no promete orden); el nombre es único en el
+   * lote (`createProductsBatchSchema`). Devuelve el detalle de las que fallaron
+   * o `null`: una foto que falla no revierte el lote.
+   */
+  const subirFotosDelLote = async (
+    products: { id: number; code: string; name: string }[]
+  ): Promise<string | null> => {
+    const porNombre = new Map(products.map((producto) => [producto.name.trim().toLowerCase(), producto]));
+    const fallas: string[] = [];
+    let pedidas = 0;
+    let subidas = 0;
+
+    for (const [indice, fila] of filas.entries()) {
+      if (fila.fotos.length === 0) continue;
+      pedidas += fila.fotos.length;
+      const detalle = (mensaje: string) => `Fila ${indice + 1} «${fila.name.trim()}»: ${mensaje}`;
+      const producto = porNombre.get(fila.name.trim().toLowerCase());
+      if (!producto) {
+        fallas.push(detalle("no se encontró el producto creado"));
+        continue;
+      }
+      const resultados = await Promise.all(
+        fila.fotos.map((archivo) => subirFoto(producto.id, archivo))
+      );
+      subidas += resultados.filter((resultado) => resultado.success).length;
+      for (const resultado of resultados) {
+        if (!resultado.success) fallas.push(detalle(resultado.error));
+      }
+    }
+
+    if (fallas.length === 0) return null;
+    return `Se subieron ${subidas} de ${pedidas} fotos. ${fallas.join(" · ")}`;
+  };
 
   const irAPrimeraConError = () => {
     const fila = filasConError[0];
@@ -283,6 +469,8 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
         prefix: f.prefix,
         price: Number(f.price),
         categoryId: f.categoryId,
+        // Estilos de la fila: sin elegir ninguno no viaja (el esquema lo deja vacío).
+        ...(f.estilos.length > 0 ? { estilos: f.estilos } : {}),
         // Vacío es 0: el producto igual queda en la vista por sucursal (S11).
         ...(branchId !== null
           ? { initialStock: f.initialStock.trim() === "" ? 0 : Number(f.initialStock) }
@@ -316,9 +504,27 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
     setLoading(true);
     setErrores({});
     const resultado = await createProductsBatch(parsed.data);
+
+    // U2: las fotos esperan al producto creado. Una que falle se avisa sin
+    // bloquear el lote ya creado (mismo criterio que el alta individual).
+    let avisoFotos: string | null = null;
+    if (resultado.success) {
+      setSubiendoFotos(true);
+      avisoFotos = await subirFotosDelLote(resultado.data.products);
+      setSubiendoFotos(false);
+    }
     setLoading(false);
 
     if (resultado.success) {
+      if (avisoFotos) {
+        await Swal.fire({
+          title: "Fotos sin subir",
+          text: `${avisoFotos}. Los productos sí se crearon, podés reintentar desde la edición.`,
+          icon: "warning",
+          confirmButtonColor: "var(--palette-brand-action)",
+          confirmButtonText: "Aceptar",
+        });
+      }
       // Con comprobante primero se descarga (y si quiere, las etiquetas): el
       // modal se cierra recién cuando se cierra el panel, una sola vez.
       if (resultado.data.receipt) {
@@ -683,6 +889,51 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
                             </p>
                           )}
                         </div>
+
+                        {/* Estilos de la fila: la misma taxonomía que la prenda, compacta. */}
+                        <div>
+                          <span className={labelClass}>Estilos</span>
+                          <div className="flex flex-wrap gap-2">
+                            {estilosDisponibles.map((estilo) => {
+                              const elegido = fila.estilos.includes(estilo.id);
+                              return (
+                                <button
+                                  key={estilo.id}
+                                  type="button"
+                                  aria-pressed={elegido}
+                                  onClick={() =>
+                                    actualizarFila(
+                                      fila.id,
+                                      "estilos",
+                                      elegido
+                                        ? fila.estilos.filter((id) => id !== estilo.id)
+                                        : [...fila.estilos, estilo.id]
+                                    )
+                                  }
+                                  className={`min-h-[44px] rounded-full border px-3 py-2 text-sm touch-manipulation ${
+                                    elegido
+                                      ? "border-accent bg-accent/10 font-medium text-brand-rosa-texto"
+                                      : "border-hairline bg-surface text-ink"
+                                  }`}
+                                >
+                                  {estilo.name}
+                                </button>
+                              );
+                            })}
+                            {estilosDisponibles.length === 0 && (
+                              <p className="text-xs text-ink-muted">No hay estilos cargados</p>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* U2: fotos de la fila, pendientes hasta que el producto exista. */}
+                        <FotosFila
+                          id={`${base}-fotos`}
+                          etiqueta={fila.name.trim() || `Producto ${index + 1}`}
+                          archivos={fila.fotos}
+                          onChange={(fotos) => actualizarFila(fila.id, "fotos", fotos)}
+                          disabled={loading}
+                        />
                       </div>
                     );
                   })}
@@ -732,6 +983,11 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
               {/* Desde md alineado con la columna derecha del cuerpo: filas a la
                   izquierda, acción a la derecha. */}
               <div className="space-y-2 md:col-start-2">
+                {subiendoFotos && (
+                  <p role="status" className="text-sm text-ink-muted">
+                    Subiendo las fotos…
+                  </p>
+                )}
                 <button
                   type="button"
                   onClick={agregarFila}
@@ -751,7 +1007,9 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
                   </button>
                   <button type="submit" disabled={loading} className="btn btn-primary flex-1">
                     {loading
-                      ? "Creando…"
+                      ? subiendoFotos
+                        ? "Subiendo fotos…"
+                        : "Creando…"
                       : `Crear ${filas.length} ${filas.length === 1 ? "producto" : "productos"}`}
                   </button>
                 </div>

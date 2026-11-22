@@ -1,5 +1,30 @@
 // src/lib/validations/product.ts
 import { z } from "zod";
+import { CANALES_PUBLICACION, type CanalPublicacion } from "@/lib/validations/prenda";
+
+/**
+ * «Publicar en» (T3 de `odd/tasks/fotos-vidriera-polkalinas.md`, S3): los
+ * mismos canales y el mismo filtro que la prenda. Vacío o desconocido se
+ * ignora; sin el campo la edición no toca las publicaciones existentes.
+ */
+const filtrarCanales = (canales: string[]): CanalPublicacion[] => [
+  ...new Set(
+    canales
+      .map((canal) => canal.trim())
+      .filter((canal): canal is CanalPublicacion =>
+        (CANALES_PUBLICACION as readonly string[]).includes(canal)
+      )
+  ),
+];
+
+/** Alta: sin canales queda vacío (publica en ninguno). */
+const publicadaEnAlta = z
+  .array(z.string())
+  .optional()
+  .transform((canales) => filtrarCanales(canales ?? []));
+
+/** Edición: sin el campo la edición no toca las publicaciones existentes. */
+const publicadaEnEdicion = z.array(z.string()).transform(filtrarCanales).optional();
 
 /**
  * Schema de creación de producto. Vive acá para que el alta masiva use la
@@ -13,13 +38,20 @@ const productFields = {
   prefix: z.string().regex(/^[A-Za-z]{2,4}$/, "Prefijo: 2-4 letras (A-Z)").transform(v => v.toUpperCase()),
   price: z.number().min(0, "El precio no puede ser negativo"),
   categoryId: z.number().int().positive("Categoría inválida").nullable().optional(),
+  // Estilos: la misma taxonomía que la prenda y opcional. Un id repetido no
+  // aporta nada, así que se descarta en vez de fallar.
+  estilos: z
+    .array(z.number().int().positive("Estilo inválido"))
+    .optional()
+    .transform((ids) => [...new Set(ids ?? [])]),
 };
 
 /**
  * Alta individual (T3 de `talles-y-compra-alta.md`): gana sucursal, cantidad
  * inicial y costo, todos opcionales. Sin ellos el alta queda exactamente como
- * antes. Con cantidad ≥ 1 se crea el inventario y su `ENTRY`; con costo > 0
- * además la compra del alta, que necesita sucursal y cantidad para existir.
+ * antes. Con cantidad ≥ 1 y sucursal se crea el inventario y su `ENTRY`; con
+ * costo > 0 además la compra del alta, que ya no necesita sucursal: la cantidad
+ * cargada es la que da las unidades de la compra.
  */
 export const createProductSchema = z
   .object({
@@ -32,14 +64,15 @@ export const createProductSchema = z
       .max(999, "La cantidad inicial no puede superar 999")
       .optional(),
     costoUnitario: z.number().min(0, "El costo no puede ser negativo").optional(),
+    publicadaEn: publicadaEnAlta,
   })
   .superRefine((data, ctx) => {
     if ((data.costoUnitario ?? 0) <= 0) return;
-    if (data.branchId === undefined || (data.cantidadInicial ?? 0) < 1) {
+    if ((data.cantidadInicial ?? 0) < 1) {
       ctx.addIssue({
         code: "custom",
-        message: "Para registrar el costo cargá la sucursal y la cantidad inicial",
-        path: ["costoUnitario"],
+        message: "Para registrar el costo cargá la cantidad inicial (1 o más)",
+        path: ["cantidadInicial"],
       });
     }
   });
@@ -61,8 +94,8 @@ const createProductsBatchRowSchema = z.object({
  * repetida; el choque con un nombre que ya existe se valida en el servidor,
  * contra los productos activos (S3).
  *
- * `branchId` es opcional a propósito: es la sucursal global del lote (D8) y,
- * mientras la UI no la mande, el lote sigue creando solo productos.
+ * `branchId` es opcional a propósito: es la sucursal global del lote (D8). Sin
+ * sucursal el lote crea igual los productos y su compra (sin stock).
  */
 export const createProductsBatchSchema = z
   .object({
@@ -87,14 +120,18 @@ export const createProductsBatchSchema = z
       vistos.add(clave);
     });
 
-    // T4: la compra del lote usa la sucursal global; sin ella el costo se perdería.
-    if (data.branchId === undefined && data.rows.some((row) => (row.costo ?? 0) > 0)) {
-      ctx.addIssue({
-        code: "custom",
-        message: "Para registrar el costo elegí la sucursal del lote",
-        path: ["branchId"],
-      });
-    }
+    // Sin sucursal no hay stock, así que la cantidad de la fila es la única
+    // fuente de unidades de la compra: sin ella el costo se perdería.
+    if (data.branchId !== undefined) return;
+    data.rows.forEach((row, rowIndex) => {
+      if ((row.costo ?? 0) > 0 && (row.initialStock ?? 0) < 1) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Para registrar el costo cargá el stock inicial de esa fila (1 o más)",
+          path: ["rows", rowIndex, "initialStock"],
+        });
+      }
+    });
   });
 
 export type CreateProductsBatchValues = z.infer<typeof createProductsBatchSchema>;
@@ -116,6 +153,13 @@ export const updateProductExtendedSchema = z.object({
   price: z.number().min(0, "El precio no puede ser negativo").optional(),
   categoryId: z.number().int().positive("Categoría inválida").nullable().optional(),
   active: z.boolean().optional(),
+  // Presente = reemplaza las publicaciones; ausente = no las toca.
+  publicadaEn: publicadaEnEdicion,
+  // Presente = reemplaza los estilos; ausente = no los toca (misma regla).
+  estilos: z
+    .array(z.number().int().positive("Estilo inválido"))
+    .transform((ids) => [...new Set(ids)])
+    .optional(),
 });
 
 export type UpdateProductExtendedValues = z.infer<typeof updateProductExtendedSchema>;

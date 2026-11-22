@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import Swal from "sweetalert2";
 import type { Product } from "@prisma/client";
 import { BranchPicker } from "@/components/ui/BranchPicker";
+import { FotoUploader, subirFotos } from "@/components/ui/FotoUploader";
 import { StockMovementReceiptPanel } from "@/app/inventario/components/StockMovementReceiptPanel";
 import type { StockMovementReceipt } from "@/lib/stock-movement-receipt";
 import { CANALES_PUBLICACION } from "@/lib/validations/prenda";
@@ -12,7 +13,8 @@ import type {
   CategoriaPrendaOption,
   TaxonomyOption,
 } from "@/lib/validations/prendaTaxonomy";
-import { createPrenda, getPrenda, updatePrenda } from "@/app/actions/prenda";
+import { createPrenda, destacarPrenda, getPrenda, updatePrenda } from "@/app/actions/prenda";
+import { generatePrendaLabels } from "@/actions/label-print";
 import {
   createCategoriaPrenda,
   createCondicionPrenda,
@@ -69,6 +71,12 @@ export function PrendaForm({ prenda, branches = [], onClose, onSuccess }: Prenda
   const [paso, setPaso] = useState(1);
   const enPasoSucursal = !isEdit && paso === 1;
   const [publicadaEn, setPublicadaEn] = useState<string[]>([]);
+  /** Destacado de la portada: solo en edición y solo si está publicada en Web. */
+  const [destacado, setDestacado] = useState(false);
+  /** Valor con el que abrió la ficha: la acción se llama solo si cambió. */
+  const [destacadoOriginal, setDestacadoOriginal] = useState(false);
+  /** T2: fotos elegidas en el alta; se suben recién con la prenda creada (id). */
+  const [fotosPendientes, setFotosPendientes] = useState<File[]>([]);
   const [code, setCode] = useState("");
 
   const [categorias, setCategorias] = useState<CategoriaPrendaOption[]>([]);
@@ -78,6 +86,8 @@ export function PrendaForm({ prenda, branches = [], onClose, onSuccess }: Prenda
   const [cargandoOpciones, setCargandoOpciones] = useState(true);
   const [cargandoPrenda, setCargandoPrenda] = useState(isEdit);
   const [guardando, setGuardando] = useState(false);
+  /** Etiquetas de prenda: la acción arma el PDF en el servidor. */
+  const [imprimiendoEtiquetas, setImprimiendoEtiquetas] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<StockMovementReceipt | null>(null);
 
@@ -107,6 +117,13 @@ export function PrendaForm({ prenda, branches = [], onClose, onSuccess }: Prenda
     return () => {
       cancelado = true;
     };
+  }, []);
+
+  // El fondo no scrollea mientras el modal está abierto (mismo cuidado que en
+  // el alta de producto: sin esto el gesto arrastra la página de atrás).
+  useEffect(() => {
+    document.body.classList.add("overflow-hidden");
+    return () => document.body.classList.remove("overflow-hidden");
   }, []);
 
   // Edición: la ficha llega del servidor (la card solo tiene el producto).
@@ -150,6 +167,8 @@ export function PrendaForm({ prenda, branches = [], onClose, onSuccess }: Prenda
       setEsUnica(ficha.esUnica);
       setEsUnicaTocada(true);
       setPublicadaEn(ficha.publicadaEn);
+      setDestacado(ficha.destacado);
+      setDestacadoOriginal(ficha.destacado);
       setCode(ficha.code);
       } catch (err) {
         console.error("Error loading prenda:", err);
@@ -175,6 +194,18 @@ export function PrendaForm({ prenda, branches = [], onClose, onSuccess }: Prenda
     currency: "ARS",
     maximumFractionDigits: 0,
   }).format(precioNumero - costoNumero);
+
+  /** Marcar exige estar publicado en Web; **desmarcar siempre se puede** (si se
+   * quitó la publicación, igual hay que poder sacarla de la portada). */
+  const puedeDestacar = isEdit && publicadaEn.includes("Web");
+  const puedeCambiarDestacado = isEdit && (puedeDestacar || destacado);
+  const ayudaDestacado = !isEdit
+    ? "Se elige después de publicar"
+    : puedeDestacar
+      ? "Reemplaza al destacado anterior de la portada."
+      : destacado
+        ? "Está en la portada. Desmarcala para quitarla."
+        : "Publicá en Web para destacarla";
 
   /** La categoría precarga «única» mientras nadie haya tocado la marca. */
   const cambiarCategoria = (id: number | null) => {
@@ -361,6 +392,77 @@ export function PrendaForm({ prenda, branches = [], onClose, onSuccess }: Prenda
     publicadaEn,
   });
 
+  /** Descarga el PDF que devuelve la acción (mismo patrón que ExportWizard). */
+  const descargarPdf = (pdfBase64: string, filename: string) => {
+    const byteCharacters = atob(pdfBase64);
+    const byteNumbers = new Array(byteCharacters.length);
+    for (let i = 0; i < byteCharacters.length; i++) {
+      byteNumbers[i] = byteCharacters.charCodeAt(i);
+    }
+    const blob = new Blob([new Uint8Array(byteNumbers)], { type: "application/pdf" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  /**
+   * Etiquetas de prenda (modelo del dueño): pregunta el tamaño y descarga una
+   * etiqueta por unidad de cada talle de la prenda. No toca el guardado.
+   */
+  const imprimirEtiquetas = async () => {
+    if (!isEdit || imprimiendoEtiquetas) return;
+
+    const elegido = await Swal.fire({
+      title: "Tamaño de la etiqueta",
+      text: "Una etiqueta por unidad de cada talle.",
+      input: "radio",
+      inputOptions: { grande: "Grande 50 × 80 mm", mediana: "Mediana 35 × 58 mm" },
+      inputValue: "grande",
+      showCancelButton: true,
+      confirmButtonText: "Imprimir",
+      cancelButtonText: "Cancelar",
+      confirmButtonColor: "var(--palette-brand-action)",
+      cancelButtonColor: "var(--palette-secondary-gray)",
+    });
+    if (!elegido.isConfirmed) return;
+
+    const selections = talles
+      .map((fila) => ({
+        productId: prenda!.id,
+        talle: fila.talle.trim(),
+        quantity: esUnica ? 1 : Number(fila.cantidad),
+      }))
+      .filter((fila) => fila.talle !== "" && Number.isInteger(fila.quantity) && fila.quantity >= 1);
+    if (selections.length === 0) {
+      setError("Cargá al menos un talle para imprimir sus etiquetas");
+      return;
+    }
+
+    setError(null);
+    setImprimiendoEtiquetas(true);
+    try {
+      const resultado = await generatePrendaLabels({
+        selections,
+        tamano: elegido.value === "mediana" ? "mediana" : "grande",
+      });
+      if (!resultado.success) {
+        setError(resultado.error);
+        return;
+      }
+      descargarPdf(resultado.data.pdfBase64, resultado.data.filename);
+    } catch (err) {
+      console.error("Error printing prenda labels:", err);
+      setError("No se pudieron generar las etiquetas");
+    } finally {
+      setImprimiendoEtiquetas(false);
+    }
+  };
+
   const handleSubmit = async (evento: React.FormEvent) => {
     evento.preventDefault();
     if (guardando) return;
@@ -405,6 +507,16 @@ export function PrendaForm({ prenda, branches = [], onClose, onSuccess }: Prenda
         setError(resultado.error);
         return;
       }
+      // El destacado se guarda aparte: si falla, la prenda ya quedó guardada.
+      // Marcar exige publicación Web; desmarcar se permite siempre.
+      if (puedeCambiarDestacado && destacado !== destacadoOriginal) {
+        const marcado = await destacarPrenda({ productId: prenda!.id, destacado });
+        if (!marcado.success) {
+          setError(`La prenda se guardó, pero no se pudo destacar: ${marcado.error}`);
+          return;
+        }
+        setDestacadoOriginal(destacado);
+      }
       await Swal.fire({
         title: "Prenda actualizada",
         text: "La prenda se actualizó correctamente",
@@ -427,12 +539,23 @@ export function PrendaForm({ prenda, branches = [], onClose, onSuccess }: Prenda
       setError(resultado.error);
       return;
     }
+    // T2: las fotos del alta se suben con la prenda ya creada. Una que falle
+    // se avisa y no bloquea al resto ni la creación.
+    const avisoFotos = await subirFotos(resultado.data.product.id, fotosPendientes);
+    if (avisoFotos) {
+      await Swal.fire({
+        title: "Fotos sin subir",
+        text: `${avisoFotos}. La prenda sí se creó, podés reintentar desde la edición.`,
+        icon: "warning",
+        confirmButtonColor: "var(--palette-brand-action)",
+        confirmButtonText: "Aceptar",
+      });
+    }
     // Con comprobante primero se descarga: el modal cierra al cerrar el panel.
     if (resultado.data.receipt) {
       setReceipt(resultado.data.receipt);
       return;
-    }
-    await Swal.fire({
+    }    await Swal.fire({
       title: "Prenda creada",
       text: "La prenda se creó correctamente",
       icon: "success",
@@ -466,7 +589,7 @@ export function PrendaForm({ prenda, branches = [], onClose, onSuccess }: Prenda
   const sucursalElegida = branches.find((b) => b.id === branchId)?.name;
 
   return createPortal(
-    <div className="fixed inset-0 z-[60] flex items-end justify-center bg-scrim-strong backdrop-blur-sm">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 md:p-6 bg-scrim-strong backdrop-blur-sm">
       <div
         role="dialog"
         aria-modal="true"
@@ -929,6 +1052,23 @@ export function PrendaForm({ prenda, branches = [], onClose, onSuccess }: Prenda
                   </div>
                 )}
 
+                {isEdit && (
+                  <div>
+                    <p className={seccionClass}>Etiquetas</p>
+                    <button
+                      type="button"
+                      onClick={imprimirEtiquetas}
+                      disabled={imprimiendoEtiquetas}
+                      className="btn btn-secondary w-full"
+                    >
+                      {imprimiendoEtiquetas ? "Generando etiquetas…" : "Imprimir etiquetas"}
+                    </button>
+                    <p className="mt-1 text-xs text-ink-muted">
+                      Una etiqueta por unidad de cada talle, para cortar y colgar.
+                    </p>
+                  </div>
+                )}
+
                 <div>
                   <span className={labelClass}>Publicada en</span>
                   <div className="flex flex-wrap gap-2">
@@ -947,6 +1087,38 @@ export function PrendaForm({ prenda, branches = [], onClose, onSuccess }: Prenda
                       </label>
                     ))}
                   </div>
+                </div>
+
+                {/* Portada de la tienda: uno solo a la vez y solo si está en Web. */}
+                <div className="flex items-center justify-between gap-3 rounded-xl bg-surface-soft p-4">
+                  <div className="min-w-0">
+                    <label htmlFor="prenda-destacado" className="text-sm font-medium text-ink">
+                      Destacar en la portada
+                    </label>
+                    <p id="prenda-destacado-ayuda" className="text-xs text-ink-muted">
+                      {ayudaDestacado}
+                    </p>
+                  </div>
+                  <input
+                    id="prenda-destacado"
+                    type="checkbox"
+                    checked={destacado}
+                    onChange={(e) => setDestacado(e.target.checked)}
+                    disabled={!puedeCambiarDestacado}
+                    aria-describedby="prenda-destacado-ayuda"
+                    className="h-5 w-5 accent-accent"
+                  />
+                </div>
+
+                {/* T2: en la edición se administran las que ya tiene; en el alta
+                    quedan pendientes hasta que la prenda exista. */}
+                <div>
+                  <p className={seccionClass}>Fotos</p>
+                  <span className={labelClass}>Hasta 4 · la primera es la portada</span>
+                  <FotoUploader
+                    productId={isEdit ? prenda!.id : null}
+                    onPendientesChange={setFotosPendientes}
+                  />
                 </div>
               </>
             )}

@@ -186,15 +186,22 @@ describe("createProductSchema: campos opcionales del alta", () => {
     expect(createProductSchema.safeParse(altaIndividual).success).toBe(true);
   });
 
-  it("rechaza un costo sin sucursal ni cantidad: no hay dónde registrar la compra", () => {
+  it("rechaza un costo sin cantidad: no hay unidades para la compra", () => {
     const parsed = createProductSchema.safeParse({ ...altaIndividual, costoUnitario: 100 });
 
     expect(parsed.success).toBe(false);
     if (parsed.success) return;
     expect(parsed.error.issues[0]?.message).toBe(
-      "Para registrar el costo cargá la sucursal y la cantidad inicial"
+      "Para registrar el costo cargá la cantidad inicial (1 o más)"
     );
-    expect(parsed.error.issues[0]?.path).toEqual(["costoUnitario"]);
+    expect(parsed.error.issues[0]?.path).toEqual(["cantidadInicial"]);
+    // Sin sucursal el costo SÍ se registra (decisión del dueño: compra sin sucursal).
+    const conCantidad = createProductSchema.safeParse({
+      ...altaIndividual,
+      costoUnitario: 100,
+      cantidadInicial: 2,
+    });
+    expect(conCantidad.success).toBe(true);
   });
 
   it("la cantidad inicial es un entero entre 0 y 999", () => {
@@ -313,15 +320,21 @@ describe("alta masiva: costo por fila (T4)", () => {
     expect(prisma.purchaseItem.createMany).not.toHaveBeenCalled();
   });
 
-  it("el costo sin sucursal del lote se rechaza en vez de perderse", async () => {
+  it("el lote sin sucursal acepta el costo si la fila trae stock inicial", () => {
     const parsed = createProductsBatchSchema.safeParse({
       rows: [{ name: "Producto 1", prefix: "AA", price: 10, initialStock: 2, costo: 100 }],
     });
 
-    expect(parsed.success).toBe(false);
-    if (parsed.success) return;
-    expect(parsed.error.issues[0]?.message).toBe("Para registrar el costo elegí la sucursal del lote");
-    expect(parsed.error.issues[0]?.path).toEqual(["branchId"]);
+    // La compra puede no tener sucursal (decisión del dueño).
+    expect(parsed.success).toBe(true);
+
+    // Pero sin unidades no hay compra que registrar: se rechaza con el path de la fila.
+    const sinStock = createProductsBatchSchema.safeParse({
+      rows: [{ name: "Producto 1", prefix: "AA", price: 10, costo: 100 }],
+    });
+    expect(sinStock.success).toBe(false);
+    if (sinStock.success) return;
+    expect(sinStock.error.issues[0]?.message).toContain("stock inicial");
   });
 
   it("el costo de la fila no puede ser negativo", () => {

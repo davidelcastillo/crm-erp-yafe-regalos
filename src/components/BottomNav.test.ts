@@ -77,6 +77,21 @@ describe("BottomNav", () => {
     expect(container).toBeEmptyDOMElement();
   });
 
+  it("renders nothing on the public vidriera", () => {
+    (usePathname as jest.Mock).mockReturnValue("/polkalinas");
+    const { container } = render(React.createElement(BottomNav));
+
+    expect(screen.queryByRole("link")).toBeNull();
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it("renders nothing on a vidriera product page", () => {
+    (usePathname as jest.Mock).mockReturnValue("/polkalinas/3");
+    const { container } = render(React.createElement(BottomNav));
+
+    expect(container).toBeEmptyDOMElement();
+  });
+
   it("renders nothing on the unauthorized page", () => {
     (usePathname as jest.Mock).mockReturnValue("/unauthorized");
     const { container } = render(React.createElement(BottomNav));

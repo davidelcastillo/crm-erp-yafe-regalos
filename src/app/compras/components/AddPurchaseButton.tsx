@@ -356,47 +356,16 @@ export function AddPurchaseButton({ products: initialProducts, onSuccess }: AddP
         </div>
       )}
 
-      {/* Product Creation Modal */}
+      {/* El alta de producto ya trae su propio modal (shell, wizard y pie):
+          envolverlo abría un segundo scrim y una barra de más. */}
       {showProductModal && (
-        <div 
-          className="fixed inset-0 bg-scrim-strong backdrop-blur-sm z-[70] flex items-end justify-center md:items-center"
-          onClick={() => {
+        <ProductForm
+          onClose={() => {
             setShowProductModal(false);
             setEditingItemId(null);
           }}
-        >
-          <div 
-            className="bg-surface w-full max-w-lg rounded-t-3xl md:rounded-2xl p-6 animate-slide-up md:animate-scale-in max-h-[90vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-semibold text-ink">
-                {editingItemId ? "Crear producto para edición" : "Nuevo Producto"}
-              </h2>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowProductModal(false);
-                  setEditingItemId(null);
-                }}
-                className="btn btn-icon btn-round hover:bg-surface-strong"
-                aria-label="Cerrar"
-              >
-                <svg className="w-6 h-6 text-ink-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            <ProductForm 
-              onClose={() => {
-                setShowProductModal(false);
-                setEditingItemId(null);
-              }}
-              onSuccess={handleProductCreated}
-            />
-          </div>
-        </div>
+          onSuccess={handleProductCreated}
+        />
       )}
     </>
   );

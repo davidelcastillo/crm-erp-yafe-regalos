@@ -1,8 +1,12 @@
 /**
  * Integration test for createProduct Server Action
  */
-import { createProduct, createProductsBatch, getProducts, searchProducts } from "../actions/product";
-import { createProductsBatchSchema } from "@/lib/validations/product";
+import { createProduct, createProductsBatch, getProductById, getProducts, searchProducts, updateProductExtended } from "../actions/product";
+import {
+  createProductSchema,
+  createProductsBatchSchema,
+  updateProductExtendedSchema,
+} from "@/lib/validations/product";
 import { prefixLockKey } from "@/lib/utils/product-code";
 import { revalidatePath } from "next/cache";
 
@@ -14,18 +18,48 @@ jest.mock("@/lib/prisma", () => {
   const mockCategoryFindUnique = jest.fn();
   const mockCategoryFindMany = jest.fn();
   const mockBranchFindFirst = jest.fn();
+  const mockInventoryCreate = jest.fn();
+  const mockMovementCreate = jest.fn();
+  const mockPurchaseCreate = jest.fn();
+  const mockPurchaseItemCreateMany = jest.fn();
   const mockInventoryCreateManyAndReturn = jest.fn();
   const mockMovementCreateMany = jest.fn();
   const mockExecuteRawUnsafe = jest.fn().mockResolvedValue(undefined);
+  const mockProductUpdate = jest.fn();
+  const mockProductFindUnique = jest.fn();
+  const mockPublicacionCreateMany = jest.fn();
+  const mockPublicacionDeleteMany = jest.fn();
+  // Estilos del producto (`ProductEstilo`, la misma taxonomía que la prenda).
+  const mockEstiloFindMany = jest.fn();
+  const mockProductEstiloCreateMany = jest.fn();
+  const mockProductEstiloDeleteMany = jest.fn();
   const mockTransaction = jest.fn(async (callback: (tx: unknown) => Promise<unknown>) => {
     const tx = {
       product: {
         findMany: mockFindMany,
         create: mockProductCreate,
+        update: mockProductUpdate,
         createManyAndReturn: mockCreateManyAndReturn,
       },
-      branchInventory: { createManyAndReturn: mockInventoryCreateManyAndReturn },
-      branchMovement: { createMany: mockMovementCreateMany },
+      branchInventory: {
+        create: mockInventoryCreate,
+        createManyAndReturn: mockInventoryCreateManyAndReturn,
+      },
+      branchMovement: {
+        create: mockMovementCreate,
+        createMany: mockMovementCreateMany,
+      },
+      prendaPublicacion: {
+        createMany: mockPublicacionCreateMany,
+        deleteMany: mockPublicacionDeleteMany,
+      },
+      productEstilo: {
+        createMany: mockProductEstiloCreateMany,
+        deleteMany: mockProductEstiloDeleteMany,
+      },
+      estiloPrenda: { findMany: mockEstiloFindMany },
+      purchase: { create: mockPurchaseCreate },
+      purchaseItem: { createMany: mockPurchaseItemCreateMany },
       $executeRawUnsafe: mockExecuteRawUnsafe,
     };
     return callback(tx);
@@ -38,8 +72,8 @@ jest.mock("@/lib/prisma", () => {
       product: {
         create: mockProductCreate,
         findMany: mockFindMany,
-        findUnique: jest.fn(),
-        update: jest.fn(),
+        findUnique: mockProductFindUnique,
+        update: mockProductUpdate,
         delete: jest.fn(),
         createManyAndReturn: mockCreateManyAndReturn,
       },
@@ -48,8 +82,25 @@ jest.mock("@/lib/prisma", () => {
         findMany: mockCategoryFindMany,
       },
       branch: { findFirst: mockBranchFindFirst },
-      branchInventory: { createManyAndReturn: mockInventoryCreateManyAndReturn },
-      branchMovement: { createMany: mockMovementCreateMany },
+      branchInventory: {
+        create: mockInventoryCreate,
+        createManyAndReturn: mockInventoryCreateManyAndReturn,
+      },
+      branchMovement: {
+        create: mockMovementCreate,
+        createMany: mockMovementCreateMany,
+      },
+      purchase: { create: mockPurchaseCreate },
+      purchaseItem: { createMany: mockPurchaseItemCreateMany },
+      prendaPublicacion: {
+        createMany: mockPublicacionCreateMany,
+        deleteMany: mockPublicacionDeleteMany,
+      },
+      productEstilo: {
+        createMany: mockProductEstiloCreateMany,
+        deleteMany: mockProductEstiloDeleteMany,
+      },
+      estiloPrenda: { findMany: mockEstiloFindMany },
     },
   };
 });
@@ -845,5 +896,406 @@ describe("clave del advisory lock", () => {
     expect(lote.success).toBe(true);
     const sqlLote = (prisma.$executeRawUnsafe as jest.Mock).mock.calls.map((c) => String(c[0]));
     expect(sqlLote).toEqual(sqlIndividual);
+  });
+});
+
+/**
+ * T3 de `odd/tasks/fotos-vidriera-polkalinas.md` (S3): el alta y la edición de
+ * un producto normal ganan «Publicar en» y escriben las filas en
+ * `PrendaPublicacion` dentro de las transacciones existentes, igual que la
+ * prenda. Sin canales no escriben nada.
+ */
+describe("productos: «Publicar en» (T3)", () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  const publicaciones = () =>
+    prisma.prendaPublicacion as unknown as {
+      createMany: jest.Mock;
+      deleteMany: jest.Mock;
+    };
+
+  it("el esquema descarta los canales desconocidos y los repetidos", () => {
+    const parsed = createProductSchema.parse({
+      name: "Con canal",
+      prefix: "CC",
+      price: 100,
+      publicadaEn: ["Web", "TikTok", " Web "],
+    });
+
+    expect(parsed.publicadaEn).toEqual(["Web"]);
+  });
+
+  it("el alta escribe una fila por canal dentro de la transacción", async () => {
+    (prisma.product.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.product.create as jest.Mock).mockResolvedValue({
+      id: 5,
+      name: "Con canal",
+      code: "CC000",
+    });
+
+    const result = await createProduct({
+      name: "Con canal",
+      prefix: "CC",
+      price: 100,
+      publicadaEn: ["Web", "Instagram"],
+    });
+
+    expect(result.success).toBe(true);
+    expect(prisma.$transaction).toHaveBeenCalled();
+    expect(publicaciones().createMany).toHaveBeenCalledWith({
+      data: [
+        { productId: 5, canal: "Web" },
+        { productId: 5, canal: "Instagram" },
+      ],
+    });
+  });
+
+  it("sin canales el alta no escribe publicaciones", async () => {
+    (prisma.product.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.product.create as jest.Mock).mockResolvedValue({ id: 6, name: "Sin canal" });
+
+    const result = await createProduct({ name: "Sin canal", prefix: "SC", price: 100 });
+
+    expect(result.success).toBe(true);
+    expect(publicaciones().createMany).not.toHaveBeenCalled();
+  });
+
+  it("la edición reemplaza las publicaciones en la misma transacción", async () => {
+    (prisma.product.update as jest.Mock).mockResolvedValue({ id: 5 });
+
+    const result = await updateProductExtended({ id: 5, publicadaEn: ["Web"] });
+
+    expect(result.success).toBe(true);
+    expect(prisma.$transaction).toHaveBeenCalled();
+    expect(publicaciones().deleteMany).toHaveBeenCalledWith({ where: { productId: 5 } });
+    expect(publicaciones().createMany).toHaveBeenCalledWith({
+      data: [{ productId: 5, canal: "Web" }],
+    });
+  });
+
+  it("la edición sin publicadaEn no toca las publicaciones", async () => {
+    (prisma.product.update as jest.Mock).mockResolvedValue({ id: 5 });
+
+    await updateProductExtended({ id: 5, name: "Renombrado" });
+
+    expect(publicaciones().deleteMany).not.toHaveBeenCalled();
+    expect(publicaciones().createMany).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Alta sin sucursal (pedido del dueño): la sucursal es opcional, el costo se
+ * registra igual como compra y la cantidad cargada es la que da las unidades.
+ */
+describe("createProduct: compra del alta sin sucursal", () => {
+  const alta = { name: "Jabón de Avena", prefix: "AA", price: 100 };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (prisma.product.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.product.create as jest.Mock).mockResolvedValue({
+      id: 9,
+      code: "AA000",
+      name: "Jabón de Avena",
+      price: 100,
+    });
+    (prisma.purchase.create as jest.Mock).mockResolvedValue({ id: 5 });
+  });
+
+  it("sin sucursal registra la compra con branchId null y no toca inventario ni movimientos", async () => {
+    const result = await createProduct({ ...alta, cantidadInicial: 3, costoUnitario: 40 });
+
+    expect(result.success).toBe(true);
+    expect(prisma.branch.findFirst).not.toHaveBeenCalled();
+    expect(prisma.branchInventory.create).not.toHaveBeenCalled();
+    expect(prisma.branchMovement.create).not.toHaveBeenCalled();
+    expect(prisma.purchase.create).toHaveBeenCalledWith({
+      data: { totalAmount: 120, branchId: null },
+    });
+    expect(prisma.purchaseItem.createMany).toHaveBeenCalledWith({
+      data: [{ purchaseId: 5, productId: 9, price: 40, quantity: 3, subtotal: 120 }],
+    });
+  });
+
+  it("con sucursal y costo deja inventario, movimiento y compra", async () => {
+    (prisma.branch.findFirst as jest.Mock).mockResolvedValue({ id: 3 });
+    (prisma.branchInventory.create as jest.Mock).mockResolvedValue({ stock: 3 });
+
+    const result = await createProduct({ ...alta, branchId: 3, cantidadInicial: 3, costoUnitario: 40 });
+
+    expect(result.success).toBe(true);
+    expect((prisma.branchInventory.create as jest.Mock).mock.calls[0][0].data).toEqual({
+      branchId: 3,
+      productId: 9,
+      stock: 3,
+    });
+    expect((prisma.branchMovement.create as jest.Mock).mock.calls[0][0].data).toEqual({
+      productId: 9,
+      branchId: 3,
+      movementType: "ENTRY",
+      quantity: 3,
+      reference: "ALTA DE PRODUCTO",
+      performedBy: "test@feria.test",
+    });
+    expect(prisma.purchase.create).toHaveBeenCalledWith({
+      data: { totalAmount: 120, branchId: 3 },
+    });
+  });
+
+  it("sin costo no hay compra, con o sin sucursal", async () => {
+    await createProduct({ ...alta, cantidadInicial: 2 });
+    await createProduct({ ...alta, name: "Otro", branchId: 3, cantidadInicial: 2 });
+
+    expect(prisma.purchase.create).not.toHaveBeenCalled();
+    expect(prisma.purchaseItem.createMany).not.toHaveBeenCalled();
+  });
+
+  it("el costo exige la cantidad y lo dice con un mensaje claro", () => {
+    const sinCantidad = createProductSchema.safeParse({ ...alta, costoUnitario: 40 });
+
+    expect(sinCantidad.success).toBe(false);
+    if (sinCantidad.success) return;
+    expect(sinCantidad.error.issues[0]?.message).toBe(
+      "Para registrar el costo cargá la cantidad inicial (1 o más)"
+    );
+    expect(sinCantidad.error.issues[0]?.path).toEqual(["cantidadInicial"]);
+
+    // Con cantidad, el costo ya no necesita sucursal.
+    expect(
+      createProductSchema.safeParse({ ...alta, costoUnitario: 40, cantidadInicial: 1 }).success
+    ).toBe(true);
+  });
+});
+
+describe("createProductsBatch: compra del lote sin sucursal", () => {
+  const fila = (n: number, initialStock: number | undefined, costo: number) => ({
+    name: `Producto ${n}`,
+    prefix: "ZZ",
+    price: n * 10,
+    ...(initialStock === undefined ? {} : { initialStock }),
+    costo,
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (prisma.product.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.product.createManyAndReturn as jest.Mock).mockResolvedValue([
+      { id: 1, code: "ZZ000", name: "Producto 1", price: 10 },
+      { id: 2, code: "ZZ001", name: "Producto 2", price: 20 },
+    ]);
+    (prisma.purchase.create as jest.Mock).mockResolvedValue({ id: 8 });
+  });
+
+  it("registra UNA compra sin sucursal con las filas que tienen costo y stock", async () => {
+    const result = await createProductsBatch({
+      rows: [fila(1, 2, 100), fila(2, 3, 50)],
+    });
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.receipt).toBeNull();
+    expect(prisma.branch.findFirst).not.toHaveBeenCalled();
+    expect(prisma.branchInventory.createManyAndReturn).not.toHaveBeenCalled();
+    expect(prisma.branchMovement.createMany).not.toHaveBeenCalled();
+    expect(prisma.purchase.create).toHaveBeenCalledTimes(1);
+    expect(prisma.purchase.create).toHaveBeenCalledWith({
+      data: { totalAmount: 350, branchId: null },
+    });
+    expect((prisma.purchaseItem.createMany as jest.Mock).mock.calls[0][0].data).toEqual([
+      { purchaseId: 8, productId: 1, price: 100, quantity: 2, subtotal: 200 },
+      { purchaseId: 8, productId: 2, price: 50, quantity: 3, subtotal: 150 },
+    ]);
+  });
+
+  it("sin sucursal, la fila con costo necesita su stock inicial y lo dice en la fila", () => {
+    const parsed = createProductsBatchSchema.safeParse({ rows: [fila(1, 0, 100)] });
+
+    expect(parsed.success).toBe(false);
+    if (parsed.success) return;
+    expect(parsed.error.issues[0]?.message).toBe(
+      "Para registrar el costo cargá el stock inicial de esa fila (1 o más)"
+    );
+    expect(parsed.error.issues[0]?.path).toEqual(["rows", 0, "initialStock"]);
+  });
+});
+
+/**
+ * Estilos del producto (pedido del dueño): la misma taxonomía que la prenda
+ * (`ProductEstilo`). El alta escribe, la edición reemplaza solo si el campo
+ * viene y un estilo inexistente o inactivo se rechaza.
+ */
+describe("productos: estilos (ProductEstilo)", () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  const filasEstilo = () =>
+    prisma.productEstilo as unknown as { createMany: jest.Mock; deleteMany: jest.Mock };
+
+  it("el esquema descarta los estilos repetidos", () => {
+    const parsed = createProductSchema.parse({
+      name: "Con estilos",
+      prefix: "CE",
+      price: 100,
+      estilos: [2, 2, 3],
+    });
+
+    expect(parsed.estilos).toEqual([2, 3]);
+  });
+
+  it("la edición distingue los estilos presentes de los ausentes", () => {
+    expect(updateProductExtendedSchema.parse({ id: 1, estilos: [] }).estilos).toEqual([]);
+    expect(updateProductExtendedSchema.parse({ id: 1 }).estilos).toBeUndefined();
+  });
+
+  it("el alta escribe una fila por estilo dentro de la transacción", async () => {
+    (prisma.estiloPrenda.findMany as jest.Mock).mockResolvedValue([{ id: 1 }, { id: 2 }]);
+    (prisma.product.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.product.create as jest.Mock).mockResolvedValue({ id: 7, name: "Con estilos" });
+
+    const result = await createProduct({
+      name: "Con estilos",
+      prefix: "CE",
+      price: 100,
+      estilos: [1, 2],
+    });
+
+    expect(result.success).toBe(true);
+    expect(prisma.estiloPrenda.findMany).toHaveBeenCalledWith({
+      where: { id: { in: [1, 2] }, active: true },
+      select: { id: true },
+    });
+    expect(filasEstilo().createMany).toHaveBeenCalledWith({
+      data: [
+        { productId: 7, estiloId: 1 },
+        { productId: 7, estiloId: 2 },
+      ],
+    });
+  });
+
+  it("sin estilos el alta no escribe estilos ni consulta la taxonomía", async () => {
+    (prisma.product.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.product.create as jest.Mock).mockResolvedValue({ id: 8, name: "Sin estilos" });
+
+    const result = await createProduct({ name: "Sin estilos", prefix: "SE", price: 100 });
+
+    expect(result.success).toBe(true);
+    expect(prisma.estiloPrenda.findMany).not.toHaveBeenCalled();
+    expect(filasEstilo().createMany).not.toHaveBeenCalled();
+  });
+
+  it("un estilo inexistente o inactivo rechaza el alta sin escribir", async () => {
+    (prisma.estiloPrenda.findMany as jest.Mock).mockResolvedValue([{ id: 1 }]);
+
+    const result = await createProduct({
+      name: "Con estilo viejo",
+      prefix: "CV",
+      price: 100,
+      estilos: [1, 9],
+    });
+
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(result.error).toBe("Un estilo seleccionado no existe o está inactivo");
+    expect(prisma.product.create).not.toHaveBeenCalled();
+    expect(filasEstilo().createMany).not.toHaveBeenCalled();
+  });
+
+  it("la edición reemplaza los estilos en la misma transacción", async () => {
+    (prisma.estiloPrenda.findMany as jest.Mock).mockResolvedValue([{ id: 3 }]);
+    (prisma.product.update as jest.Mock).mockResolvedValue({ id: 5 });
+
+    const result = await updateProductExtended({ id: 5, estilos: [3] });
+
+    expect(result.success).toBe(true);
+    expect(prisma.$transaction).toHaveBeenCalled();
+    expect(filasEstilo().deleteMany).toHaveBeenCalledWith({ where: { productId: 5 } });
+    expect(filasEstilo().createMany).toHaveBeenCalledWith({
+      data: [{ productId: 5, estiloId: 3 }],
+    });
+  });
+
+  it("la edición sin el campo no toca los estilos", async () => {
+    (prisma.product.update as jest.Mock).mockResolvedValue({ id: 5 });
+
+    await updateProductExtended({ id: 5, name: "Renombrado" });
+
+    expect(prisma.estiloPrenda.findMany).not.toHaveBeenCalled();
+    expect(filasEstilo().deleteMany).not.toHaveBeenCalled();
+    expect(filasEstilo().createMany).not.toHaveBeenCalled();
+  });
+
+  it("la edición con un estilo inactivo no escribe nada", async () => {
+    (prisma.estiloPrenda.findMany as jest.Mock).mockResolvedValue([]);
+
+    const result = await updateProductExtended({ id: 5, estilos: [9] });
+
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(result.error).toBe("Un estilo seleccionado no existe o está inactivo");
+    expect(prisma.product.update).not.toHaveBeenCalled();
+    expect(filasEstilo().deleteMany).not.toHaveBeenCalled();
+  });
+
+  it("getProductById devuelve los estilos para precargar la edición", async () => {
+    (prisma.product.findUnique as jest.Mock).mockResolvedValue({
+      id: 5,
+      publicaciones: [],
+      estilosProducto: [{ estiloId: 4 }, { estiloId: 6 }],
+    });
+
+    const result = await getProductById(5);
+
+    expect(result.success).toBe(true);
+    expect((result.data as { estilos: number[] }).estilos).toEqual([4, 6]);
+  });
+
+  it("el lote escribe los estilos de cada fila en una sola createMany", async () => {
+    (prisma.estiloPrenda.findMany as jest.Mock).mockResolvedValue([
+      { id: 1 },
+      { id: 2 },
+      { id: 3 },
+    ]);
+    (prisma.product.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.product.createManyAndReturn as jest.Mock).mockResolvedValue([
+      { id: 10, code: "ZZ000", name: "Producto A" },
+      { id: 11, code: "ZZ001", name: "Producto B" },
+    ]);
+
+    const result = await createProductsBatch({
+      rows: [
+        { name: "Producto A", prefix: "ZZ", price: 10, estilos: [1, 2] },
+        { name: "Producto B", prefix: "ZZ", price: 10, estilos: [3] },
+      ],
+    });
+
+    expect(result.success).toBe(true);
+    expect(prisma.estiloPrenda.findMany).toHaveBeenCalledTimes(1);
+    expect(filasEstilo().createMany).toHaveBeenCalledTimes(1);
+    expect(filasEstilo().createMany).toHaveBeenCalledWith({
+      data: [
+        { productId: 10, estiloId: 1 },
+        { productId: 10, estiloId: 2 },
+        { productId: 11, estiloId: 3 },
+      ],
+    });
+  });
+
+  it("un estilo inactivo en el lote marca solo su fila y no crea nada", async () => {
+    (prisma.estiloPrenda.findMany as jest.Mock).mockResolvedValue([{ id: 1 }]);
+    (prisma.product.findMany as jest.Mock).mockResolvedValue([]);
+
+    const result = await createProductsBatch({
+      rows: [
+        { name: "Producto A", prefix: "ZZ", price: 10, estilos: [1] },
+        { name: "Producto B", prefix: "ZZ", price: 10, estilos: [99] },
+      ],
+    });
+
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(result.rowErrors).toEqual([
+      { row: 1, field: "estilos", message: "Un estilo seleccionado no existe o está inactivo" },
+    ]);
+    expect(prisma.product.createManyAndReturn).not.toHaveBeenCalled();
+    expect(filasEstilo().createMany).not.toHaveBeenCalled();
   });
 });

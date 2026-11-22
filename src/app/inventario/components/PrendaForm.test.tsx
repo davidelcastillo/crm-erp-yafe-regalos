@@ -17,6 +17,7 @@ jest.mock("@/app/actions/prenda", () => ({
   createPrenda: jest.fn(),
   updatePrenda: jest.fn(),
   getPrenda: jest.fn(),
+  destacarPrenda: jest.fn(),
 }));
 
 jest.mock("@/app/actions/prendaTaxonomy", () => ({
@@ -33,7 +34,27 @@ jest.mock("sweetalert2", () => ({
   fire: jest.fn(),
 }));
 
-import { createPrenda, getPrenda, updatePrenda } from "@/app/actions/prenda";
+// Etiquetas de prenda: la acción arma el PDF en el servidor (pdf-lib).
+jest.mock("@/actions/label-print", () => ({
+  generatePrendaLabels: jest.fn(),
+}));
+
+// Fotos de la prenda (T2): el componente real queda, se observa el helper que
+// dispara la subida y se responde la carga de las fotos existentes.
+jest.mock("@/components/ui/FotoUploader", () => ({
+  ...jest.requireActual("@/components/ui/FotoUploader"),
+  subirFotos: jest.fn(async () => null),
+}));
+
+jest.mock("@/app/actions/foto", () => ({
+  firmarSubidaFoto: jest.fn(),
+  confirmarFoto: jest.fn(),
+  quitarFoto: jest.fn(),
+  getFotosProducto: jest.fn(async () => ({ success: true, data: [] })),
+}));
+
+import { createPrenda, destacarPrenda, getPrenda, updatePrenda } from "@/app/actions/prenda";
+import { generatePrendaLabels } from "@/actions/label-print";
 import {
   createCategoriaPrenda,
   getCategoriaPrendaOptions,
@@ -42,14 +63,23 @@ import {
   getMedidaTipoOptions,
 } from "@/app/actions/prendaTaxonomy";
 import Swal from "sweetalert2";
+import { subirFotos } from "@/components/ui/FotoUploader";
+import { getFotosProducto } from "@/app/actions/foto";
+
+const mockSubirFotos = subirFotos as jest.MockedFunction<typeof subirFotos>;
+const mockGetFotos = getFotosProducto as jest.MockedFunction<typeof getFotosProducto>;
 
 const mockCreate = createPrenda as jest.MockedFunction<typeof createPrenda>;
 const mockUpdate = updatePrenda as jest.MockedFunction<typeof updatePrenda>;
 const mockGet = getPrenda as jest.MockedFunction<typeof getPrenda>;
+const mockDestacar = destacarPrenda as jest.MockedFunction<typeof destacarPrenda>;
 const mockCrearCategoria = createCategoriaPrenda as jest.MockedFunction<
   typeof createCategoriaPrenda
 >;
 const mockSwal = Swal.fire as unknown as jest.Mock;
+const mockGeneratePrendaLabels = generatePrendaLabels as jest.MockedFunction<
+  typeof generatePrendaLabels
+>;
 
 const branches = [{ id: 1, name: "Depósito" }];
 
@@ -95,6 +125,7 @@ const prenda = {
   estilos: [4],
   medidas: [],
   publicadaEn: ["Web"],
+  destacado: false,
 };
 
 beforeEach(() => {
@@ -122,6 +153,11 @@ beforeEach(() => {
     data: [{ id: 6, name: "Axila" }],
   });
   mockGet.mockResolvedValue({ success: true, data: prenda } as never);
+  mockGetFotos.mockResolvedValue({ success: true, data: [] } as never);
+  mockDestacar.mockResolvedValue({
+    success: true,
+    data: { productId: 9, destacado: true },
+  } as never);
   mockSwal.mockResolvedValue({ isConfirmed: false });
 });
 
@@ -390,5 +426,226 @@ describe("PrendaForm: filas de medidas", () => {
       )
     );
     expect(within(screen.getByRole("dialog")).getByText("Medidas")).toBeInTheDocument();
+  });
+});
+
+/**
+ * T2 de `odd/tasks/fotos-vidriera-polkalinas.md`: la prenda gana la sección de
+ * fotos. En el alta las fotos se suben recién con la prenda creada (para tener
+ * el id); en la edición se cargan y se administran las existentes.
+ */
+describe("PrendaForm: fotos (T2)", () => {
+  it("muestra la sección de fotos en la ficha del alta", async () => {
+    renderAlta();
+    await esperarOpciones();
+    elegirSucursal();
+    await esperarFicha();
+
+    expect(screen.getByText("Fotos")).toBeInTheDocument();
+    expect(screen.getByLabelText(/agregar fotos/i)).toBeInTheDocument();
+  });
+
+  it("en el alta sube las fotos pendientes cuando la prenda ya existe", async () => {
+    mockCreate.mockResolvedValue({
+      success: true,
+      data: { product: { id: 9, code: "PK000", name: "Campera", price: 12000 } },
+    } as never);
+
+    renderAlta();
+    await esperarOpciones();
+    await completarMinimos();
+
+    const input = screen.getByLabelText(/agregar fotos/i) as HTMLInputElement;
+    Object.defineProperty(input, "files", {
+      value: [new File(["x"], "foto.jpg", { type: "image/jpeg" })],
+      configurable: true,
+    });
+    fireEvent.change(input);
+
+    fireEvent.click(screen.getByRole("button", { name: /crear prenda/i }));
+
+    await waitFor(() => expect(mockSubirFotos).toHaveBeenCalledWith(9, [expect.any(File)]));
+  });
+
+  it("en la edición carga las fotos existentes y marca la portada", async () => {
+    mockGetFotos.mockResolvedValue({
+      success: true,
+      data: [
+        { position: 0, path: "hash-portada", alt: null, bytes: 10 },
+        { position: 1, path: "hash-segunda", alt: null, bytes: 10 },
+      ],
+    } as never);
+
+    render(<PrendaForm prenda={producto} onClose={jest.fn()} onSuccess={jest.fn()} />);
+
+    expect(await screen.findByText("Portada")).toBeInTheDocument();
+    expect(mockGetFotos).toHaveBeenCalledWith({ productId: 9 });
+    expect(screen.getByRole("button", { name: /quitar foto 2/i })).toBeInTheDocument();
+  });
+});
+
+/**
+ * Destacado de la portada (pedido del dueño): solo se puede elegir en una
+ * prenda ya publicada en Web y se guarda aparte del formulario.
+ */
+describe("PrendaForm: destacado de la portada", () => {
+  it("en el alta el control está deshabilitado: se elige después de publicar", async () => {
+    renderAlta();
+    await esperarOpciones();
+    elegirSucursal();
+    await esperarFicha();
+
+    const control = screen.getByLabelText(/destacar en la portada/i);
+    expect(control).toBeDisabled();
+    expect(control).not.toBeChecked();
+    expect(screen.getByText(/se elige después de publicar/i)).toBeInTheDocument();
+  });
+
+  it("en la edición de una prenda sin Web está deshabilitado y avisa", async () => {
+    mockGet.mockResolvedValue({
+      success: true,
+      data: { ...prenda, publicadaEn: ["Instagram"] },
+    } as never);
+
+    render(<PrendaForm prenda={producto} onClose={jest.fn()} onSuccess={jest.fn()} />);
+
+    const control = await screen.findByLabelText(/destacar en la portada/i);
+    expect(control).toBeDisabled();
+    expect(screen.getByText(/publicá en web para destacarla/i)).toBeInTheDocument();
+  });
+
+  it("en la edición de una prenda publicada se habilita y guarda el cambio", async () => {
+    mockUpdate.mockResolvedValue({ success: true, data: { id: 9 } } as never);
+
+    render(<PrendaForm prenda={producto} onClose={jest.fn()} onSuccess={jest.fn()} />);
+
+    const control = await screen.findByLabelText(/destacar en la portada/i);
+    expect(control).toBeEnabled();
+    expect(control).not.toBeChecked();
+
+    fireEvent.click(control);
+    expect(control).toBeChecked();
+
+    fireEvent.click(screen.getByRole("button", { name: /guardar prenda/i }));
+
+    await waitFor(() =>
+      expect(mockDestacar).toHaveBeenCalledWith({ productId: 9, destacado: true })
+    );
+    // El guardado normal sigue ocurriendo: el destacado va aparte.
+    expect(mockUpdate).toHaveBeenCalled();
+  });
+
+  it("sin cambios en el destacado no llama la acción", async () => {
+    mockUpdate.mockResolvedValue({ success: true, data: { id: 9 } } as never);
+
+    render(<PrendaForm prenda={producto} onClose={jest.fn()} onSuccess={jest.fn()} />);
+    await screen.findByLabelText(/destacar en la portada/i);
+
+    fireEvent.click(screen.getByRole("button", { name: /guardar prenda/i }));
+
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalled());
+    expect(mockDestacar).not.toHaveBeenCalled();
+  });
+
+  it("si el destacado falla, la prenda ya quedó guardada y se muestra el error", async () => {
+    mockUpdate.mockResolvedValue({ success: true, data: { id: 9 } } as never);
+    mockDestacar.mockResolvedValue({
+      success: false,
+      error: "Solo se puede destacar una prenda activa y publicada en Web",
+    } as never);
+    const onClose = jest.fn();
+
+    render(<PrendaForm prenda={producto} onClose={onClose} onSuccess={jest.fn()} />);
+    fireEvent.click(await screen.findByLabelText(/destacar en la portada/i));
+    fireEvent.click(screen.getByRole("button", { name: /guardar prenda/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/no se pudo destacar/i);
+    expect(mockUpdate).toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Etiquetas de prenda (pedido del dueño): el botón de la edición pregunta el
+ * tamaño y descarga una etiqueta por unidad de cada talle de la prenda.
+ */
+describe("PrendaForm: etiquetas de prenda", () => {
+  it("pregunta el tamaño y llama la acción con el elegido y los talles de la prenda", async () => {
+    URL.createObjectURL = jest.fn(() => "blob:test");
+    URL.revokeObjectURL = jest.fn();
+    const originalClick = HTMLAnchorElement.prototype.click;
+    HTMLAnchorElement.prototype.click = jest.fn();
+
+    try {
+      mockGet.mockResolvedValue({
+        success: true,
+        data: {
+          ...prenda,
+          esUnica: false,
+          talles: [
+            { talle: "S", cantidad: 2 },
+            { talle: "M", cantidad: 1 },
+          ],
+        },
+      } as never);
+      mockSwal.mockResolvedValueOnce({ isConfirmed: true, value: "mediana" });
+      mockGeneratePrendaLabels.mockResolvedValue({
+        success: true,
+        data: { pdfBase64: "JVBERi0xLjQ=", filename: "etiquetas-prenda-RPH014-mediana.pdf" },
+      } as never);
+
+      render(<PrendaForm prenda={producto} onClose={jest.fn()} onSuccess={jest.fn()} />);
+      await screen.findByDisplayValue("Campera de jean");
+
+      fireEvent.click(screen.getByRole("button", { name: /imprimir etiquetas/i }));
+
+      await waitFor(() =>
+        expect(mockSwal).toHaveBeenCalledWith(
+          expect.objectContaining({
+            input: "radio",
+            confirmButtonColor: "var(--palette-brand-action)",
+          })
+        )
+      );
+      await waitFor(() =>
+        expect(mockGeneratePrendaLabels).toHaveBeenCalledWith({
+          tamano: "mediana",
+          selections: [
+            { productId: 9, talle: "S", quantity: 2 },
+            { productId: 9, talle: "M", quantity: 1 },
+          ],
+        })
+      );
+    } finally {
+      HTMLAnchorElement.prototype.click = originalClick;
+    }
+  });
+
+  it("si se cancela el tamaño no genera nada", async () => {
+    mockSwal.mockResolvedValueOnce({ isConfirmed: false });
+
+    render(<PrendaForm prenda={producto} onClose={jest.fn()} onSuccess={jest.fn()} />);
+    await screen.findByDisplayValue("Campera de jean");
+
+    fireEvent.click(screen.getByRole("button", { name: /imprimir etiquetas/i }));
+
+    await waitFor(() => expect(mockSwal).toHaveBeenCalled());
+    expect(mockGeneratePrendaLabels).not.toHaveBeenCalled();
+  });
+
+  it("si la generación falla, el error queda visible y la prenda se puede seguir guardando", async () => {
+    mockSwal.mockResolvedValueOnce({ isConfirmed: true, value: "grande" });
+    mockGeneratePrendaLabels.mockResolvedValue({
+      success: false,
+      error: "El talle «XL» no pertenece a la prenda RPH014",
+    } as never);
+
+    render(<PrendaForm prenda={producto} onClose={jest.fn()} onSuccess={jest.fn()} />);
+    await screen.findByDisplayValue("Campera de jean");
+
+    fireEvent.click(screen.getByRole("button", { name: /imprimir etiquetas/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/no pertenece a la prenda/i);
+    expect(screen.getByRole("button", { name: /guardar prenda/i })).toBeEnabled();
   });
 });

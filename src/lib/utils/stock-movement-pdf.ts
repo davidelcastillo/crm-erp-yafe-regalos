@@ -1,12 +1,12 @@
 import { PDFDocument, rgb } from 'pdf-lib';
 import type { StockMovementReceipt, StockMovementSide } from '@/lib/stock-movement-receipt';
 import {
-  DOCUMENT_COLOR,
   DOCUMENT_FONT_SIZE,
   documentColor,
   embedDocumentFonts,
 } from '@/lib/fonts/document-fonts';
-import { LOGO_PNG_BASE64 } from './pdf-logo';
+import { PDF_BRAND_COLOR } from '@/lib/pdf-brand';
+import { drawBrandLogo } from './pdf-logo';
 import { formatPrice } from './pdf';
 
 const PAGE_WIDTH = 595.28;
@@ -37,16 +37,15 @@ export async function generateStockMovementPdf(
   const pdf = await PDFDocument.create();
   const { font, bold } = await embedDocumentFonts(pdf);
   const { title: titleSize, body, label: labelSize, footer: footerSize } = DOCUMENT_FONT_SIZE;
-  const logo = await pdf.embedPng(LOGO_PNG_BASE64);
   const supported = new Set(font.getCharacterSet());
   // Poppins tampoco trae emojis: reemplazarlos evita perder el comprobante por una nota.
   const safe = (value: string) => Array.from(value.normalize('NFC'))
     .map((char) => /\s/.test(char) ? ' ' : supported.has(char.codePointAt(0)!) ? char : '?').join('');
-  const ink = documentColor(DOCUMENT_COLOR.ink);
-  const muted = documentColor(DOCUMENT_COLOR.muted);
-  const brand = documentColor(DOCUMENT_COLOR.brand);
-  const hairline = documentColor(DOCUMENT_COLOR.hairline);
-  const zebra = documentColor(DOCUMENT_COLOR.zebra);
+  const ink = documentColor(PDF_BRAND_COLOR.cacao);
+  const muted = documentColor(PDF_BRAND_COLOR.cacaoSoft);
+  const brand = documentColor(PDF_BRAND_COLOR.strawberry);
+  const hairline = documentColor(PDF_BRAND_COLOR.border);
+  const zebra = documentColor(PDF_BRAND_COLOR.cream);
   const white = rgb(1, 1, 1);
   // S6: mismos tonos semánticos que las tarjetas de la app.
   const gain = rgb(21 / 255, 128 / 255, 61 / 255);
@@ -111,10 +110,10 @@ export async function generateStockMovementPdf(
     const text = (value: string, left: number, y: number, size: number = body, strong = false, color = ink) => {
       page.drawText(safe(value), { x: left, y, size, font: strong ? bold : font, color });
     };
-    page.drawImage(logo, { x: MARGIN, y: HEADER_TOP - LOGO_SIZE, width: LOGO_SIZE, height: LOGO_SIZE });
+    drawBrandLogo(page, { x: MARGIN, y: HEADER_TOP, size: LOGO_SIZE });
     text(title, MARGIN, TITLE_BASELINE, titleSize, true, brand);
     lines.forEach((line, i) => text(line, MARGIN, DETAIL_BASELINE - i * DETAIL_LINE_HEIGHT, labelSize, false, muted));
-    // Encabezado de tabla: banda violeta con el texto en blanco en negrita.
+    // Encabezado de tabla: banda frutilla con el texto en blanco en negrita.
     page.drawRectangle({
       x: MARGIN, y: tableTop - TABLE_HEAD_HEIGHT, width: TABLE_WIDTH, height: TABLE_HEAD_HEIGHT, color: brand,
     });

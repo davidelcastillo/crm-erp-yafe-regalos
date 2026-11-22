@@ -39,6 +39,10 @@ export async function proxy(request: NextRequest) {
   const isExcluded =
     pathname === '/login' ||
     pathname === '/unauthorized' ||
+    // Vidriera pública (S2/S4 de la vidriera Polkalina's): solo lectura, sin
+    // login y para cualquier rol. La visibilidad la decide la action, que no
+    // publica nada fuera del canal «Web».
+    pathname.startsWith('/polkalinas') ||
     pathname.startsWith('/_next/') ||
     pathname === '/favicon.ico' ||
     pathname.startsWith('/images/') ||

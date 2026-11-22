@@ -5,10 +5,30 @@
  * bajo el Uint8Array de otro realm de jsdom, así que esta suite corre en node
  * (mismo criterio que `src/lib/utils/pdf.test.ts`).
  */
-import { PDFDocument } from 'pdf-lib';
+import { PDFDocument, StandardFonts, type PDFFont } from 'pdf-lib';
 import zlib from 'zlib';
+// @ts-expect-error -- fontkit no publica tipos (mismo criterio que `label-print.ts`)
+import * as fontkit from 'fontkit';
 import { generateProductLabels } from './label-print';
 import { prisma } from '@/lib/prisma';
+import { SHRIKHAND_TTF_BASE64 } from '@/lib/fonts/shrikhand';
+import {
+  AMOUNT_MIN_FONT_SIZE_PT,
+  BOX_BORDER_COLOR,
+  BOX_COLOR,
+  BOX_LEFT_MM,
+  BOX_WIDTH_MM,
+  CODE_MIN_FONT_SIZE_PT,
+  HANDLE_MIN_FONT_SIZE_PT,
+  HANDLE_TEXT,
+  HANDLE_TOP_MM,
+  LABEL_HEIGHT_MM,
+  LABEL_INSET_Y_MM,
+  PRICE_BOX_HEIGHT_MM,
+  PRICE_BOX_TOP_MM,
+  PRICE_TEXT_COLOR,
+  TEXT_COLOR,
+} from '@/lib/label-layout';
 
 jest.mock('@/lib/prisma', () => ({
   prisma: {
@@ -82,6 +102,43 @@ const textOrigins = (base64: string) =>
     }) ?? [];
 
 const LABELS_PER_SHEET = 72;
+
+/** `r g b rg` (relleno) o `r g b RG` (trazo), como lo escribe pdf-lib para un hex. */
+const colorOp = (hex: string, op: 'rg' | 'RG'): string =>
+  `${[1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).join(' ')} ${op}`;
+
+/** Paleta de la marca: crema del fondo, rosa de las cajas, cacao y frutilla.
+ *  El borde `#EADAD6` es el único apoyo fuera de las cuatro familias. */
+const CACAO = '#4A2C2A';
+const CREAM = '#FFF6F0';
+const PINK = '#F2C4CC';
+const STRAWBERRY = '#C8323C';
+const PALETTE = [CREAM, PINK, STRAWBERRY, CACAO, '#EADAD6'];
+
+/**
+ * Todos los colores de relleno (`rg`) que aparecen en las páginas, en hex. Sirve
+ * para comprobar que nada se sale de la paleta: pdf-lib escribe el operador con
+ * los componentes normalizados, así que se vuelven a armar como `#RRGGBB`.
+ */
+const fillColors = (base64: string): string[] =>
+  [
+    ...new Set(
+      (pageStreams(base64).join('\n').match(/-?[\d.]+ -?[\d.]+ -?[\d.]+ rg/g) ?? []).map(
+        (op) =>
+          '#' +
+          op
+            .replace(' rg', '')
+            .split(' ')
+            .map((component) =>
+              Math.round(Number(component) * 255)
+                .toString(16)
+                .padStart(2, '0')
+                .toUpperCase()
+            )
+            .join('')
+      )
+    ),
+  ];
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -185,7 +242,25 @@ describe('generateProductLabels — PDF según la plantilla (§S3)', () => {
     expect(text).toContain('1.250,00');
   });
 
-  test('el codigo va oscuro y el importe en negro; el tono de marca queda para $ y handle', async () => {
+  test('la etiqueta de producto usa solo la paleta de la marca', async () => {
+    const result = await generateProductLabels({
+      branchId: 1,
+      selections: [{ productId: 1, quantity: 2 }],
+    });
+    if (!result.success) throw new Error(result.error);
+
+    const colores = fillColors(result.data.pdfBase64);
+    // Nada de rosa viejo (#fcd2d3) ni del rosa muy claro anterior (#FBE7EC).
+    expect(colores).not.toContain('#FCD2D3');
+    expect(colores).not.toContain('#FBE7EC');
+    // Todo relleno sale de las cuatro familias de la marca.
+    expect(colores.filter((hex) => !PALETTE.includes(hex))).toEqual([]);
+    // Y las cuatro estan: crema del fondo, rosa de las cajas, cacao del borde y
+    // frutilla del precio.
+    expect(colores).toEqual(expect.arrayContaining([CREAM, PINK, CACAO, STRAWBERRY]));
+  });
+
+  test('el código, el `$` y el handle van en cacao; el importe, en frutilla', async () => {
     mockProductFindMany.mockResolvedValue([{ id: 1, code: 'AAA001', price: 1500 }]);
 
     const result = await generateProductLabels({
@@ -196,19 +271,15 @@ describe('generateProductLabels — PDF según la plantilla (§S3)', () => {
     if (!result.success) throw new Error(result.error);
 
     const content = pageStreams(result.data.pdfBase64).join("\n");
-    // Código: #222222, en negrita.
-    expect(content).toContain(
-      '0.13333333333333333 0.13333333333333333 0.13333333333333333 rg'
-    );
-    // Importe: negro pleno.
-    expect(content).toContain('0 0 0 rg');
-    // El tono de marca (#6b2b43) queda solo en el `$` y en @feria_conexx.
-    expect(
-      content.match(/0\.4196078431372549 0\.16862745098039217 0\.2627450980392157 rg/g)
-    ).toHaveLength(2);
+    expect(content).toContain(colorOp(CACAO, 'rg'));
+    expect(content).toContain(colorOp(STRAWBERRY, 'rg'));
+    // Nada de la paleta vieja: ni #222222, ni #6b2b43, ni negro pleno.
+    expect(content).not.toContain(colorOp('#222222', 'rg'));
+    expect(content).not.toContain(colorOp('#6b2b43', 'rg'));
+    expect(content).not.toContain(colorOp('#000000', 'rg'));
   });
 
-  test('dibuja las marcas de corte: 8 ticks por etiqueta, en negro', async () => {
+  test('dibuja las marcas de corte: 8 ticks por etiqueta, en cacao', async () => {
     const result = await generateProductLabels({
       branchId: 1,
       selections: [{ productId: 1, quantity: 5 }],
@@ -216,8 +287,9 @@ describe('generateProductLabels — PDF según la plantilla (§S3)', () => {
     if (!result.success) throw new Error(result.error);
 
     const content = pageStreams(result.data.pdfBase64).join(' ');
-    // Negro como color de TRAZO (RG), no de relleno (rg).
-    expect(content).toContain('0 0 0 RG');
+    // Cacao como color de TRAZO (RG), no de relleno (rg): negro ya no se usa.
+    expect(content).toContain(colorOp(CACAO, 'RG'));
+    expect(content).not.toContain(colorOp('#000000', 'RG'));
     // Dos ticks por esquina: 8 por etiqueta, 40 para 5 etiquetas.
     expect(strokeOps(result.data.pdfBase64)).toBe(5 * 8);
   });
@@ -237,11 +309,13 @@ describe('generateProductLabels — PDF según la plantilla (§S3)', () => {
     expect(text.match(/BBB888/g)).toHaveLength(2);
     expect(text.match(/1\.250,00/g)).toHaveLength(3);
 
-    // Cuatro textos por etiqueta: código, $, precio y @feria_conexx.
+    // Cuatro textos por etiqueta: código, $, precio y «Polkalina's».
     expect(textOperators(result.data.pdfBase64)).toBe(5 * 4);
 
-    // El handle (@feria_conexx = 13 glifos) va una vez por etiqueta, con su hex.
-    const handles = hexTexts(result.data.pdfBase64).filter((hex) => hex.length === 13 * 4);
+    // El handle («Polkalina's» = 11 glifos) va una vez por etiqueta, con su hex.
+    const handles = hexTexts(result.data.pdfBase64).filter(
+      (hex) => hex.length === "Polkalina's".length * 4
+    );
     expect(handles).toHaveLength(5);
     expect(new Set(handles).size).toBe(1);
   });
@@ -338,11 +412,13 @@ describe('generateProductLabels — última hoja rellenada (S4)', () => {
     expect(pdfText(result.data.pdfBase64).match(/AAA001/g)).toHaveLength(5);
     expect(textOperators(result.data.pdfBase64)).toBe(5 * 4);
 
-    // El relleno conserva la etiqueta rosa (72 fondos) y las marcas de corte (72 × 8).
-    expect(fillOps(result.data.pdfBase64, '#fcd2d3')).toBe(LABELS_PER_SHEET);
+    // El relleno conserva la etiqueta crema (72 fondos, uno por etiqueta).
+    expect(fillOps(result.data.pdfBase64, CREAM)).toBe(LABELS_PER_SHEET);
     expect(strokeOps(result.data.pdfBase64)).toBe(LABELS_PER_SHEET * 8);
-    // Cajas del código y del precio solo en las 5 reales: 6 rellenos por caja.
-    expect(fillOps(result.data.pdfBase64, '#ffeff3')).toBe(5 * 2 * 6);
+    // Cada caja (código y precio) va en el rosa de la marca, con su borde cacao:
+    // 6 rellenos por caja redondeada (2 rectángulos cruzados + 4 círculos).
+    expect(fillOps(result.data.pdfBase64, PINK)).toBe(5 * 2 * 6);
+    expect(fillOps(result.data.pdfBase64, BOX_BORDER_COLOR)).toBeGreaterThanOrEqual(5 * 2 * 6);
   });
 
   test('sin el relleno la hoja queda como estaba: solo las etiquetas pedidas', async () => {
@@ -352,9 +428,11 @@ describe('generateProductLabels — última hoja rellenada (S4)', () => {
     });
     if (!result.success) throw new Error(result.error);
 
-    expect(fillOps(result.data.pdfBase64, '#fcd2d3')).toBe(5);
+    // Cada etiqueta real: un fondo crema y sus dos cajas en rosa.
+    expect(fillOps(result.data.pdfBase64, CREAM)).toBe(5);
     expect(strokeOps(result.data.pdfBase64)).toBe(5 * 8);
-    expect(fillOps(result.data.pdfBase64, '#ffeff3')).toBe(5 * 2 * 6);
+    expect(fillOps(result.data.pdfBase64, PINK)).toBe(5 * 2 * 6);
+    expect(fillOps(result.data.pdfBase64, BOX_BORDER_COLOR)).toBeGreaterThanOrEqual(5 * 2 * 6);
   });
 
   test('el relleno se suma a las hojas ya completas sin agregar páginas', async () => {
@@ -368,5 +446,185 @@ describe('generateProductLabels — última hoja rellenada (S4)', () => {
     expect((await loadPdf(result.data.pdfBase64)).getPageCount()).toBe(2);
     expect(textOperators(result.data.pdfBase64)).toBe((LABELS_PER_SHEET + 1) * 4);
     expect(strokeOps(result.data.pdfBase64)).toBe(2 * LABELS_PER_SHEET * 8);
+  });
+});
+
+// L13: el dueño mandó la etiqueta impresa con el importe cortado ($299,9 en vez
+// de $299,95) y el handle saliéndose de su lugar. Lo que se mide acá es el
+// ancho y el alto **dibujados**, no los que se pidieron.
+type TextRun = {
+  size: number;
+  x: number;
+  y: number;
+  fill: string;
+  hex: string;
+  text: string;
+};
+
+/** Cada `drawText`: tamaño, origen (línea de base, puntos) y texto mostrado. */
+const textRuns = (base64: string): TextRun[] => {
+  const runs: TextRun[] = [];
+  for (const block of pageStreams(base64).join('\n').match(/BT[\s\S]*?ET/g) ?? []) {
+    const size = block.match(/\/[^\s]+\s+([\d.]+)\s+Tf/)?.[1];
+    const origin = block.match(/1 0 0 1 (-?[\d.]+) (-?[\d.]+) Tm/);
+    const shown = block.match(/<([0-9A-Fa-f]+)>\s*Tj/);
+    const fill = block.match(/(-?[\d.]+) (-?[\d.]+) (-?[\d.]+) rg/);
+    if (!size || !origin || !shown) continue;
+    runs.push({
+      size: Number(size),
+      x: Number(origin[1]),
+      y: Number(origin[2]),
+      fill: fill ? `${fill[1]} ${fill[2]} ${fill[3]} rg` : '',
+      hex: shown[1],
+      text: Buffer.from(shown[1], 'hex').toString('latin1'),
+    });
+  }
+  return runs;
+};
+
+/**
+ * Los textos de una etiqueta por su papel: el `$` y el handle van con la fuente
+ * embebida (llegado como ids de glifo), el código y el importe en Helvetica.
+ */
+const labelTexts = (base64: string) => {
+  const runs = textRuns(base64);
+  const handleHexLen = HANDLE_TEXT.length * 4;
+  const handle = runs.filter((run) => run.hex.length === handleHexLen);
+  const dollar = runs.filter((run) => run.hex.length === 4);
+  const plain = runs.filter((run) => run.hex.length !== 4 && run.hex.length !== handleHexLen);
+  return { dollar, handle, plain };
+};
+
+/** Fuentes de la etiqueta, para medir el ancho realmente dibujado. */
+let medidores: { display: PDFFont; bold: PDFFont } | undefined;
+const fontMetrics = async () => {
+  if (!medidores) {
+    const doc = await PDFDocument.create();
+    doc.registerFontkit(fontkit);
+    medidores = {
+      display: await doc.embedFont(Buffer.from(SHRIKHAND_TTF_BASE64, 'base64')),
+      bold: await doc.embedFont(StandardFonts.HelveticaBold),
+    };
+  }
+  return medidores;
+};
+
+/** Tinta real de un texto en el TTF de Shrikhand, en em sobre la línea base. */
+const inkEm = (text: string) => {
+  const font = fontkit.create(Buffer.from(SHRIKHAND_TTF_BASE64, 'base64'));
+  let arriba = -Infinity;
+  let abajo = Infinity;
+  for (const glyph of font.layout(text).glyphs) {
+    arriba = Math.max(arriba, glyph.bbox.maxY);
+    abajo = Math.min(abajo, glyph.bbox.minY);
+  }
+  return { arriba: arriba / font.unitsPerEm, abajo: abajo / font.unitsPerEm };
+};
+
+describe('etiquetas — textos largos: nada se sale de su caja', () => {
+  const MM = 72 / 25.4;
+  const CAJA_IZQ = BOX_LEFT_MM * MM;
+  const CAJA_DER = (BOX_LEFT_MM + BOX_WIDTH_MM) * MM;
+  /** mm desde el borde superior de la hoja a puntos desde el borde inferior. */
+  const desdeArriba = (topMm: number) => (210 - topMm) * MM;
+
+  const unEtiqueta = async (code: string, price: number) => {
+    mockProductFindMany.mockResolvedValue([{ id: 1, code, price }]);
+    const result = await generateProductLabels({
+      branchId: 1,
+      selections: [{ productId: 1, quantity: 1 }],
+    });
+    if (!result.success) throw new Error(result.error);
+    return result.data.pdfBase64;
+  };
+
+  test('con código de 8 caracteres y $299.999,99 el texto entra completo en la caja', async () => {
+    const pdf = await unEtiqueta('ABCD1234', 299999.99);
+    const { display, bold } = await fontMetrics();
+    const { dollar, handle, plain } = labelTexts(pdf);
+
+    // Texto completo: no se pierde ni un carácter ni un centavo.
+    expect(pdfText(pdf)).toContain('299.999,99');
+    expect(plain.map((run) => run.text)).toEqual(['ABCD1234', '299.999,99']);
+    expect(handle).toHaveLength(1);
+
+    // Fondo de la caja: el ancho dibujado no pasa el borde derecho.
+    const derecho = (run: TextRun, font: PDFFont, text: string) =>
+      run.x + font.widthOfTextAtSize(text, run.size);
+
+    const [code, amount] = plain;
+    expect(code.x).toBeGreaterThanOrEqual(CAJA_IZQ - 1e-6);
+    expect(derecho(code, bold, code.text)).toBeLessThanOrEqual(CAJA_DER + 1e-6);
+    expect(dollar[0].x).toBeGreaterThanOrEqual(CAJA_IZQ - 1e-6);
+    expect(derecho(amount, bold, amount.text)).toBeLessThanOrEqual(CAJA_DER + 1e-6);
+    expect(handle[0].x).toBeGreaterThanOrEqual(CAJA_IZQ - 1e-6);
+    expect(derecho(handle[0], display, HANDLE_TEXT)).toBeLessThanOrEqual(CAJA_DER + 1e-6);
+  });
+
+  test('un importe que no entra ni al mínimo legible se parte en dos líneas sin perder centavos', async () => {
+    const pdf = await unEtiqueta('ABCD1234', 299999999.99);
+    const { bold } = await fontMetrics();
+    const { handle, plain } = labelTexts(pdf);
+
+    // El dato completo sigue en el PDF, repartido en dos líneas.
+    const [code, ...amounts] = plain;
+    expect(code.text).toBe('ABCD1234');
+    expect(amounts.map((run) => run.text).join('')).toBe('299.999.999,99');
+
+    // Ni el código ni el importe bajan del mínimo legible, y cada línea entra.
+    for (const run of [code, ...amounts]) {
+      expect(run.size).toBeGreaterThanOrEqual(CODE_MIN_FONT_SIZE_PT);
+      expect(run.size).toBeGreaterThanOrEqual(AMOUNT_MIN_FONT_SIZE_PT);
+      expect(run.x + bold.widthOfTextAtSize(run.text, run.size)).toBeLessThanOrEqual(
+        CAJA_DER + 1e-6
+      );
+    }
+
+    // Las dos líneas quedan dentro de la caja del importe.
+    const cajaAbajo = desdeArriba(LABEL_INSET_Y_MM + PRICE_BOX_TOP_MM + PRICE_BOX_HEIGHT_MM);
+    const cajaArriba = desdeArriba(LABEL_INSET_Y_MM + PRICE_BOX_TOP_MM);
+    for (const run of amounts) {
+      expect(run.y).toBeGreaterThanOrEqual(cajaAbajo);
+      expect(run.y).toBeLessThanOrEqual(cajaArriba);
+    }
+
+    // El handle tampoco se achica de más.
+    expect(handle[0].size).toBeGreaterThanOrEqual(HANDLE_MIN_FONT_SIZE_PT);
+  });
+
+  test('el handle entra en su banda: ni pisa la caja del importe ni se sale de la etiqueta', async () => {
+    const pdf = await unEtiqueta('AAA001', 1250);
+    const { handle } = labelTexts(pdf);
+    const run = handle[0];
+
+    expect(run.size).toBeGreaterThanOrEqual(HANDLE_MIN_FONT_SIZE_PT);
+
+    // Tinta real del TTF, no la caja de línea (que es 1,458 em y no entra).
+    const tinta = inkEm(HANDLE_TEXT);
+    const arribaPdf = run.y + tinta.arriba * run.size;
+    const abajoPdf = run.y + tinta.abajo * run.size;
+    const bandaArriba = desdeArriba(LABEL_INSET_Y_MM + HANDLE_TOP_MM);
+    const etiquetaAbajo = desdeArriba(LABEL_INSET_Y_MM + LABEL_HEIGHT_MM);
+
+    expect(arribaPdf).toBeLessThanOrEqual(bandaArriba + 0.5);
+    expect(abajoPdf).toBeGreaterThanOrEqual(etiquetaAbajo - 0.5);
+  });
+
+  test('el importe va en frutilla y las dos cajas comparten el rosa de la marca', async () => {
+    const pdf = await unEtiqueta('AAA001', 1250);
+    const { dollar, plain } = labelTexts(pdf);
+    const amount = plain[1];
+
+    // El `$` y el handle van en cacao; solo el importe en frutilla.
+    expect(dollar[0].fill).toBe(colorOp(TEXT_COLOR, 'rg'));
+    expect(amount.fill).toBe(colorOp(PRICE_TEXT_COLOR, 'rg'));
+    expect(amount.fill).toBe(colorOp(STRAWBERRY, 'rg'));
+    // Las dos cajas se pintan con el mismo rosa: 6 rellenos por caja y por
+    // etiqueta, o sea 12 en total (2 rectángulos + 4 círculos cada una).
+    const rellenos = (hex: string) =>
+      pageStreams(pdf).join('\n').split(colorOp(hex, 'rg')).length - 1;
+    expect(rellenos(PINK)).toBe(12);
+    expect(rellenos(BOX_BORDER_COLOR)).toBeGreaterThanOrEqual(12);
+    expect(rellenos(BOX_COLOR)).toBe(rellenos(PINK));
   });
 });

@@ -6,10 +6,26 @@ import type { Product } from "@prisma/client";
 import { ProductForm } from "../components/ProductForm";
 
 // Mock the actions. We mock BOTH the HU2 `createProduct` and the extended
-// `updateProductExtended` so we can exercise both modes.
+// `updateProductExtended` so we can exercise both modes. `getProductById` es de
+// donde la edición saca los canales publicados (T3).
 jest.mock("../../actions/product", () => ({
   createProduct: jest.fn(),
   updateProductExtended: jest.fn(),
+  getProductById: jest.fn(),
+}));
+
+// Las fotos del alta se suben con el producto ya creado (T2): se conserva el
+// componente real y se observa el helper que dispara la subida.
+jest.mock("@/components/ui/FotoUploader", () => ({
+  ...jest.requireActual("@/components/ui/FotoUploader"),
+  subirFotos: jest.fn(async () => null),
+}));
+
+jest.mock("@/app/actions/foto", () => ({
+  firmarSubidaFoto: jest.fn(),
+  confirmarFoto: jest.fn(),
+  quitarFoto: jest.fn(),
+  getFotosProducto: jest.fn(async () => ({ success: true, data: [] })),
 }));
 
 // Mock CategorySelector to keep this suite focused on ProductForm behavior
@@ -37,6 +53,11 @@ jest.mock("@/app/actions/branch", () => ({
   getBranchOptions: jest.fn(),
 }));
 
+// Los estilos activos son la misma taxonomía que la prenda (pills seleccionables).
+jest.mock("@/app/actions/prendaTaxonomy", () => ({
+  getEstiloPrendaOptions: jest.fn(),
+}));
+
 // Mock next/navigation
 jest.mock("next/navigation", () => ({
   useRouter: jest.fn(() => ({
@@ -50,8 +71,11 @@ jest.mock("sweetalert2", () => ({
   fire: jest.fn().mockResolvedValue({ isConfirmed: true }),
 }));
 
-import { createProduct, updateProductExtended } from "../../actions/product";
+import { createProduct, updateProductExtended, getProductById } from "../../actions/product";
 import { getBranchOptions } from "@/app/actions/branch";
+import { getEstiloPrendaOptions } from "@/app/actions/prendaTaxonomy";
+import { subirFotos } from "@/components/ui/FotoUploader";
+import { getFotosProducto } from "@/app/actions/foto";
 import { createProductSchema } from "@/lib/validations/product";
 import { useRouter } from "next/navigation";
 import Swal from "sweetalert2";
@@ -60,10 +84,33 @@ const mockCreateProduct = createProduct as jest.MockedFunction<typeof createProd
 const mockUpdateProductExtended = updateProductExtended as jest.MockedFunction<
   typeof updateProductExtended
 >;
+const mockGetProductById = getProductById as jest.MockedFunction<typeof getProductById>;
+const mockSubirFotos = subirFotos as jest.MockedFunction<typeof subirFotos>;
+const mockGetEstiloPrendaOptions = getEstiloPrendaOptions as jest.MockedFunction<
+  typeof getEstiloPrendaOptions
+>;
+/** Los estilos activos se piden una vez al abrir el modal: default para toda la suite. */
+mockGetEstiloPrendaOptions.mockResolvedValue({
+  success: true,
+  data: [
+    { id: 1, name: "Y2K" },
+    { id: 2, name: "Alternativo" },
+  ],
+} as never);
+
+/**
+ * El alta es un wizard (2 pasos): la sucursal primero y la ficha después. Los
+ * campos de la ficha solo existen en el paso 2.
+ */
+const irAlPaso2 = async () => {
+  fireEvent.click(screen.getByRole("button", { name: /continuar/i }));
+  await screen.findByLabelText(/nombre/i);
+};
 
 describe("ProductForm Component", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockGetProductById.mockResolvedValue({ success: true, data: { publicadaEn: [] } } as never);
     mockCreateProduct.mockResolvedValue({
       success: true,
       data: {
@@ -73,6 +120,7 @@ describe("ProductForm Component", () => {
         categoryId: null,
         active: true,
         kind: "PRODUCT" as const,
+        destacado: false,
         price: 0 as unknown as import("@prisma/client/runtime/library").Decimal,
         code: "TS000",
         codePrefix: "TS",
@@ -89,6 +137,7 @@ describe("ProductForm Component", () => {
         categoryId: null,
         active: true,
         kind: "PRODUCT" as const,
+        destacado: false,
         price: 0 as unknown as import("@prisma/client/runtime/library").Decimal,
         code: "TS000",
         codePrefix: "TS",
@@ -98,24 +147,49 @@ describe("ProductForm Component", () => {
     });
   });
 
-  it("renders form fields correctly (create mode)", () => {
+  it("renders the create form as a two-step wizard, branch first", async () => {
     render(<ProductForm product={null} onClose={() => {}} />);
 
-    expect(screen.getByLabelText(/nombre/i)).toBeInTheDocument();
+    // Paso 1: sucursal, con la opción explícita de no cargar stock.
+    expect(screen.getByText(/paso 1 de 2 · elegí la sucursal/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /sin sucursal/i })).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
+    // Sin sucursal elegida se puede continuar: el producto se crea sin stock.
+    expect(screen.getByRole("button", { name: /continuar/i })).toBeEnabled();
+    expect(screen.queryByLabelText(/nombre/i)).not.toBeInTheDocument();
+
+    await irAlPaso2();
+
+    expect(screen.getByText(/paso 2 de 2/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/descripción/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/prefijo.*2-4 letras/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/precio de venta/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /crear producto/i })).toBeInTheDocument();
-    // No initial stock field anymore (stock lives in BranchInventory)
-    expect(screen.queryByLabelText(/cantidad inicial/i)).not.toBeInTheDocument();
-    // Category selector is rendered
+    // Categoría, fotos y canales viven en el paso 2.
     expect(screen.getByTestId("category-selector")).toBeInTheDocument();
+    expect(screen.getByText("Fotos")).toBeInTheDocument();
     // Active toggle is NOT shown in create mode (defaults to active=true)
     expect(screen.queryByRole("switch")).not.toBeInTheDocument();
   });
 
+  it("cantidad y costo se cargan siempre: sin sucursal el aviso lo explica", async () => {
+    render(<ProductForm product={null} onClose={() => {}} />);
+    await irAlPaso2();
+
+    expect(screen.getByLabelText(/cantidad inicial/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^costo/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /sin sucursal: no se carga stock; el costo igual queda registrado como compra/i
+      )
+    ).toBeInTheDocument();
+  });
+
   it("shows validation error when required fields are empty", async () => {
     render(<ProductForm product={null} onClose={() => {}} />);
+    await irAlPaso2();
 
     const submitButton = screen.getByRole("button", { name: /crear producto/i });
     fireEvent.click(submitButton);
@@ -129,6 +203,7 @@ describe("ProductForm Component", () => {
 
   it("calls createProduct with correct data when form is submitted", async () => {
     render(<ProductForm product={null} onClose={() => {}} />);
+    await irAlPaso2();
 
     const nameInput = screen.getByLabelText(/nombre/i);
     const descInput = screen.getByLabelText(/descripción/i);
@@ -152,12 +227,21 @@ describe("ProductForm Component", () => {
         // Sin categoría elegida el alta manda null explícito (H2): el esquema
         // la acepta como nullable, así que el payload sigue siendo válido.
         categoryId: null,
+        // Sin canales elegidos no publica en ninguno (T3).
+        publicadaEn: [],
+        // Sin estilos elegidos el alta manda la lista vacía.
+        estilos: [],
+        // Sin sucursal el payload no lleva branchId, pero la cantidad y el
+        // costo viajan siempre (se registran como compra).
+        cantidadInicial: 0,
+        costoUnitario: 0,
       });
     });
   });
 
   it("sends the chosen category in the create payload (H2)", async () => {
     render(<ProductForm product={null} onClose={() => {}} />);
+    await irAlPaso2();
 
     fireEvent.change(screen.getByLabelText(/nombre/i), { target: { value: "Con categoría" } });
     fireEvent.change(screen.getByLabelText(/prefijo.*2-4 letras/i), { target: { value: "AA" } });
@@ -177,6 +261,7 @@ describe("ProductForm Component", () => {
 
   it("keeps the create payload valid for the schema when no category is chosen", async () => {
     render(<ProductForm product={null} onClose={() => {}} />);
+    await irAlPaso2();
 
     fireEvent.change(screen.getByLabelText(/nombre/i), { target: { value: "Sin categoría" } });
     fireEvent.change(screen.getByLabelText(/prefijo.*2-4 letras/i), { target: { value: "AA" } });
@@ -196,6 +281,7 @@ describe("ProductForm Component", () => {
     mockCreateProduct.mockResolvedValue({ success: false, error: "El nombre es requerido" });
 
     render(<ProductForm product={null} onClose={() => {}} />);
+    await irAlPaso2();
 
     const nameInput = screen.getByLabelText(/nombre/i);
     const prefixInput = screen.getByLabelText(/prefijo.*2-4 letras/i);
@@ -262,6 +348,7 @@ describe("ProductForm Component", () => {
         onSuccess={onSuccessMock}
       />
     );
+    await irAlPaso2();
 
     const nameInput = screen.getByLabelText(/nombre/i);
     const prefixInput = screen.getByLabelText(/prefijo.*2-4 letras/i);
@@ -291,6 +378,7 @@ describe("ProductForm Component", () => {
     });
 
     render(<ProductForm product={null} onClose={onCloseMock} />);
+    await irAlPaso2();
 
     const nameInput = screen.getByLabelText(/nombre/i);
     const prefixInput = screen.getByLabelText(/prefijo.*2-4 letras/i);
@@ -480,10 +568,10 @@ describe("ProductForm Component", () => {
 });
 
 /**
- * T3 (odd/tasks/talles-y-compra-alta.md): el alta individual gana sucursal,
- * cantidad inicial y costo. Sin sucursal elegida el alta queda como hoy.
+ * Alta sin sucursal (pedido del dueño): la sucursal es opcional en el wizard y
+ * el costo se registra como compra igual, con la cantidad que da las unidades.
  */
-describe("ProductForm · alta con stock y costo (T3)", () => {
+describe("ProductForm · alta sin sucursal", () => {
   const SUCURSALES = [
     { id: 1, name: "Sucursal Centro" },
     { id: 2, name: "Sucursal Norte" },
@@ -491,16 +579,11 @@ describe("ProductForm · alta con stock y costo (T3)", () => {
 
   const mockGetBranchOptions = getBranchOptions as jest.MockedFunction<typeof getBranchOptions>;
 
-  /** Elige la sucursal y espera los campos que dependen de ella. */
-  const elegirSucursal = async () => {
-    fireEvent.click(await screen.findByRole("button", { name: "Sucursal Centro" }));
-    await screen.findByLabelText(/cantidad inicial/i);
-  };
-
-  const llenarAlta = () => {
-    fireEvent.change(screen.getByLabelText(/nombre/i), { target: { value: "Jabón de Avena" } });
-    fireEvent.change(screen.getByLabelText(/prefijo.*2-4 letras/i), { target: { value: "AA" } });
-    fireEvent.change(screen.getByLabelText(/precio de venta/i), { target: { value: "1500" } });
+  /** Paso 1 → elige la sucursal y continúa a la ficha. */
+  const elegirSucursal = async (nombre: string) => {
+    const opcion = await screen.findByRole("button", { name: nombre });
+    fireEvent.click(opcion);
+    await irAlPaso2();
   };
 
   beforeEach(() => {
@@ -509,19 +592,24 @@ describe("ProductForm · alta con stock y costo (T3)", () => {
     mockCreateProduct.mockResolvedValue({ success: true, data: { id: 1 } } as never);
   });
 
-  it("sin sucursal elegida no muestra cantidad inicial ni costo", async () => {
+  const llenarFicha = () => {
+    fireEvent.change(screen.getByLabelText(/nombre/i), { target: { value: "Jabón de Avena" } });
+    fireEvent.change(screen.getByLabelText(/prefijo.*2-4 letras/i), { target: { value: "AA" } });
+    fireEvent.change(screen.getByLabelText(/precio de venta/i), { target: { value: "1500" } });
+  };
+
+  it("sin sucursal manda cantidad y costo y NO manda branchId", async () => {
     render(<ProductForm product={null} onClose={() => {}} />);
 
-    expect(await screen.findByRole("group", { name: "Sucursal" })).toBeInTheDocument();
-    expect(screen.queryByLabelText(/cantidad inicial/i)).not.toBeInTheDocument();
-    expect(screen.queryByLabelText(/^costo/i)).not.toBeInTheDocument();
-  });
+    // La opción de no cargar stock arranca elegida y el paso 2 la mantiene.
+    expect(await screen.findByRole("button", { name: "Sucursal Centro" })).toHaveAttribute(
+      "aria-pressed",
+      "false"
+    );
+    await irAlPaso2();
+    expect(screen.getByText(/paso 2 de 2 · sin sucursal/i)).toBeInTheDocument();
 
-  it("con sucursal carga cantidad y costo, y el payload los lleva", async () => {
-    render(<ProductForm product={null} onClose={() => {}} />);
-    llenarAlta();
-    await elegirSucursal();
-
+    llenarFicha();
     fireEvent.change(screen.getByLabelText(/cantidad inicial/i), { target: { value: "5" } });
     fireEvent.change(screen.getByLabelText(/^costo/i), { target: { value: "100" } });
     fireEvent.click(screen.getByRole("button", { name: /crear producto/i }));
@@ -529,16 +617,34 @@ describe("ProductForm · alta con stock y costo (T3)", () => {
     await waitFor(() => expect(mockCreateProduct).toHaveBeenCalled());
 
     const payload = mockCreateProduct.mock.calls[0][0];
+    expect(payload).not.toHaveProperty("branchId");
     expect(payload).toEqual(
-      expect.objectContaining({ branchId: 1, cantidadInicial: 5, costoUnitario: 100 })
+      expect.objectContaining({ cantidadInicial: 5, costoUnitario: 100 })
     );
     expect(createProductSchema.safeParse(payload).success).toBe(true);
   });
 
+  it("con sucursal manda branchId, cantidad y costo", async () => {
+    render(<ProductForm product={null} onClose={() => {}} />);
+    await elegirSucursal("Sucursal Centro");
+    expect(screen.getByText(/paso 2 de 2 · sucursal centro/i)).toBeInTheDocument();
+
+    llenarFicha();
+    fireEvent.change(screen.getByLabelText(/cantidad inicial/i), { target: { value: "5" } });
+    fireEvent.change(screen.getByLabelText(/^costo/i), { target: { value: "100" } });
+    fireEvent.click(screen.getByRole("button", { name: /crear producto/i }));
+
+    await waitFor(() => expect(mockCreateProduct).toHaveBeenCalled());
+
+    expect(mockCreateProduct.mock.calls[0][0]).toEqual(
+      expect.objectContaining({ branchId: 1, cantidadInicial: 5, costoUnitario: 100 })
+    );
+  });
+
   it("con sucursal y sin costo el payload viaja con costo 0", async () => {
     render(<ProductForm product={null} onClose={() => {}} />);
-    llenarAlta();
-    await elegirSucursal();
+    await elegirSucursal("Sucursal Centro");
+    llenarFicha();
     fireEvent.change(screen.getByLabelText(/cantidad inicial/i), { target: { value: "3" } });
     fireEvent.click(screen.getByRole("button", { name: /crear producto/i }));
 
@@ -549,7 +655,27 @@ describe("ProductForm · alta con stock y costo (T3)", () => {
     );
   });
 
-  it("en la edición no hay sucursal, cantidad ni costo", async () => {
+  it("se puede volver a «Sin sucursal» después de elegir una", async () => {
+    render(<ProductForm product={null} onClose={() => {}} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Sucursal Centro" }));
+    expect(screen.getByRole("button", { name: "Sucursal Centro" })).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /sin sucursal/i }));
+    expect(screen.getByRole("button", { name: /sin sucursal/i })).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
+    expect(screen.getByRole("button", { name: "Sucursal Centro" })).toHaveAttribute(
+      "aria-pressed",
+      "false"
+    );
+  });
+
+  it("en la edición no hay wizard, sucursal, cantidad ni costo", async () => {
     const product = {
       id: 1,
       name: "Producto Existente",
@@ -565,10 +691,293 @@ describe("ProductForm · alta con stock y costo (T3)", () => {
 
     render(<ProductForm product={product} onClose={() => {}} />);
 
+    expect(screen.queryByText(/paso 1 de 2/i)).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/nombre/i)).toBeInTheDocument();
     expect(screen.queryByRole("group", { name: "Sucursal" })).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/cantidad inicial/i)).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/^costo/i)).not.toBeInTheDocument();
     // La edición no pide las sucursales.
     expect(mockGetBranchOptions).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * T2 y T3 de `odd/tasks/fotos-vidriera-polkalinas.md`: el producto gana la
+ * sección de fotos (misma que la prenda) y «Publicar en» (S3). Las fotos del
+ * alta se suben recién con el producto creado, para tener su id.
+ */
+describe("ProductForm · fotos y «Publicar en» (T2/T3)", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockGetProductById.mockResolvedValue({ success: true, data: { publicadaEn: [] } } as never);
+    mockCreateProduct.mockResolvedValue({ success: true, data: { id: 1 } } as never);
+    mockUpdateProductExtended.mockResolvedValue({ success: true, data: { id: 1 } } as never);
+  });
+
+  const llenarAlta = async () => {
+    await irAlPaso2();
+    fireEvent.change(screen.getByLabelText(/nombre/i), { target: { value: "Jabón de Avena" } });
+    fireEvent.change(screen.getByLabelText(/prefijo.*2-4 letras/i), { target: { value: "AA" } });
+    fireEvent.change(screen.getByLabelText(/precio de venta/i), { target: { value: "1500" } });
+  };
+
+  const elegirFoto = (input: HTMLInputElement, files: File[]) => {
+    Object.defineProperty(input, "files", { value: files, configurable: true });
+    fireEvent.change(input);
+  };
+
+  it("muestra la sección de fotos en el alta", async () => {
+    render(<ProductForm product={null} onClose={() => {}} />);
+    await irAlPaso2();
+
+    expect(screen.getByText("Fotos")).toBeInTheDocument();
+    expect(screen.getByLabelText(/agregar fotos/i)).toBeInTheDocument();
+  });
+
+  it("manda publicadaEn con los canales elegidos", async () => {
+    render(<ProductForm product={null} onClose={() => {}} />);
+    await llenarAlta();
+    fireEvent.click(screen.getByLabelText("Web"));
+
+    fireEvent.click(screen.getByRole("button", { name: /crear producto/i }));
+
+    await waitFor(() => expect(mockCreateProduct).toHaveBeenCalled());
+    const payload = mockCreateProduct.mock.calls[0][0];
+    expect(payload).toEqual(expect.objectContaining({ publicadaEn: ["Web"] }));
+    expect(createProductSchema.safeParse(payload).success).toBe(true);
+  });
+
+  it("sin canales elegidos manda publicadaEn vacío", async () => {
+    render(<ProductForm product={null} onClose={() => {}} />);
+    await llenarAlta();
+
+    fireEvent.click(screen.getByRole("button", { name: /crear producto/i }));
+
+    await waitFor(() => expect(mockCreateProduct).toHaveBeenCalled());
+    expect(mockCreateProduct.mock.calls[0][0]).toEqual(
+      expect.objectContaining({ publicadaEn: [] })
+    );
+  });
+
+  it("en la edición precarga los canales publicados y los guarda", async () => {
+    mockGetProductById.mockResolvedValue({
+      success: true,
+      data: { publicadaEn: ["Web"] },
+    } as never);
+
+    const product = {
+      id: 1,
+      name: "Producto Existente",
+      description: "-",
+      categoryId: null,
+      active: true,
+      price: 500,
+      code: "EX001",
+      codePrefix: "EX",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    } as unknown as Product;
+
+    render(<ProductForm product={product} onClose={() => {}} />);
+
+    expect(await screen.findByLabelText("Web")).toBeChecked();
+    expect(mockGetProductById).toHaveBeenCalledWith(1);
+
+    fireEvent.click(screen.getByRole("button", { name: /actualizar producto/i }));
+
+    await waitFor(() =>
+      expect(mockUpdateProductExtended).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 1, publicadaEn: ["Web"] })
+      )
+    );
+  });
+
+  it("en el alta sube las fotos pendientes después de crear el producto", async () => {
+    mockCreateProduct.mockResolvedValue({ success: true, data: { id: 12 } } as never);
+
+    render(<ProductForm product={null} onClose={() => {}} />);
+    await llenarAlta();
+    elegirFoto(screen.getByLabelText(/agregar fotos/i) as HTMLInputElement, [
+      new File(["x"], "foto.jpg", { type: "image/jpeg" }),
+    ]);
+
+    fireEvent.click(screen.getByRole("button", { name: /crear producto/i }));
+
+    await waitFor(() => expect(mockSubirFotos).toHaveBeenCalledWith(12, [expect.any(File)]));
+  });
+});
+
+/**
+ * Reporte del dueño: «El modal de productos no me deja hacer scroll hacia
+ * abajo, baja la página de atrás de inventario» y «editar un producto normal
+ * sigue sin dejarme ver las fotos». El shell pasa a ser el de `PrendaForm`:
+ * cabecera fija, área central scrolleable que contiene el gesto y pie fijo.
+ */
+describe("ProductForm · scroll del modal (reporte del dueño)", () => {
+  const productoExistente = {
+    id: 7,
+    name: "Producto Existente",
+    description: "-",
+    categoryId: null,
+    active: true,
+    price: 500,
+    code: "EX001",
+    codePrefix: "EX",
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  } as unknown as Product;
+
+  const mockGetBranchOptions = getBranchOptions as jest.MockedFunction<typeof getBranchOptions>;
+  const mockGetFotosProducto = getFotosProducto as jest.MockedFunction<typeof getFotosProducto>;
+
+  /** Área central: scrollea sola y no deja que el gesto llegue al fondo. */
+  const areaScrolleable = () => {
+    const area = screen.getByRole("dialog").querySelector(".overscroll-contain");
+    expect(area).not.toBeNull();
+    return area as HTMLElement;
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockGetBranchOptions.mockResolvedValue({ success: true, data: [] } as never);
+    mockGetProductById.mockResolvedValue({ success: true, data: { publicadaEn: [] } } as never);
+    mockGetFotosProducto.mockResolvedValue({ success: true, data: [] } as never);
+  });
+
+  it("tiene un área central scrolleable que retiene el gesto", async () => {
+    render(<ProductForm product={null} onClose={() => {}} />);
+
+    const area = areaScrolleable();
+    expect(area.className).toContain("overflow-y-auto");
+    expect(area.className).toContain("overscroll-contain");
+    expect(area.className).toContain("min-h-0");
+    expect(area.className).toContain("flex-1");
+  });
+
+  it("deja el pie (Cancelar/Continuar) fuera del área scrolleable", async () => {
+    render(<ProductForm product={null} onClose={() => {}} />);
+
+    const area = areaScrolleable();
+    expect(area.contains(screen.getByRole("button", { name: /continuar/i }))).toBe(false);
+    expect(area.contains(screen.getByRole("button", { name: /cancelar/i }))).toBe(false);
+  });
+
+  it("el bloque de fotos del alta vive dentro del área scrolleable", async () => {
+    render(<ProductForm product={null} onClose={() => {}} />);
+    await irAlPaso2();
+
+    const area = areaScrolleable();
+    expect(area.contains(screen.getByText("Fotos"))).toBe(true);
+    expect(area.contains(screen.getByLabelText(/agregar fotos/i))).toBe(true);
+  });
+
+  it("en la edición las fotos se ven, cargan las guardadas y quedan alcanzables", async () => {
+    mockGetFotosProducto.mockResolvedValue({
+      success: true,
+      data: [{ position: 0, path: "a.jpg", alt: "Frente" }],
+    } as never);
+
+    render(<ProductForm product={productoExistente} onClose={() => {}} />);
+
+    const area = areaScrolleable();
+    expect(area.contains(screen.getByText("Fotos"))).toBe(true);
+    expect(area.contains(screen.getByLabelText(/agregar fotos/i))).toBe(true);
+    expect(screen.getByRole("button", { name: /actualizar producto/i })).toBeInTheDocument();
+
+    // El uploader recibe el id del producto para traer las fotos existentes.
+    await waitFor(() => expect(mockGetFotosProducto).toHaveBeenCalledWith({ productId: 7 }));
+    expect(await screen.findByAltText(/frente/i)).toBeInTheDocument();
+    expect(screen.getByText("Portada")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /quitar foto 1/i })).toBeInTheDocument();
+  });
+
+  it("bloquea el scroll del body mientras está abierto y lo libera al cerrar", () => {
+    const { unmount } = render(<ProductForm product={null} onClose={() => {}} />);
+    expect(document.body).toHaveClass("overflow-hidden");
+
+    unmount();
+    expect(document.body).not.toHaveClass("overflow-hidden");
+  });
+});
+
+/**
+ * Estilos del producto (pedido del dueño): las mismas pills que la prenda, en
+ * el paso 2 del alta y en la edición, con los activos precargados.
+ */
+describe("ProductForm · estilos", () => {
+  const productoExistente = {
+    id: 1,
+    name: "Remera",
+    description: "-",
+    categoryId: null,
+    active: true,
+    price: 100,
+    code: "RE000",
+    codePrefix: "RE",
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  } as unknown as Product;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCreateProduct.mockResolvedValue({ success: true, data: { id: 1 } } as never);
+    mockUpdateProductExtended.mockResolvedValue({ success: true, data: { id: 1 } } as never);
+    mockGetProductById.mockResolvedValue({
+      success: true,
+      data: { publicadaEn: [], estilos: [] },
+    } as never);
+  });
+
+  it("el alta muestra los estilos activos y manda los elegidos", async () => {
+    render(<ProductForm product={null} onClose={() => {}} />);
+    await irAlPaso2();
+
+    const y2k = await screen.findByRole("button", { name: "Y2K" });
+    expect(screen.getByRole("button", { name: "Alternativo" })).toBeInTheDocument();
+    expect(y2k).toHaveAttribute("aria-pressed", "false");
+
+    fireEvent.click(y2k);
+    expect(y2k).toHaveAttribute("aria-pressed", "true");
+
+    fireEvent.change(screen.getByLabelText(/nombre/i), { target: { value: "Remera Y2K" } });
+    fireEvent.change(screen.getByLabelText(/prefijo.*2-4 letras/i), { target: { value: "AA" } });
+    fireEvent.change(screen.getByLabelText(/precio de venta/i), { target: { value: "100" } });
+    fireEvent.click(screen.getByRole("button", { name: /crear producto/i }));
+
+    await waitFor(() =>
+      expect(mockCreateProduct).toHaveBeenCalledWith(
+        expect.objectContaining({ estilos: [1] })
+      )
+    );
+  });
+
+  it("sin estilos cargados muestra el estado vacío", async () => {
+    mockGetEstiloPrendaOptions.mockResolvedValueOnce({ success: true, data: [] } as never);
+
+    render(<ProductForm product={null} onClose={() => {}} />);
+    await irAlPaso2();
+
+    expect(await screen.findByText("No hay estilos cargados")).toBeInTheDocument();
+  });
+
+  it("la edición precarga los estilos guardados y los manda", async () => {
+    mockGetProductById.mockResolvedValue({
+      success: true,
+      data: { publicadaEn: [], estilos: [2] },
+    } as never);
+
+    render(<ProductForm product={productoExistente} onClose={() => {}} />);
+
+    const alternativo = await screen.findByRole("button", { name: "Alternativo" });
+    await waitFor(() => expect(alternativo).toHaveAttribute("aria-pressed", "true"));
+    expect(screen.getByRole("button", { name: "Y2K" })).toHaveAttribute("aria-pressed", "false");
+
+    fireEvent.click(screen.getByRole("button", { name: /actualizar producto/i }));
+
+    await waitFor(() =>
+      expect(mockUpdateProductExtended).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 1, estilos: [2] })
+      )
+    );
   });
 });

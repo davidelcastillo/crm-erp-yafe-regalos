@@ -18,6 +18,8 @@
  * superior izquierda y las medidas que el dibujo necesita.
  */
 
+import { PDF_BRAND_COLOR } from './pdf-brand';
+
 /** 1 mm en puntos PostScript (72 pt = 1 pulgada). */
 export const MM_TO_PT = 72 / 25.4;
 
@@ -50,19 +52,22 @@ export const CUT_MARK_LENGTH_MM = 1.1;
 /** Separación entre el borde de la etiqueta y el tick, en mm. */
 export const CUT_MARK_OFFSET_MM = 0.15;
 export const CUT_MARK_WIDTH_MM = 0.2;
-export const CUT_MARK_COLOR = '#000000';
+export const CUT_MARK_COLOR = PDF_BRAND_COLOR.cacao;
 
-// --- Colores medidos ------------------------------------------------------
+// --- Colores de la marca --------------------------------------------------
 /** Fondo de la etiqueta. */
-export const LABEL_BACKGROUND_COLOR = '#fcd2d3';
-/** Cajas del código y del precio. */
-export const BOX_COLOR = '#ffeff3';
-/** `$` y `@feria_conexx`: el tono de marca de la plantilla. */
-export const TEXT_COLOR = '#6b2b43';
-/** Código del producto: oscuro, en negrita, para que se lea de lejos (L12). */
-export const CODE_TEXT_COLOR = '#222222';
-/** Importe: negro pleno (L12). */
-export const PRICE_TEXT_COLOR = '#000000';
+export const LABEL_BACKGROUND_COLOR = PDF_BRAND_COLOR.cream;
+/** Las dos cajas (código y precio): el rosa de la marca. */
+export const BOX_COLOR = PDF_BRAND_COLOR.pink;
+/** Borde fino cacao de las cajas: el rosa solo, sin borde, desentonaba al imprimir. */
+export const BOX_BORDER_COLOR = PDF_BRAND_COLOR.cacao;
+export const BOX_BORDER_WIDTH_MM = 0.25;
+/** `$` y el handle «Polkalina's». */
+export const TEXT_COLOR = PDF_BRAND_COLOR.cacao;
+/** Código del producto: en negrita y en cacao, para que se lea de lejos (L12). */
+export const CODE_TEXT_COLOR = PDF_BRAND_COLOR.cacao;
+/** Importe: frutilla, el cuarto color de la marca (L12). */
+export const PRICE_TEXT_COLOR = PDF_BRAND_COLOR.strawberry;
 
 // --- Caja del código (81 % del ancho, centrada) ---------------------------
 export const BOX_WIDTH_MM = 26.7;
@@ -86,10 +91,21 @@ export const PRICE_GAP_MM = 0.6;
 export const CURRENCY_SYMBOL = '$';
 
 // --- Handle, justo debajo de la caja del precio ---------------------------
-export const HANDLE_TEXT = '@feria_conexx';
+export const HANDLE_TEXT = "Polkalina's";
 export const HANDLE_TOP_MM = PRICE_BOX_TOP_MM + PRICE_BOX_HEIGHT_MM; // 20,7
 /** Ancho máximo del handle: 88 % de la caja (23,4 mm). */
 export const HANDLE_MAX_WIDTH_RATIO = 0.88;
+/**
+ * Alto máximo de la tinta del handle dentro de su banda. Shrikhand declara
+ * 1,458 em de alto de línea, más que la banda entera (2,8 mm): lo que se mide
+ * es la tinta, y se deja un 10 % de aire arriba y abajo.
+ */
+export const HANDLE_MAX_HEIGHT_RATIO = 0.9;
+/**
+ * Alto de la tinta de «Polkalina's» sobre la línea base, medido en el TTF: 0,75
+ * em (y 0,009 em por debajo, que se desprecia). Es lo que centra la banda.
+ */
+export const HANDLE_INK_ASCENT_EM = 0.75;
 
 // --- Tamaños de fuente (pt) ----------------------------------------------
 export const CODE_FONT_SIZE_PT = 12;
@@ -99,6 +115,15 @@ export const PRICE_FONT_SIZE_PT = 20;
  * glifo a 0,89 em, así que 5,5 / 0,89 ≈ 6,18 mm ≈ 17,5 pt.
  */
 export const DOLLAR_FONT_SIZE_PT = 17.5;
+
+/**
+ * Mínimos legibles: por debajo de esto la etiqueta ya no se lee de lejos. Si el
+ * importe no entra a 8 pt se parte en dos líneas (entero y centavos) en vez de
+ * achicarlo más; el handle baja como mucho a 9 pt.
+ */
+export const CODE_MIN_FONT_SIZE_PT = 8;
+export const AMOUNT_MIN_FONT_SIZE_PT = 8;
+export const HANDLE_MIN_FONT_SIZE_PT = 9;
 
 /** Esquina superior izquierda de una etiqueta dentro de su hoja. */
 export interface LabelSlot {
@@ -157,11 +182,20 @@ export function calculateLabelSlots(totalLabels: number): LabelSlot[] {
  * Marcas de corte de una etiqueta: dos ticks por esquina (uno horizontal y uno
  * vertical), separados del borde para que el corte se guíe por afuera de la
  * etiqueta. Con la grilla de 9 × 8 todos los ticks caen dentro de la hoja.
+ *
+ * La medida se puede pasar por parámetro porque la etiqueta chica del peluche
+ * usa otra grilla sobre la misma hoja (`label-chica-layout`).
  */
-export function cutMarksForSlot(slot: LabelSlot): CutMark[] {
+export function cutMarksForSlot(
+  slot: LabelSlot,
+  size: { widthMm: number; heightMm: number } = {
+    widthMm: LABEL_WIDTH_MM,
+    heightMm: LABEL_HEIGHT_MM,
+  }
+): CutMark[] {
   const { x, y } = slot;
-  const right = x + LABEL_WIDTH_MM;
-  const bottom = y + LABEL_HEIGHT_MM;
+  const right = x + size.widthMm;
+  const bottom = y + size.heightMm;
   const gap = CUT_MARK_OFFSET_MM;
   const largo = CUT_MARK_LENGTH_MM;
 
@@ -187,4 +221,15 @@ export function formatPrice(price: number): string {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
+}
+
+/**
+ * El mismo importe en dos líneas, para cuando ni al mínimo legible entra en una:
+ * parte entera y `,` + centavos. Conserva el dato completo (no se pierden los
+ * centavos).
+ */
+export function formatPriceLines(price: number): [string, string] {
+  const formatted = formatPrice(price);
+  const comma = formatted.lastIndexOf(',');
+  return [formatted.slice(0, comma), formatted.slice(comma)];
 }

@@ -220,9 +220,10 @@ export async function getPurchaseById(id: number) {
 /**
  * Crea una compra con items distribuidos a múltiples sucursales.
  *
- * Restricción del schema: `Purchase.branchId` es NOT NULL, por lo que la
- * cabecera adopta el `branchId` de la PRIMERA línea como cabecera. Todas las
- * líneas de items pueden ir a distintas sucursales. Se validan:
+ * Restricción del schema: el split toma el `branchId` de la PRIMERA línea como
+ * cabecera. Todas las líneas de items pueden ir a distintas sucursales.
+ * (`Purchase.branchId` es opcional desde la compra del alta sin sucursal, pero
+ * este flujo siempre manda una.) Se validan:
  *   - las branches involucradas existan y estén activas;
  *   - los productos existan y estén activos.
  * En cada `branchId` destino, se crea los `PurchaseItem`, se incrementa

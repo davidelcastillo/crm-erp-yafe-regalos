@@ -134,6 +134,15 @@ export const updatePrendaSchema = z.object({
   ...camposPrenda,
 });
 
+/**
+ * Destacado de la portada de la tienda: el producto se elige en la ficha y la
+ * acción verifica que esté activo y publicado en Web. Uno solo a la vez.
+ */
+export const destacarPrendaSchema = z.object({
+  productId: idRequerido("Producto inválido"),
+  destacado: z.boolean(),
+});
+
 export type CreatePrendaValues = z.infer<typeof createPrendaSchema>;
 export type UpdatePrendaValues = z.infer<typeof updatePrendaSchema>;
 
@@ -154,4 +163,6 @@ export type PrendaEditable = {
   estilos: number[];
   medidas: Array<{ medidaTipoId: number; valorCm: number }>;
   publicadaEn: string[];
+  /** Destacado en la portada de la tienda (`Product.destacado`). */
+  destacado: boolean;
 };

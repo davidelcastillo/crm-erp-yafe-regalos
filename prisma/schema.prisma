@@ -20,10 +20,16 @@ model Product {
   categoryId        Int?
   category          Category?           @relation(fields: [categoryId], references: [id])
   active            Boolean             @default(true)
+  // Destacado en la portada de la tienda: uno solo a la vez y solo si está
+  // publicado en Web (lo garantizan la acción y la home; la base no lo impone).
+  destacado         Boolean             @default(false)
   // Aditivo: una prenda es un Product con ficha PrendaDetalle (variante C).
   kind              ProductKind         @default(PRODUCT)
   prenda            PrendaDetalle?
+  // Estilos del producto normal (las prendas los tienen en su ficha).
+  estilosProducto   ProductEstilo[]
   publicaciones     PrendaPublicacion[]
+  images            ProductImage[]
   purchaseItems     PurchaseItem[]
   saleItems         SaleItem[]
   pedidoItems       PedidoItem[]
@@ -79,8 +85,10 @@ model Purchase {
   createdAt   DateTime       @default(now())
   totalAmount Decimal        @default(0) @db.Decimal(10, 2)
   updatedAt   DateTime       @updatedAt
-  branchId    Int
-  branch      Branch         @relation("BranchPurchases", fields: [branchId], references: [id])
+  // Opcional: la compra del alta de un producto creado SIN sucursal se
+  // registra igual (es un gasto de mercadería, no de una sucursal puntual).
+  branchId    Int?
+  branch      Branch?        @relation("BranchPurchases", fields: [branchId], references: [id])
   items       PurchaseItem[]
 
   @@index([branchId])
@@ -355,7 +363,8 @@ model EstiloPrenda {
   id      Int            @id @default(autoincrement())
   name    String         @unique
   active  Boolean        @default(true)
-  prendas PrendaEstilo[]
+  prendas  PrendaEstilo[]
+  productos ProductEstilo[]
 }
 
 model PrendaEstilo {
@@ -363,6 +372,17 @@ model PrendaEstilo {
   estiloId  Int
   prenda    PrendaDetalle @relation(fields: [productId], references: [productId], onDelete: Cascade)
   estilo    EstiloPrenda  @relation(fields: [estiloId], references: [id])
+
+  @@id([productId, estiloId])
+  @@index([estiloId])
+}
+
+// Estilos de un producto normal (los de prenda viven en PrendaEstilo).
+model ProductEstilo {
+  productId Int
+  estiloId  Int
+  product   Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  estilo    EstiloPrenda @relation(fields: [estiloId], references: [id])
 
   @@id([productId, estiloId])
   @@index([estiloId])
@@ -394,6 +414,23 @@ model PrendaPublicacion {
   product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@id([productId, canal])
+}
+
+// --- Fotos del producto (ADR-08) --------------------------------------------
+// Hasta 4 fotos por `Product` de cualquier kind, la posición 0 es la portada
+// (el rango 0..3 lo valida la Server Action: Prisma no expresa el CHECK).
+// `path` guarda solo el prefijo del hash; los dos archivos del bucket
+// `product-images` se derivan de ahí (`<path>_lg.webp` y `<path>_sm.webp`).
+model ProductImage {
+  id        Int     @id @default(autoincrement())
+  productId Int
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  position  Int
+  path      String
+  alt       String?
+  bytes     Int
+
+  @@unique([productId, position])
 }
 
 // --- Pedidos ----------------------------------------------------------------

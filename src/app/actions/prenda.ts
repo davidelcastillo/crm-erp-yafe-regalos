@@ -10,9 +10,13 @@ import { getNextCode, prefixLockKey } from "@/lib/utils/product-code";
 import type { StockMovementReceipt } from "@/lib/stock-movement-receipt";
 import {
   createPrendaSchema,
+  destacarPrendaSchema,
   updatePrendaSchema,
   type PrendaEditable,
 } from "@/lib/validations/prenda";
+
+/** Canal de `PrendaPublicacion` que publica en la tienda. */
+const CANAL_WEB = "Web";
 
 /** Motivo del ingreso inicial en el movimiento y en el comprobante. */
 const PRENDA_ENTRY_REFERENCE = "ALTA DE PRENDA";
@@ -369,6 +373,7 @@ export async function getPrenda(id: number) {
         description: true,
         price: true,
         kind: true,
+        destacado: true,
         prenda: {
           select: {
             esUnica: true,
@@ -411,11 +416,58 @@ export async function getPrenda(id: number) {
         valorCm: Number(medida.valorCm),
       })),
       publicadaEn: product.publicaciones.map((publicacion) => publicacion.canal),
+      destacado: product.destacado,
     };
 
     return { success: true as const, data };
   } catch (error) {
     console.error("Error al obtener la prenda:", error);
     return { success: false as const, error: "Error al obtener la prenda" };
+  }
+}
+
+/**
+ * Destacado de la portada de la tienda (pedido del dueño): solo un producto
+ * activo y publicado en Web puede serlo, y con uno solo a la vez. Al destacar,
+ * el anterior se desmarca en la misma transacción; al desmarcar, la portada
+ * queda sin destacado y cae a su propio fallback.
+ */
+export async function destacarPrenda(data: unknown) {
+  try {
+    const auth = await requireAdmin();
+    if (!auth.ok) return { success: false as const, error: auth.error };
+
+    const { productId, destacado } = destacarPrendaSchema.parse(data);
+
+    if (destacado) {
+      const publicable = await prisma.product.findFirst({
+        where: { id: productId, active: true, publicaciones: { some: { canal: CANAL_WEB } } },
+        select: { id: true },
+      });
+      if (!publicable) {
+        return {
+          success: false as const,
+          error: "Solo se puede destacar una prenda activa y publicada en Web",
+        };
+      }
+    }
+
+    await prisma.$transaction(async (tx) => {
+      // Barrido primero: nunca quedan dos destacados a la vez.
+      await tx.product.updateMany({ where: { destacado: true }, data: { destacado: false } });
+      if (destacado) {
+        await tx.product.update({ where: { id: productId }, data: { destacado: true } });
+      }
+    });
+
+    // La portada pública se lee de la vidriera.
+    revalidatePath("/polkalinas");
+    return { success: true as const, data: { productId, destacado } };
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return { success: false as const, error: zodMessage(error) };
+    }
+    console.error("Error al destacar la prenda:", error);
+    return { success: false as const, error: "Error al destacar la prenda" };
   }
 }

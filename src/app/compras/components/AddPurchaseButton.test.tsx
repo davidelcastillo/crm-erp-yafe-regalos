@@ -4,6 +4,7 @@
 import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import type { Product } from "@prisma/client";
 import { AddPurchaseButton } from "./AddPurchaseButton";
+import { PurchasesList } from "./PurchasesList";
 
 // Mock the actions - CORRECTED: getProducts is from product actions, not purchase
 jest.mock("../../actions/purchase", () => ({
@@ -14,6 +15,24 @@ jest.mock("../../actions/product", () => ({
   getProducts: jest.fn(),
   createProduct: jest.fn(),
   updateProduct: jest.fn(),
+}));
+
+// `CategorySelector` (dentro de ProductForm) importa las actions de categoría,
+// que cargan Prisma: se mockean para que el suite no dependa de la base.
+jest.mock("@/app/actions/category", () => ({
+  getCategoryOptions: jest.fn(async () => ({ success: true, data: [] })),
+  createCategory: jest.fn(),
+}));
+
+// Las fotos del producto y la lista de sucursales también cargan Prisma.
+jest.mock("@/app/actions/foto", () => ({
+  firmarSubidaFoto: jest.fn(),
+  confirmarFoto: jest.fn(),
+  quitarFoto: jest.fn(),
+  getFotosProducto: jest.fn(async () => ({ success: true, data: [] })),
+}));
+jest.mock("@/app/actions/branch", () => ({
+  getBranchOptions: jest.fn(async () => ({ success: true, data: [] })),
 }));
 
 // Mock auth action (getUser) — used to send performedBy with the purchase
@@ -421,7 +440,7 @@ describe("AddPurchaseButton - Inline Product Creation", () => {
     } as never);
   });
 
-it("opens product creation modal when '+ Nuevo producto' is clicked", () => {
+it("opens product creation modal when '+ Nuevo producto' is clicked", async () => {
     render(<AddPurchaseButton products={mockProducts} />);
     
     // Open purchase modal
@@ -437,8 +456,9 @@ it("opens product creation modal when '+ Nuevo producto' is clicked", () => {
     expect(createButton).toBeInTheDocument();
     fireEvent.click(createButton);
     
-    // Should open product creation modal - look for the specific title
-    expect(screen.getByText(/crear producto para edición/i)).toBeInTheDocument();
+    // El alta de producto es un wizard: primero la sucursal.
+    expect(screen.getByText(/paso 1 de 2 · elegí la sucursal/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /continuar/i }));
     expect(screen.getByLabelText(/nombre/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/prefijo.*2-4 letras/i)).toBeInTheDocument();
   });
@@ -454,18 +474,14 @@ it("closes product creation modal when clicking outside", () => {
     const createButton = screen.getByRole("button", { name: /crear nuevo producto/i });
     fireEvent.click(createButton);
     
-    // Verify product modal is open - look for the specific create product title
-    expect(screen.getByText(/crear producto para edición/i)).toBeInTheDocument();
+    // Verify product modal is open
+    expect(screen.getByText(/paso 1 de 2 · elegí la sucursal/i)).toBeInTheDocument();
     
-    // Click on product modal backdrop (the dark background behind the modal)
-    // The backdrop is the div with onClick handler that closes the modal
-    const backdrop = document.body.querySelector('.fixed.inset-0.bg-scrim-strong.backdrop-blur-sm');
-    if (backdrop) {
-      fireEvent.click(backdrop);
-    }
+    // El ✕ del alta de producto es el segundo del DOM (el primero es el de la compra).
+    fireEvent.click(screen.getAllByRole("button", { name: /cerrar/i })[1]);
     
     // Product modal should be closed
-    expect(screen.queryByText(/crear producto para edición/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/paso 1 de 2 · elegí la sucursal/i)).not.toBeInTheDocument();
     // Purchase modal should still be open
     expect(screen.getByText(/nueva compra/i)).toBeInTheDocument();
   });
@@ -576,6 +592,7 @@ it("closes product creation modal when clicking outside", () => {
     // Open product creation modal
     const createButton = screen.getByRole("button", { name: /crear nuevo producto/i });
     fireEvent.click(createButton);
+    fireEvent.click(screen.getByRole("button", { name: /continuar/i }));
     
     // Fill in product creation form
     const nameInput = screen.getByLabelText(/nombre/i);
@@ -593,7 +610,7 @@ it("closes product creation modal when clicking outside", () => {
     // Wait for product creation to complete and modal to close
     await waitFor(() => {
       // Product creation modal should be closed
-      expect(screen.queryByText(/crear producto para edición/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/paso 1 de 2 · elegí la sucursal/i)).not.toBeInTheDocument();
       
       // Purchase modal should still be open
       expect(screen.getByText(/nueva compra/i)).toBeInTheDocument();
@@ -645,6 +662,7 @@ it("closes product creation modal when clicking outside", () => {
     // Open product creation modal
     const createButton = screen.getByRole("button", { name: /crear nuevo producto/i });
     fireEvent.click(createButton);
+    fireEvent.click(screen.getByRole("button", { name: /continuar/i }));
     
     // Fill in product creation form with valid data
     const nameInput = screen.getByLabelText(/nombre/i);
@@ -662,7 +680,7 @@ it("closes product creation modal when clicking outside", () => {
     // The product creation modal closes (the product was created), and the
     // purchase modal stays open underneath.
     await waitFor(() => {
-      expect(screen.queryByText(/crear producto para edición/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/paso 1 de 2 · elegí la sucursal/i)).not.toBeInTheDocument();
       expect(screen.getByText(/nueva compra/i)).toBeInTheDocument();
     });
   });
@@ -877,5 +895,43 @@ describe("AddPurchaseButton hardening (FIX-FASE4 issue 3)", () => {
     await waitFor(() => {
       expect(screen.queryByText(/nueva compra/i)).not.toBeInTheDocument();
     });
+  });
+});
+// ---------------------------------------------------------------------------
+// /compras: la compra del alta sin sucursal se registra con branchId null y la
+// lista la tiene que mostrar igual, sin ocultarla ni romper.
+// ---------------------------------------------------------------------------
+describe("/compras · compras sin sucursal", () => {
+  const compra = (branch: { id: number; name: string } | null) => [
+    {
+      id: 1,
+      date: new Date("2026-04-16T17:00:00.000Z").toISOString(),
+      totalAmount: 120,
+      branch,
+      items: [
+        {
+          id: 1,
+          productId: 1,
+          price: 40,
+          quantity: 3,
+          subtotal: 120,
+          product: { id: 1, name: "Jabón de Avena" },
+        },
+      ],
+    },
+  ];
+
+  it("muestra «Sin sucursal» cuando la compra no tiene sucursal", () => {
+    render(<PurchasesList purchases={compra(null)} />);
+
+    expect(screen.getByText("Sin sucursal")).toBeInTheDocument();
+    expect(screen.getByText("Jabón de Avena")).toBeInTheDocument();
+  });
+
+  it("muestra el nombre de la sucursal cuando la tiene", () => {
+    render(<PurchasesList purchases={compra({ id: 3, name: "Centro" })} />);
+
+    expect(screen.getByText("Centro")).toBeInTheDocument();
+    expect(screen.queryByText("Sin sucursal")).not.toBeInTheDocument();
   });
 });

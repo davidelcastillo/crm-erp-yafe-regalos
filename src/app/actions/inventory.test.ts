@@ -318,6 +318,34 @@ describe("getProductsWithBranchStock (active default)", () => {
 });
 
 // ===========================================================================
+// getProductsWithBranchStock - categoría de prenda para el filtro de tipo
+// ===========================================================================
+describe("getProductsWithBranchStock (categoría de prenda)", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("trae la categoría de prenda para poder filtrar por tipo sin otra consulta", async () => {
+    mockProductFindMany.mockResolvedValue([]);
+
+    await getProductsWithBranchStock({});
+
+    expect(mockProductFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        include: expect.objectContaining({
+          prenda: {
+            select: {
+              categoriaId: true,
+              categoria: { select: { id: true, name: true } },
+            },
+          },
+        }),
+      })
+    );
+  });
+});
+
+// ===========================================================================
 // exportBranchProductsPdf (Fase 4 - Export wizard server action)
 // ===========================================================================
 describe("exportBranchProductsPdf (Fase 4 branch PDF export)", () => {

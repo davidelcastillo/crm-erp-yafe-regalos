@@ -5,7 +5,12 @@ import { getProductsWithBranchStock } from "../actions/inventory";
 import { getBranchOptions } from "../actions/branch";
 import { getCategoryOptions, createCategory } from "../actions/category";
 import { InventarioList } from "./components/InventarioList";
-import { InventoryFilters, type InventorySortOption } from "./components/InventoryFilters";
+import {
+  InventoryFilters,
+  type InventoryItemKind,
+  type InventorySortOption,
+} from "./components/InventoryFilters";
+import { getCategoriaPrendaOptions } from "../actions/prendaTaxonomy";
 import { MoveStockModal } from "./components/MoveStockModal";
 import { StockAdjustmentModal } from "./components/StockAdjustmentModal";
 import { ExportWizard } from "./components/ExportWizard";
@@ -32,8 +37,15 @@ import { motion, useReducedMotion, useScroll, useTransform } from 'motion/react'
 type BranchOption = { id: number; name: string };
 type CategoryOption = { id: number; name: string };
 
-/** Producto con la categoría que trae `getProductsWithBranchStock` (búsqueda por nombre de categoría). */
-type InventoryProduct = Product & { category: { id: number; name: string } | null };
+/** Producto con la categoría que trae `getProductsWithBranchStock` (búsqueda por nombre de categoría).
+ *  En una prenda la categoría es la de prenda (`prenda.categoria`), no `categoryId`. */
+type InventoryProduct = Product & {
+  category: { id: number; name: string } | null;
+  prenda?: {
+    categoriaId: number;
+    categoria: { id: number; name: string } | null;
+  } | null;
+};
 
 /** Paso del acceso único al stock (S4): el menú o ya una de sus acciones. */
 type StockStep = 'menu' | 'mover' | 'ajuste';
@@ -105,6 +117,10 @@ export default function InventarioPage() {
   // Phase 3: branch + category filters and Move Stock modal
   const [branches, setBranches] = useState<BranchOption[]>([]);
   const [categories, setCategories] = useState<CategoryOption[]>([]);
+  // Las prendas se catalogan con `CategoriaPrenda`, no con `Category`: el
+  // selector de categoría cambia de lista según el tipo elegido.
+  const [prendaCategories, setPrendaCategories] = useState<CategoryOption[]>([]);
+  const [itemKind, setItemKind] = useState<InventoryItemKind>('all');
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
   // Un solo acceso por tema (S4): el menú de pasos y, adentro, el modal de siempre.
   const [stockStep, setStockStep] = useState<StockStep | null>(null);
@@ -161,34 +177,49 @@ export default function InventarioPage() {
     };
   }, [branchId, reloadKey, fetchProducts]);
 
-  // Búsqueda y categoría se filtran en memoria, como en los modales de stock:
-  // el catálogo se pide una vez por sucursal, no una vez por letra.
+  // Búsqueda, tipo y categoría se filtran en memoria, como en los modales de
+  // stock: el catálogo se pide una vez por sucursal, no una vez por letra.
+  // El tipo sale de `Product.kind`, no del prefijo del código.
   const visibleProducts = useMemo(() => {
+    const byKind =
+      itemKind === 'prenda'
+        ? products.filter((p) => p.kind === 'PRENDA')
+        : itemKind === 'product'
+          ? products.filter((p) => p.kind !== 'PRENDA')
+          : products;
     const term = search.trim().toLowerCase();
     const byTerm = term
-      ? products.filter(
+      ? byKind.filter(
           (p) =>
             p.name.toLowerCase().includes(term) ||
             p.code.toLowerCase().includes(term) ||
             (p.description ?? '').toLowerCase().includes(term) ||
             (p.category?.name ?? '').toLowerCase().includes(term)
         )
-      : products;
-    return selectedCategoryId === null
-      ? byTerm
-      : byTerm.filter((p) => p.categoryId === selectedCategoryId);
-  }, [products, search, selectedCategoryId]);
+      : byKind;
+    if (selectedCategoryId === null) return byTerm;
+    // Una prenda lleva su categoría en la ficha, no en `categoryId`.
+    return byTerm.filter((p) =>
+      itemKind === 'prenda'
+        ? p.prenda?.categoria?.id === selectedCategoryId
+        : p.categoryId === selectedCategoryId
+    );
+  }, [products, search, selectedCategoryId, itemKind]);
 
   // Load branch + category options once on mount (for the filters and the
   // Move Stock modal, which needs the branch list to choose origen/destino).
   useEffect(() => {
     (async () => {
-      const [branchRes, categoryRes] = await Promise.all([
+      const [branchRes, categoryRes, prendaCategoryRes] = await Promise.all([
         getBranchOptions(),
         getCategoryOptions(),
+        getCategoriaPrendaOptions(),
       ]);
       if (branchRes.success && branchRes.data) setBranches(branchRes.data as BranchOption[]);
       if (categoryRes.success && categoryRes.data) setCategories(categoryRes.data as CategoryOption[]);
+      if (prendaCategoryRes.success && prendaCategoryRes.data) {
+        setPrendaCategories(prendaCategoryRes.data as CategoryOption[]);
+      }
     })();
   }, []);
 
@@ -396,10 +427,17 @@ export default function InventarioPage() {
             combined selection via getProductsWithBranchStock). */}
         <div className="mb-4">
           <InventoryFilters
-            categories={categories}
+            categories={itemKind === 'prenda' ? prendaCategories : categories}
             selectedCategoryId={selectedCategoryId}
             onFilterChange={(cId) => {
               setSelectedCategoryId(cId);
+            }}
+            itemKind={itemKind}
+            onItemKindChange={(kind) => {
+              setItemKind(kind);
+              // Las categorías de producto y de prenda son listas distintas:
+              // una selección de la anterior no significa nada en la nueva.
+              setSelectedCategoryId(null);
             }}
             sortBy={sortBy}
             onSortChange={setSortBy}
