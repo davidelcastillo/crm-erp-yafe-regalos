@@ -53,12 +53,30 @@ function isUniqueConstraintError(error: unknown): boolean {
   return error instanceof Object && "code" in error && error.code === "P2002";
 }
 
+/**
+ * Mismo criterio que la prenda: los estilos elegidos tienen que existir y estar
+ * activos. Una fila desactivada no entra en un alta ni en una edición.
+ */
+async function estilosInvalidos(ids: number[]): Promise<string | null> {
+  if (ids.length === 0) return null;
+  const estilos = await prisma.estiloPrenda.findMany({
+    where: { id: { in: ids }, active: true },
+    select: { id: true },
+  });
+  return estilos.length === ids.length
+    ? null
+    : "Un estilo seleccionado no existe o está inactivo";
+}
+
 export async function createProduct(data: unknown) {
   try {
     const auth = await requireAdmin();
     if (!auth.ok) return { success: false as const, error: auth.error };
 
     const validatedData = createProductSchema.parse(data);
+
+    const estilosMalos = await estilosInvalidos(validatedData.estilos);
+    if (estilosMalos) return { success: false as const, error: estilosMalos };
 
     // Sucursal del stock inicial (T3): se valida antes de escribir, como el lote.
     const branch =
@@ -111,6 +129,13 @@ export async function createProduct(data: unknown) {
           if (validatedData.publicadaEn.length > 0) {
             await tx.prendaPublicacion.createMany({
               data: validatedData.publicadaEn.map((canal) => ({ productId: creado.id, canal })),
+            });
+          }
+
+          // Estilos: la misma taxonomía que la prenda (`ProductEstilo`).
+          if (validatedData.estilos.length > 0) {
+            await tx.productEstilo.createMany({
+              data: validatedData.estilos.map((estiloId) => ({ productId: creado.id, estiloId })),
             });
           }
 
@@ -266,6 +291,29 @@ export async function createProductsBatch(data: unknown) {
       }
     }
 
+    // Los estilos de todas las filas se verifican en UNA consulta, igual que las
+    // categorías: uno inactivo o inexistente marca solo las filas que lo usan.
+    const estilosPedidos = [...new Set(rows.flatMap((row) => row.estilos))];
+    if (estilosPedidos.length > 0) {
+      const estilos = await prisma.estiloPrenda.findMany({
+        where: { id: { in: estilosPedidos }, active: true },
+        select: { id: true },
+      });
+      const activos = new Set(estilos.map((estilo) => estilo.id));
+      const inactivos = new Set(estilosPedidos.filter((id) => !activos.has(id)));
+      if (inactivos.size > 0) {
+        const mensaje = "Un estilo seleccionado no existe o está inactivo";
+        return batchFailure(
+          mensaje,
+          rows.flatMap((row, rowIndex) =>
+            row.estilos.some((id) => inactivos.has(id))
+              ? [{ row: rowIndex, field: "estilos", message: mensaje }]
+              : []
+          )
+        );
+      }
+    }
+
     // Solo bloquean los nombres de productos ACTIVOS, sin distinguir mayúsculas (S3).
     const existentes = await prisma.product.findMany({
       where: {
@@ -349,6 +397,15 @@ export async function createProductsBatch(data: unknown) {
               code: producto.code,
               name: producto.name,
             }));
+
+            // Estilos de cada fila: una sola `createMany` para todo el lote, con
+            // el id real de cada producto cruzado por código (mismo índice).
+            const estilosDelLote = filasCreadas.flatMap(({ producto }, i) =>
+              rows[i].estilos.map((estiloId) => ({ productId: producto.id, estiloId }))
+            );
+            if (estilosDelLote.length > 0) {
+              await tx.productEstilo.createMany({ data: estilosDelLote });
+            }
 
             // T4: UNA sola compra del lote, solo con las filas que tienen costo y
             // stock cargado. El ENTRY de abajo ya ingresa el stock: la compra no lo toca.
@@ -509,18 +566,23 @@ export async function getProductById(id: number) {
 
     const product = await prisma.product.findUnique({
       where: { id },
-      // La edición necesita los canales ya publicados (S3) para no borrarlos.
-      include: { publicaciones: { select: { canal: true } } },
+      // La edición necesita los canales ya publicados (S3) y los estilos
+      // guardados, para precargarlos sin borrarlos.
+      include: {
+        publicaciones: { select: { canal: true } },
+        estilosProducto: { select: { estiloId: true } },
+      },
     });
     if (!product) {
       return { success: false, error: "Producto no encontrado" };
     }
-    const { publicaciones, ...ficha } = product;
+    const { publicaciones, estilosProducto, ...ficha } = product;
     return {
       success: true,
       data: parseObject({
         ...ficha,
         publicadaEn: publicaciones.map((publicacion) => publicacion.canal),
+        estilos: estilosProducto.map((estilo) => estilo.estiloId),
       }),
     };
   } catch (error) {
@@ -868,6 +930,9 @@ export async function updateProductExtended(data: unknown) {
 
     const validatedData = updateProductExtendedSchema.parse(data);
 
+    const estilosMalos = await estilosInvalidos(validatedData.estilos ?? []);
+    if (estilosMalos) return { success: false as const, error: estilosMalos };
+
     const cambios = {
       ...(validatedData.name && { name: validatedData.name }),
       ...(validatedData.description !== undefined && {
@@ -881,24 +946,40 @@ export async function updateProductExtended(data: unknown) {
     };
 
     // S3: «Publicar en» reemplaza las filas de `PrendaPublicacion` en la misma
-    // transacción que la ficha. Sin el campo, las publicaciones no se tocan.
+    // transacción que la ficha. Los estilos hacen lo mismo con `ProductEstilo`.
+    // Sin el campo, cada uno queda como estaba.
+    const tocaPublicaciones = validatedData.publicadaEn !== undefined;
+    const tocaEstilos = validatedData.estilos !== undefined;
     const product =
-      validatedData.publicadaEn === undefined
+      !tocaPublicaciones && !tocaEstilos
         ? await prisma.product.update({ where: { id: validatedData.id }, data: cambios })
         : await prisma.$transaction(async (tx) => {
             const actualizado = await tx.product.update({
               where: { id: validatedData.id },
               data: cambios,
             });
-            await tx.prendaPublicacion.deleteMany({ where: { productId: validatedData.id } });
-            // `publicadaEn` no es undefined en esta rama; el chequeo es por el cierre.
-            if (validatedData.publicadaEn && validatedData.publicadaEn.length > 0) {
-              await tx.prendaPublicacion.createMany({
-                data: validatedData.publicadaEn.map((canal) => ({
-                  productId: validatedData.id,
-                  canal,
-                })),
-              });
+            if (tocaPublicaciones) {
+              await tx.prendaPublicacion.deleteMany({ where: { productId: validatedData.id } });
+              // `publicadaEn` no es undefined en esta rama; el chequeo es por el cierre.
+              if (validatedData.publicadaEn && validatedData.publicadaEn.length > 0) {
+                await tx.prendaPublicacion.createMany({
+                  data: validatedData.publicadaEn.map((canal) => ({
+                    productId: validatedData.id,
+                    canal,
+                  })),
+                });
+              }
+            }
+            if (tocaEstilos) {
+              await tx.productEstilo.deleteMany({ where: { productId: validatedData.id } });
+              if (validatedData.estilos && validatedData.estilos.length > 0) {
+                await tx.productEstilo.createMany({
+                  data: validatedData.estilos.map((estiloId) => ({
+                    productId: validatedData.id,
+                    estiloId,
+                  })),
+                });
+              }
             }
             return actualizado;
           });

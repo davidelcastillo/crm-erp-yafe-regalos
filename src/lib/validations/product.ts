@@ -38,6 +38,12 @@ const productFields = {
   prefix: z.string().regex(/^[A-Za-z]{2,4}$/, "Prefijo: 2-4 letras (A-Z)").transform(v => v.toUpperCase()),
   price: z.number().min(0, "El precio no puede ser negativo"),
   categoryId: z.number().int().positive("Categoría inválida").nullable().optional(),
+  // Estilos: la misma taxonomía que la prenda y opcional. Un id repetido no
+  // aporta nada, así que se descarta en vez de fallar.
+  estilos: z
+    .array(z.number().int().positive("Estilo inválido"))
+    .optional()
+    .transform((ids) => [...new Set(ids ?? [])]),
 };
 
 /**
@@ -149,6 +155,11 @@ export const updateProductExtendedSchema = z.object({
   active: z.boolean().optional(),
   // Presente = reemplaza las publicaciones; ausente = no las toca.
   publicadaEn: publicadaEnEdicion,
+  // Presente = reemplaza los estilos; ausente = no los toca (misma regla).
+  estilos: z
+    .array(z.number().int().positive("Estilo inválido"))
+    .transform((ids) => [...new Set(ids)])
+    .optional(),
 });
 
 export type UpdateProductExtendedValues = z.infer<typeof updateProductExtendedSchema>;

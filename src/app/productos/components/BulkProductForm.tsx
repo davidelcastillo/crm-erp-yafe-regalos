@@ -5,6 +5,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Swal from "sweetalert2";
 import { getCategoryOptions } from "@/app/actions/category";
+import { getEstiloPrendaOptions } from "@/app/actions/prendaTaxonomy";
+import type { TaxonomyOption } from "@/lib/validations/prendaTaxonomy";
 import { createProductsBatch } from "@/app/actions/product";
 import { createProductsBatchSchema } from "@/lib/validations/product";
 import { CategorySelector } from "@/components/ui/CategorySelector";
@@ -27,6 +29,8 @@ type Fila = {
   initialStock: string;
   /** Costo que salió cada unidad (T4); vacío es 0 y no entra en la compra. */
   costo: string;
+  /** Estilos de la fila (misma taxonomía que la prenda); vacío son ninguno. */
+  estilos: number[];
   /** Fotos pendientes (U2): no viajan en el lote, se suben con el producto creado. */
   fotos: File[];
 };
@@ -208,6 +212,7 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
       categoryId: null,
       initialStock: "",
       costo: "",
+      estilos: [],
       fotos: [],
     },
   ]);
@@ -215,6 +220,8 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
   const [branchId, setBranchId] = useState<number | null>(null);
   const [receipt, setReceipt] = useState<StockMovementReceipt | null>(null);
   const [categorias, setCategorias] = useState<{ id: number; name: string }[]>([]);
+  // Una sola lista de estilos activos para todas las filas.
+  const [estilosDisponibles, setEstilosDisponibles] = useState<TaxonomyOption[]>([]);
   const [cargandoCategorias, setCargandoCategorias] = useState(true);
   const [errorCategorias, setErrorCategorias] = useState(false);
   const [errores, setErrores] = useState<Record<string, FilaError[]>>({});
@@ -265,6 +272,22 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
     };
   }, []);
 
+  // Estilos activos: una sola lista para todas las filas, igual que las categorías.
+  useEffect(() => {
+    let cancelado = false;
+    (async () => {
+      try {
+        const resultado = await getEstiloPrendaOptions();
+        if (!cancelado && resultado.success) setEstilosDisponibles(resultado.data);
+      } catch (error) {
+        console.error("Error loading style options:", error);
+      }
+    })();
+    return () => {
+      cancelado = true;
+    };
+  }, []);
+
   // El paso nuevo se anuncia por su título: el panel conserva su `h2` y el paso
   // se nombra con un `h3` enfocable.
   useEffect(() => {
@@ -298,6 +321,7 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
       categoryId: null,
       initialStock: "",
       costo: "",
+      estilos: [],
       fotos: [],
     };
     idParaEnfocar.current = nueva.id;
@@ -313,6 +337,7 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
       fila.price.trim() ||
       fila.initialStock.trim() ||
       fila.costo.trim() ||
+      fila.estilos.length > 0 ||
       fila.fotos.length > 0;
     if (conDatos) {
       const confirmacion = await Swal.fire({
@@ -363,6 +388,7 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
         f.price.trim() ||
         f.initialStock.trim() ||
         f.costo.trim() ||
+        f.estilos.length > 0 ||
         f.fotos.length > 0
     );
     if (!conDatos) {
@@ -443,6 +469,8 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
         prefix: f.prefix,
         price: Number(f.price),
         categoryId: f.categoryId,
+        // Estilos de la fila: sin elegir ninguno no viaja (el esquema lo deja vacío).
+        ...(f.estilos.length > 0 ? { estilos: f.estilos } : {}),
         // Vacío es 0: el producto igual queda en la vista por sucursal (S11).
         ...(branchId !== null
           ? { initialStock: f.initialStock.trim() === "" ? 0 : Number(f.initialStock) }
@@ -860,6 +888,42 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
                               {mensajeDe("categoryId")}
                             </p>
                           )}
+                        </div>
+
+                        {/* Estilos de la fila: la misma taxonomía que la prenda, compacta. */}
+                        <div>
+                          <span className={labelClass}>Estilos</span>
+                          <div className="flex flex-wrap gap-2">
+                            {estilosDisponibles.map((estilo) => {
+                              const elegido = fila.estilos.includes(estilo.id);
+                              return (
+                                <button
+                                  key={estilo.id}
+                                  type="button"
+                                  aria-pressed={elegido}
+                                  onClick={() =>
+                                    actualizarFila(
+                                      fila.id,
+                                      "estilos",
+                                      elegido
+                                        ? fila.estilos.filter((id) => id !== estilo.id)
+                                        : [...fila.estilos, estilo.id]
+                                    )
+                                  }
+                                  className={`min-h-[44px] rounded-full border px-3 py-2 text-sm touch-manipulation ${
+                                    elegido
+                                      ? "border-accent bg-accent/10 font-medium text-brand-rosa-texto"
+                                      : "border-hairline bg-surface text-ink"
+                                  }`}
+                                >
+                                  {estilo.name}
+                                </button>
+                              );
+                            })}
+                            {estilosDisponibles.length === 0 && (
+                              <p className="text-xs text-ink-muted">No hay estilos cargados</p>
+                            )}
+                          </div>
                         </div>
 
                         {/* U2: fotos de la fila, pendientes hasta que el producto exista. */}

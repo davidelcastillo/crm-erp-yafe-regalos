@@ -10,7 +10,9 @@ import { CategorySelector } from "@/components/ui/CategorySelector";
 import { BranchPicker } from "@/components/ui/BranchPicker";
 import { FotoUploader, subirFotos } from "@/components/ui/FotoUploader";
 import { CANALES_PUBLICACION } from "@/lib/validations/prenda";
+import type { TaxonomyOption } from "@/lib/validations/prendaTaxonomy";
 import { getBranchOptions } from "@/app/actions/branch";
+import { getEstiloPrendaOptions } from "@/app/actions/prendaTaxonomy";
 import {
   createProduct,
   getProductById,
@@ -73,6 +75,12 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
    * guardar sin haber cargado no borra publicaciones.
    */
   const [publicadaEn, setPublicadaEn] = useState<string[] | null>(isEdit ? null : []);
+  /**
+   * Estilos del producto: la misma taxonomía que la prenda. En la edición
+   * arranca en `null` hasta leer los guardados, así guardar sin cargar no los borra.
+   */
+  const [estilos, setEstilos] = useState<number[] | null>(isEdit ? null : []);
+  const [estilosDisponibles, setEstilosDisponibles] = useState<TaxonomyOption[]>([]);
   /** T2: fotos elegidas en el alta; se suben recién con el producto creado (id). */
   const [fotosPendientes, setFotosPendientes] = useState<File[]>([]);
 
@@ -92,6 +100,27 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
         : [...(prev ?? []), canal]
     );
 
+  const toggleEstilo = (id: number) =>
+    setEstilos((prev) =>
+      (prev ?? []).includes(id) ? (prev ?? []).filter((actual) => actual !== id) : [...(prev ?? []), id]
+    );
+
+  // Los estilos activos se piden una vez, en el alta y en la edición.
+  useEffect(() => {
+    let cancelado = false;
+    (async () => {
+      try {
+        const resultado = await getEstiloPrendaOptions();
+        if (!cancelado && resultado.success) setEstilosDisponibles(resultado.data);
+      } catch (error) {
+        console.error("Error loading style options:", error);
+      }
+    })();
+    return () => {
+      cancelado = true;
+    };
+  }, []);
+
   // La edición lee los canales ya publicados antes de poder guardar.
   useEffect(() => {
     if (!product) return;
@@ -100,7 +129,9 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
       try {
         const resultado = await getProductById(product.id);
         if (cancelado || !resultado.success) return;
-        setPublicadaEn((resultado.data as { publicadaEn?: string[] }).publicadaEn ?? []);
+        const ficha = resultado.data as { publicadaEn?: string[]; estilos?: number[] };
+        setPublicadaEn(ficha.publicadaEn ?? []);
+        setEstilos(ficha.estilos ?? []);
       } catch (error) {
         console.error("Error loading product publications:", error);
         if (!cancelado) setPublicadaEn([]);
@@ -174,6 +205,8 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
           active: isActive,
           // Sin canales cargados todavía no se toca lo publicado.
           ...(publicadaEn !== null ? { publicadaEn } : {}),
+          // Sin estilos cargados todavía no se tocan los guardados.
+          ...(estilos !== null ? { estilos } : {}),
         }
       : {
           name: formData.name,
@@ -185,6 +218,7 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
           // que antes (categoryId=null).
           categoryId: categoryId,
           publicadaEn: publicadaEn ?? [],
+          estilos: estilos ?? [],
           // La cantidad y el costo viajan siempre: con costo se registra la
           // compra del alta, haya o no sucursal. Sin sucursal no hay stock.
           ...(branchId !== null ? { branchId } : {}),
@@ -478,6 +512,34 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
               onValueChange={setCategoryId}
               label=""
             />
+          </div>
+
+          {/* Estilos: la misma taxonomía que la prenda, con sus mismas pills. */}
+          <div>
+            <span className={labelClass}>Estilos</span>
+            <div className="flex flex-wrap gap-2">
+              {estilosDisponibles.map((estilo) => {
+                const elegido = (estilos ?? []).includes(estilo.id);
+                return (
+                  <button
+                    key={estilo.id}
+                    type="button"
+                    aria-pressed={elegido}
+                    onClick={() => toggleEstilo(estilo.id)}
+                    className={`min-h-[44px] rounded-full border px-4 py-2 text-sm transition-colors touch-manipulation ${
+                      elegido
+                        ? "border-accent bg-accent/10 font-medium text-brand-rosa-texto"
+                        : "border-hairline bg-surface text-ink"
+                    }`}
+                  >
+                    {estilo.name}
+                  </button>
+                );
+              })}
+              {estilosDisponibles.length === 0 && (
+                <p className="text-xs text-ink-muted">No hay estilos cargados</p>
+              )}
+            </div>
           </div>
 
           {/* T3: «Publicar en» — mismo patrón que la prenda. */}

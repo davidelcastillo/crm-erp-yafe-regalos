@@ -53,6 +53,11 @@ jest.mock("@/app/actions/branch", () => ({
   getBranchOptions: jest.fn(),
 }));
 
+// Los estilos activos son la misma taxonomía que la prenda (pills seleccionables).
+jest.mock("@/app/actions/prendaTaxonomy", () => ({
+  getEstiloPrendaOptions: jest.fn(),
+}));
+
 // Mock next/navigation
 jest.mock("next/navigation", () => ({
   useRouter: jest.fn(() => ({
@@ -68,6 +73,7 @@ jest.mock("sweetalert2", () => ({
 
 import { createProduct, updateProductExtended, getProductById } from "../../actions/product";
 import { getBranchOptions } from "@/app/actions/branch";
+import { getEstiloPrendaOptions } from "@/app/actions/prendaTaxonomy";
 import { subirFotos } from "@/components/ui/FotoUploader";
 import { getFotosProducto } from "@/app/actions/foto";
 import { createProductSchema } from "@/lib/validations/product";
@@ -80,6 +86,17 @@ const mockUpdateProductExtended = updateProductExtended as jest.MockedFunction<
 >;
 const mockGetProductById = getProductById as jest.MockedFunction<typeof getProductById>;
 const mockSubirFotos = subirFotos as jest.MockedFunction<typeof subirFotos>;
+const mockGetEstiloPrendaOptions = getEstiloPrendaOptions as jest.MockedFunction<
+  typeof getEstiloPrendaOptions
+>;
+/** Los estilos activos se piden una vez al abrir el modal: default para toda la suite. */
+mockGetEstiloPrendaOptions.mockResolvedValue({
+  success: true,
+  data: [
+    { id: 1, name: "Y2K" },
+    { id: 2, name: "Alternativo" },
+  ],
+} as never);
 
 /**
  * El alta es un wizard (2 pasos): la sucursal primero y la ficha después. Los
@@ -212,6 +229,8 @@ describe("ProductForm Component", () => {
         categoryId: null,
         // Sin canales elegidos no publica en ninguno (T3).
         publicadaEn: [],
+        // Sin estilos elegidos el alta manda la lista vacía.
+        estilos: [],
         // Sin sucursal el payload no lleva branchId, pero la cantidad y el
         // costo viajan siempre (se registran como compra).
         cantidadInicial: 0,
@@ -878,5 +897,87 @@ describe("ProductForm · scroll del modal (reporte del dueño)", () => {
 
     unmount();
     expect(document.body).not.toHaveClass("overflow-hidden");
+  });
+});
+
+/**
+ * Estilos del producto (pedido del dueño): las mismas pills que la prenda, en
+ * el paso 2 del alta y en la edición, con los activos precargados.
+ */
+describe("ProductForm · estilos", () => {
+  const productoExistente = {
+    id: 1,
+    name: "Remera",
+    description: "-",
+    categoryId: null,
+    active: true,
+    price: 100,
+    code: "RE000",
+    codePrefix: "RE",
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  } as unknown as Product;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCreateProduct.mockResolvedValue({ success: true, data: { id: 1 } } as never);
+    mockUpdateProductExtended.mockResolvedValue({ success: true, data: { id: 1 } } as never);
+    mockGetProductById.mockResolvedValue({
+      success: true,
+      data: { publicadaEn: [], estilos: [] },
+    } as never);
+  });
+
+  it("el alta muestra los estilos activos y manda los elegidos", async () => {
+    render(<ProductForm product={null} onClose={() => {}} />);
+    await irAlPaso2();
+
+    const y2k = await screen.findByRole("button", { name: "Y2K" });
+    expect(screen.getByRole("button", { name: "Alternativo" })).toBeInTheDocument();
+    expect(y2k).toHaveAttribute("aria-pressed", "false");
+
+    fireEvent.click(y2k);
+    expect(y2k).toHaveAttribute("aria-pressed", "true");
+
+    fireEvent.change(screen.getByLabelText(/nombre/i), { target: { value: "Remera Y2K" } });
+    fireEvent.change(screen.getByLabelText(/prefijo.*2-4 letras/i), { target: { value: "AA" } });
+    fireEvent.change(screen.getByLabelText(/precio de venta/i), { target: { value: "100" } });
+    fireEvent.click(screen.getByRole("button", { name: /crear producto/i }));
+
+    await waitFor(() =>
+      expect(mockCreateProduct).toHaveBeenCalledWith(
+        expect.objectContaining({ estilos: [1] })
+      )
+    );
+  });
+
+  it("sin estilos cargados muestra el estado vacío", async () => {
+    mockGetEstiloPrendaOptions.mockResolvedValueOnce({ success: true, data: [] } as never);
+
+    render(<ProductForm product={null} onClose={() => {}} />);
+    await irAlPaso2();
+
+    expect(await screen.findByText("No hay estilos cargados")).toBeInTheDocument();
+  });
+
+  it("la edición precarga los estilos guardados y los manda", async () => {
+    mockGetProductById.mockResolvedValue({
+      success: true,
+      data: { publicadaEn: [], estilos: [2] },
+    } as never);
+
+    render(<ProductForm product={productoExistente} onClose={() => {}} />);
+
+    const alternativo = await screen.findByRole("button", { name: "Alternativo" });
+    await waitFor(() => expect(alternativo).toHaveAttribute("aria-pressed", "true"));
+    expect(screen.getByRole("button", { name: "Y2K" })).toHaveAttribute("aria-pressed", "false");
+
+    fireEvent.click(screen.getByRole("button", { name: /actualizar producto/i }));
+
+    await waitFor(() =>
+      expect(mockUpdateProductExtended).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 1, estilos: [2] })
+      )
+    );
   });
 });
