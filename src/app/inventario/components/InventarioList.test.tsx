@@ -9,6 +9,14 @@ jest.mock("sweetalert2", () => ({
   fire: jest.fn().mockResolvedValue({ isConfirmed: true }),
 }));
 
+// Las etiquetas cargan pdf-lib/fontkit en el árbol: se mockea para que la lista
+// no arrastre fuentes al entorno jsdom (mismo criterio que InventarioCard.test).
+jest.mock("@/actions/label-print", () => ({
+  generatePrendaLabels: jest.fn(),
+  generateProductLabels: jest.fn(),
+  generateEntryReceiptWithLabels: jest.fn(),
+}));
+
 jest.mock("@/app/actions/product", () => ({
   createProduct: jest.fn(),
   getProductById: jest.fn(),
