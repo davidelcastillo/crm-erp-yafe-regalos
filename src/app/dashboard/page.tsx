@@ -9,10 +9,9 @@ import { Product } from "@prisma/client";
 import { DashboardChart } from "./components/DashboardChart";
 import { ProductAnalytics } from "./components/ProductAnalytics";
 import { ResumenPanel, type ResumenPanelData } from "./components/ResumenPanel";
+import { DashboardLoading } from "./components/DashboardLoading";
 import { BranchSelector } from "@/components/ui/BranchSelector";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { Spinner } from "@/components/ui/Spinner";
-import { CardSkeleton } from "@/components/ui/Skeleton";
 import { toFullLabel } from "@/lib/dates";
 
 type PeriodType = "cierre" | "7" | "30" | "90" | "custom";
@@ -31,20 +30,6 @@ const PERIOD_OPTIONS: { value: PeriodType; label: string }[] = [
  * romper el look— el período con el gráfico de ingresos vs egresos y el
  * analizador de productos que ya vivían acá.
  */
-const DashboardLoading = () => (
-  <div className="min-h-screen bg-surface-strong pb-24">
-    <div className="px-4 pt-6">
-      <Spinner label="Cargando dashboard..." />
-      <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <CardSkeleton />
-        <CardSkeleton />
-        <CardSkeleton />
-        <CardSkeleton />
-      </div>
-    </div>
-  </div>
-);
-
 export default function DashboardPage() {
   const [branchId, setBranchId] = useState<number | null>(null);
   const [period, setPeriod] = useState<PeriodType>("cierre");

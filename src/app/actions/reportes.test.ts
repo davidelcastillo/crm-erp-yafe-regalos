@@ -8,7 +8,8 @@
  *  - las ventas se reparten entre los estilos del producto (prorrateo), y la
  *    suma de los estilos tiene que dar el total vendido;
  *  - un producto sin estilo cae en «Sin estilo»;
- *  - la venta directa (sin pedido) cuenta como canal «Mostrador».
+ *  - la venta directa (sin pedido) se atribuye a la sucursal donde se vendió;
+ *  - «gastos» del panel es el mismo egreso que el tablero: compras + caja.
  */
 import { getResumenPanel } from "./dashboard";
 import { getReportes } from "./reportes";
@@ -18,6 +19,8 @@ const mockSaleFindMany = jest.fn();
 const mockSaleItemFindMany = jest.fn();
 const mockInventoryFindMany = jest.fn();
 const mockInventoryAggregate = jest.fn();
+const mockPurchaseAggregate = jest.fn();
+const mockCashGroupBy = jest.fn();
 const mockPedidoFindMany = jest.fn();
 const mockPedidoCount = jest.fn();
 const mockCashCloseFindMany = jest.fn();
@@ -30,6 +33,8 @@ jest.mock("@/lib/prisma", () => ({
       findMany: (...args: unknown[]) => mockInventoryFindMany(...args),
       aggregate: (...args: unknown[]) => mockInventoryAggregate(...args),
     },
+    purchase: { aggregate: (...args: unknown[]) => mockPurchaseAggregate(...args) },
+    cashMovement: { groupBy: (...args: unknown[]) => mockCashGroupBy(...args) },
     pedido: {
       findMany: (...args: unknown[]) => mockPedidoFindMany(...args),
       count: (...args: unknown[]) => mockPedidoCount(...args),
@@ -82,7 +87,8 @@ describe("guardián de sesión", () => {
 });
 
 describe("getResumenPanel", () => {
-  // Dos ventas del período: una de un pedido (WhatsApp) y una directa.
+  // Dos ventas del período: una de un pedido (WhatsApp) y una directa, sin
+  // pedido, que se atribuye a la sucursal donde se vendió.
   const VENTAS = [
     {
       id: 1,
@@ -90,6 +96,7 @@ describe("getResumenPanel", () => {
       totalAmount: 100,
       items: [{ quantity: 2, subtotal: 8000, product: { name: "Vestido lino", prenda: { estilos: [] }, estilosProducto: [{ estilo: { name: "Second hand" } }] } }],
       pedido: { canal: { name: "WhatsApp" } },
+      branch: { name: "Punto Rosa" },
       customer: { name: "Ana", surname: "Paz" },
     },
     {
@@ -98,6 +105,7 @@ describe("getResumenPanel", () => {
       totalAmount: 300,
       items: [{ quantity: 3, subtotal: 6000, product: { name: "Top seda", prenda: { estilos: [] }, estilosProducto: [] } }],
       pedido: null,
+      branch: { name: "Punto Rosa" },
       customer: null,
     },
   ];
@@ -141,6 +149,12 @@ describe("getResumenPanel", () => {
       args?.take ? VENTAS.slice(0, args.take) : VENTAS
     );
     mockInventoryAggregate.mockResolvedValue({ _sum: { stock: 12 } });
+    mockPurchaseAggregate.mockResolvedValue({ _sum: { totalAmount: 250 } });
+    // Solo el egreso de caja es gasto; el ingreso no.
+    mockCashGroupBy.mockResolvedValue([
+      { type: "EGRESO", _sum: { amount: 50 } },
+      { type: "INGRESO", _sum: { amount: 900 } },
+    ]);
     mockPedidoFindMany.mockImplementation(async (args: { where: { estado: string } }) =>
       args.where.estado === "RESERVADO" ? RESERVAS : PARA_ENVIAR
     );
@@ -149,13 +163,14 @@ describe("getResumenPanel", () => {
     mockCashCloseFindMany.mockResolvedValue([]);
   });
 
-  it("resume ventas, prendas disponibles, reservas y envíos del período", async () => {
+  it("resume ventas, gastos, reservas y envíos del período", async () => {
     const resultado = await getResumenPanel({ branchId: 2 });
     expect(resultado.success).toBe(true);
     if (!resultado.success) return;
 
     expect(resultado.data.ventas).toEqual({ monto: 400, unidades: 5, cantidad: 2 });
-    expect(resultado.data.prendasDisponibles).toBe(12);
+    // Gastos = compras (250) + egresos de caja (50): el mismo criterio del tablero.
+    expect(resultado.data.gastos).toBe(300);
     // Solo la reserva con saldo: V-0007 debe 60 y vence hoy.
     expect(resultado.data.reservas).toEqual({ cantidad: 1, saldo: 60, vencenHoy: 1 });
     expect(resultado.data.paraEnviar).toEqual({ cantidad: 3, salenHoy: 1 });
@@ -171,9 +186,16 @@ describe("getResumenPanel", () => {
         },
       })
     );
-    expect(mockInventoryAggregate).toHaveBeenCalledWith(
+    expect(mockPurchaseAggregate).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({ branchId: 2, product: { kind: "PRENDA" } }),
+        _sum: { totalAmount: true },
+        where: expect.objectContaining({ AND: expect.anything() }),
+      })
+    );
+    expect(mockCashGroupBy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        by: ["type"],
+        where: expect.objectContaining({ AND: expect.anything() }),
       })
     );
     expect(mockPedidoFindMany).toHaveBeenCalledWith(
@@ -184,7 +206,7 @@ describe("getResumenPanel", () => {
     );
   });
 
-  it("reparte las ventas por canal y la venta directa cae en Mostrador", async () => {
+  it("la venta sin pedido se atribuye a su sucursal, no a «Mostrador»", async () => {
     const resultado = await getResumenPanel({});
     expect(resultado.success).toBe(true);
     if (!resultado.success) return;
@@ -193,7 +215,7 @@ describe("getResumenPanel", () => {
     expect(porCanal).toEqual(
       expect.arrayContaining([
         { canal: "WhatsApp", monto: 100, porcentaje: 25 },
-        { canal: "Mostrador", monto: 300, porcentaje: 75 },
+        { canal: "Punto Rosa", monto: 300, porcentaje: 75 },
       ])
     );
     // Los porcentajes de los canales suman 100.
@@ -227,13 +249,13 @@ describe("getResumenPanel", () => {
     ]);
   });
 
-  it("trae las últimas 5 ventas con clienta, prenda y canal", async () => {
+  it("trae las últimas 4 ventas con clienta, prenda y sucursal", async () => {
     const resultado = await getResumenPanel({});
     expect(resultado.success).toBe(true);
     if (!resultado.success) return;
 
     expect(mockSaleFindMany).toHaveBeenCalledWith(
-      expect.objectContaining({ take: 5, orderBy: { date: "desc" } })
+      expect.objectContaining({ take: 4, orderBy: { date: "desc" } })
     );
     expect(resultado.data.ultimasVentas).toHaveLength(2);
     expect(resultado.data.ultimasVentas[0]).toEqual({

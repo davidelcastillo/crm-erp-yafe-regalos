@@ -8,8 +8,8 @@ import { toLocalDateKey, toShortLabel } from "@/lib/dates";
 
 /**
  * Las secciones de `panel.html` que se alimentan de `getResumenPanel`: los cuatro
- * KPIs, ventas por canal, reservas por cobrar, últimas ventas, para enviar y el
- * top de estilos del período.
+ * KPIs, ventas por canal y últimas ventas arriba, reservas por cobrar y para
+ * enviar abajo, y el top de estilos del período.
  *
  * El número se escribe acá y no con `style: "currency"`: el formateador de moneda
  * de `es-AR` pega un espacio duro que rompe los rótulos y los tests.
@@ -19,7 +19,7 @@ const plata = (monto: number) =>
 
 export type ResumenPanelData = {
   ventas: { monto: number; unidades: number; cantidad: number };
-  prendasDisponibles: number;
+  gastos: number;
   reservas: { cantidad: number; saldo: number; vencenHoy: number };
   paraEnviar: { cantidad: number; salenHoy: number };
   porCanal: { canal: string; monto: number; porcentaje: number }[];
@@ -165,7 +165,7 @@ const plural = (cantidad: number, uno: string, varios: string) =>
 export function ResumenPanel({ data }: { data: ResumenPanelData | null }) {
   const resumen: ResumenPanelData = data ?? {
     ventas: { monto: 0, unidades: 0, cantidad: 0 },
-    prendasDisponibles: 0,
+    gastos: 0,
     reservas: { cantidad: 0, saldo: 0, vencenHoy: 0 },
     paraEnviar: { cantidad: 0, salenHoy: 0 },
     porCanal: [],
@@ -182,9 +182,10 @@ export function ResumenPanel({ data }: { data: ResumenPanelData | null }) {
       detalle: plural(resumen.ventas.cantidad, "venta", "ventas"),
     },
     {
-      label: "Prendas disponibles",
-      valor: String(resumen.prendasDisponibles),
-      detalle: "en inventario",
+      label: "Gastos del período",
+      valor: plata(resumen.gastos),
+      detalle: "compras y caja",
+      rojo: true,
     },
     {
       label: "Reservas sin cobrar",
@@ -233,6 +234,25 @@ export function ResumenPanel({ data }: { data: ResumenPanelData | null }) {
           )}
         </Panel>
 
+        <Panel title="Últimas ventas" action={{ href: "/ventas", label: "Ver ventas" }}>
+          {resumen.ultimasVentas.length === 0 ? (
+            <Vacio>Todavía no hay ventas.</Vacio>
+          ) : (
+            <ul>
+              {resumen.ultimasVentas.map((venta) => (
+                <Fila key={venta.id} titulo={venta.cliente} detalle={venta.prenda}>
+                  <span className="shrink-0 rounded-full bg-surface-strong px-2.5 py-1 text-xs font-semibold text-ink-muted">
+                    {venta.canal}
+                  </span>
+                  <b className="shrink-0 text-sm text-ink">{plata(venta.monto)}</b>
+                </Fila>
+              ))}
+            </ul>
+          )}
+        </Panel>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-2 md:gap-5">
         <Panel title="Reservas por cobrar" action={{ href: "/ventas/pedidos", label: "Ver todas" }}>
           {resumen.reservasPorCobrar.length === 0 ? (
             <Vacio>No hay reservas sin cobrar.</Vacio>
@@ -245,25 +265,6 @@ export function ResumenPanel({ data }: { data: ResumenPanelData | null }) {
                   detalle={`${reserva.prenda} · ${vencimiento(reserva.venceEl)}`}
                 >
                   <b className="shrink-0 text-sm text-ink">{plata(reserva.saldo)}</b>
-                </Fila>
-              ))}
-            </ul>
-          )}
-        </Panel>
-      </div>
-
-      <div className="grid gap-3 md:grid-cols-2 md:gap-5">
-        <Panel title="Últimas ventas" action={{ href: "/ventas", label: "Ver ventas" }}>
-          {resumen.ultimasVentas.length === 0 ? (
-            <Vacio>Todavía no hay ventas.</Vacio>
-          ) : (
-            <ul>
-              {resumen.ultimasVentas.map((venta) => (
-                <Fila key={venta.id} titulo={venta.cliente} detalle={venta.prenda}>
-                  <span className="shrink-0 rounded-full bg-surface-strong px-2.5 py-1 text-xs font-semibold text-ink-muted">
-                    {venta.canal}
-                  </span>
-                  <b className="shrink-0 text-sm text-ink">{plata(venta.monto)}</b>
                 </Fila>
               ))}
             </ul>

@@ -352,21 +352,29 @@ export async function getResumenPanel(data?: unknown) {
     }
 
     const esCierre = validated.type === "cierre";
-    const { porFecha } = esCierre
+    const { porFecha, porCarga } = esCierre
       ? await pisosDeCaja(branchId)
-      : { porFecha: {} };
+      : { porFecha: {}, porCarga: {} };
     const deVentas = {
       AND: [{ date: { gte: rango.desde, lte: rango.hasta } }, branchWhere, porFecha],
     };
+    // La plata de caja se mide por cuándo se cargó (`createdAt`) en el período del
+    // cierre, igual que en `fetchStats`; en los demás períodos, por su fecha.
+    const dePlata = esCierre ? { AND: [branchWhere, porCarga] } : deVentas;
 
     // El canal sale del pedido que cobró la venta; la venta directa de mostrador
-    // no tiene pedido y cae en «Mostrador».
+    // no tiene pedido y se atribuye a la sucursal donde se vendió.
+    const canalDeVenta = (venta: {
+      pedido: { canal: { name: string } } | null;
+      branch: { name: string };
+    }) => venta.pedido?.canal.name ?? venta.branch.name;
     const ventaSelect = {
       id: true,
       date: true,
       totalAmount: true,
       customer: { select: { name: true, surname: true } },
       pedido: { select: { canal: { select: { name: true } } } },
+      branch: { select: { name: true } },
       items: {
         select: {
           quantity: true,
@@ -389,18 +397,21 @@ export async function getResumenPanel(data?: unknown) {
     const dePedidosDe = (id: number) => ({ items: { some: { branchId: id } } });
     const pedidosDeSucursal = branchId ? dePedidosDe(branchId) : {};
 
-    const [ventas, ultimasVentas, disponibles, reservas, envios, enviosHoy, enviosLista] =
+    const [ventas, ultimasVentas, compras, egresosCaja, reservas, envios, enviosHoy, enviosLista] =
       await Promise.all([
         prisma.sale.findMany({ where: deVentas, select: ventaSelect }),
         prisma.sale.findMany({
           where: deVentas,
           orderBy: { date: "desc" },
-          take: 5,
+          take: 4,
           select: ventaSelect,
         }),
-        prisma.branchInventory.aggregate({
-          _sum: { stock: true },
-          where: { stock: { gt: 0 }, ...branchWhere, product: { kind: "PRENDA" } },
+        // «Gastos del período» es el mismo egreso que el tablero: compras + caja.
+        prisma.purchase.aggregate({ _sum: { totalAmount: true }, where: deVentas }),
+        prisma.cashMovement.groupBy({
+          by: ["type"],
+          where: dePlata,
+          _sum: { amount: true },
         }),
         prisma.pedido.findMany({
           where: { estado: "RESERVADO", ...pedidosDeSucursal },
@@ -452,7 +463,7 @@ export async function getResumenPanel(data?: unknown) {
 
     const canales = new Map<string, number>();
     for (const venta of ventas) {
-      const canal = venta.pedido?.canal.name ?? "Mostrador";
+      const canal = canalDeVenta(venta);
       canales.set(canal, (canales.get(canal) ?? 0) + Number(venta.totalAmount));
     }
     const porCanal = [...canales.entries()]
@@ -507,7 +518,10 @@ export async function getResumenPanel(data?: unknown) {
       success: true as const,
       data: {
         ventas: { monto: dosDecimales(monto), unidades, cantidad: ventas.length },
-        prendasDisponibles: Number(disponibles._sum.stock ?? 0),
+        gastos: dosDecimales(
+          Number(compras._sum.totalAmount ?? 0) +
+            Number(egresosCaja.find((c) => c.type === "EGRESO")?._sum.amount ?? 0)
+        ),
         reservas: {
           cantidad: conSaldo.length,
           saldo: dosDecimales(conSaldo.reduce((suma, p) => suma + p.saldo, 0)),
@@ -530,7 +544,7 @@ export async function getResumenPanel(data?: unknown) {
           fecha: toLocalDateKey(v.date),
           cliente: nombreCliente(v.customer),
           prenda: v.items[0]?.product.name ?? "—",
-          canal: v.pedido?.canal.name ?? "Mostrador",
+          canal: canalDeVenta(v),
           monto: Number(v.totalAmount),
         })),
         paraEnviarLista: enviosLista.map((p) => ({

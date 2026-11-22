@@ -1,7 +1,7 @@
 /**
  * Home interna calcada de `polkalinas-html/sistema/panel.html`: encabezado con
- * «Nueva venta», cuatro KPIs, ventas por canal + reservas por cobrar, últimas
- * ventas + para enviar, y el top de estilos del período.
+ * «Nueva venta», cuatro KPIs, ventas por canal + últimas ventas, reservas por
+ * cobrar + para enviar, y el top de estilos del período.
  *
  * Los datos salen de `getResumenPanel` (mockeada acá: el action tiene su propia
  * suite contra la base local) y el período sigue gobernando el gráfico.
@@ -44,7 +44,7 @@ const claveDeHoy = () => {
 
 const RESUMEN = {
   ventas: { monto: 845000, unidades: 70, cantidad: 62 },
-  prendasDisponibles: 64,
+  gastos: 315000,
   reservas: { cantidad: 5, saldo: 120000, vencenHoy: 2 },
   paraEnviar: { cantidad: 3, salenHoy: 1 },
   porCanal: [
@@ -74,6 +74,30 @@ const RESUMEN = {
       canal: 'WhatsApp',
       monto: 24000,
     },
+    {
+      id: 2,
+      fecha: '2026-11-19',
+      cliente: 'Sofi L.',
+      prenda: 'Top seda',
+      canal: 'Punto Rosa',
+      monto: 12000,
+    },
+    {
+      id: 3,
+      fecha: '2026-11-19',
+      cliente: 'Vale P.',
+      prenda: 'Pollera jean',
+      canal: 'Punto Rosa',
+      monto: 18000,
+    },
+    {
+      id: 4,
+      fecha: '2026-11-18',
+      cliente: 'Rochi G.',
+      prenda: 'Blazer lino',
+      canal: 'Instagram',
+      monto: 30000,
+    },
   ],
   paraEnviarLista: [
     {
@@ -88,7 +112,7 @@ const RESUMEN = {
 
 const resumenVacio = {
   ventas: { monto: 0, unidades: 0, cantidad: 0 },
-  prendasDisponibles: 0,
+  gastos: 0,
   reservas: { cantidad: 0, saldo: 0, vencenHoy: 0 },
   paraEnviar: { cantidad: 0, salenHoy: 0 },
   porCanal: [],
@@ -132,15 +156,17 @@ describe('Dashboard — encabezado', () => {
 });
 
 describe('Dashboard — cuatro KPIs', () => {
-  it('muestra ventas, prendas, reservas y envíos con sus datos', async () => {
+  it('muestra ventas, gastos, reservas y envíos con sus datos', async () => {
     await cargar();
 
     expect(screen.getByText('Ventas del período')).toBeInTheDocument();
     expect(screen.getByText(/\$ 845\.000/)).toBeInTheDocument();
     expect(screen.getByText('62 ventas')).toBeInTheDocument();
 
-    expect(screen.getByText('Prendas disponibles')).toBeInTheDocument();
-    expect(screen.getByText('64')).toBeInTheDocument();
+    // La tarjeta de prendas disponibles se reemplazó por los gastos del período.
+    expect(screen.getByText('Gastos del período')).toBeInTheDocument();
+    expect(screen.getByText(/\$ 315\.000/)).toBeInTheDocument();
+    expect(screen.queryByText('Prendas disponibles')).not.toBeInTheDocument();
 
     expect(screen.getByText('Reservas sin cobrar')).toBeInTheDocument();
     expect(screen.getByText('2 vencen hoy')).toBeInTheDocument();
@@ -200,6 +226,30 @@ describe('Dashboard — últimas ventas', () => {
     expect(within(tarjeta).getByText('Campera de jean')).toBeInTheDocument();
     expect(within(tarjeta).getByText('WhatsApp')).toBeInTheDocument();
     expect(within(tarjeta).getByText(/\$ 24\.000/)).toBeInTheDocument();
+  });
+
+  it('entran 4 ventas en la tarjeta', async () => {
+    await cargar();
+
+    const tarjeta = screen.getByRole('heading', { name: 'Últimas ventas' }).closest('section')!;
+
+    expect(within(tarjeta).getAllByRole('listitem')).toHaveLength(4);
+  });
+});
+
+describe('Dashboard — orden de las tarjetas', () => {
+  it('últimas ventas sube a la primera fila, junto a ventas por canal', async () => {
+    await cargar();
+
+    const titulos = screen
+      .getAllByRole('heading', { level: 2 })
+      .map((h) => h.textContent?.trim());
+    const posicion = (titulo: string) => titulos.indexOf(titulo);
+
+    expect(posicion('Ventas por canal')).toBeGreaterThanOrEqual(0);
+    // Primera fila: canal y últimas ventas. Reservas por cobrar baja a la segunda.
+    expect(posicion('Últimas ventas')).toBe(posicion('Ventas por canal') + 1);
+    expect(posicion('Reservas por cobrar')).toBeGreaterThan(posicion('Últimas ventas'));
   });
 });
 
@@ -282,5 +332,12 @@ describe('Dashboard — carga', () => {
     render(<DashboardPage />);
 
     expect(screen.getByRole('status', { name: 'Cargando dashboard...' })).toBeInTheDocument();
+  });
+
+  it('el esqueleto de carga usa la banda de marca y la hoja glass', () => {
+    const { container } = render(<DashboardPage />);
+
+    expect(container.querySelector('.brand-gradient')).not.toBeNull();
+    expect(container.querySelector('.glass')).not.toBeNull();
   });
 });
