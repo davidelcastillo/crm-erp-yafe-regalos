@@ -19,9 +19,7 @@ describe("BottomNav", () => {
     (usePathname as jest.Mock).mockReturnValue("/dashboard");
     render(React.createElement(BottomNav));
 
-    // 6 destinos (pedido del dueño 2026-11-20: «Pedidos» en la barra para
-    // entrar rápido). «Clientes» salió de la barra (S6): se entra desde
-    // /sucursales.
+    // 6 destinos: «Reportes» se entra desde el botón del dashboard.
     const navLinks = screen.getAllByRole("link");
     expect(navLinks).toHaveLength(6);
     expect(navLinks.map((l) => l.textContent)).toEqual(
@@ -34,6 +32,7 @@ describe("BottomNav", () => {
         "Sucursales",
       ])
     );
+    expect(screen.queryByRole("link", { name: /reportes/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /clientes/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /productos/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /inactivos/i })).not.toBeInTheDocument();

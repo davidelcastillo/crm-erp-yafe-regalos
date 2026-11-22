@@ -41,6 +41,8 @@ type CategoryOption = { id: number; name: string };
  *  En una prenda la categoría es la de prenda (`prenda.categoria`), no `categoryId`. */
 type InventoryProduct = Product & {
   category: { id: number; name: string } | null;
+  /** Categorías del producto (N:N): el filtro coincide con cualquiera. */
+  categorias?: { category: { id: number; name: string } }[];
   prenda?: {
     categoriaId: number;
     categoria: { id: number; name: string } | null;
@@ -198,11 +200,12 @@ export default function InventarioPage() {
         )
       : byKind;
     if (selectedCategoryId === null) return byTerm;
-    // Una prenda lleva su categoría en la ficha, no en `categoryId`.
+    // Una prenda lleva su categoría en la ficha; un producto, en el puente
+    // (varias, todas equivalentes): alcanza con que una coincida.
     return byTerm.filter((p) =>
       itemKind === 'prenda'
         ? p.prenda?.categoria?.id === selectedCategoryId
-        : p.categoryId === selectedCategoryId
+        : (p.categorias ?? []).some((fila) => fila.category.id === selectedCategoryId)
     );
   }, [products, search, selectedCategoryId, itemKind]);
 

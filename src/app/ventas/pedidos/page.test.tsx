@@ -188,6 +188,16 @@ beforeEach(() => {
 });
 
 describe("Pedidos: tablero", () => {
+  it("usa la banda de marca y la hoja glass del resto del sistema", async () => {
+    const { container } = render(<PedidosPage />);
+    await boardListo();
+
+    expect(container.querySelector(".brand-gradient")).not.toBeNull();
+    const hoja = container.querySelector("main");
+    expect(hoja).toHaveClass("glass");
+    expect(hoja?.className).toContain("rounded-t-[2.5rem]");
+  });
+
   it("muestra las cuatro columnas con sus conteos", async () => {
     render(<PedidosPage />);
     await boardListo();

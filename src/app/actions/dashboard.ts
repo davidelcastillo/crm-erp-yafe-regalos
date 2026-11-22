@@ -317,6 +317,254 @@ export async function getPerformanceData(data?: unknown) {
   }
 }
 
+const panelSchema = z.object({
+  type: z.enum(["cierre", "7", "30", "90", "custom"]).optional(),
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
+  branchId: z.coerce.number().int().positive().optional(),
+});
+
+const dosDecimales = (n: number) => Math.round(n * 100) / 100;
+
+const nombreCliente = (cliente: { name: string; surname: string } | null) =>
+  cliente ? `${cliente.name} ${cliente.surname}`.trim() : "Sin clienta";
+
+/**
+ * Home interna: KPIs del período, ventas por canal y las dos listas cortas
+ * (reservas sin cobrar y pedidos para enviar). Mismos períodos y sucursal que
+ * `getPerformanceData`, incluido el piso del último cierre de caja.
+ *
+ * Un pedido no tiene sucursal propia (la tienen sus ítems), así que el filtro de
+ * sucursal entra por `items.some`.
+ */
+export async function getResumenPanel(data?: unknown) {
+  try {
+    const auth = await requireAdmin();
+    if (!auth.ok) return { success: false as const, error: auth.error };
+
+    const validated = panelSchema.parse(data ?? {});
+    const { branchId } = validated;
+    const branchWhere = branchId ? { branchId } : {};
+
+    const rango = await rangoDelPeriodo(validated);
+    if (!rango.success) {
+      return { success: false as const, error: rango.error };
+    }
+
+    const esCierre = validated.type === "cierre";
+    const { porFecha, porCarga } = esCierre
+      ? await pisosDeCaja(branchId)
+      : { porFecha: {}, porCarga: {} };
+    const deVentas = {
+      AND: [{ date: { gte: rango.desde, lte: rango.hasta } }, branchWhere, porFecha],
+    };
+    // La plata de caja se mide por cuándo se cargó (`createdAt`) en el período del
+    // cierre, igual que en `fetchStats`; en los demás períodos, por su fecha.
+    const dePlata = esCierre ? { AND: [branchWhere, porCarga] } : deVentas;
+
+    // El canal sale del pedido que cobró la venta; la venta directa de mostrador
+    // no tiene pedido y se atribuye a la sucursal donde se vendió.
+    const canalDeVenta = (venta: {
+      pedido: { canal: { name: string } } | null;
+      branch: { name: string };
+    }) => venta.pedido?.canal.name ?? venta.branch.name;
+    const ventaSelect = {
+      id: true,
+      date: true,
+      totalAmount: true,
+      customer: { select: { name: true, surname: true } },
+      pedido: { select: { canal: { select: { name: true } } } },
+      branch: { select: { name: true } },
+      items: {
+        select: {
+          quantity: true,
+          subtotal: true,
+          product: {
+            select: {
+              name: true,
+              // Estilos de prenda (en la ficha) y de producto (en su puente).
+              prenda: { select: { estilos: { select: { estilo: { select: { name: true } } } } } },
+              estilosProducto: { select: { estilo: { select: { name: true } } } },
+            },
+          },
+        },
+      },
+    } as const;
+
+    const hoy = toLocalDateKey(new Date());
+    const hoyDesde = inicioDelDia(hoy);
+    const hoyHasta = finDelDia(hoy);
+    const dePedidosDe = (id: number) => ({ items: { some: { branchId: id } } });
+    const pedidosDeSucursal = branchId ? dePedidosDe(branchId) : {};
+
+    const [ventas, ultimasVentas, compras, egresosCaja, reservas, envios, enviosHoy, enviosLista] =
+      await Promise.all([
+        prisma.sale.findMany({ where: deVentas, select: ventaSelect }),
+        prisma.sale.findMany({
+          where: deVentas,
+          orderBy: { date: "desc" },
+          take: 4,
+          select: ventaSelect,
+        }),
+        // «Gastos del período» es el mismo egreso que el tablero: compras + caja.
+        prisma.purchase.aggregate({ _sum: { totalAmount: true }, where: deVentas }),
+        prisma.cashMovement.groupBy({
+          by: ["type"],
+          where: dePlata,
+          _sum: { amount: true },
+        }),
+        prisma.pedido.findMany({
+          where: { estado: "RESERVADO", ...pedidosDeSucursal },
+          orderBy: [{ venceEl: { sort: "asc", nulls: "last" } }],
+          select: {
+            id: true,
+            numero: true,
+            total: true,
+            venceEl: true,
+            customer: { select: { name: true, surname: true } },
+            items: {
+              take: 1,
+              select: { cantidad: true, product: { select: { name: true } } },
+            },
+            pagos: { select: { monto: true } },
+          },
+        }),
+        prisma.pedido.count({ where: { estado: "PARA_ENVIAR", ...pedidosDeSucursal } }),
+        // «Salen hoy» se mide con el único vencimiento que el pedido declara.
+        prisma.pedido.count({
+          where: {
+            estado: "PARA_ENVIAR",
+            venceEl: { gte: hoyDesde, lte: hoyHasta },
+            ...pedidosDeSucursal,
+          },
+        }),
+        prisma.pedido.findMany({
+          where: { estado: "PARA_ENVIAR", ...pedidosDeSucursal },
+          orderBy: [{ envioEstado: "asc" }, { pagadoAt: "asc" }],
+          take: 5,
+          select: {
+            id: true,
+            numero: true,
+            envioEstado: true,
+            customer: { select: { name: true, surname: true } },
+            items: {
+              take: 1,
+              select: { cantidad: true, product: { select: { name: true } } },
+            },
+          },
+        }),
+      ]);
+
+    const monto = ventas.reduce((suma, v) => suma + Number(v.totalAmount), 0);
+    const unidades = ventas.reduce(
+      (suma, v) => suma + v.items.reduce((s, i) => s + i.quantity, 0),
+      0
+    );
+
+    const canales = new Map<string, number>();
+    for (const venta of ventas) {
+      const canal = canalDeVenta(venta);
+      canales.set(canal, (canales.get(canal) ?? 0) + Number(venta.totalAmount));
+    }
+    const porCanal = [...canales.entries()]
+      .map(([canal, total]) => ({
+        canal,
+        monto: dosDecimales(total),
+        porcentaje: monto > 0 ? dosDecimales((total / monto) * 100) : 0,
+      }))
+      .sort((a, b) => b.monto - a.monto);
+
+    // El saldo de una reserva no está en la base: es total menos sus señas.
+    const conSaldo = reservas
+      .map((p) => ({
+        ...p,
+        saldo:
+          Number(p.total) - p.pagos.reduce((suma, pago) => suma + Number(pago.monto), 0),
+      }))
+      .filter((p) => p.saldo > 0);
+    const venceHoy = (fecha: Date | null) =>
+      !!fecha && fecha >= hoyDesde && fecha <= hoyHasta;
+
+    // Top de estilos del período, con el MISMO prorrateo que /reportes: un producto
+    // con N estilos reparte su venta en partes iguales; sin estilos va a «Sin estilo».
+    const porEstilo = new Map<string, { total: number; unidades: number }>();
+    for (const venta of ventas) {
+      for (const item of venta.items) {
+        const estilos = [
+          ...(item.product.prenda?.estilos ?? []),
+          ...item.product.estilosProducto,
+        ].map((fila) => fila.estilo.name);
+        const partes = estilos.length || 1;
+        const montoItem = Number(item.subtotal);
+        for (const estilo of estilos.length ? estilos : ["Sin estilo"]) {
+          const fila = porEstilo.get(estilo) ?? { total: 0, unidades: 0 };
+          fila.total += montoItem / partes;
+          fila.unidades += item.quantity / partes;
+          porEstilo.set(estilo, fila);
+        }
+      }
+    }
+    const estilos = [...porEstilo.entries()]
+      .map(([estilo, fila]) => ({
+        estilo,
+        total: dosDecimales(fila.total),
+        unidades: dosDecimales(fila.unidades),
+      }))
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 6);
+
+
+    return {
+      success: true as const,
+      data: {
+        ventas: { monto: dosDecimales(monto), unidades, cantidad: ventas.length },
+        gastos: dosDecimales(
+          Number(compras._sum.totalAmount ?? 0) +
+            Number(egresosCaja.find((c) => c.type === "EGRESO")?._sum.amount ?? 0)
+        ),
+        reservas: {
+          cantidad: conSaldo.length,
+          saldo: dosDecimales(conSaldo.reduce((suma, p) => suma + p.saldo, 0)),
+          vencenHoy: conSaldo.filter((p) => venceHoy(p.venceEl)).length,
+        },
+        paraEnviar: { cantidad: envios, salenHoy: enviosHoy },
+        porCanal,
+        estilos,
+        // La tarjeta es un resumen: muestra la primera prenda del pedido.
+        reservasPorCobrar: conSaldo.slice(0, 5).map((p) => ({
+          id: p.id,
+          numero: p.numero,
+          cliente: nombreCliente(p.customer),
+          prenda: p.items[0]?.product.name ?? "—",
+          venceEl: p.venceEl ? toLocalDateKey(p.venceEl) : null,
+          saldo: dosDecimales(p.saldo),
+        })),
+        ultimasVentas: ultimasVentas.map((v) => ({
+          id: v.id,
+          fecha: toLocalDateKey(v.date),
+          cliente: nombreCliente(v.customer),
+          prenda: v.items[0]?.product.name ?? "—",
+          canal: canalDeVenta(v),
+          monto: Number(v.totalAmount),
+        })),
+        paraEnviarLista: enviosLista.map((p) => ({
+          id: p.id,
+          numero: p.numero,
+          cliente: nombreCliente(p.customer),
+          prenda: p.items[0]?.product.name ?? "—",
+          envioEstado: p.envioEstado,
+        })),
+      },
+    };
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return { success: false as const, error: "Parámetros del panel inválidos" };
+    }
+    console.error("Error fetching resumen del panel:", error);
+    return { success: false as const, error: "Error al obtener el resumen del panel" };
+  }
+}
+
 // Get analytics for a specific product
 export async function getProductAnalytics(productId: number) {
   try {

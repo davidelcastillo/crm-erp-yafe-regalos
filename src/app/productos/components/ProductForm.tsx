@@ -1,17 +1,21 @@
 // src/app/productos/components/ProductForm.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Product } from "@prisma/client";
 import Swal from "sweetalert2";
-import { CategorySelector } from "@/components/ui/CategorySelector";
+import { CategoriasPicker } from "@/components/ui/CategoriasPicker";
+import type { CategoryOption } from "@/components/ui/CategorySelector";
 import { BranchPicker } from "@/components/ui/BranchPicker";
 import { FotoUploader, subirFotos } from "@/components/ui/FotoUploader";
+import { EstilosPicker } from "@/components/ui/EstilosPicker";
 import { CANALES_PUBLICACION } from "@/lib/validations/prenda";
 import type { TaxonomyOption } from "@/lib/validations/prendaTaxonomy";
 import { getBranchOptions } from "@/app/actions/branch";
+import { getCategoryOptions } from "@/app/actions/category";
+import { getFotosProducto } from "@/app/actions/foto";
 import { getEstiloPrendaOptions } from "@/app/actions/prendaTaxonomy";
 import {
   createProduct,
@@ -31,11 +35,12 @@ interface ProductFormProps {
  * Reusable create/edit modal for Products (App Router Client Component).
  *
  * Fase 3:
- *  - Adds a Category field (CategorySelector with inline "+ Nueva categoría").
+ *  - Adds a Category field (CategoriasPicker: varias por producto, con alta
+ *    rápida de categoría).
  *  - Adds an Active/Inactive toggle (edit mode only) with a SweetAlert2
  *    confirmation before deactivating.
  *  - Uses `updateProductExtended` for the extended payload in edit mode
- *    (carrying categoryId + active on top of the HU2 fields).
+ *    (carrying `categorias` + active on top of the HU2 fields).
  *  - `code` and `codePrefix` are immutable in edit mode (read-only display).
  *  - There is NO `stock` field on Product anymore (stock lives in BranchInventory
  *    per branch). The HU2 create mode no longer asks for initial stock.
@@ -47,9 +52,13 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const isEdit = !!product;
-  const [categoryId, setCategoryId] = useState<number | null>(
-    product?.categoryId ?? null
-  );
+  /**
+   * Categorías del producto: varias y todas equivalentes (pedido del dueño). En
+   * la edición arranca en `null` hasta leer las guardadas, así guardar sin haber
+   * cargado no las borra.
+   */
+  const [categorias, setCategorias] = useState<number[] | null>(isEdit ? null : []);
+  const [categoriasDisponibles, setCategoriasDisponibles] = useState<CategoryOption[]>([]);
   const [isActive, setIsActive] = useState<boolean>(product?.active ?? true);
 
   /**
@@ -85,6 +94,27 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
   const [fotosPendientes, setFotosPendientes] = useState<File[]>([]);
 
   /**
+   * Variantes (opcionales, como los talles de la prenda): nombre libre +
+   * cantidad y, si existe, la foto del producto a la que se asocian. En la
+   * edición arranca en `null` hasta leer las guardadas, así guardar antes de
+   * cargar no las borra.
+   */
+  const [tieneVariantes, setTieneVariantes] = useState(false);
+  const [variantes, setVariantes] = useState<
+    { key: number; nombre: string; cantidad: string; fotoPosition: string }[] | null
+  >(isEdit ? null : []);
+  /** Fotos ya guardadas del producto: alimentan el selector de foto de la variante. */
+  const [fotos, setFotos] = useState<{ position: number }[]>([]);
+  /** Clave estable de cada fila; el interruptor también cuenta como toque. */
+  const siguienteKey = useRef(0);
+  const variantesTocadas = useRef(false);
+  const variantesFilas = variantes ?? [];
+  const totalVariantes = variantesFilas.reduce(
+    (total, fila) => total + (Number(fila.cantidad) || 0),
+    0
+  );
+
+  /**
    * Con el modal abierto la página de atrás no scrollea: en el celular el gesto
    * se escapaba del modal y movía /inventario. Es DOM, no estado de React.
    */
@@ -100,10 +130,61 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
         : [...(prev ?? []), canal]
     );
 
+  // Las categorías se piden una vez, en el alta y en la edición.
+  useEffect(() => {
+    let cancelado = false;
+    (async () => {
+      try {
+        const resultado = await getCategoryOptions();
+        if (!cancelado && resultado.success && resultado.data) {
+          setCategoriasDisponibles(resultado.data as CategoryOption[]);
+        }
+      } catch (error) {
+        console.error("Error loading category options:", error);
+      }
+    })();
+    return () => {
+      cancelado = true;
+    };
+  }, []);
+
+  const toggleCategoria = (id: number) =>
+    setCategorias((prev) =>
+      (prev ?? []).includes(id)
+        ? (prev ?? []).filter((actual) => actual !== id)
+        : [...(prev ?? []), id]
+    );
+
   const toggleEstilo = (id: number) =>
     setEstilos((prev) =>
       (prev ?? []).includes(id) ? (prev ?? []).filter((actual) => actual !== id) : [...(prev ?? []), id]
     );
+
+  const nuevaFilaVariante = () => ({
+    key: ++siguienteKey.current,
+    nombre: "",
+    cantidad: "",
+    fotoPosition: "",
+  });
+
+  /** El interruptor arma la primera fila; al apagarse la lista queda vacía. */
+  const toggleVariantes = (activar: boolean) => {
+    variantesTocadas.current = true;
+    setTieneVariantes(activar);
+    setVariantes(activar ? (variantesFilas.length > 0 ? variantesFilas : [nuevaFilaVariante()]) : []);
+  };
+
+  const cambiarVariante = (
+    key: number,
+    campo: "nombre" | "cantidad" | "fotoPosition",
+    valor: string
+  ) =>
+    setVariantes((prev) =>
+      (prev ?? []).map((fila) => (fila.key === key ? { ...fila, [campo]: valor } : fila))
+    );
+  const agregarVariante = () => setVariantes((prev) => [...(prev ?? []), nuevaFilaVariante()]);
+  const quitarVariante = (key: number) =>
+    setVariantes((prev) => (prev ?? []).filter((fila) => fila.key !== key));
 
   // Los estilos activos se piden una vez, en el alta y en la edición.
   useEffect(() => {
@@ -129,12 +210,50 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
       try {
         const resultado = await getProductById(product.id);
         if (cancelado || !resultado.success) return;
-        const ficha = resultado.data as { publicadaEn?: string[]; estilos?: number[] };
+        const ficha = resultado.data as {
+          publicadaEn?: string[];
+          estilos?: number[];
+          categorias?: number[];
+          variantes?: { nombre: string; cantidad: number; fotoPosition: number | null }[];
+        };
         setPublicadaEn(ficha.publicadaEn ?? []);
         setEstilos(ficha.estilos ?? []);
+        setCategorias(ficha.categorias ?? []);
+        // Si ya se tocó el interruptor, el usuario manda: no se pisa lo tipeado.
+        if (variantesTocadas.current) return;
+        const guardadas = ficha.variantes ?? [];
+        setTieneVariantes(guardadas.length > 0);
+        setVariantes(
+          guardadas.map((variante) => ({
+            key: ++siguienteKey.current,
+            nombre: variante.nombre,
+            cantidad: String(variante.cantidad),
+            fotoPosition: variante.fotoPosition === null ? "" : String(variante.fotoPosition),
+          }))
+        );
       } catch (error) {
         console.error("Error loading product publications:", error);
         if (!cancelado) setPublicadaEn([]);
+      }
+    })();
+    return () => {
+      cancelado = true;
+    };
+  }, [product]);
+
+  // Las fotos guardadas solo existen en la edición: son las opciones del
+  // selector de foto de cada variante.
+  useEffect(() => {
+    if (!product) return;
+    let cancelado = false;
+    (async () => {
+      try {
+        const resultado = await getFotosProducto({ productId: product.id });
+        if (!cancelado && resultado.success) {
+          setFotos(resultado.data.map((foto) => ({ position: foto.position })));
+        }
+      } catch (error) {
+        console.error("Error loading product photos:", error);
       }
     })();
     return () => {
@@ -195,35 +314,56 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
     e.preventDefault();
     setLoading(true);
 
+    /**
+     * Variantes para el payload: solo las filas con nombre. Apagado en el alta
+     * la clave no viaja; apagado en la edición viaja vacío y borra las guardadas
+     * (`null` = todavía no se leyeron: no se toca nada).
+     */
+    const variantesPayload = tieneVariantes
+      ? variantesFilas
+          .filter((fila) => fila.nombre.trim() !== "")
+          .map((fila) => ({
+            nombre: fila.nombre.trim(),
+            cantidad: Number(fila.cantidad) || 0,
+            ...(fila.fotoPosition !== "" ? { fotoPosition: Number(fila.fotoPosition) } : {}),
+          }))
+      : isEdit && variantes !== null
+        ? []
+        : null;
+    const variantesDelPayload =
+      variantesPayload !== null ? { variantes: variantesPayload } : {};
+
     const payload = isEdit
       ? {
           id: product!.id,
           name: formData.name,
           description: formData.description || null,
           price: formData.price,
-          categoryId: categoryId,
           active: isActive,
+          // Sin categorías cargadas todavía no se tocan las guardadas.
+          ...(categorias !== null ? { categorias } : {}),
           // Sin canales cargados todavía no se toca lo publicado.
           ...(publicadaEn !== null ? { publicadaEn } : {}),
           // Sin estilos cargados todavía no se tocan los guardados.
           ...(estilos !== null ? { estilos } : {}),
+          ...variantesDelPayload,
         }
       : {
           name: formData.name,
           description: formData.description,
           prefix: formData.prefix,
           price: formData.price,
-          // La categoría elegida viaja en el alta (H2). Sin elección va null
-          // explícito: el esquema la acepta nullable y el producto queda igual
-          // que antes (categoryId=null).
-          categoryId: categoryId,
+          // Las categorías elegidas viajan en el alta (vacío = sin categoría).
+          categorias: categorias ?? [],
           publicadaEn: publicadaEn ?? [],
           estilos: estilos ?? [],
           // La cantidad y el costo viajan siempre: con costo se registra la
           // compra del alta, haya o no sucursal. Sin sucursal no hay stock.
           ...(branchId !== null ? { branchId } : {}),
-          cantidadInicial: Number(cantidadInicial) || 0,
+          // Con variantes el total sale de la suma, como los talles de prenda.
+          cantidadInicial: tieneVariantes ? totalVariantes : Number(cantidadInicial) || 0,
           costoUnitario: Number(costo) || 0,
+          ...variantesDelPayload,
         };
 
     const result = isEdit
@@ -459,27 +599,143 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
             </>
           )}
 
-          {/* Cantidad y costo: siempre visibles. El costo se registra como
-              compra del alta, haya o no sucursal. */}
+          {/* Interruptor de variantes (opcional, como los talles de prenda). */}
+          <div className="flex items-center justify-between gap-3 rounded-xl bg-surface-soft p-4">
+            <div className="min-w-0">
+              <label htmlFor="product-tiene-variantes" className="text-sm font-medium text-ink">
+                Este producto tiene variantes
+              </label>
+              <p className="text-xs text-ink-muted">
+                Con variantes el total de unidades sale de la suma de las filas.
+              </p>
+            </div>
+            <input
+              id="product-tiene-variantes"
+              type="checkbox"
+              checked={tieneVariantes}
+              onChange={(e) => toggleVariantes(e.target.checked)}
+              className="h-5 w-5 accent-accent"
+            />
+          </div>
+
+          {/* Filas «Nombre + cantidad» y, si la foto existe, a cuál se asocian. */}
+          {tieneVariantes && (
+            <div className="space-y-2">
+              <span className={labelClass}>Variantes</span>
+              {variantesFilas.map((fila, indice) => {
+                const numero = indice + 1;
+                return (
+                  <div
+                    key={fila.key}
+                    className="space-y-2 rounded-xl border border-hairline bg-surface p-3"
+                  >
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={fila.nombre}
+                        onChange={(e) => cambiarVariante(fila.key, "nombre", e.target.value)}
+                        aria-label={`Variante ${numero}`}
+                        maxLength={40}
+                        placeholder="Ej: Roja"
+                        className={inputClass}
+                      />
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        step="1"
+                        min="0"
+                        max="999"
+                        value={fila.cantidad}
+                        onChange={(e) => cambiarVariante(fila.key, "cantidad", e.target.value)}
+                        aria-label={`Cantidad de la variante ${numero}`}
+                        placeholder="0"
+                        className={`${inputClass} w-24 text-center`}
+                      />
+                      {variantesFilas.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => quitarVariante(fila.key)}
+                          aria-label={`Quitar variante ${numero}`}
+                          className="btn btn-icon text-ink-muted hover:bg-surface-strong"
+                        >
+                          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                    <div>
+                      <label
+                        htmlFor={`product-variante-${fila.key}-foto`}
+                        className="mb-1 block text-xs text-ink-muted"
+                      >
+                        Foto de la variante {numero}
+                      </label>
+                      <select
+                        id={`product-variante-${fila.key}-foto`}
+                        value={fila.fotoPosition}
+                        onChange={(e) => cambiarVariante(fila.key, "fotoPosition", e.target.value)}
+                        disabled={!isEdit}
+                        className={`${inputClass} bg-surface`}
+                      >
+                        <option value="">Sin foto</option>
+                        {fotos.map((foto) => (
+                          <option key={foto.position} value={String(foto.position)}>
+                            Foto {foto.position + 1}
+                          </option>
+                        ))}
+                      </select>
+                      {!isEdit && (
+                        <p className="mt-1 text-xs text-ink-muted">
+                          Las fotos se asocian cuando el producto ya existe (edición).
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+              <button
+                type="button"
+                onClick={agregarVariante}
+                className="btn btn-ghost text-sm text-accent"
+              >
+                ＋ Agregar variante
+              </button>
+            </div>
+          )}
+
+          {/* Cantidad y costo: el total de unidades se deriva con variantes. */}
           {!isEdit && (
             <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label htmlFor="product-cantidad-inicial" className={labelClass}>
-                  Cantidad inicial
-                </label>
-                <input
-                  id="product-cantidad-inicial"
-                  type="number"
-                  inputMode="numeric"
-                  step="1"
-                  min="0"
-                  max="999"
-                  value={cantidadInicial}
-                  onChange={(e) => setCantidadInicial(e.target.value)}
-                  className={inputClass}
-                  placeholder="0"
-                />
-              </div>
+              {tieneVariantes ? (
+                <div>
+                  <span className={labelClass}>Total de unidades</span>
+                  <p
+                    data-testid="product-cantidad-total"
+                    className={`${inputClass} bg-surface-strong text-sm text-ink-muted`}
+                  >
+                    {totalVariantes} {totalVariantes === 1 ? "unidad" : "unidades"}
+                  </p>
+                </div>
+              ) : (
+                <div>
+                  <label htmlFor="product-cantidad-inicial" className={labelClass}>
+                    Cantidad inicial
+                  </label>
+                  <input
+                    id="product-cantidad-inicial"
+                    type="number"
+                    inputMode="numeric"
+                    step="1"
+                    min="0"
+                    max="999"
+                    value={cantidadInicial}
+                    onChange={(e) => setCantidadInicial(e.target.value)}
+                    className={inputClass}
+                    placeholder="0"
+                  />
+                </div>
+              )}
               <div>
                 <label htmlFor="product-costo" className={labelClass}>
                   Costo
@@ -504,43 +760,31 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
             </div>
           )}
 
-          {/* Category Selector */}
-          <div>
-            <span className={labelClass}>Categoría</span>
-            <CategorySelector
-              selectedId={categoryId}
-              onValueChange={setCategoryId}
-              label=""
-            />
-          </div>
+          {/* Categorías: varias por producto, todas equivalentes. */}
+          <CategoriasPicker
+            id="product-categorias"
+            options={categoriasDisponibles}
+            onOptionsChange={setCategoriasDisponibles}
+            selected={categorias ?? []}
+            onToggle={toggleCategoria}
+            onCreated={(id) =>
+              setCategorias((prev) =>
+                (prev ?? []).includes(id) ? (prev ?? []) : [...(prev ?? []), id]
+              )
+            }
+            disabled={loading}
+          />
 
-          {/* Estilos: la misma taxonomía que la prenda, con sus mismas pills. */}
-          <div>
-            <span className={labelClass}>Estilos</span>
-            <div className="flex flex-wrap gap-2">
-              {estilosDisponibles.map((estilo) => {
-                const elegido = (estilos ?? []).includes(estilo.id);
-                return (
-                  <button
-                    key={estilo.id}
-                    type="button"
-                    aria-pressed={elegido}
-                    onClick={() => toggleEstilo(estilo.id)}
-                    className={`min-h-[44px] rounded-full border px-4 py-2 text-sm transition-colors touch-manipulation ${
-                      elegido
-                        ? "border-accent bg-accent/10 font-medium text-brand-rosa-texto"
-                        : "border-hairline bg-surface text-ink"
-                    }`}
-                  >
-                    {estilo.name}
-                  </button>
-                );
-              })}
-              {estilosDisponibles.length === 0 && (
-                <p className="text-xs text-ink-muted">No hay estilos cargados</p>
-              )}
-            </div>
-          </div>
+          {/* Estilos: la misma taxonomía que la prenda, con su alta rápida. */}
+          <EstilosPicker
+            options={estilosDisponibles}
+            onOptionsChange={setEstilosDisponibles}
+            selected={estilos ?? []}
+            onToggle={toggleEstilo}
+            onCreated={(id) =>
+              setEstilos((prev) => (prev ?? []).includes(id) ? (prev ?? []) : [...(prev ?? []), id])
+            }
+          />
 
           {/* T3: «Publicar en» — mismo patrón que la prenda. */}
           <div>

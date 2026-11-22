@@ -115,6 +115,22 @@ export default async function FichaVidrieraPage({
               <BotonWhatsApp nombre={item.name} codigo={item.code} />
             )}
 
+            {/* Variantes del producto, sin stock exacto: las opciones que publica
+              la ficha, igual que los talles de una prenda. */}
+            {item.variantes && item.variantes.length > 0 && (
+              <div role="group" aria-label="Variantes" className="flex flex-wrap items-center gap-2">
+                <span className="text-[15px] text-ink">Variantes</span>
+                {item.variantes.map((variante) => (
+                  <span
+                    key={variante.nombre}
+                    className="inline-flex min-h-10 items-center rounded-[10px] border-[1.5px] border-hairline-strong bg-surface px-2.5 font-semibold text-ink"
+                  >
+                    {variante.nombre}
+                  </span>
+                ))}
+              </div>
+            )}
+
             {item.descripcion && (
               <p className="text-[15px] leading-relaxed break-words text-ink-body">{item.descripcion}</p>
             )}
@@ -129,7 +145,18 @@ export default async function FichaVidrieraPage({
               </div>
             )}
 
-            {item.categoria && <p className="text-[15px] text-ink-muted">Categoría: {item.categoria}</p>}
+            {/* Todas las categorías del producto: son equivalentes, así que se
+                listan juntas (la de prenda entra como única). */}
+            {item.categorias && item.categorias.length > 0 ? (
+              <p className="text-[15px] text-ink-muted">
+                {item.categorias.length > 1 ? "Categorías" : "Categoría"}:{" "}
+                {item.categorias.join(" · ")}
+              </p>
+            ) : (
+              item.categoria && (
+                <p className="text-[15px] text-ink-muted">Categoría: {item.categoria}</p>
+              )
+            )}
 
             {item.sucursales && item.sucursales.length > 0 && (
               <p className="text-[15px] text-ink-muted">

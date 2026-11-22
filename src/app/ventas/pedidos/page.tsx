@@ -663,8 +663,9 @@ export default function PedidosPage() {
 
   return (
     <div className="min-h-screen bg-surface pb-20">
-      {/* El degradé de marca como capa de fondo del encabezado, como en /ventas. */}
-      <div className="relative isolate pb-6">
+      {/* El degradé de marca como capa de fondo del encabezado, como en /ventas;
+          el tablero sube en la hoja glass que usan las demás páginas. */}
+      <div className="relative isolate pb-16">
         <div className="brand-gradient pointer-events-none absolute inset-0" aria-hidden="true" />
         <PageHeader
           title="Pedidos"
@@ -713,7 +714,7 @@ export default function PedidosPage() {
         </svg>
       </button>
 
-      <main className="px-3 pt-3">
+      <main className="glass -mt-12 rounded-t-[2.5rem] px-3 pt-6 pb-8">
         {/* Celular: un selector por estado y una sola columna a la vista. */}
         <div
           role="tablist"

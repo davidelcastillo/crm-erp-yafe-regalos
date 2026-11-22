@@ -7,7 +7,7 @@
  * por fila con su resumen, el resultado del envío y, con sucursal elegida
  * (D8), el stock por fila con su comprobante.
  */
-import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act, within } from "@testing-library/react";
 import { BulkProductForm } from "../components/BulkProductForm";
 
 jest.mock("../../actions/product", () => ({
@@ -25,6 +25,7 @@ jest.mock("@/app/actions/category", () => ({
 // todas las filas del lote.
 jest.mock("@/app/actions/prendaTaxonomy", () => ({
   getEstiloPrendaOptions: jest.fn(),
+  createEstiloPrenda: jest.fn(),
 }));
 
 jest.mock("sweetalert2", () => ({
@@ -66,7 +67,7 @@ jest.mock("@/app/inventario/components/StockMovementReceiptPanel", () => ({
 
 import { createProductsBatch } from "../../actions/product";
 import { getCategoryOptions, createCategory } from "@/app/actions/category";
-import { getEstiloPrendaOptions } from "@/app/actions/prendaTaxonomy";
+import { createEstiloPrenda, getEstiloPrendaOptions } from "@/app/actions/prendaTaxonomy";
 import type { StockMovementReceipt } from "@/lib/stock-movement-receipt";
 import Swal from "sweetalert2";
 import { subirFoto } from "@/components/ui/FotoUploader";
@@ -85,6 +86,9 @@ const mockGetCategoryOptions = getCategoryOptions as jest.MockedFunction<typeof 
 const mockCreateCategory = createCategory as jest.MockedFunction<typeof createCategory>;
 const mockGetEstiloPrendaOptions = getEstiloPrendaOptions as jest.MockedFunction<
   typeof getEstiloPrendaOptions
+>;
+const mockCreateEstiloPrenda = createEstiloPrenda as jest.MockedFunction<
+  typeof createEstiloPrenda
 >;
 /** Estilos activos: una sola lista para todas las filas del lote. */
 mockGetEstiloPrendaOptions.mockResolvedValue({
@@ -146,7 +150,7 @@ const renderForm = async () => {
 const nombres = () => screen.getAllByLabelText(/^nombre/i);
 const prefijos = () => screen.getAllByLabelText(/^prefijo/i);
 const precios = () => screen.getAllByLabelText(/^precio/i);
-const categorias = () => screen.getAllByLabelText(/^categoría/i);
+const categorias = () => screen.getAllByLabelText(/^categorías/i);
 /** Solo existe con una sucursal elegida (T5). */
 const stocks = () => screen.queryAllByLabelText(/^stock inicial/i);
 /** Costo por fila (T4): también solo con sucursal, porque la compra es del lote. */
@@ -155,7 +159,8 @@ const elegirSucursal = (nombre = "Sucursal Centro") =>
   fireEvent.click(screen.getByRole("button", { name: nombre }));
 
 /** Espera a que la lista única de categorías termine de cargar. */
-const esperarCategorias = () => waitFor(() => expect(categorias()[0]).toBeEnabled());
+const esperarCategorias = () =>
+  waitFor(() => expect(screen.getAllByRole("button", { name: "Bebidas" })).toHaveLength(1));
 
 /** Paso 1 → paso 2 (T15): Continuar y esperar la lista única de categorías. */
 const continuar = async () => {
@@ -338,11 +343,11 @@ describe("BulkProductForm", () => {
     expect(nombres()[1]).toHaveFocus();
   });
 
-  it("el error de categoría se anuncia en el disparador de la fila", async () => {
+  it("el error de categoría se anuncia en el grupo de pills de la fila", async () => {
     mockCreateProductsBatch.mockResolvedValue({
       success: false,
       error: "La categoría seleccionada no existe",
-      rowErrors: [{ row: 0, field: "categoryId", message: "La categoría seleccionada no existe" }],
+      rowErrors: [{ row: 0, field: "categorias", message: "La categoría seleccionada no existe" }],
     } as never);
 
     await renderForm();
@@ -384,7 +389,7 @@ describe("BulkProductForm", () => {
     await waitFor(() => expect(onSuccess).toHaveBeenCalled());
     expect(onClose).toHaveBeenCalled();
     expect(mockCreateProductsBatch).toHaveBeenCalledWith({
-      rows: [{ name: "Producto único", prefix: "AA", price: 10, categoryId: null, estilos: [] }],
+      rows: [{ name: "Producto único", prefix: "AA", price: 10, categorias: [], estilos: [] }],
     });
     expect(mockSwalFire).toHaveBeenCalledWith(
       expect.objectContaining({ text: expect.stringContaining("1 producto") })
@@ -406,8 +411,8 @@ describe("BulkProductForm", () => {
     expect(nombres()[0]).toHaveValue("Producto A");
   });
 
-  // S4: una categoría por fila. La lista se pide una sola vez para todo el modal.
-  it("cada fila tiene su categoría y viaja con su fila", async () => {
+  // S4: una fila puede tener varias categorías, todas equivalentes.
+  it("cada fila elige sus categorías y viajan con su fila", async () => {
     const { onSuccess } = await renderForm();
     await continuar();
 
@@ -416,18 +421,17 @@ describe("BulkProductForm", () => {
     llenarFila(1, "Producto dos");
 
     expect(categorias()).toHaveLength(2);
-    fireEvent.click(categorias()[0]);
-    fireEvent.click(screen.getByRole("option", { name: "Bebidas" }));
-    fireEvent.click(categorias()[1]);
-    fireEvent.click(screen.getByRole("option", { name: "Limpieza" }));
+    fireEvent.click(within(categorias()[0]).getByRole("button", { name: "Bebidas" }));
+    fireEvent.click(within(categorias()[0]).getByRole("button", { name: "Limpieza" }));
+    fireEvent.click(within(categorias()[1]).getByRole("button", { name: "Limpieza" }));
 
     fireEvent.click(screen.getByRole("button", { name: /crear 2 productos/i }));
 
     await waitFor(() => expect(onSuccess).toHaveBeenCalled());
     expect(mockCreateProductsBatch).toHaveBeenCalledWith({
       rows: [
-        { name: "Producto uno", prefix: "AA", price: 10, categoryId: 5, estilos: [] },
-        { name: "Producto dos", prefix: "AA", price: 10, categoryId: 7, estilos: [] },
+        { name: "Producto uno", prefix: "AA", price: 10, categorias: [5, 7], estilos: [] },
+        { name: "Producto dos", prefix: "AA", price: 10, categorias: [7], estilos: [] },
       ],
     });
   });
@@ -449,23 +453,26 @@ describe("BulkProductForm", () => {
     // La píldora de la segunda fila crea la categoría.
     fireEvent.click(screen.getAllByRole("button", { name: "Crear nueva categoría" })[1]);
 
-    await waitFor(() => expect(categorias()[1]).toHaveTextContent("Almacén"));
-    // Solo la fila que la creó la elige; la otra sigue vacía.
-    expect(categorias()[0]).toHaveTextContent("Seleccionar categoría");
+    await waitFor(() =>
+      expect(within(categorias()[1]).getByRole("button", { name: "Almacén" })).toHaveAttribute(
+        "aria-pressed",
+        "true"
+      )
+    );
+    // Solo la fila que la creó la elige; la otra la ofrece sin marcarla.
+    expect(within(categorias()[0]).getByRole("button", { name: "Almacén" })).toHaveAttribute(
+      "aria-pressed",
+      "false"
+    );
     expect(mockGetCategoryOptions).toHaveBeenCalledTimes(1);
-
-    // La lista del modal creció: la otra fila también la ofrece.
-    fireEvent.click(categorias()[0]);
-    expect(screen.getByRole("option", { name: "Almacén" })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("option", { name: "Sin categoría" }));
 
     fireEvent.click(screen.getByRole("button", { name: /crear 2 productos/i }));
 
     await waitFor(() => expect(onSuccess).toHaveBeenCalled());
     expect(mockCreateProductsBatch).toHaveBeenCalledWith({
       rows: [
-        { name: "Producto uno", prefix: "AA", price: 10, categoryId: null, estilos: [] },
-        { name: "Producto dos", prefix: "AA", price: 10, categoryId: 11, estilos: [] },
+        { name: "Producto uno", prefix: "AA", price: 10, categorias: [], estilos: [] },
+        { name: "Producto dos", prefix: "AA", price: 10, categorias: [11], estilos: [] },
       ],
     });
     expect(mockGetCategoryOptions).toHaveBeenCalledTimes(1);
@@ -515,7 +522,7 @@ describe("BulkProductForm", () => {
     await waitFor(() => expect(onSuccess).toHaveBeenCalled());
     // Sin sucursal no viajan `branchId` ni `initialStock`.
     expect(mockCreateProductsBatch).toHaveBeenCalledWith({
-      rows: [{ name: "Producto único", prefix: "AA", price: 10, categoryId: null, estilos: [] }],
+      rows: [{ name: "Producto único", prefix: "AA", price: 10, categorias: [], estilos: [] }],
     });
   });
 
@@ -543,8 +550,8 @@ describe("BulkProductForm", () => {
     expect(mockCreateProductsBatch).toHaveBeenCalledWith({
       branchId: 1,
       rows: [
-        { name: "Producto uno", prefix: "AA", price: 10, categoryId: null, estilos: [], initialStock: 5 },
-        { name: "Producto dos", prefix: "AA", price: 20, categoryId: null, estilos: [], initialStock: 0 },
+        { name: "Producto uno", prefix: "AA", price: 10, categorias: [], estilos: [], initialStock: 5 },
+        { name: "Producto dos", prefix: "AA", price: 20, categorias: [], estilos: [], initialStock: 0 },
       ],
     });
   });
@@ -574,8 +581,8 @@ describe("BulkProductForm", () => {
     expect(mockCreateProductsBatch).toHaveBeenCalledWith({
       branchId: 1,
       rows: [
-        { name: "Producto uno", prefix: "AA", price: 10, categoryId: null, estilos: [], initialStock: 2, costo: 100 },
-        { name: "Producto dos", prefix: "AA", price: 20, categoryId: null, estilos: [], initialStock: 0 },
+        { name: "Producto uno", prefix: "AA", price: 10, categorias: [], estilos: [], initialStock: 2, costo: 100 },
+        { name: "Producto dos", prefix: "AA", price: 20, categorias: [], estilos: [], initialStock: 0 },
       ],
     });
   });
@@ -596,7 +603,7 @@ describe("BulkProductForm", () => {
 
     await waitFor(() => expect(onSuccess).toHaveBeenCalled());
     expect(mockCreateProductsBatch).toHaveBeenCalledWith({
-      rows: [{ name: "Producto único", prefix: "AA", price: 10, categoryId: null, estilos: [] }],
+      rows: [{ name: "Producto único", prefix: "AA", price: 10, categorias: [], estilos: [] }],
     });
   });
 
@@ -825,8 +832,8 @@ describe("BulkProductForm: fotos del lote", () => {
     // El esquema del lote no tiene fotos: viajan solo los campos de la fila.
     expect(mockCreateProductsBatch).toHaveBeenCalledWith({
       rows: [
-        { name: "Producto uno", prefix: "AA", price: 10, categoryId: null, estilos: [] },
-        { name: "Producto dos", prefix: "AA", price: 10, categoryId: null, estilos: [] },
+        { name: "Producto uno", prefix: "AA", price: 10, categorias: [], estilos: [] },
+        { name: "Producto dos", prefix: "AA", price: 10, categorias: [], estilos: [] },
       ],
     });
   });
@@ -970,5 +977,123 @@ describe("BulkProductForm · estilos por fila", () => {
     await continuar();
 
     expect(screen.getByText("No hay estilos cargados")).toBeInTheDocument();
+  });
+
+  it("crear un estilo lo suma a la lista compartida y lo marca solo en su fila", async () => {
+    mockCreateEstiloPrenda.mockResolvedValue({
+      success: true,
+      data: { id: 9, name: "Grunge" },
+    } as never);
+    mockSwalFire.mockResolvedValueOnce({ isConfirmed: true, value: " Grunge " } as never);
+
+    await renderForm();
+    await continuar();
+    fireEvent.click(screen.getByRole("button", { name: /agregar producto/i }));
+    llenarFila(0, "Producto uno");
+    llenarFila(1, "Producto dos");
+
+    // El alta vive en la card de cada fila: se crea desde la primera.
+    fireEvent.click(screen.getAllByRole("button", { name: /nuevo estilo/i })[0]);
+
+    await waitFor(() =>
+      expect(mockCreateEstiloPrenda).toHaveBeenCalledWith({ name: "Grunge" })
+    );
+    const grunge = await screen.findAllByRole("button", { name: "Grunge" });
+    expect(grunge).toHaveLength(2);
+    expect(grunge[0]).toHaveAttribute("aria-pressed", "true");
+    expect(grunge[1]).toHaveAttribute("aria-pressed", "false");
+  });
+});
+
+describe("BulkProductForm · variantes", () => {
+  // Igual que los otros bloques: el envío tiene que devolver el lote creado.
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCreateProductsBatch.mockResolvedValue({
+      success: true,
+      data: { products: [{ id: 1, code: "AA000", name: "Camisa" }], receipt: null },
+    } as never);
+  });
+
+  it("manda las variantes de la fila y esconde el stock inicial", async () => {
+    await renderForm();
+    elegirSucursal();
+    await continuar();
+    llenarFila(0, "Camisa");
+    expect(stocks()).toHaveLength(1);
+
+    fireEvent.click(screen.getByLabelText("Agregar variante al producto 1"));
+    fireEvent.change(screen.getByLabelText("Variante 1 del producto 1"), {
+      target: { value: "Roja" },
+    });
+    fireEvent.change(screen.getByLabelText("Cantidad de la variante 1 del producto 1"), {
+      target: { value: "2" },
+    });
+
+    // Con variantes el stock sale de la suma: el campo simple desaparece.
+    expect(stocks()).toHaveLength(0);
+
+    fireEvent.click(screen.getByRole("button", { name: /crear 1 producto/i }));
+
+    await waitFor(() => expect(mockCreateProductsBatch).toHaveBeenCalled());
+    expect((mockCreateProductsBatch.mock.calls[0][0] as { rows: unknown[] }).rows[0]).toEqual(
+      expect.objectContaining({ name: "Camisa", variantes: [{ nombre: "Roja", cantidad: 2 }] })
+    );
+  });
+
+  it("sin variantes la fila viaja como antes", async () => {
+    await renderForm();
+    await continuar();
+    llenarFila(0, "Producto único");
+
+    fireEvent.click(screen.getByRole("button", { name: /crear 1 producto/i }));
+
+    await waitFor(() => expect(mockCreateProductsBatch).toHaveBeenCalled());
+    expect((mockCreateProductsBatch.mock.calls[0][0] as { rows: unknown[] }).rows[0]).not.toHaveProperty("variantes");
+  });
+});
+
+/**
+ * «Publicar en» por fila (pedido del dueño): los mismos checkboxes que el alta
+ * individual, dentro de la card de cada producto, y viajan en su fila.
+ */
+describe("BulkProductForm · publicar en por fila", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCreateProductsBatch.mockResolvedValue({
+      success: true,
+      data: {
+        products: [
+          { id: 1, code: "AA000", name: "Producto uno" },
+          { id: 2, code: "AA001", name: "Producto dos" },
+        ],
+        receipt: null,
+      },
+    } as never);
+  });
+
+  it("cada fila elige sus canales y solo viajan los elegidos", async () => {
+    await renderForm();
+    await continuar();
+    fireEvent.click(screen.getByRole("button", { name: /agregar producto/i }));
+    llenarFila(0, "Producto uno");
+    llenarFila(1, "Producto dos");
+
+    // Los mismos tres canales en cada fila.
+    expect(screen.getAllByLabelText("Web")).toHaveLength(2);
+    expect(screen.getAllByLabelText("Instagram")).toHaveLength(2);
+    expect(screen.getAllByLabelText("WhatsApp")).toHaveLength(2);
+
+    fireEvent.click(screen.getAllByLabelText("Web")[0]);
+
+    fireEvent.click(screen.getByRole("button", { name: /crear 2 productos/i }));
+
+    await waitFor(() => expect(mockCreateProductsBatch).toHaveBeenCalled());
+    const payload = mockCreateProductsBatch.mock.calls[0][0] as {
+      rows: Record<string, unknown>[];
+    };
+    expect(payload.rows[0]).toEqual(expect.objectContaining({ publicadaEn: ["Web"] }));
+    // La fila sin canales no manda la clave (el esquema la deja vacía).
+    expect(payload.rows[1]).not.toHaveProperty("publicadaEn");
   });
 });

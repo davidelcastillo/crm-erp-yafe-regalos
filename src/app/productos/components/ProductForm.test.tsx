@@ -28,24 +28,10 @@ jest.mock("@/app/actions/foto", () => ({
   getFotosProducto: jest.fn(async () => ({ success: true, data: [] })),
 }));
 
-// Mock CategorySelector to keep this suite focused on ProductForm behavior
-type CategorySelectorMockProps = {
-  selectedId?: number | null;
-  onValueChange?: (id: number | null) => void;
-};
-
-jest.mock("@/components/ui/CategorySelector", () => ({
-  CategorySelector: ({ onValueChange, selectedId }: CategorySelectorMockProps) => (
-    <div data-testid="category-selector">
-      <button
-        type="button"
-        onClick={() => onValueChange?.(42)}
-        aria-label="select-category"
-      >
-        Select category {selectedId ?? "none"}
-      </button>
-    </div>
-  ),
+// Categorías: el picker múltiple carga la lista desde la action (una sola vez).
+jest.mock("@/app/actions/category", () => ({
+  getCategoryOptions: jest.fn(),
+  createCategory: jest.fn(),
 }));
 
 // El alta pide la sucursal del stock inicial (T3): se mockean las opciones.
@@ -56,6 +42,7 @@ jest.mock("@/app/actions/branch", () => ({
 // Los estilos activos son la misma taxonomía que la prenda (pills seleccionables).
 jest.mock("@/app/actions/prendaTaxonomy", () => ({
   getEstiloPrendaOptions: jest.fn(),
+  createEstiloPrenda: jest.fn(),
 }));
 
 // Mock next/navigation
@@ -72,8 +59,9 @@ jest.mock("sweetalert2", () => ({
 }));
 
 import { createProduct, updateProductExtended, getProductById } from "../../actions/product";
+import { createCategory, getCategoryOptions } from "@/app/actions/category";
 import { getBranchOptions } from "@/app/actions/branch";
-import { getEstiloPrendaOptions } from "@/app/actions/prendaTaxonomy";
+import { createEstiloPrenda, getEstiloPrendaOptions } from "@/app/actions/prendaTaxonomy";
 import { subirFotos } from "@/components/ui/FotoUploader";
 import { getFotosProducto } from "@/app/actions/foto";
 import { createProductSchema } from "@/lib/validations/product";
@@ -89,6 +77,20 @@ const mockSubirFotos = subirFotos as jest.MockedFunction<typeof subirFotos>;
 const mockGetEstiloPrendaOptions = getEstiloPrendaOptions as jest.MockedFunction<
   typeof getEstiloPrendaOptions
 >;
+const mockCreateEstiloPrenda = createEstiloPrenda as jest.MockedFunction<
+  typeof createEstiloPrenda
+>;
+const mockGetCategoryOptions = getCategoryOptions as jest.MockedFunction<
+  typeof getCategoryOptions
+>;
+const mockCreateCategory = createCategory as jest.MockedFunction<typeof createCategory>;
+
+/**
+ * Categorías del producto: pills múltiples (todas equivalentes). La lista se
+ * pide una vez al abrir el modal.
+ */
+const elegirCategoria = (nombre: string) =>
+  fireEvent.click(screen.getByRole("button", { name: nombre }));
 /** Los estilos activos se piden una vez al abrir el modal: default para toda la suite. */
 mockGetEstiloPrendaOptions.mockResolvedValue({
   success: true,
@@ -110,6 +112,13 @@ const irAlPaso2 = async () => {
 describe("ProductForm Component", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockGetCategoryOptions.mockResolvedValue({
+      success: true,
+      data: [
+        { id: 5, name: "Bebidas" },
+        { id: 7, name: "Limpieza" },
+      ],
+    } as never);
     mockGetProductById.mockResolvedValue({ success: true, data: { publicadaEn: [] } } as never);
     mockCreateProduct.mockResolvedValue({
       success: true,
@@ -168,7 +177,7 @@ describe("ProductForm Component", () => {
     expect(screen.getByLabelText(/precio de venta/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /crear producto/i })).toBeInTheDocument();
     // Categoría, fotos y canales viven en el paso 2.
-    expect(screen.getByTestId("category-selector")).toBeInTheDocument();
+    expect(screen.getByText("Categorías")).toBeInTheDocument();
     expect(screen.getByText("Fotos")).toBeInTheDocument();
     // Active toggle is NOT shown in create mode (defaults to active=true)
     expect(screen.queryByRole("switch")).not.toBeInTheDocument();
@@ -224,9 +233,9 @@ describe("ProductForm Component", () => {
         description: "Jabón artesanal exfoliante",
         prefix: "AA",
         price: 1500,
-        // Sin categoría elegida el alta manda null explícito (H2): el esquema
-        // la acepta como nullable, así que el payload sigue siendo válido.
-        categoryId: null,
+        // Sin categorías elegidas el alta manda la lista vacía: el producto
+        // queda igual que antes (sin categoría).
+        categorias: [],
         // Sin canales elegidos no publica en ninguno (T3).
         publicadaEn: [],
         // Sin estilos elegidos el alta manda la lista vacía.
@@ -239,7 +248,7 @@ describe("ProductForm Component", () => {
     });
   });
 
-  it("sends the chosen category in the create payload (H2)", async () => {
+  it("sends the chosen categories in the create payload", async () => {
     render(<ProductForm product={null} onClose={() => {}} />);
     await irAlPaso2();
 
@@ -247,16 +256,34 @@ describe("ProductForm Component", () => {
     fireEvent.change(screen.getByLabelText(/prefijo.*2-4 letras/i), { target: { value: "AA" } });
     fireEvent.change(screen.getByLabelText(/precio de venta/i), { target: { value: "100" } });
 
-    // El mock de CategorySelector avisa 42 al hacer clic
-    fireEvent.click(screen.getByLabelText(/select-category/i));
+    // Un producto puede tener varias: todas viajan en el alta.
+    elegirCategoria("Bebidas");
+    elegirCategoria("Limpieza");
 
     fireEvent.click(screen.getByRole("button", { name: /crear producto/i }));
 
     await waitFor(() => {
       expect(mockCreateProduct).toHaveBeenCalledWith(
-        expect.objectContaining({ name: "Con categoría", categoryId: 42 })
+        expect.objectContaining({ name: "Con categoría", categorias: [5, 7] })
       );
     });
+  });
+
+  it("crear una categoría desde el picker la deja elegida sin recargar la lista", async () => {
+    ;(Swal.fire as jest.Mock).mockResolvedValueOnce({ isConfirmed: true, value: "Almacén" });
+    mockCreateCategory.mockResolvedValue({
+      success: true,
+      data: { id: 11, name: "Almacén" },
+    } as never);
+
+    render(<ProductForm product={null} onClose={() => {}} />);
+    await irAlPaso2();
+
+    fireEvent.click(screen.getByRole("button", { name: "Crear nueva categoría" }));
+
+    const nueva = await screen.findByRole("button", { name: "Almacén" });
+    expect(nueva).toHaveAttribute("aria-pressed", "true");
+    expect(mockGetCategoryOptions).toHaveBeenCalledTimes(1);
   });
 
   it("keeps the create payload valid for the schema when no category is chosen", async () => {
@@ -274,7 +301,7 @@ describe("ProductForm Component", () => {
     const payload = mockCreateProduct.mock.calls[0][0];
     const parsed = createProductSchema.safeParse(payload);
     expect(parsed.success).toBe(true);
-    expect(parsed.success && parsed.data.categoryId).toBeNull();
+    expect(parsed.success && parsed.data.categorias).toEqual([]);
   });
 
   it("displays error message when createProduct fails", async () => {
@@ -457,7 +484,7 @@ describe("ProductForm Component", () => {
     });
   });
 
-  it("uses updateProductExtended with id, name, price, categoryId, active when editing", async () => {
+  it("uses updateProductExtended with id, name, price, categorias, active when editing", async () => {
     const existingProduct = {
       id: 1,
       name: "Producto",
@@ -471,6 +498,12 @@ describe("ProductForm Component", () => {
       updatedAt: new Date(),
     } as unknown as Product;
 
+    // La edición precarga las categorías guardadas del producto.
+    mockGetProductById.mockResolvedValue({
+      success: true,
+      data: { publicadaEn: [], categorias: [5, 7] },
+    } as never);
+
     render(
       <ProductForm
         product={existingProduct}
@@ -479,8 +512,17 @@ describe("ProductForm Component", () => {
       />
     );
 
-    // Use the mocked CategorySelector to set categoryId
-    fireEvent.click(screen.getByLabelText(/select-category/i));
+    // Las dos pills llegan marcadas desde la ficha.
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Bebidas" })).toHaveAttribute(
+        "aria-pressed",
+        "true"
+      )
+    );
+    expect(screen.getByRole("button", { name: "Limpieza" })).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
 
     const submitButton = screen.getByRole("button", { name: /actualizar producto/i });
     fireEvent.click(submitButton);
@@ -489,11 +531,13 @@ describe("ProductForm Component", () => {
       expect(mockUpdateProductExtended).toHaveBeenCalledWith(
         expect.objectContaining({
           id: 1,
-          categoryId: 42,
+          categorias: [5, 7],
           active: true,
         })
       );
     });
+    // La columna heredada la sincroniza el servidor con la primera categoría.
+    expect(mockUpdateProductExtended.mock.calls[0][0]).not.toHaveProperty("categoryId");
   });
 
   it("confirms with SweetAlert2 before deactivating a product (edit mode)", async () => {
@@ -979,5 +1023,239 @@ describe("ProductForm · estilos", () => {
         expect.objectContaining({ id: 1, estilos: [2] })
       )
     );
+  });
+});
+
+/**
+ * Alta rápida de un estilo desde el formulario (pedido del dueño): mismo
+ * diálogo que la prenda, con la action existente `createEstiloPrenda`.
+ */
+describe("ProductForm · nuevo estilo", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCreateProduct.mockResolvedValue({ success: true, data: { id: 1 } } as never);
+    mockGetProductById.mockResolvedValue({
+      success: true,
+      data: { publicadaEn: [], estilos: [] },
+    } as never);
+    mockGetEstiloPrendaOptions.mockResolvedValue({
+      success: true,
+      data: [
+        { id: 1, name: "Y2K" },
+        { id: 2, name: "Alternativo" },
+      ],
+    } as never);
+  });
+
+  it("crea el estilo con el nombre recortado y queda seleccionado", async () => {
+    mockCreateEstiloPrenda.mockResolvedValue({
+      success: true,
+      data: { id: 9, name: "Grunge" },
+    } as never);
+    (Swal.fire as jest.Mock).mockResolvedValueOnce({
+      isConfirmed: true,
+      value: "  Grunge  ",
+    });
+
+    render(<ProductForm product={null} onClose={() => {}} />);
+    await irAlPaso2();
+
+    fireEvent.click(await screen.findByRole("button", { name: /nuevo estilo/i }));
+
+    await waitFor(() =>
+      expect(mockCreateEstiloPrenda).toHaveBeenCalledWith({ name: "Grunge" })
+    );
+    expect(await screen.findByRole("button", { name: "Grunge" })).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
+  });
+
+  it("el error del servidor se muestra y no toca la selección", async () => {
+    mockCreateEstiloPrenda.mockResolvedValue({
+      success: false,
+      error: "Ya existe un estilo con ese nombre",
+    } as never);
+    (Swal.fire as jest.Mock)
+      .mockResolvedValueOnce({ isConfirmed: true, value: "Y2K" })
+      .mockResolvedValueOnce({ isConfirmed: true });
+
+    render(<ProductForm product={null} onClose={() => {}} />);
+    await irAlPaso2();
+
+    fireEvent.click(await screen.findByRole("button", { name: /nuevo estilo/i }));
+
+    await waitFor(() =>
+      expect(Swal.fire).toHaveBeenCalledWith(
+        expect.objectContaining({
+          icon: "error",
+          text: "Ya existe un estilo con ese nombre",
+        })
+      )
+    );
+    expect(screen.getByRole("button", { name: "Y2K" })).toHaveAttribute(
+      "aria-pressed",
+      "false"
+    );
+  });
+});
+
+/**
+ * Variantes del producto (pedido del dueño): opcionales, como los talles de la
+ * prenda. Con variantes la cantidad total se deriva de las filas; sin
+ * variantes el formulario queda como siempre.
+ */
+describe("ProductForm · variantes", () => {
+  const producto = {
+    id: 7,
+    name: "Camisa",
+    description: "-",
+    categoryId: null,
+    active: true,
+    price: 100,
+    code: "CA001",
+    codePrefix: "CA",
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  } as unknown as Product;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (getFotosProducto as jest.Mock).mockResolvedValue({ success: true, data: [] });
+    mockGetProductById.mockResolvedValue({ success: true, data: { publicadaEn: [] } } as never);
+    mockCreateProduct.mockResolvedValue({ success: true, data: { id: 1 } } as never);
+    mockUpdateProductExtended.mockResolvedValue({ success: true, data: { id: 1 } } as never);
+  });
+
+  const llenarAlta = async () => {
+    await irAlPaso2();
+    fireEvent.change(screen.getByLabelText(/nombre/i), { target: { value: "Camisa" } });
+    fireEvent.change(screen.getByLabelText(/prefijo.*2-4 letras/i), { target: { value: "CA" } });
+    fireEvent.change(screen.getByLabelText(/precio de venta/i), { target: { value: "100" } });
+  };
+
+  const activarVariantes = () =>
+    fireEvent.click(screen.getByLabelText("Este producto tiene variantes"));
+
+  it("el alta ofrece el interruptor y sin activarlo no muestra filas", async () => {
+    render(<ProductForm product={null} onClose={() => {}} />);
+    await irAlPaso2();
+
+    expect(screen.getByLabelText("Este producto tiene variantes")).not.toBeChecked();
+    expect(screen.queryByLabelText("Variante 1")).not.toBeInTheDocument();
+    // Sin variantes sigue estando la cantidad simple de siempre.
+    expect(screen.getByLabelText(/cantidad inicial/i)).toBeInTheDocument();
+  });
+
+  it("al activarlo aparecen las filas y el total derivado reemplaza la cantidad", async () => {
+    render(<ProductForm product={null} onClose={() => {}} />);
+    await irAlPaso2();
+
+    activarVariantes();
+
+    expect(screen.getByLabelText("Variante 1")).toBeInTheDocument();
+    expect(screen.getByLabelText("Cantidad de la variante 1")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Variante 1"), { target: { value: "Roja" } });
+    fireEvent.change(screen.getByLabelText("Cantidad de la variante 1"), {
+      target: { value: "2" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /agregar variante/i }));
+    fireEvent.change(screen.getByLabelText("Variante 2"), { target: { value: "Azul" } });
+    fireEvent.change(screen.getByLabelText("Cantidad de la variante 2"), {
+      target: { value: "3" },
+    });
+
+    expect(screen.getByTestId("product-cantidad-total")).toHaveTextContent("5 unidades");
+    expect(screen.queryByLabelText(/cantidad inicial/i)).not.toBeInTheDocument();
+  });
+
+  it("el alta manda las variantes y la suma como cantidad", async () => {
+    render(<ProductForm product={null} onClose={() => {}} />);
+    await llenarAlta();
+    activarVariantes();
+
+    fireEvent.change(screen.getByLabelText("Variante 1"), { target: { value: "Roja" } });
+    fireEvent.change(screen.getByLabelText("Cantidad de la variante 1"), {
+      target: { value: "2" },
+    });
+    fireEvent.change(screen.getByLabelText(/^costo/i), { target: { value: "40" } });
+
+    fireEvent.click(screen.getByRole("button", { name: /crear producto/i }));
+
+    await waitFor(() => expect(mockCreateProduct).toHaveBeenCalled());
+    const payload = mockCreateProduct.mock.calls[0][0] as Record<string, unknown>;
+    expect(payload).toEqual(
+      expect.objectContaining({
+        variantes: [{ nombre: "Roja", cantidad: 2 }],
+        cantidadInicial: 2,
+      })
+    );
+    expect(createProductSchema.safeParse(payload).success).toBe(true);
+  });
+
+  it("la edición precarga las variantes guardadas con su foto", async () => {
+    mockGetProductById.mockResolvedValue({
+      success: true,
+      data: {
+        publicadaEn: [],
+        estilos: [],
+        variantes: [{ nombre: "Roja", cantidad: 2, fotoPosition: 0 }],
+      },
+    } as never);
+    (getFotosProducto as jest.Mock).mockResolvedValue({
+      success: true,
+      data: [{ position: 0, path: "hash", alt: null }],
+    });
+
+    render(<ProductForm product={producto} onClose={() => {}} />);
+
+    expect(await screen.findByLabelText("Variante 1")).toHaveValue("Roja");
+    expect(screen.getByLabelText("Cantidad de la variante 1")).toHaveValue(2);
+    expect(await screen.findByLabelText("Foto de la variante 1")).toHaveValue("0");
+    expect(screen.getByLabelText("Este producto tiene variantes")).toBeChecked();
+  });
+
+  it("la edición manda las variantes editadas y la posición de la foto", async () => {
+    render(<ProductForm product={producto} onClose={() => {}} />);
+    activarVariantes();
+    fireEvent.change(screen.getByLabelText("Variante 1"), { target: { value: "Roja" } });
+    fireEvent.change(screen.getByLabelText("Cantidad de la variante 1"), {
+      target: { value: "4" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /actualizar producto/i }));
+
+    await waitFor(() => expect(mockUpdateProductExtended).toHaveBeenCalled());
+    expect(mockUpdateProductExtended.mock.calls[0][0]).toEqual(
+      expect.objectContaining({ id: 7, variantes: [{ nombre: "Roja", cantidad: 4 }] })
+    );
+  });
+});
+
+/**
+ * Descripción del producto (pedido del dueño: «Hagamos mas largas las
+descripciones de productos»): el tope sube de 500 a 2000 caracteres. La
+descripción de la prenda tiene su propio esquema y no cambia.
+ */
+describe("createProductSchema · largo de la descripción", () => {
+  const conDescripcion = (largo: number) =>
+    createProductSchema.safeParse({
+      name: "Producto",
+      prefix: "AA",
+      price: 100,
+      description: "a".repeat(largo),
+    });
+
+  it("acepta 1500 caracteres", () => {
+    expect(conDescripcion(1500).success).toBe(true);
+  });
+
+  it("rechaza 2001 caracteres con el mensaje nuevo", () => {
+    const resultado = conDescripcion(2001);
+
+    expect(resultado.success).toBe(false);
+    if (resultado.success) return;
+    expect(resultado.error.issues[0]?.message).toBe("Máximo 2000 caracteres");
   });
 });

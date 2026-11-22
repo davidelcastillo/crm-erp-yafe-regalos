@@ -852,3 +852,62 @@ describe("ajustes de stock respetan lo reservado (R1)", () => {
     expect(mockBranchMovementCreate).not.toHaveBeenCalled();
   });
 });
+
+// ===========================================================================
+// getProductsWithBranchStock - categorías del producto (N:N)
+// ===========================================================================
+describe("getProductsWithBranchStock (categorías del producto)", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("filtra por cualquiera de las categorías del producto", async () => {
+    mockProductFindMany.mockResolvedValue([]);
+
+    await getProductsWithBranchStock({ categoryId: 7 });
+
+    expect(mockProductFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ categorias: { some: { categoryId: 7 } } }),
+      })
+    );
+  });
+
+  it("trae todas las categorías para que la card las muestre", async () => {
+    mockProductFindMany.mockResolvedValue([]);
+
+    await getProductsWithBranchStock({});
+
+    expect(mockProductFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        include: expect.objectContaining({
+          categorias: { select: { category: { select: { id: true, name: true } } } },
+        }),
+      })
+    );
+  });
+});
+
+// ===========================================================================
+// getProductsWithBranchStock - fotos y variantes para la card del inventario
+// ===========================================================================
+describe("getProductsWithBranchStock (portada y variantes)", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("pide la portada y los nombres de las variantes para la card", async () => {
+    mockProductFindMany.mockResolvedValue([]);
+
+    await getProductsWithBranchStock({});
+
+    expect(mockProductFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        include: expect.objectContaining({
+          images: { orderBy: { position: "asc" }, take: 1, select: { path: true } },
+          variantes: { orderBy: { id: "asc" }, select: { nombre: true } },
+        }),
+      })
+    );
+  });
+});

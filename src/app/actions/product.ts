@@ -11,7 +11,7 @@ import { z } from "zod";
 import { getNextCode, prefixLockKey } from "@/lib/utils/product-code";
 import { registrarCompraDelAlta } from "@/lib/compra-alta";
 import type { StockMovementReceipt } from "@/lib/stock-movement-receipt";
-import { createProductSchema, createProductsBatchSchema, updateProductExtendedSchema } from "@/lib/validations/product";
+import { createProductSchema, createProductsBatchSchema, updateProductExtendedSchema, sumaVariantes } from "@/lib/validations/product";
 
 /** Motivo del ingreso inicial en el movimiento y en el comprobante (D9). */
 const BATCH_ENTRY_REFERENCE = "ALTA DE PRODUCTOS";
@@ -29,7 +29,7 @@ const searchProductsSchema = z.object({
 const updateProductSchema = z.object({
   id: z.number().int().positive("ID inválido"),
   name: z.string().min(1, "El nombre es requerido").max(255, "El nombre es muy largo").optional(),
-  description: z.string().max(500, "La descripción es muy larga").optional().nullable(),
+  description: z.string().max(2000, "La descripción es muy larga").optional().nullable(),
   price: z.number().min(0, "El precio no puede ser negativo").optional(),
   // code y codePrefix NO están en el schema - son inmutables tras creación
 });
@@ -68,6 +68,25 @@ async function estilosInvalidos(ids: number[]): Promise<string | null> {
     : "Un estilo seleccionado no existe o está inactivo";
 }
 
+/** Las categorías elegidas tienen que existir (mismo criterio que los estilos). */
+async function categoriasInvalidas(ids: number[]): Promise<string | null> {
+  if (ids.length === 0) return null;
+  const categorias = await prisma.category.findMany({
+    where: { id: { in: ids } },
+    select: { id: true },
+  });
+  return categorias.length === ids.length
+    ? null
+    : "La categoría seleccionada no existe";
+}
+
+/**
+ * Categorías que pide un payload. `categorias` manda; `categoryId` es la
+ * principal heredada y solo se usa cuando la lista no viene (callers viejos).
+ */
+const categoriasDe = (data: { categorias?: number[]; categoryId?: number | null }): number[] =>
+  data.categorias ?? (data.categoryId != null ? [data.categoryId] : []);
+
 export async function createProduct(data: unknown) {
   try {
     const auth = await requireAdmin();
@@ -77,6 +96,11 @@ export async function createProduct(data: unknown) {
 
     const estilosMalos = await estilosInvalidos(validatedData.estilos);
     if (estilosMalos) return { success: false as const, error: estilosMalos };
+
+    // Categorías del producto (N:N): todas equivalentes y todas existentes.
+    const categorias = categoriasDe(validatedData);
+    const categoriasMalas = await categoriasInvalidas(categorias);
+    if (categoriasMalas) return { success: false as const, error: categoriasMalas };
 
     // Sucursal del stock inicial (T3): se valida antes de escribir, como el lote.
     const branch =
@@ -89,7 +113,10 @@ export async function createProduct(data: unknown) {
     if (validatedData.branchId !== undefined && !branch) {
       return { success: false as const, error: "Sucursal inválida o inactiva" };
     }
-    const cantidadInicial = validatedData.cantidadInicial ?? 0;
+    const cantidadInicial =
+      (validatedData.variantes?.length ?? 0) > 0
+        ? sumaVariantes(validatedData.variantes)
+        : (validatedData.cantidadInicial ?? 0);
 
     // Retry logic with advisory lock to handle race conditions
     const maxRetries = 3;
@@ -120,9 +147,18 @@ export async function createProduct(data: unknown) {
               price: validatedData.price,
               code,
               codePrefix: validatedData.prefix,
-              categoryId: validatedData.categoryId ?? null,
+              // La columna heredada queda con la primera categoría: la siguen
+              // leyendo compras, ventas, reportes y etiquetas.
+              categoryId: categorias[0] ?? null,
             },
           });
+
+          // Categorías del producto (`ProductCategory`): todas equivalentes.
+          if (categorias.length > 0) {
+            await tx.productCategory.createMany({
+              data: categorias.map((categoryId) => ({ productId: creado.id, categoryId })),
+            });
+          }
 
           // S3: «Publicar en» reutiliza `PrendaPublicacion`, la misma tabla
           // que la prenda (sin migración).
@@ -136,6 +172,18 @@ export async function createProduct(data: unknown) {
           if (validatedData.estilos.length > 0) {
             await tx.productEstilo.createMany({
               data: validatedData.estilos.map((estiloId) => ({ productId: creado.id, estiloId })),
+            });
+          }
+
+          // Variantes: en el alta todavía no hay fotos, así que la posición se
+          // elige después, en la edición.
+          if (validatedData.variantes && validatedData.variantes.length > 0) {
+            await tx.productVariante.createMany({
+              data: validatedData.variantes.map((variante) => ({
+                productId: creado.id,
+                nombre: variante.nombre,
+                cantidad: variante.cantidad,
+              })),
             });
           }
 
@@ -261,11 +309,10 @@ export async function createProductsBatch(data: unknown) {
       return batchFailure("Sucursal inválida o inactiva");
     }
 
-    // Una categoría por fila (S4): las distintas se verifican en UNA consulta,
+    // Categorías de cada fila (N:N): las distintas se verifican en UNA consulta,
     // nunca una por fila (H6).
-    const categoriasPedidas = [
-      ...new Set(rows.flatMap((row) => (row.categoryId == null ? [] : [row.categoryId]))),
-    ];
+    const categoriasDeLasFilas = rows.map((row) => categoriasDe(row));
+    const categoriasPedidas = [...new Set(categoriasDeLasFilas.flat())];
     if (categoriasPedidas.length > 0) {
       const categorias = await prisma.category.findMany({
         where: { id: { in: categoriasPedidas } },
@@ -276,17 +323,19 @@ export async function createProductsBatch(data: unknown) {
       if (faltantes.size > 0) {
         return batchFailure(
           "La categoría seleccionada no existe",
-          rows.flatMap((row, rowIndex) =>
-            row.categoryId != null && faltantes.has(row.categoryId)
-              ? [
-                  {
-                    row: rowIndex,
-                    field: "categoryId",
-                    message: "La categoría seleccionada no existe",
-                  },
-                ]
-              : []
-          )
+          rows.flatMap((row, rowIndex) => {
+            const ids = categoriasDeLasFilas[rowIndex];
+            if (!ids.some((id) => faltantes.has(id))) return [];
+            // La columna heredada conserva su propio campo de error.
+            const field = (row.categorias ?? []).length > 0 ? "categorias" : "categoryId";
+            return [
+              {
+                row: rowIndex,
+                field,
+                message: "La categoría seleccionada no existe",
+              },
+            ];
+          })
         );
       }
     }
@@ -376,7 +425,8 @@ export async function createProductsBatch(data: unknown) {
                 price: row.price,
                 code: codigos[i],
                 codePrefix: row.prefix,
-                categoryId: row.categoryId ?? null,
+                // La columna heredada queda con la primera categoría de la fila.
+                categoryId: categoriasDeLasFilas[i][0] ?? null,
               })),
               select: { id: true, code: true, name: true, price: true },
             });
@@ -388,7 +438,11 @@ export async function createProductsBatch(data: unknown) {
               if (!creado) throw new Error("No se pudo leer uno de los productos creados");
               return {
                 producto: creado,
-                stockInicial: row.initialStock ?? 0,
+                // Con variantes el stock es la suma, igual que en el alta individual.
+                stockInicial:
+                  (row.variantes?.length ?? 0) > 0
+                    ? sumaVariantes(row.variantes)
+                    : (row.initialStock ?? 0),
                 costo: row.costo ?? 0,
               };
             });
@@ -405,6 +459,37 @@ export async function createProductsBatch(data: unknown) {
             );
             if (estilosDelLote.length > 0) {
               await tx.productEstilo.createMany({ data: estilosDelLote });
+            }
+
+            // Categorías de cada fila (`ProductCategory`), también en una sola
+            // `createMany` para todo el lote.
+            const categoriasDelLote = filasCreadas.flatMap(({ producto }, i) =>
+              categoriasDeLasFilas[i].map((categoryId) => ({ productId: producto.id, categoryId }))
+            );
+            if (categoriasDelLote.length > 0) {
+              await tx.productCategory.createMany({ data: categoriasDelLote });
+            }
+
+            // «Publicar en» de cada fila: una sola `createMany` para todo el
+            // lote, cruzando por código como los estilos.
+            const publicacionesDelLote = filasCreadas.flatMap(({ producto }, i) =>
+              (rows[i].publicadaEn ?? []).map((canal) => ({ productId: producto.id, canal }))
+            );
+            if (publicacionesDelLote.length > 0) {
+              await tx.prendaPublicacion.createMany({ data: publicacionesDelLote });
+            }
+
+            // Variantes: una sola `createMany` para todo el lote (sin fotos:
+            // el producto recién se está creando).
+            const variantesDelLote = rows.flatMap((row, i) =>
+              (row.variantes ?? []).map((variante) => ({
+                productId: filasCreadas[i].producto.id,
+                nombre: variante.nombre,
+                cantidad: variante.cantidad,
+              }))
+            );
+            if (variantesDelLote.length > 0) {
+              await tx.productVariante.createMany({ data: variantesDelLote });
             }
 
             // T4: UNA sola compra del lote, solo con las filas que tienen costo y
@@ -566,23 +651,31 @@ export async function getProductById(id: number) {
 
     const product = await prisma.product.findUnique({
       where: { id },
-      // La edición necesita los canales ya publicados (S3) y los estilos
-      // guardados, para precargarlos sin borrarlos.
+      // La edición necesita los canales ya publicados (S3), los estilos
+      // guardados y las variantes, para precargarlos sin borrarlos.
       include: {
         publicaciones: { select: { canal: true } },
         estilosProducto: { select: { estiloId: true } },
+        // Categorías del producto (N:N): la edición las precarga todas.
+        categorias: { select: { categoryId: true } },
+        variantes: {
+          orderBy: { id: "asc" },
+          select: { nombre: true, cantidad: true, fotoPosition: true },
+        },
       },
     });
     if (!product) {
       return { success: false, error: "Producto no encontrado" };
     }
-    const { publicaciones, estilosProducto, ...ficha } = product;
+    const { publicaciones, estilosProducto, categorias, variantes, ...ficha } = product;
     return {
       success: true,
       data: parseObject({
         ...ficha,
         publicadaEn: publicaciones.map((publicacion) => publicacion.canal),
         estilos: estilosProducto.map((estilo) => estilo.estiloId),
+        categorias: categorias.map((fila) => fila.categoryId),
+        variantes,
       }),
     };
   } catch (error) {
@@ -933,25 +1026,58 @@ export async function updateProductExtended(data: unknown) {
     const estilosMalos = await estilosInvalidos(validatedData.estilos ?? []);
     if (estilosMalos) return { success: false as const, error: estilosMalos };
 
+    // Con la lista de categorías presente se reemplaza entera y se valida que
+    // existan; sin la lista, la edición no toca las del producto.
+    const tocaCategorias = validatedData.categorias !== undefined;
+    if (tocaCategorias) {
+      const categoriasMalas = await categoriasInvalidas(validatedData.categorias ?? []);
+      if (categoriasMalas) return { success: false as const, error: categoriasMalas };
+    }
+
+    // La foto de la variante tiene que existir: guarda la `position` de una foto
+    // del propio producto. En el alta se ignora porque todavía no hay ninguna.
+    const tocaVariantes = validatedData.variantes !== undefined;
+    if (tocaVariantes && (validatedData.variantes?.length ?? 0) > 0) {
+      const posiciones = new Set(
+        (
+          await prisma.productImage.findMany({
+            where: { productId: validatedData.id },
+            select: { position: true },
+          })
+        ).map((foto) => foto.position)
+      );
+      const fotoInexistente = (validatedData.variantes ?? []).some(
+        (variante) => variante.fotoPosition !== undefined && !posiciones.has(variante.fotoPosition)
+      );
+      if (fotoInexistente) {
+        return { success: false as const, error: "La foto de la variante no existe" };
+      }
+    }
+
     const cambios = {
       ...(validatedData.name && { name: validatedData.name }),
       ...(validatedData.description !== undefined && {
         description: validatedData.description,
       }),
       ...(validatedData.price !== undefined && { price: validatedData.price }),
-      ...(validatedData.categoryId !== undefined && {
-        categoryId: validatedData.categoryId,
-      }),
+      // `categorias` manda y deja `categoryId` sincronizado con la primera: la
+      // columna heredada la siguen leyendo compras, ventas, reportes y etiquetas.
+      ...(validatedData.categorias !== undefined
+        ? { categoryId: validatedData.categorias[0] ?? null }
+        : validatedData.categoryId !== undefined
+          ? { categoryId: validatedData.categoryId }
+          : {}),
       ...(validatedData.active !== undefined && { active: validatedData.active }),
     };
 
     // S3: «Publicar en» reemplaza las filas de `PrendaPublicacion` en la misma
-    // transacción que la ficha. Los estilos hacen lo mismo con `ProductEstilo`.
+    // transacción que la ficha. Los estilos hacen lo mismo con `ProductEstilo`,
+    // las variantes con `ProductVariante` y las categorías con `ProductCategory`.
     // Sin el campo, cada uno queda como estaba.
     const tocaPublicaciones = validatedData.publicadaEn !== undefined;
     const tocaEstilos = validatedData.estilos !== undefined;
     const product =
-      !tocaPublicaciones && !tocaEstilos
+      !tocaPublicaciones && !tocaEstilos && !tocaVariantes && !tocaCategorias
         ? await prisma.product.update({ where: { id: validatedData.id }, data: cambios })
         : await prisma.$transaction(async (tx) => {
             const actualizado = await tx.product.update({
@@ -977,6 +1103,30 @@ export async function updateProductExtended(data: unknown) {
                   data: validatedData.estilos.map((estiloId) => ({
                     productId: validatedData.id,
                     estiloId,
+                  })),
+                });
+              }
+            }
+            if (tocaCategorias) {
+              await tx.productCategory.deleteMany({ where: { productId: validatedData.id } });
+              if (validatedData.categorias && validatedData.categorias.length > 0) {
+                await tx.productCategory.createMany({
+                  data: validatedData.categorias.map((categoryId) => ({
+                    productId: validatedData.id,
+                    categoryId,
+                  })),
+                });
+              }
+            }
+            if (tocaVariantes) {
+              await tx.productVariante.deleteMany({ where: { productId: validatedData.id } });
+              if (validatedData.variantes && validatedData.variantes.length > 0) {
+                await tx.productVariante.createMany({
+                  data: validatedData.variantes.map((variante) => ({
+                    productId: validatedData.id,
+                    nombre: variante.nombre,
+                    cantidad: variante.cantidad,
+                    fotoPosition: variante.fotoPosition ?? null,
                   })),
                 });
               }

@@ -355,6 +355,7 @@ describe("InventarioPage — FAB crear producto (spec inventory-ui)", () => {
       name: "Detergente Limón",
       code: "DE000",
       categoryId: 1,
+      categorias: [{ category: { id: 1, name: "Limpieza" } }],
     } as unknown as Product;
     mockGetProductsWithBranchStock.mockResolvedValue({
       success: true,

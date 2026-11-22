@@ -29,6 +29,17 @@ import { ProductoCard } from "./ProductoCard";
 /** Cuántas piezas se ven antes del «Ver más prendas» del mockup. */
 const VISIBLES = 12;
 
+/**
+ * Categorías públicas del ítem: todas las del producto (son equivalentes), con la
+ * principal como respaldo para los ítems que todavía no traen la lista.
+ */
+const categoriasDe = (item: VidrieraItem) =>
+  item.categorias ?? (item.categoria ? [item.categoria] : []);
+
+/** Ids de esas categorías: el filtro `?categoria=7` coincide con cualquiera. */
+const categoriaIdsDe = (item: VidrieraItem) =>
+  item.categoriaIds ?? (item.categoriaId ? [item.categoriaId] : []);
+
 const ORDEN_TALLES = ["XS", "S", "M", "L", "XL", "XXL", "Único"];
 
 /** Los talles cargados, en el orden de la guía y no alfabético. */
@@ -105,8 +116,8 @@ export function CatalogoVista({
     return categoriasActivas.some((valor) => {
       if (valor === "cositas") return item.kind === "PRODUCT";
       const id = Number(valor);
-      if (Number.isInteger(id) && id > 0) return item.categoriaId === id;
-      return item.categoria === (NOMBRE_CATEGORIA[valor as CategoriaSlug] ?? valor);
+      if (Number.isInteger(id) && id > 0) return categoriaIdsDe(item).includes(id);
+      return categoriasDe(item).includes(NOMBRE_CATEGORIA[valor as CategoriaSlug] ?? valor);
     });
   };
 
@@ -115,7 +126,7 @@ export function CatalogoVista({
     !categoriaFija ||
     (categoriaFija === "cositas"
       ? item.kind === "PRODUCT"
-      : item.categoria === NOMBRE_CATEGORIA[categoriaFija]);
+      : categoriasDe(item).includes(NOMBRE_CATEGORIA[categoriaFija]));
 
   const desde = Number(valores.desde) || 0;
   const hasta = Number(valores.hasta) || 0;
@@ -143,8 +154,11 @@ export function CatalogoVista({
   const kindDeOpciones = categoriaFija === "cositas" ? "PRODUCT" : "PRENDA";
   const conteosCategoria = new Map<string, number>();
   for (const item of items) {
-    if (item.kind !== kindDeOpciones || !item.categoria || !deLaRuta(item)) continue;
-    conteosCategoria.set(item.categoria, (conteosCategoria.get(item.categoria) ?? 0) + 1);
+    if (item.kind !== kindDeOpciones || !deLaRuta(item)) continue;
+    // Un producto puede estar en varias: cuenta una vez en cada una (sin repetir).
+    for (const nombre of new Set(categoriasDe(item))) {
+      conteosCategoria.set(nombre, (conteosCategoria.get(nombre) ?? 0) + 1);
+    }
   }
 
   const opciones: OpcionCategoria[] = [

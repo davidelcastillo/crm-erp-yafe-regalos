@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Product } from "@prisma/client";
 import { updateProduct, deleteProduct, toggleProductActive, updateProductExtended } from "@/app/actions/product";
+import { urlFoto } from "@/components/ui/FotoUploader";
 import { sumStock, type StockSource } from "@/lib/inventory-stock";
 import { PrendaForm } from "./PrendaForm";
 import { ProductForm } from "@/app/productos/components/ProductForm";
@@ -24,6 +25,13 @@ type SerializedProduct = Omit<Product, "createdAt" | "updatedAt"> & {
 
 /** Fila de `BranchInventory` tal como la devuelve `getProductsWithBranchStock`. */
 type BranchStockRow = { stock: number; branch?: { id: number; name: string } | null };
+/** Portada (posición 0) y variantes que arma `getProductsWithBranchStock`. */
+type ProductExtra = {
+  images?: { path: string }[];
+  variantes?: { nombre: string }[];
+  /** Categorías del producto (N:N): la card las muestra todas. */
+  categorias?: { category: { id: number; name: string } }[];
+};
 
 const MAX_SUCURSALES_VISIBLES = 3;
 
@@ -305,11 +313,24 @@ export function InventarioCard({ product, dataProductId, isHighlighted, onViewMo
   );
   const visibleBranches = stockBranches.slice(0, MAX_SUCURSALES_VISIBLES);
   const hiddenBranches = stockBranches.length - visibleBranches.length;
+  const extra = product as unknown as ProductExtra;
+  // La primera foto por posición es la portada: la card la muestra en miniatura.
+  const portada = extra.images?.[0]?.path ?? null;
+  const variantes = extra.variantes ?? [];
+  const categorias = extra.categorias ?? [];
 
 // View mode - show product info
    return (
      <div className={`glass rounded-2xl border border-hairline-soft p-4 ${isHighlighted ? "ring-2 ring-info" : ""}`} data-product-id={dataProductId}>
        <div className="flex items-start justify-between gap-3">
+         <div className="flex min-w-0 flex-1 items-start gap-3">
+           {portada && (
+             <img
+               src={urlFoto(product.id, portada)}
+               alt={product.name}
+               className="h-20 w-16 shrink-0 rounded-lg border border-hairline-soft object-cover"
+             />
+           )}
          <div className="min-w-0 flex-1">
            <div className="flex items-center gap-2 mb-1">
              <h3 className="min-w-0 text-base font-semibold text-ink break-words">{product.name}</h3>
@@ -322,6 +343,31 @@ export function InventarioCard({ product, dataProductId, isHighlighted, onViewMo
                {product.description}
              </p>
            )}
+           {categorias.length > 0 && (
+             <ul aria-label="Categorías" className="mt-2 flex flex-wrap gap-1.5">
+               {categorias.map((fila) => (
+                 <li
+                   key={fila.category.id}
+                   className="rounded-full bg-surface-strong px-2.5 py-1 text-xs text-ink-muted"
+                 >
+                   {fila.category.name}
+                 </li>
+               ))}
+             </ul>
+           )}
+           {variantes.length > 0 && (
+             <ul aria-label="Variantes" className="mt-2 flex flex-wrap gap-1.5">
+               {variantes.map((variante) => (
+                 <li
+                   key={variante.nombre}
+                   className="rounded-full bg-surface-strong px-2.5 py-1 text-xs text-ink-muted"
+                 >
+                   {variante.nombre}
+                 </li>
+               ))}
+             </ul>
+           )}
+         </div>
          </div>
          <div className="flex shrink-0 flex-col items-end gap-2">
             <span

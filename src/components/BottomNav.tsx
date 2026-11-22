@@ -43,6 +43,7 @@ const InventoryIcon = ({ active }: { active: boolean }) => (
 
 
 
+
 // Icon for Sucursales (simple building-like icon)
 const SucursalIcon = ({ active }: { active: boolean }) => (
    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -50,8 +51,8 @@ const SucursalIcon = ({ active }: { active: boolean }) => (
    </svg>
 );
 
-// Seis destinos (pedido del dueño 2026-11-20: «Pedidos» en la barra para
-// entrar rápido). STYLE.md declaraba cinco como máximo; se actualiza a seis.
+// Seis destinos: el máximo que fija STYLE.md. «Reportes» NO va acá: se entra
+// desde el botón del dashboard (pedido del dueño).
 // «Clientes» no está: se entra desde el botón del encabezado de /sucursales (S6).
 const navItems = [
    { href: "/dashboard", label: "Dashboard", icon: DashboardIcon },

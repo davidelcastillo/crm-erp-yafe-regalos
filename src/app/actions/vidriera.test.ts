@@ -46,15 +46,21 @@ type Fila = {
   name: string;
   description: string | null;
   price: number;
+  /** Orden por defecto de la vidriera: lo modificado más recientemente primero. */
+  updatedAt: Date;
   kind: "PRENDA" | "PRODUCT";
   active: boolean;
   /** Destacado de la portada (`Product.destacado`): dato público del ítem. */
   destacado: boolean;
   /** Categoría propia del producto normal (las prendas usan la de prenda). */
   category: { id: number; name: string } | null;
+  /** Categorías del producto (`ProductCategory`): varias, todas equivalentes. */
+  categorias?: { category: { id: number; name: string } }[];
   /** Canales de `PrendaPublicacion`: la vidriera solo muestra «Web». */
   canales: string[];
   images: { path: string; alt: string | null }[];
+  /** Variantes del producto (opcional): nombre y si tiene foto propia. */
+  variantes?: { nombre: string; fotoPosition: number | null }[];
   prenda: {
     categoria: { id: number; name: string } | null;
     condicion: { name: string } | null;
@@ -70,6 +76,7 @@ const CAMPERA: Fila = {
   // Placeholder heredado: la ficha pública lo devuelve vacío.
   description: "-",
   price: 45000,
+  updatedAt: new Date("2026-03-01T00:00:00.000Z"),
   kind: "PRENDA",
   active: true,
   destacado: false,
@@ -93,6 +100,7 @@ const REMERA: Fila = {
   name: "Remera lisa",
   description: "Remera de algodón",
   price: 12000,
+  updatedAt: new Date("2026-02-01T00:00:00.000Z"),
   kind: "PRENDA",
   active: true,
   destacado: false,
@@ -113,12 +121,17 @@ const PERFUME: Fila = {
   name: "Perfume floral",
   description: "Perfume floral 100 ml",
   price: 30000,
+  updatedAt: new Date("2026-01-01T00:00:00.000Z"),
   kind: "PRODUCT",
   active: true,
   destacado: false,
   category: { id: 9, name: "Perfumes" },
   canales: ["Web"],
   images: [{ path: "hash-perfume", alt: null }],
+  variantes: [
+    { nombre: "Floral", fotoPosition: null },
+    { nombre: "Cítrico", fotoPosition: 0 },
+  ],
   prenda: null,
 };
 
@@ -142,11 +155,42 @@ let RESERVADOS: number[] = [];
 /** Productos con al menos una venta. */
 let VENDIDOS: number[] = [];
 
-type Where = {
+/** Condición de un `where`: lo que arma la acción, con o sin `AND` alrededor. */
+type Condicion = {
+  name?: { contains?: string };
+  code?: { contains?: string };
+  prenda?: { categoriaId?: number };
+  categorias?: { some?: { categoryId?: number } };
+  OR?: Condicion[];
+};
+
+type Where = Condicion & {
   active?: boolean;
   publicaciones?: { some?: { canal?: string } };
-  prenda?: { categoriaId?: number };
-  OR?: { name?: { contains?: string }; code?: { contains?: string } }[];
+  AND?: Condicion[];
+  OR?: Condicion[];
+};
+
+/** Orden pedido a la base: la misma forma que acepta Prisma. */
+type Orden = { id?: "asc" | "desc"; updatedAt?: "asc" | "desc"; name?: "asc" | "desc" };
+
+/** Valor comparable de cada campo que la acción puede pedir. */
+const valorOrden = (fila: Fila, campo: keyof Orden): number | string => {
+  if (campo === "id") return fila.id;
+  if (campo === "name") return fila.name.toLowerCase();
+  return fila.updatedAt.getTime();
+};
+
+/** Aplica el `orderBy` como la base real, para probar el orden que arma la acción. */
+const comparar = (a: Fila, b: Fila, orden: Orden | Orden[]): number => {
+  for (const criterio of Array.isArray(orden) ? orden : [orden]) {
+    const [campo, direccion] = Object.entries(criterio)[0] as [keyof Orden, "asc" | "desc"];
+    const signo = direccion === "desc" ? -1 : 1;
+    const izq = valorOrden(a, campo);
+    const der = valorOrden(b, campo);
+    if (izq !== der) return (izq < der ? -1 : 1) * signo;
+  }
+  return 0;
 };
 
 const coincide = (fila: Fila, where: Where | undefined): boolean => {
@@ -156,6 +200,31 @@ const coincide = (fila: Fila, where: Where | undefined): boolean => {
   if (canal && !fila.canales.includes(canal)) return false;
   const categoriaId = where.prenda?.categoriaId;
   if (categoriaId !== undefined && fila.prenda?.categoria?.id !== categoriaId) return false;
+  // N:N del producto: la categoría pedida puede ser cualquiera de las suyas.
+  const enElPuente = where.categorias?.some?.categoryId;
+  if (
+    enElPuente !== undefined &&
+    !(fila.categorias ?? []).some((filaCategoria) => filaCategoria.category.id === enElPuente)
+  ) {
+    return false;
+  }
+  // El filtro por categoría va en un `AND` para no chocar con el `OR` de `q`.
+  const porCategoria = where.AND?.[0];
+  if (
+    porCategoria &&
+    !porCategoria.OR?.some(
+      (alternativa) =>
+        (alternativa.prenda?.categoriaId !== undefined &&
+          fila.prenda?.categoria?.id === alternativa.prenda.categoriaId) ||
+        (alternativa.categorias?.some?.categoryId !== undefined &&
+          (fila.categorias ?? []).some(
+            (filaCategoria) =>
+              filaCategoria.category.id === alternativa.categorias?.some?.categoryId
+          ))
+    )
+  ) {
+    return false;
+  }
   const texto = where.OR?.[0]?.name?.contains?.toLowerCase();
   if (texto) {
     return (
@@ -177,8 +246,11 @@ beforeEach(() => {
   RESERVADOS = [];
   VENDIDOS = [];
 
-  mockProductFindMany.mockImplementation(async (args: { where?: Where }) =>
-    PUBLICADAS.filter((fila) => coincide(fila, args?.where))
+  mockProductFindMany.mockImplementation(
+    async (args: { where?: Where; orderBy?: Orden | Orden[] }) =>
+      PUBLICADAS.filter((fila) => coincide(fila, args?.where)).sort((a, b) =>
+        comparar(a, b, args?.orderBy ?? [])
+      )
   );
   mockProductFindFirst.mockImplementation(
     async (args: { where?: { id?: number } & Where }) =>
@@ -247,7 +319,21 @@ describe("getVidriera — qué se publica (S2)", () => {
     };
     expect(consulta.where?.active).toBe(true);
     expect(consulta.where?.publicaciones).toEqual({ some: { canal: "Web" } });
-    expect(consulta.orderBy).toEqual({ name: "asc" });
+    // Orden por defecto: lo modificado más recientemente, con `id` de desempate.
+    expect(consulta.orderBy).toEqual([{ updatedAt: "desc" }, { id: "desc" }]);
+  });
+
+  it("ordena por fecha de modificación: el más nuevo primero", async () => {
+    const perfumeOriginal = PERFUME.updatedAt;
+    PERFUME.updatedAt = new Date("2026-04-01T00:00:00.000Z");
+    try {
+      const resultado = await getVidriera();
+      if (!resultado.success) throw new Error("la vidriera tendría que responder");
+
+      expect(resultado.data.items.map((item) => item.code)).toEqual(["AR-1", "PK-1"]);
+    } finally {
+      PERFUME.updatedAt = perfumeOriginal;
+    }
   });
 
   it("el select no pide ningún dato interno (costo, sucursales, clientes)", async () => {
@@ -267,9 +353,18 @@ describe("getVidriera — qué se publica (S2)", () => {
       destacado: true,
       // Categoría propia del producto normal (`Category`): dato público del ítem.
       category: { select: { id: true, name: true } },
+      // Categorías del producto (N:N, todas públicas): la card las muestra todas.
+      categorias: {
+        select: { categoryId: true, category: { select: { id: true, name: true } } },
+      },
       images: {
         orderBy: { position: "asc" },
         select: { path: true, alt: true },
+      },
+      // Variantes: nombre y si tiene foto propia (nunca la cantidad ni el stock).
+      variantes: {
+        orderBy: { id: "asc" },
+        select: { nombre: true, fotoPosition: true },
       },
       prenda: {
         select: {
@@ -300,8 +395,12 @@ describe("getVidriera — qué se publica (S2)", () => {
       portada: expect.stringMatching(/\/product-images\/1\/hash-portada_sm\.webp$/),
       categoria: "Camperas",
       categoriaId: 7,
+      categorias: ["Camperas"],
+      categoriaIds: [7],
       talles: ["M", "S"],
       estilos: [],
+      // Una prenda no tiene variantes: el campo viene vacío.
+      variantes: [],
       destacado: false,
     });
   });
@@ -326,6 +425,26 @@ describe("getVidriera — qué se publica (S2)", () => {
     const perfume = resultado.data.items.find((item) => item.code === "AR-1");
     expect(perfume?.categoria).toBe("Perfumes");
     expect(perfume?.categoriaId).toBe(9);
+  });
+
+  it("un producto con varias categorías las expone todas, sin repetir", async () => {
+    PERFUME.categorias = [
+      { category: { id: 9, name: "Perfumes" } },
+      { category: { id: 12, name: "Regalos" } },
+    ];
+    try {
+      const resultado = await getVidriera();
+      if (!resultado.success) throw new Error("la vidriera tendría que responder");
+
+      const perfume = resultado.data.items.find((item) => item.code === "AR-1");
+      expect(perfume?.categorias).toEqual(["Perfumes", "Regalos"]);
+      expect(perfume?.categoriaIds).toEqual([9, 12]);
+      // La principal sigue siendo la primera: los consumidores viejos no cambian.
+      expect(perfume?.categoria).toBe("Perfumes");
+      expect(perfume?.categoriaId).toBe(9);
+    } finally {
+      delete PERFUME.categorias;
+    }
   });
 
   it("un producto sin categoría no rompe la lista", async () => {
@@ -419,11 +538,33 @@ describe("getVidriera — filtros", () => {
     try {
       const resultado = await getVidriera({ categoriaId: 8 });
 
-      expect(mockProductFindMany.mock.calls[0][0].where.prenda).toEqual({ categoriaId: 8 });
+      expect(mockProductFindMany.mock.calls[0][0].where.AND).toEqual([
+        {
+          OR: [
+            { prenda: { categoriaId: 8 } },
+            { categorias: { some: { categoryId: 8 } } },
+          ],
+        },
+      ]);
       if (!resultado.success) throw new Error("la vidriera tendría que responder");
       expect(resultado.data.items.map((item) => item.code)).toEqual(["PK-2"]);
     } finally {
       REMERA.canales = ["Instagram"];
+    }
+  });
+
+  it("el filtro por categoría encuentra el producto por su segunda categoría", async () => {
+    PERFUME.categorias = [
+      { category: { id: 9, name: "Perfumes" } },
+      { category: { id: 12, name: "Regalos" } },
+    ];
+    try {
+      const resultado = await getVidriera({ categoriaId: 12 });
+
+      if (!resultado.success) throw new Error("la vidriera tendría que responder");
+      expect(resultado.data.items.map((item) => item.code)).toEqual(["AR-1"]);
+    } finally {
+      delete PERFUME.categorias;
     }
   });
 
@@ -462,11 +603,15 @@ describe("getVidrieraItem — ficha pública (T5)", () => {
       portada: expect.stringMatching(/\/hash-portada_sm\.webp$/),
       categoria: "Camperas",
       categoriaId: 7,
+      categorias: ["Camperas"],
+      categoriaIds: [7],
       descripcion: "",
       sucursales: [{ id: 1, name: "Casa central" }],
       condicion: "Muy bueno",
       detalleCondicion: "Con marcas en el ruedo",
       talles: ["M", "S"],
+      // Una prenda no tiene variantes: la ficha las manda vacías.
+      variantes: [],
       estilos: [],
       destacado: false,
       fotos: [
@@ -525,6 +670,8 @@ describe("getVidrieraItem — ficha pública (T5)", () => {
       portada: expect.stringMatching(/\/hash-perfume_sm\.webp$/),
       categoria: "Perfumes",
       categoriaId: 9,
+      categorias: ["Perfumes"],
+      categoriaIds: [9],
       descripcion: "Perfume floral 100 ml",
       // Sin stock no hay sucursal para mostrar, pero el campo siempre viene.
       sucursales: [],
@@ -532,6 +679,11 @@ describe("getVidrieraItem — ficha pública (T5)", () => {
       detalleCondicion: null,
       talles: [],
       estilos: [],
+      // Variantes públicas: nombre + si tiene foto propia, sin cantidades.
+      variantes: [
+        { nombre: "Floral", conFoto: false },
+        { nombre: "Cítrico", conFoto: true },
+      ],
       destacado: false,
       fotos: [
         {
@@ -540,6 +692,17 @@ describe("getVidrieraItem — ficha pública (T5)", () => {
         },
       ],
     });
+  });
+
+  it("la ficha publica las variantes del producto sin cantidades ni stock", async () => {
+    const resultado = await getVidrieraItem({ id: 3 });
+
+    if (!resultado.success) throw new Error("la ficha tendría que responder");
+    expect(resultado.data.variantes).toEqual([
+      { nombre: "Floral", conFoto: false },
+      { nombre: "Cítrico", conFoto: true },
+    ]);
+    expect(JSON.stringify(resultado.data.variantes)).not.toContain("cantidad");
   });
 
   it("un producto con stock muestra las sucursales donde retirarlo, sin el stock", async () => {

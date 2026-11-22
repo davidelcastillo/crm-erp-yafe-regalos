@@ -7,9 +7,12 @@ import Swal from "sweetalert2";
 import { getCategoryOptions } from "@/app/actions/category";
 import { getEstiloPrendaOptions } from "@/app/actions/prendaTaxonomy";
 import type { TaxonomyOption } from "@/lib/validations/prendaTaxonomy";
+import { CANALES_PUBLICACION } from "@/lib/validations/prenda";
 import { createProductsBatch } from "@/app/actions/product";
 import { createProductsBatchSchema } from "@/lib/validations/product";
-import { CategorySelector } from "@/components/ui/CategorySelector";
+import type { CategoryOption } from "@/components/ui/CategorySelector";
+import { CategoriasPicker } from "@/components/ui/CategoriasPicker";
+import { EstilosPicker } from "@/components/ui/EstilosPicker";
 import { BranchPicker } from "@/components/ui/BranchPicker";
 import { subirFoto } from "@/components/ui/FotoUploader";
 import { MAX_FOTOS } from "@/lib/storage";
@@ -24,18 +27,23 @@ type Fila = {
   name: string;
   prefix: string;
   price: string;
-  categoryId: number | null;
+  /** Categorías de la fila (varias, todas equivalentes); vacío son ninguna. */
+  categorias: number[];
   /** Stock inicial en la sucursal del lote; vacío es 0 (T5). */
   initialStock: string;
   /** Costo que salió cada unidad (T4); vacío es 0 y no entra en la compra. */
   costo: string;
   /** Estilos de la fila (misma taxonomía que la prenda); vacío son ninguno. */
   estilos: number[];
+  /** Variantes de la fila (nombre + cantidad): con ellas el stock es la suma. */
+  variantes: { nombre: string; cantidad: string }[];
+  /** «Publicar en» de la fila: los mismos canales que el alta individual. */
+  publicadaEn: string[];
   /** Fotos pendientes (U2): no viajan en el lote, se suben con el producto creado. */
   fotos: File[];
 };
 /** `row` es un mensaje que no pertenece a un campo puntual: se muestra en la card. */
-type Campo = "name" | "prefix" | "price" | "categoryId" | "initialStock" | "costo" | "row";
+type Campo = "name" | "prefix" | "price" | "categorias" | "initialStock" | "costo" | "row";
 type FilaError = { field: Campo; message: string };
 /** Paso 1: sucursal del stock inicial. Paso 2: las filas de productos (S17). */
 type Paso = "sucursal" | "productos";
@@ -60,7 +68,7 @@ function erroresPorFila(
       item.field === "name" ||
       item.field === "prefix" ||
       item.field === "price" ||
-      item.field === "categoryId" ||
+      item.field === "categorias" ||
       item.field === "initialStock" ||
       item.field === "costo"
         ? item.field
@@ -209,17 +217,19 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
       name: "",
       prefix: "",
       price: "",
-      categoryId: null,
+      categorias: [],
       initialStock: "",
       costo: "",
       estilos: [],
+      variantes: [],
+      publicadaEn: [],
       fotos: [],
     },
   ]);
   const [paso, setPaso] = useState<Paso>("sucursal");
   const [branchId, setBranchId] = useState<number | null>(null);
   const [receipt, setReceipt] = useState<StockMovementReceipt | null>(null);
-  const [categorias, setCategorias] = useState<{ id: number; name: string }[]>([]);
+  const [categorias, setCategorias] = useState<CategoryOption[]>([]);
   // Una sola lista de estilos activos para todas las filas.
   const [estilosDisponibles, setEstilosDisponibles] = useState<TaxonomyOption[]>([]);
   const [cargandoCategorias, setCargandoCategorias] = useState(true);
@@ -318,10 +328,12 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
       name: "",
       prefix: filas[filas.length - 1]?.prefix ?? "", // una fila nueva copia el prefijo anterior
       price: "",
-      categoryId: null,
+      categorias: [],
       initialStock: "",
       costo: "",
       estilos: [],
+      variantes: [],
+      publicadaEn: [],
       fotos: [],
     };
     idParaEnfocar.current = nueva.id;
@@ -338,6 +350,8 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
       fila.initialStock.trim() ||
       fila.costo.trim() ||
       fila.estilos.length > 0 ||
+      fila.variantes.length > 0 ||
+      fila.publicadaEn.length > 0 ||
       fila.fotos.length > 0;
     if (conDatos) {
       const confirmacion = await Swal.fire({
@@ -364,6 +378,28 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
   const actualizarFila = <K extends keyof Omit<Fila, "id">>(id: string, campo: K, valor: Fila[K]) =>
     setFilas((prev) => prev.map((f) => (f.id === id ? { ...f, [campo]: valor } : f)));
 
+  /** Variantes de la fila: un solo punto de cambio, con la fila siempre fresca. */
+  const actualizarVariantes = (
+    id: string,
+    cambio: (variantes: Fila["variantes"]) => Fila["variantes"]
+  ) =>
+    setFilas((prev) =>
+      prev.map((f) => (f.id === id ? { ...f, variantes: cambio(f.variantes) } : f))
+    );
+  const agregarVariante = (id: string) =>
+    actualizarVariantes(id, (variantes) => [...variantes, { nombre: "", cantidad: "" }]);
+  const quitarVariante = (id: string, indice: number) =>
+    actualizarVariantes(id, (variantes) => variantes.filter((_, i) => i !== indice));
+  const cambiarVariante = (
+    id: string,
+    indice: number,
+    campo: "nombre" | "cantidad",
+    valor: string
+  ) =>
+    actualizarVariantes(id, (variantes) =>
+      variantes.map((variante, i) => (i === indice ? { ...variante, [campo]: valor } : variante))
+    );
+
   /** Enter pasa al campo siguiente; en el último campo de la última fila agrega una fila. */
   const alPresionarEnter = (evento: React.KeyboardEvent<HTMLInputElement>) => {
     if (evento.key !== "Enter") return;
@@ -389,6 +425,8 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
         f.initialStock.trim() ||
         f.costo.trim() ||
         f.estilos.length > 0 ||
+        f.variantes.length > 0 ||
+        f.publicadaEn.length > 0 ||
         f.fotos.length > 0
     );
     if (!conDatos) {
@@ -468,9 +506,21 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
         name: f.name,
         prefix: f.prefix,
         price: Number(f.price),
-        categoryId: f.categoryId,
+        // Categorías de la fila: varias y todas equivalentes (vacío = ninguna).
+        categorias: f.categorias,
         // Estilos de la fila: sin elegir ninguno no viaja (el esquema lo deja vacío).
         ...(f.estilos.length > 0 ? { estilos: f.estilos } : {}),
+        // Canales de la fila: sin elegir ninguno no viaja (queda sin publicar).
+        ...(f.publicadaEn.length > 0 ? { publicadaEn: f.publicadaEn } : {}),
+        // Variantes de la fila: con ellas el stock es la suma, no `initialStock`.
+        ...(f.variantes.length > 0
+          ? {
+              variantes: f.variantes.map((variante) => ({
+                nombre: variante.nombre,
+                cantidad: variante.cantidad.trim() === "" ? 0 : Number(variante.cantidad),
+              })),
+            }
+          : {}),
         // Vacío es 0: el producto igual queda en la vista por sucursal (S11).
         ...(branchId !== null
           ? { initialStock: f.initialStock.trim() === "" ? 0 : Number(f.initialStock) }
@@ -809,8 +859,90 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
                           )}
                         </div>
 
-                        {/* Stock inicial: solo tiene sentido con una sucursal elegida (D8). */}
-                        {branchId !== null && (
+                        {/* Variantes de la fila: con alguna, el stock es su suma y el
+                            campo simple de stock inicial no se muestra. */}
+                        <div className="space-y-2">
+                          {fila.variantes.map((variante, indiceVariante) => {
+                            const numero = indiceVariante + 1;
+                            const idNombre = `${base}-variante-${numero}-nombre`;
+                            const idCantidad = `${base}-variante-${numero}-cantidad`;
+                            return (
+                              <div
+                                key={numero}
+                                className="space-y-2 rounded-xl border border-hairline bg-surface p-3"
+                              >
+                                <div>
+                                  <label htmlFor={idNombre} className={labelClass}>
+                                    Variante {numero} del producto {index + 1}
+                                  </label>
+                                  <input
+                                    id={idNombre}
+                                    data-bulk-field="variante"
+                                    type="text"
+                                    value={variante.nombre}
+                                    onChange={(e) =>
+                                      cambiarVariante(fila.id, indiceVariante, "nombre", e.target.value)
+                                    }
+                                    onKeyDown={alPresionarEnter}
+                                    enterKeyHint="next"
+                                    maxLength={40}
+                                    placeholder="Ej: Roja"
+                                    className={inputClass}
+                                  />
+                                </div>
+                                <div>
+                                  <label htmlFor={idCantidad} className={labelClass}>
+                                    Cantidad de la variante {numero} del producto {index + 1}
+                                  </label>
+                                  <input
+                                    id={idCantidad}
+                                    data-bulk-field="variante"
+                                    type="number"
+                                    inputMode="numeric"
+                                    step="1"
+                                    min="0"
+                                    max="999"
+                                    value={variante.cantidad}
+                                    onChange={(e) =>
+                                      cambiarVariante(
+                                        fila.id,
+                                        indiceVariante,
+                                        "cantidad",
+                                        e.target.value
+                                      )
+                                    }
+                                    onKeyDown={alPresionarEnter}
+                                    enterKeyHint="next"
+                                    placeholder="0"
+                                    className={inputClass}
+                                  />
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => quitarVariante(fila.id, indiceVariante)}
+                                  disabled={loading}
+                                  aria-label={`Quitar variante ${numero} del producto ${index + 1}`}
+                                  className="btn btn-ghost w-full"
+                                >
+                                  Quitar variante
+                                </button>
+                              </div>
+                            );
+                          })}
+                          <button
+                            type="button"
+                            onClick={() => agregarVariante(fila.id)}
+                            disabled={loading}
+                            aria-label={`Agregar variante al producto ${index + 1}`}
+                            className="btn btn-secondary w-full"
+                          >
+                            + Agregar variante
+                          </button>
+                        </div>
+
+                        {/* Stock inicial: solo tiene sentido con una sucursal elegida (D8)
+                            y sin variantes, porque ahí el stock es la suma. */}
+                        {branchId !== null && fila.variantes.length === 0 && (
                           <div>
                             <label htmlFor={`${base}-initialStock`} className={labelClass}>
                               Stock inicial
@@ -870,59 +1002,88 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
                         )}
 
                         <div>
-                          <label htmlFor={`${base}-categoryId`} className={labelClass}>
-                            Categoría
-                          </label>
-                          <CategorySelector
-                            id={`${base}-categoryId`}
-                            selectedId={fila.categoryId}
-                            onValueChange={(id) => actualizarFila(fila.id, "categoryId", id)}
+                          <span id={`${base}-categorias-label`} className={labelClass}>
+                            Categorías
+                          </span>
+                          <CategoriasPicker
+                            compact
+                            id={`${base}-categorias`}
+                            labelledBy={`${base}-categorias-label`}
                             options={categorias}
                             onOptionsChange={setCategorias}
+                            selected={fila.categorias}
+                            onToggle={(id) =>
+                              actualizarFila(
+                                fila.id,
+                                "categorias",
+                                fila.categorias.includes(id)
+                                  ? fila.categorias.filter((actual) => actual !== id)
+                                  : [...fila.categorias, id]
+                              )
+                            }
+                            onCreated={(id) =>
+                              actualizarFila(fila.id, "categorias", [...fila.categorias, id])
+                            }
                             disabled={cargandoCategorias || loading}
-                            invalid={Boolean(mensajeDe("categoryId"))}
-                            describedBy={descritoPor("categoryId")}
+                            invalid={Boolean(mensajeDe("categorias"))}
+                            describedBy={descritoPor("categorias")}
                           />
-                          {mensajeDe("categoryId") && (
-                            <p id={`${base}-categoryId-error`} className="mt-1 text-sm text-error-ink">
-                              {mensajeDe("categoryId")}
+                          {mensajeDe("categorias") && (
+                            <p id={`${base}-categorias-error`} className="mt-1 text-sm text-error-ink">
+                              {mensajeDe("categorias")}
                             </p>
                           )}
                         </div>
 
                         {/* Estilos de la fila: la misma taxonomía que la prenda, compacta. */}
+                        <EstilosPicker
+                          compact
+                          options={estilosDisponibles}
+                          onOptionsChange={setEstilosDisponibles}
+                          selected={fila.estilos}
+                          onToggle={(id) =>
+                            actualizarFila(
+                              fila.id,
+                              "estilos",
+                              fila.estilos.includes(id)
+                                ? fila.estilos.filter((actual) => actual !== id)
+                                : [...fila.estilos, id]
+                            )
+                          }
+                          onCreated={(id) =>
+                            actualizarFila(fila.id, "estilos", [...fila.estilos, id])
+                          }
+                          disabled={loading}
+                        />
+
+                        {/* «Publicar en» de la fila: los mismos canales que el
+                            alta individual, compactos dentro de la card. */}
                         <div>
-                          <span className={labelClass}>Estilos</span>
+                          <span className={labelClass}>Publicar en</span>
                           <div className="flex flex-wrap gap-2">
-                            {estilosDisponibles.map((estilo) => {
-                              const elegido = fila.estilos.includes(estilo.id);
-                              return (
-                                <button
-                                  key={estilo.id}
-                                  type="button"
-                                  aria-pressed={elegido}
-                                  onClick={() =>
+                            {CANALES_PUBLICACION.map((canal) => (
+                              <label
+                                key={canal}
+                                className="inline-flex min-h-[44px] items-center gap-2 rounded-full border border-hairline bg-surface px-3 py-2 text-sm text-ink touch-manipulation"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={fila.publicadaEn.includes(canal)}
+                                  onChange={() =>
                                     actualizarFila(
                                       fila.id,
-                                      "estilos",
-                                      elegido
-                                        ? fila.estilos.filter((id) => id !== estilo.id)
-                                        : [...fila.estilos, estilo.id]
+                                      "publicadaEn",
+                                      fila.publicadaEn.includes(canal)
+                                        ? fila.publicadaEn.filter((actual) => actual !== canal)
+                                        : [...fila.publicadaEn, canal]
                                     )
                                   }
-                                  className={`min-h-[44px] rounded-full border px-3 py-2 text-sm touch-manipulation ${
-                                    elegido
-                                      ? "border-accent bg-accent/10 font-medium text-brand-rosa-texto"
-                                      : "border-hairline bg-surface text-ink"
-                                  }`}
-                                >
-                                  {estilo.name}
-                                </button>
-                              );
-                            })}
-                            {estilosDisponibles.length === 0 && (
-                              <p className="text-xs text-ink-muted">No hay estilos cargados</p>
-                            )}
+                                  disabled={loading}
+                                  className="h-4 w-4 accent-accent"
+                                />
+                                {canal}
+                              </label>
+                            ))}
                           </div>
                         </div>
 

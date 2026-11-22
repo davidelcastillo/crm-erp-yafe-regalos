@@ -1,7 +1,7 @@
 /**
  * Integration test for createProduct Server Action
  */
-import { createProduct, createProductsBatch, getProductById, getProducts, searchProducts, updateProductExtended } from "../actions/product";
+import { createProduct, createProductsBatch, getProductById, getProducts, searchProducts, updateProduct, updateProductExtended } from "../actions/product";
 import {
   createProductSchema,
   createProductsBatchSchema,
@@ -33,6 +33,14 @@ jest.mock("@/lib/prisma", () => {
   const mockEstiloFindMany = jest.fn();
   const mockProductEstiloCreateMany = jest.fn();
   const mockProductEstiloDeleteMany = jest.fn();
+  // Categorías del producto (`ProductCategory`, puente N:N).
+  const mockProductCategoriaCreateMany = jest.fn();
+  const mockProductCategoriaDeleteMany = jest.fn();
+  // Variantes del producto (`ProductVariante`).
+  const mockVarianteCreateMany = jest.fn();
+  const mockVarianteDeleteMany = jest.fn();
+  // Fotos del producto: la variante guarda la `position` de una existente.
+  const mockImageFindMany = jest.fn();
   const mockTransaction = jest.fn(async (callback: (tx: unknown) => Promise<unknown>) => {
     const tx = {
       product: {
@@ -57,6 +65,15 @@ jest.mock("@/lib/prisma", () => {
         createMany: mockProductEstiloCreateMany,
         deleteMany: mockProductEstiloDeleteMany,
       },
+      productCategory: {
+        createMany: mockProductCategoriaCreateMany,
+        deleteMany: mockProductCategoriaDeleteMany,
+      },
+      productVariante: {
+        createMany: mockVarianteCreateMany,
+        deleteMany: mockVarianteDeleteMany,
+      },
+      productImage: { findMany: mockImageFindMany },
       estiloPrenda: { findMany: mockEstiloFindMany },
       purchase: { create: mockPurchaseCreate },
       purchaseItem: { createMany: mockPurchaseItemCreateMany },
@@ -100,6 +117,15 @@ jest.mock("@/lib/prisma", () => {
         createMany: mockProductEstiloCreateMany,
         deleteMany: mockProductEstiloDeleteMany,
       },
+      productCategory: {
+        createMany: mockProductCategoriaCreateMany,
+        deleteMany: mockProductCategoriaDeleteMany,
+      },
+      productVariante: {
+        createMany: mockVarianteCreateMany,
+        deleteMany: mockVarianteDeleteMany,
+      },
+      productImage: { findMany: mockImageFindMany },
       estiloPrenda: { findMany: mockEstiloFindMany },
     },
   };
@@ -174,6 +200,7 @@ describe("createProduct Server Action - Integration", () => {
 
   it("persists the chosen category when creating a product (H2)", async () => {
     const { product } = prisma;
+    (prisma.category.findMany as jest.Mock).mockResolvedValue([{ id: 7 }]);
     (product.findMany as jest.Mock).mockResolvedValue([]);
     (product.create as jest.Mock).mockResolvedValue({ id: 3, name: "Con categoría", code: "CC000" });
 
@@ -254,6 +281,7 @@ describe("createProduct Server Action - Integration", () => {
   });
 
   it("avisa cuando la categoría elegida ya no existe", async () => {
+    (prisma.category.findMany as jest.Mock).mockResolvedValue([{ id: 7 }]);
     (prisma.$transaction as jest.Mock).mockRejectedValueOnce(
       Object.assign(new Error("Foreign key constraint failed"), { code: "P2003" }),
     );
@@ -1240,6 +1268,8 @@ describe("productos: estilos (ProductEstilo)", () => {
       id: 5,
       publicaciones: [],
       estilosProducto: [{ estiloId: 4 }, { estiloId: 6 }],
+      categorias: [],
+      variantes: [],
     });
 
     const result = await getProductById(5);
@@ -1297,5 +1327,468 @@ describe("productos: estilos (ProductEstilo)", () => {
     ]);
     expect(prisma.product.createManyAndReturn).not.toHaveBeenCalled();
     expect(filasEstilo().createMany).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Variantes del producto (pedido del dueño): nombre libre + cantidad, opcional
+ * como los talles de la prenda. Con variantes el stock inicial del alta es la
+ * suma; sin variantes manda `cantidadInicial`. La foto de la variante guarda la
+ * `position` de una foto existente del producto.
+ */
+describe("productos: variantes (ProductVariante)", () => {
+  const variantes = () =>
+    prisma.productVariante as unknown as { createMany: jest.Mock; deleteMany: jest.Mock };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (prisma.product.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.product.create as jest.Mock).mockResolvedValue({
+      id: 12,
+      code: "AA000",
+      name: "Camisa",
+      price: 100,
+    });
+  });
+
+  it("el esquema valida nombre, cantidad y unicidad de nombre", () => {
+    const base = { name: "Camisa", prefix: "AA", price: 100 };
+
+    expect(
+      createProductSchema.safeParse({
+        ...base,
+        variantes: [
+          { nombre: "Roja", cantidad: 2 },
+          { nombre: "Azul", cantidad: 3, fotoPosition: 1 },
+        ],
+      }).success
+    ).toBe(true);
+
+    // Nombre repetido (sin importar mayúsculas ni espacios).
+    expect(
+      createProductSchema.safeParse({
+        ...base,
+        variantes: [
+          { nombre: "Roja", cantidad: 1 },
+          { nombre: " roja ", cantidad: 1 },
+        ],
+      }).success
+    ).toBe(false);
+
+    expect(
+      createProductSchema.safeParse({ ...base, variantes: [{ nombre: "Roja", cantidad: 1000 }] })
+        .success
+    ).toBe(false);
+    expect(
+      createProductSchema.safeParse({ ...base, variantes: [{ nombre: "", cantidad: 1 }] }).success
+    ).toBe(false);
+    expect(
+      createProductSchema.safeParse({
+        ...base,
+        variantes: [{ nombre: "Roja", cantidad: 1, fotoPosition: 4 }],
+      }).success
+    ).toBe(false);
+  });
+
+  it("el alta escribe una fila por variante y usa la suma como stock inicial", async () => {
+    (prisma.branch.findFirst as jest.Mock).mockResolvedValue({ id: 3 });
+    (prisma.branchInventory.create as jest.Mock).mockResolvedValue({ stock: 10 });
+
+    const result = await createProduct({
+      name: "Camisa",
+      prefix: "AA",
+      price: 100,
+      branchId: 3,
+      variantes: [
+        { nombre: "Roja", cantidad: 2 },
+        { nombre: "Azul", cantidad: 3, fotoPosition: 1 },
+        { nombre: "Negra", cantidad: 5 },
+      ],
+    });
+
+    expect(result.success).toBe(true);
+    // En el alta todavía no hay fotos: la posición se elige en la edición.
+    expect(variantes().createMany).toHaveBeenCalledWith({
+      data: [
+        { productId: 12, nombre: "Roja", cantidad: 2 },
+        { productId: 12, nombre: "Azul", cantidad: 3 },
+        { productId: 12, nombre: "Negra", cantidad: 5 },
+      ],
+    });
+    expect((prisma.branchInventory.create as jest.Mock).mock.calls[0][0].data).toEqual({
+      branchId: 3,
+      productId: 12,
+      stock: 10,
+    });
+  });
+
+  it("sin variantes el alta usa la cantidad inicial y no escribe variantes", async () => {
+    (prisma.branch.findFirst as jest.Mock).mockResolvedValue({ id: 3 });
+    (prisma.branchInventory.create as jest.Mock).mockResolvedValue({ stock: 7 });
+
+    const result = await createProduct({
+      name: "Camisa",
+      prefix: "AA",
+      price: 100,
+      branchId: 3,
+      cantidadInicial: 7,
+    });
+
+    expect(result.success).toBe(true);
+    expect(variantes().createMany).not.toHaveBeenCalled();
+    expect((prisma.branchInventory.create as jest.Mock).mock.calls[0][0].data.stock).toBe(7);
+  });
+
+  it("la compra del alta usa la misma cantidad que el stock ingresado", async () => {
+    (prisma.purchase.create as jest.Mock).mockResolvedValue({ id: 5 });
+
+    const result = await createProduct({
+      name: "Camisa",
+      prefix: "AA",
+      price: 100,
+      costoUnitario: 40,
+      variantes: [
+        { nombre: "Roja", cantidad: 2 },
+        { nombre: "Azul", cantidad: 8 },
+      ],
+    });
+
+    expect(result.success).toBe(true);
+    expect(prisma.purchaseItem.createMany).toHaveBeenCalledWith({
+      data: [{ purchaseId: 5, productId: 12, price: 40, quantity: 10, subtotal: 400 }],
+    });
+  });
+
+  it("la edición reemplaza las variantes y sin el campo no las toca", async () => {
+    (prisma.product.update as jest.Mock).mockResolvedValue({ id: 12 });
+    (prisma.productImage.findMany as jest.Mock).mockResolvedValue([{ position: 0 }]);
+
+    await updateProductExtended({
+      id: 12,
+      variantes: [{ nombre: "Roja", cantidad: 2, fotoPosition: 0 }],
+    });
+
+    expect(variantes().deleteMany).toHaveBeenCalledWith({ where: { productId: 12 } });
+    expect(variantes().createMany).toHaveBeenCalledWith({
+      data: [{ productId: 12, nombre: "Roja", cantidad: 2, fotoPosition: 0 }],
+    });
+
+    jest.clearAllMocks();
+    (prisma.product.update as jest.Mock).mockResolvedValue({ id: 12 });
+
+    await updateProductExtended({ id: 12, name: "Camisa nueva" });
+
+    expect(variantes().deleteMany).not.toHaveBeenCalled();
+    expect(variantes().createMany).not.toHaveBeenCalled();
+  });
+
+  it("la edición rechaza una foto que el producto no tiene", async () => {
+    (prisma.productImage.findMany as jest.Mock).mockResolvedValue([{ position: 0 }]);
+
+    const result = await updateProductExtended({
+      id: 12,
+      variantes: [{ nombre: "Roja", cantidad: 1, fotoPosition: 2 }],
+    });
+
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(result.error).toBe("La foto de la variante no existe");
+    expect(variantes().createMany).not.toHaveBeenCalled();
+    expect(prisma.product.update).not.toHaveBeenCalled();
+  });
+
+  it("la acción legada updateProduct ya no corta la descripción en 500", async () => {
+    (prisma.product.update as jest.Mock).mockResolvedValue({ id: 5 });
+
+    const result = await updateProduct({ id: 5, description: "a".repeat(1500) });
+
+    expect(result.success).toBe(true);
+  });
+
+  it("getProductById devuelve las variantes guardadas", async () => {
+    (prisma.product.findUnique as jest.Mock).mockResolvedValue({
+      id: 12,
+      name: "Camisa",
+      price: 100,
+      publicaciones: [],
+      estilosProducto: [],
+      categorias: [],
+      variantes: [{ nombre: "Roja", cantidad: 2, fotoPosition: 0 }],
+    });
+
+    const result = await getProductById(12);
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect((result.data as unknown as { variantes: unknown }).variantes).toEqual([
+      { nombre: "Roja", cantidad: 2, fotoPosition: 0 },
+    ]);
+  });
+
+  it("el lote escribe las variantes de cada fila y usa su suma como stock", async () => {
+    (prisma.branch.findFirst as jest.Mock).mockResolvedValue({
+      id: 3,
+      name: "Centro",
+      code: "CEN",
+    });
+    (prisma.product.createManyAndReturn as jest.Mock).mockResolvedValue([
+      { id: 21, code: "ZZ000", name: "Camisa", price: 100 },
+    ]);
+    (prisma.branchInventory.createManyAndReturn as jest.Mock).mockResolvedValue([
+      { productId: 21, stock: 5 },
+    ]);
+
+    const result = await createProductsBatch({
+      branchId: 3,
+      rows: [
+        {
+          name: "Camisa",
+          prefix: "ZZ",
+          price: 100,
+          initialStock: 9,
+          variantes: [
+            { nombre: "Roja", cantidad: 2 },
+            { nombre: "Azul", cantidad: 3 },
+          ],
+        },
+      ],
+    });
+
+    expect(result.success).toBe(true);
+    expect(variantes().createMany).toHaveBeenCalledWith({
+      data: [
+        { productId: 21, nombre: "Roja", cantidad: 2 },
+        { productId: 21, nombre: "Azul", cantidad: 3 },
+      ],
+    });
+    expect(
+      (prisma.branchInventory.createManyAndReturn as jest.Mock).mock.calls[0][0].data
+    ).toEqual([{ branchId: 3, productId: 21, stock: 5 }]);
+  });
+});
+
+/**
+ * «Publicar en» del lote (pedido del dueño): el alta masiva pide los mismos
+ * canales que el alta individual, por fila. Una sola `createMany` para todo el
+ * lote, cruzando por código, y sin canales no escribe nada.
+ */
+describe("productos: «Publicar en» del lote", () => {
+  const publicaciones = () =>
+    prisma.prendaPublicacion as unknown as { createMany: jest.Mock; deleteMany: jest.Mock };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (prisma.product.findMany as jest.Mock).mockResolvedValue([]);
+  });
+
+  it("el lote escribe los canales de cada fila en una sola createMany", async () => {
+    (prisma.product.createManyAndReturn as jest.Mock).mockResolvedValue([
+      { id: 10, code: "ZZ000", name: "Producto A" },
+      { id: 11, code: "ZZ001", name: "Producto B" },
+    ]);
+
+    const result = await createProductsBatch({
+      rows: [
+        // TikTok no es un canal: lo descarta el mismo filtro que el individual.
+        { name: "Producto A", prefix: "ZZ", price: 10, publicadaEn: ["Web", "TikTok"] },
+        { name: "Producto B", prefix: "ZZ", price: 10 },
+      ],
+    });
+
+    expect(result.success).toBe(true);
+    expect(publicaciones().createMany).toHaveBeenCalledTimes(1);
+    expect(publicaciones().createMany).toHaveBeenCalledWith({
+      data: [{ productId: 10, canal: "Web" }],
+    });
+  });
+
+  it("sin canales el lote no escribe publicaciones", async () => {
+    (prisma.product.createManyAndReturn as jest.Mock).mockResolvedValue([
+      { id: 10, code: "ZZ000", name: "Producto A" },
+    ]);
+
+    const result = await createProductsBatch({
+      rows: [{ name: "Producto A", prefix: "ZZ", price: 10 }],
+    });
+
+    expect(result.success).toBe(true);
+    expect(publicaciones().createMany).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Categorías del producto (pedido del dueño): varias por producto y todas
+ * equivalentes. `categoryId` sigue sincronizado con la primera para los
+ * consumidores viejos que leen esa columna.
+ */
+describe("productos: categorías (ProductCategory)", () => {
+  const filas = () =>
+    prisma.productCategory as unknown as { createMany: jest.Mock; deleteMany: jest.Mock };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (prisma.product.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.product.create as jest.Mock).mockResolvedValue({ id: 9, name: "Con categorías" });
+  });
+
+  it("el esquema descarta las categorías repetidas", () => {
+    const parsed = createProductSchema.parse({
+      name: "Con categorías",
+      prefix: "CC",
+      price: 100,
+      categorias: [3, 3, 4],
+    });
+
+    expect(parsed.categorias).toEqual([3, 4]);
+  });
+
+  it("la edición distingue las categorías presentes de las ausentes", () => {
+    expect(updateProductExtendedSchema.parse({ id: 1, categorias: [] }).categorias).toEqual([]);
+    expect(updateProductExtendedSchema.parse({ id: 1 }).categorias).toBeUndefined();
+  });
+
+  it("el alta escribe una fila por categoría y deja la primera en categoryId", async () => {
+    (prisma.category.findMany as jest.Mock).mockResolvedValue([{ id: 5 }, { id: 7 }]);
+
+    const result = await createProduct({
+      name: "Con categorías",
+      prefix: "CC",
+      price: 100,
+      categorias: [5, 7],
+    });
+
+    expect(result.success).toBe(true);
+    expect(prisma.product.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ categoryId: 5 }) })
+    );
+    expect(filas().createMany).toHaveBeenCalledWith({
+      data: [
+        { productId: 9, categoryId: 5 },
+        { productId: 9, categoryId: 7 },
+      ],
+    });
+  });
+
+  it("una categoría inexistente rechaza el alta sin escribir", async () => {
+    (prisma.category.findMany as jest.Mock).mockResolvedValue([{ id: 5 }]);
+
+    const result = await createProduct({
+      name: "Con categoría vieja",
+      prefix: "CV",
+      price: 100,
+      categorias: [5, 99],
+    });
+
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(result.error).toBe("La categoría seleccionada no existe");
+    expect(prisma.product.create).not.toHaveBeenCalled();
+    expect(filas().createMany).not.toHaveBeenCalled();
+  });
+
+  it("la edición reemplaza las categorías y sincroniza categoryId con la primera", async () => {
+    (prisma.category.findMany as jest.Mock).mockResolvedValue([{ id: 9 }]);
+    (prisma.product.update as jest.Mock).mockResolvedValue({ id: 5 });
+
+    const result = await updateProductExtended({ id: 5, categorias: [9] });
+
+    expect(result.success).toBe(true);
+    expect(prisma.product.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ categoryId: 9 }) })
+    );
+    expect(filas().deleteMany).toHaveBeenCalledWith({ where: { productId: 5 } });
+    expect(filas().createMany).toHaveBeenCalledWith({
+      data: [{ productId: 5, categoryId: 9 }],
+    });
+  });
+
+  it("la edición sin el campo no toca las categorías", async () => {
+    (prisma.product.update as jest.Mock).mockResolvedValue({ id: 5 });
+
+    await updateProductExtended({ id: 5, name: "Renombrado" });
+
+    expect(prisma.category.findMany).not.toHaveBeenCalled();
+    expect(filas().deleteMany).not.toHaveBeenCalled();
+    expect(filas().createMany).not.toHaveBeenCalled();
+  });
+
+  it("la edición con una categoría vacía deja categoryId en null", async () => {
+    (prisma.product.update as jest.Mock).mockResolvedValue({ id: 5 });
+
+    const result = await updateProductExtended({ id: 5, categorias: [] });
+
+    expect(result.success).toBe(true);
+    expect(prisma.product.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ categoryId: null }) })
+    );
+    expect(filas().deleteMany).toHaveBeenCalledWith({ where: { productId: 5 } });
+    expect(filas().createMany).not.toHaveBeenCalled();
+  });
+
+  it("getProductById devuelve las categorías para precargar la edición", async () => {
+    (prisma.product.findUnique as jest.Mock).mockResolvedValue({
+      id: 5,
+      publicaciones: [],
+      estilosProducto: [],
+      variantes: [],
+      categorias: [{ categoryId: 4 }, { categoryId: 6 }],
+    });
+
+    const result = await getProductById(5);
+
+    expect(result.success).toBe(true);
+    expect((result.data as { categorias: number[] }).categorias).toEqual([4, 6]);
+  });
+
+  it("el lote escribe las categorías de cada fila y sincroniza categoryId", async () => {
+    (prisma.category.findMany as jest.Mock).mockResolvedValue([{ id: 1 }, { id: 2 }, { id: 3 }]);
+    (prisma.product.createManyAndReturn as jest.Mock).mockResolvedValue([
+      { id: 10, code: "ZZ000", name: "Producto A" },
+      { id: 11, code: "ZZ001", name: "Producto B" },
+    ]);
+
+    const result = await createProductsBatch({
+      rows: [
+        { name: "Producto A", prefix: "ZZ", price: 10, categorias: [1, 2] },
+        { name: "Producto B", prefix: "ZZ", price: 10, categorias: [3] },
+      ],
+    });
+
+    expect(result.success).toBe(true);
+    expect(prisma.product.createManyAndReturn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: [
+          expect.objectContaining({ categoryId: 1 }),
+          expect.objectContaining({ categoryId: 3 }),
+        ],
+      })
+    );
+    expect(filas().createMany).toHaveBeenCalledTimes(1);
+    expect(filas().createMany).toHaveBeenCalledWith({
+      data: [
+        { productId: 10, categoryId: 1 },
+        { productId: 10, categoryId: 2 },
+        { productId: 11, categoryId: 3 },
+      ],
+    });
+  });
+
+  it("una categoría inexistente en el lote marca solo su fila", async () => {
+    (prisma.category.findMany as jest.Mock).mockResolvedValue([{ id: 1 }]);
+
+    const result = await createProductsBatch({
+      rows: [
+        { name: "Producto A", prefix: "ZZ", price: 10, categorias: [1] },
+        { name: "Producto B", prefix: "ZZ", price: 10, categorias: [99] },
+      ],
+    });
+
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(result.rowErrors).toEqual([
+      { row: 1, field: "categorias", message: "La categoría seleccionada no existe" },
+    ]);
+    expect(prisma.product.createManyAndReturn).not.toHaveBeenCalled();
+    expect(filas().createMany).not.toHaveBeenCalled();
   });
 });
