@@ -14,6 +14,7 @@ import type {
   TaxonomyOption,
 } from "@/lib/validations/prendaTaxonomy";
 import { createPrenda, destacarPrenda, getPrenda, updatePrenda } from "@/app/actions/prenda";
+import { getFotosProducto } from "@/app/actions/foto";
 import { generatePrendaLabels } from "@/actions/label-print";
 import {
   createCategoriaPrenda,
@@ -35,7 +36,15 @@ export interface PrendaFormProps {
 }
 
 type MedidaFila = { key: number; medidaTipoId: string; valorCm: string };
-type TalleFila = { key: number; talle: string; cantidad: string };
+type TalleFila = {
+  key: number;
+  talle: string;
+  /** Variante libre de la fila («Color rojo»); vacía = sin variante. */
+  variante: string;
+  cantidad: string;
+  /** `position` de una foto del producto; vacío = sin foto. */
+  fotoPosition: string;
+};
 
 /**
  * Alta y edición de prenda (U3): bottom-sheet con la ficha completa de la ropa
@@ -57,8 +66,10 @@ export function PrendaForm({ prenda, branches = [], onClose, onSuccess }: Prenda
     detalleCondicion: "",
     detalleIntervencion: "",
   });
-  /** S1: filas «Talle + Cantidad»; el total se deriva, nunca se escribe a mano. */
-  const [talles, setTalles] = useState<TalleFila[]>([{ key: 1, talle: "", cantidad: "1" }]);
+  /** S1: filas «Talle + Variante + Cantidad»; el total se deriva, nunca se escribe a mano. */
+  const [talles, setTalles] = useState<TalleFila[]>([
+    { key: 1, talle: "", variante: "", cantidad: "1", fotoPosition: "" },
+  ]);
   const [categoriaId, setCategoriaId] = useState<number | null>(null);
   const [condicionId, setCondicionId] = useState<number | null>(null);
   const [estilos, setEstilos] = useState<number[]>([]);
@@ -77,6 +88,8 @@ export function PrendaForm({ prenda, branches = [], onClose, onSuccess }: Prenda
   const [destacadoOriginal, setDestacadoOriginal] = useState(false);
   /** T2: fotos elegidas en el alta; se suben recién con la prenda creada (id). */
   const [fotosPendientes, setFotosPendientes] = useState<File[]>([]);
+  /** Fotos guardadas: son las opciones del selector de foto de cada fila (edición). */
+  const [fotos, setFotos] = useState<{ position: number }[]>([]);
   const [code, setCode] = useState("");
 
   const [categorias, setCategorias] = useState<CategoriaPrendaOption[]>([]);
@@ -151,7 +164,9 @@ export function PrendaForm({ prenda, branches = [], onClose, onSuccess }: Prenda
         ficha.talles.map((fila, i) => ({
           key: i + 1,
           talle: fila.talle,
+          variante: fila.variante,
           cantidad: String(fila.cantidad),
+          fotoPosition: fila.fotoPosition === null ? "" : String(fila.fotoPosition),
         }))
       );
       setCategoriaId(ficha.categoriaPrendaId);
@@ -175,6 +190,26 @@ export function PrendaForm({ prenda, branches = [], onClose, onSuccess }: Prenda
         if (!cancelado) setError("No se pudo cargar la prenda");
       } finally {
         if (!cancelado) setCargandoPrenda(false);
+      }
+    })();
+    return () => {
+      cancelado = true;
+    };
+  }, [prenda]);
+
+  // Las fotos guardadas solo existen en la edición: son las opciones del
+  // selector de foto de cada fila de talle.
+  useEffect(() => {
+    if (!prenda) return;
+    let cancelado = false;
+    (async () => {
+      try {
+        const resultado = await getFotosProducto({ productId: prenda.id });
+        if (!cancelado && resultado.success) {
+          setFotos(resultado.data.map((foto) => ({ position: foto.position })));
+        }
+      } catch (err) {
+        console.error("Error loading prenda photos:", err);
       }
     })();
     return () => {
@@ -340,14 +375,20 @@ export function PrendaForm({ prenda, branches = [], onClose, onSuccess }: Prenda
       {
         key: prev.length === 0 ? 1 : Math.max(...prev.map((f) => f.key)) + 1,
         talle: "",
+        variante: "",
         cantidad: "1",
+        fotoPosition: "",
       },
     ]);
 
   const quitarTalle = (key: number) =>
     setTalles((prev) => prev.filter((fila) => fila.key !== key));
 
-  const actualizarTalle = (key: number, campo: "talle" | "cantidad", valor: string) =>
+  const actualizarTalle = (
+    key: number,
+    campo: "talle" | "variante" | "cantidad" | "fotoPosition",
+    valor: string
+  ) =>
     setTalles((prev) =>
       prev.map((fila) => (fila.key === key ? { ...fila, [campo]: valor } : fila))
     );
@@ -376,7 +417,10 @@ export function PrendaForm({ prenda, branches = [], onClose, onSuccess }: Prenda
       .filter((fila) => fila.talle.trim() !== "")
       .map((fila) => ({
         talle: fila.talle.trim(),
+        // Sin variante la clave no viaja: el servidor la guarda vacía.
+        ...(fila.variante.trim() !== "" ? { variante: fila.variante.trim() } : {}),
         cantidad: Number(fila.cantidad) || 0,
+        ...(fila.fotoPosition !== "" ? { fotoPosition: Number(fila.fotoPosition) } : {}),
       })),
     condicionId: condicionId as number,
     detalleCondicion: form.detalleCondicion.trim() || undefined,
@@ -482,8 +526,11 @@ export function PrendaForm({ prenda, branches = [], onClose, onSuccess }: Prenda
               ? "Cargá al menos un talle con su cantidad"
               : tallesValidos.length !== talles.length
                 ? "Cada talle necesita una cantidad de 1 o más"
-                : esUnica && (tallesValidos.length !== 1 || Number(tallesValidos[0].cantidad) !== 1)
-                  ? "Una prenda única lleva un solo talle con cantidad 1"
+                : esUnica &&
+                    (tallesValidos.length !== 1 ||
+                      Number(tallesValidos[0].cantidad) !== 1 ||
+                      tallesValidos[0].variante.trim() !== "")
+                  ? "Una prenda única lleva un solo talle sin variante y con cantidad 1"
                   : categoriaId === null
                     ? "Elegí la categoría de prenda"
                     : condicionId === null
@@ -741,56 +788,103 @@ export function PrendaForm({ prenda, branches = [], onClose, onSuccess }: Prenda
                   />
                 </div>
 
-                {/* S1: filas «Talle + Cantidad»; una prenda única lleva un solo talle. */}
+                {/* S1: filas «Talle + Variante + Cantidad»; una prenda única lleva un solo talle. */}
                 <div>
                   <p className={seccionClass}>Talles y unidades</p>
                   <span className={labelClass}>Talles *</span>
                   <div className="space-y-2">
                     {talles.map((fila, indice) => (
-                      <div key={fila.key} className="flex items-center gap-2">
-                        <input
-                          id={indice === 0 ? "prenda-talle" : `prenda-talle-${fila.key}`}
-                          type="text"
-                          value={fila.talle}
-                          onChange={(e) => actualizarTalle(fila.key, "talle", e.target.value)}
-                          placeholder="Único"
-                          maxLength={20}
-                          aria-label={`Talle ${indice + 1}`}
-                          className={inputClass}
-                        />
-                        {!esUnica && (
-                          <>
+                      <div key={fila.key} className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <input
+                            id={indice === 0 ? "prenda-talle" : `prenda-talle-${fila.key}`}
+                            type="text"
+                            value={fila.talle}
+                            onChange={(e) => actualizarTalle(fila.key, "talle", e.target.value)}
+                            placeholder="Único"
+                            maxLength={20}
+                            aria-label={`Talle ${indice + 1}`}
+                            className={inputClass}
+                          />
+                          {!esUnica && (
+                            <>
+                              <input
+                                id={`prenda-talle-cantidad-${fila.key}`}
+                                type="number"
+                                inputMode="numeric"
+                                step="1"
+                                min="1"
+                                max="999"
+                                value={fila.cantidad}
+                                onChange={(e) =>
+                                  actualizarTalle(fila.key, "cantidad", e.target.value)
+                                }
+                                aria-label={`Cantidad del talle ${indice + 1}`}
+                                className={`${inputClass} w-24 text-center`}
+                              />
+                              {talles.length > 1 && (
+                                <button
+                                  type="button"
+                                  onClick={() => quitarTalle(fila.key)}
+                                  className="btn btn-icon text-ink-muted hover:bg-surface-strong"
+                                  aria-label={`Quitar talle ${indice + 1}`}
+                                >
+                                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                  </svg>
+                                </button>
+                              )}
+                            </>
+                          )}
+                        </div>
+                        <div className={`grid gap-2 ${esUnica ? "" : "grid-cols-2"}`}>
+                          {!esUnica && (
                             <input
-                              id={`prenda-talle-cantidad-${fila.key}`}
-                              type="number"
-                              inputMode="numeric"
-                              step="1"
-                              min="1"
-                              max="999"
-                              value={fila.cantidad}
+                              id={`prenda-talle-variante-${fila.key}`}
+                              type="text"
+                              value={fila.variante}
                               onChange={(e) =>
-                                actualizarTalle(fila.key, "cantidad", e.target.value)
+                                actualizarTalle(fila.key, "variante", e.target.value)
                               }
-                              aria-label={`Cantidad del talle ${indice + 1}`}
-                              className={`${inputClass} w-24 text-center`}
+                              placeholder="Ej: Color rojo"
+                              maxLength={40}
+                              aria-label={`Variante del talle ${indice + 1}`}
+                              className={inputClass}
                             />
-                            {talles.length > 1 && (
-                              <button
-                                type="button"
-                                onClick={() => quitarTalle(fila.key)}
-                                className="btn btn-icon text-ink-muted hover:bg-surface-strong"
-                                aria-label={`Quitar talle ${indice + 1}`}
-                              >
-                                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                              </button>
-                            )}
-                          </>
-                        )}
+                          )}
+                          <div>
+                            <label
+                              htmlFor={`prenda-talle-foto-${fila.key}`}
+                              className="mb-1 block text-xs text-ink-muted"
+                            >
+                              Foto del talle {indice + 1}
+                            </label>
+                            <select
+                              id={`prenda-talle-foto-${fila.key}`}
+                              value={fila.fotoPosition}
+                              onChange={(e) =>
+                                actualizarTalle(fila.key, "fotoPosition", e.target.value)
+                              }
+                              disabled={!isEdit}
+                              className={`${inputClass} bg-surface`}
+                            >
+                              <option value="">Sin foto</option>
+                              {fotos.map((foto) => (
+                                <option key={foto.position} value={String(foto.position)}>
+                                  Foto {foto.position + 1}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
                       </div>
                     ))}
                   </div>
+                  {!isEdit && (
+                    <p className="mt-1 text-xs text-ink-muted">
+                      Las fotos se asocian cuando la prenda ya existe (edición).
+                    </p>
+                  )}
                   {!esUnica && (
                     <button
                       type="button"
@@ -816,7 +910,13 @@ export function PrendaForm({ prenda, branches = [], onClose, onSuccess }: Prenda
                       // Una prenda única colapsa las filas a un solo talle (S1).
                       if (e.target.checked) {
                         setTalles((prev) => [
-                          { key: prev[0]?.key ?? 1, talle: prev[0]?.talle ?? "", cantidad: "1" },
+                          {
+                            key: prev[0]?.key ?? 1,
+                            talle: prev[0]?.talle ?? "",
+                            variante: "",
+                            cantidad: "1",
+                            fotoPosition: prev[0]?.fotoPosition ?? "",
+                          },
                         ]);
                       }
                     }}
