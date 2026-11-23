@@ -339,10 +339,14 @@ model PrendaDetalle {
 model PrendaTalle {
   productId Int
   talle     String
+  // Variante libre de la combinación (Color rojo, Estampado flores…). Vacía = sin variante.
+  variante  String  @default("")
   cantidad  Int
+  // Foto de la combinación (opcional): `ProductImage.position` del mismo producto.
+  fotoPosition Int?
   prenda    PrendaDetalle @relation(fields: [productId], references: [productId], onDelete: Cascade)
 
-  @@id([productId, talle])
+  @@id([productId, talle, variante])
   @@index([productId])
 }
 

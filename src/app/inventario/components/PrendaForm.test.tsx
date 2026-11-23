@@ -445,6 +445,24 @@ describe("PrendaForm: fotos (T2)", () => {
     expect(screen.getByLabelText(/agregar fotos/i)).toBeInTheDocument();
   });
 
+  // Pedido del dueño: «que salga primero para poner las fotos».
+  it("pone el bloque de fotos antes que el nombre, en el alta y en la edición", async () => {
+    const antesDe = (a: HTMLElement, b: HTMLElement) =>
+      (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+
+    const { unmount } = renderAlta();
+    await esperarOpciones();
+    elegirSucursal();
+    await esperarFicha();
+    expect(antesDe(screen.getByText("Fotos"), screen.getByLabelText(/nombre/i))).toBe(true);
+    unmount();
+
+    render(<PrendaForm prenda={producto} onClose={jest.fn()} onSuccess={jest.fn()} />);
+    expect(
+      antesDe(await screen.findByText("Fotos"), await screen.findByLabelText(/nombre/i))
+    ).toBe(true);
+  });
+
   it("en el alta sube las fotos pendientes cuando la prenda ya existe", async () => {
     mockCreate.mockResolvedValue({
       success: true,

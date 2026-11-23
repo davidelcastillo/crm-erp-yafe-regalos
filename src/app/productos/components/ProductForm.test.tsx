@@ -778,6 +778,33 @@ describe("ProductForm · fotos y «Publicar en» (T2/T3)", () => {
     expect(screen.getByLabelText(/agregar fotos/i)).toBeInTheDocument();
   });
 
+  // Pedido del dueño: «que salga primero para poner las fotos».
+  it("pone el bloque de fotos antes que el nombre, en el alta y en la edición", async () => {
+    const antesDe = (a: HTMLElement, b: HTMLElement) =>
+      (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+
+    const { unmount } = render(<ProductForm product={null} onClose={() => {}} />);
+    await irAlPaso2();
+    expect(antesDe(screen.getByText("Fotos"), screen.getByLabelText(/nombre/i))).toBe(true);
+    unmount();
+
+    const productoExistente = {
+      id: 1,
+      name: "Producto Existente",
+      description: "-",
+      categoryId: null,
+      active: true,
+      price: 500,
+      code: "EX001",
+      codePrefix: "EX",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    } as unknown as Product;
+
+    render(<ProductForm product={productoExistente} onClose={() => {}} />);
+    expect(antesDe(screen.getByText("Fotos"), screen.getByLabelText(/nombre/i))).toBe(true);
+  });
+
   it("manda publicadaEn con los canales elegidos", async () => {
     render(<ProductForm product={null} onClose={() => {}} />);
     await llenarAlta();

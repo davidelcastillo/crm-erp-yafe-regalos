@@ -662,6 +662,16 @@ export function PrendaForm({ prenda, branches = [], onClose, onSuccess }: Prenda
                   </p>
                 )}
 
+                {/* Pedido del dueño: las fotos van primero en la ficha. */}
+                <div>
+                  <p className={seccionClass}>Fotos</p>
+                  <span className={labelClass}>Hasta 4 · la primera es la portada</span>
+                  <FotoUploader
+                    productId={isEdit ? prenda!.id : null}
+                    onPendientesChange={setFotosPendientes}
+                  />
+                </div>
+
                 <div>
                   <label htmlFor="prenda-nombre" className={labelClass}>
                     Nombre *
@@ -1107,17 +1117,6 @@ export function PrendaForm({ prenda, branches = [], onClose, onSuccess }: Prenda
                     disabled={!puedeCambiarDestacado}
                     aria-describedby="prenda-destacado-ayuda"
                     className="h-5 w-5 accent-accent"
-                  />
-                </div>
-
-                {/* T2: en la edición se administran las que ya tiene; en el alta
-                    quedan pendientes hasta que la prenda exista. */}
-                <div>
-                  <p className={seccionClass}>Fotos</p>
-                  <span className={labelClass}>Hasta 4 · la primera es la portada</span>
-                  <FotoUploader
-                    productId={isEdit ? prenda!.id : null}
-                    onPendientesChange={setFotosPendientes}
                   />
                 </div>
               </>

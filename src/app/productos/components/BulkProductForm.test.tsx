@@ -783,6 +783,14 @@ describe("BulkProductForm: fotos del lote", () => {
   beforeEach(() => {
     // Este describe no hereda el `beforeEach` del anterior: se limpia acá.
     jest.clearAllMocks();
+    // Las categorías se piden al abrir el modal: el test tiene que poder correr solo.
+    mockGetCategoryOptions.mockResolvedValue({
+      success: true,
+      data: [
+        { id: 5, name: "Bebidas" },
+        { id: 7, name: "Limpieza" },
+      ],
+    } as never);
     mockSubirFoto.mockResolvedValue({ success: true });
     mockCreateProductsBatch.mockResolvedValue({
       success: true,
@@ -805,6 +813,17 @@ describe("BulkProductForm: fotos del lote", () => {
     llenarFila(1, "Producto dos");
     return utilidades;
   };
+
+  // Pedido del dueño: «que salga primero para poner las fotos».
+  it("pone las fotos de cada fila antes que el nombre", async () => {
+    await dosFilas();
+
+    const antesDe = (a: HTMLElement, b: HTMLElement) =>
+      (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+
+    expect(antesDe(selectorFotos(0), nombres()[0])).toBe(true);
+    expect(antesDe(selectorFotos(1), nombres()[1])).toBe(true);
+  });
 
   it("cada fila acepta fotos, las muestra pendientes y no viajan en el payload", async () => {
     const { onSuccess } = await dosFilas();
