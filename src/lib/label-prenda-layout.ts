@@ -2,7 +2,7 @@
 /**
  * Geometría de la etiqueta de prenda en sus dos medidas (modelo del dueño):
  * fondo crema con borde cacao, agujero troquelado arriba, frutilla, «Polkalina's»,
- * las líneas Código / Talle / $ y «ÚNICA» al pie.
+ * las líneas Código / Talle / Variante / $ y «ÚNICA» al pie.
  *
  * Hoja **A4 vertical** (210 × 297 mm):
  * - `grande`  50 × 80 mm → grilla de 3 × 3 = **9 etiquetas** por hoja.
@@ -32,6 +32,7 @@ export const PRENDA_BRAND_TEXT = "Polkalina's";
 export const PRENDA_UNICA_TEXT = 'ÚNICA';
 export const PRENDA_CODE_PREFIX = 'Código: ';
 export const PRENDA_TALLE_PREFIX = 'Talle: ';
+export const PRENDA_VARIANTE_PREFIX = 'Variante: ';
 
 // --- Colores (paleta de la marca) -----------------------------------------
 export const PRENDA_LABEL_BACKGROUND_COLOR = PDF_BRAND_COLOR.cream;
@@ -68,9 +69,11 @@ export interface PrendaLabelLayout {
   brandTopMm: number;
   brandFontSizePt: number;
   brandMaxWidthMm: number;
-  /** Líneas de código, talle y precio (borde superior de cada una). */
+  /** Líneas de código, talle, variante y precio (borde superior de cada una). */
   codeTopMm: number;
   talleTopMm: number;
+  /** Debajo del talle, con su misma tipografía; sin variante no se dibuja. */
+  varianteTopMm: number;
   priceTopMm: number;
   lineFontSizePt: number;
   priceFontSizePt: number;
@@ -114,9 +117,10 @@ export const PRENDA_LABEL_LAYOUTS: Record<PrendaLabelSize, PrendaLabelLayout> = 
     brandTopMm: 27,
     brandFontSizePt: 17,
     brandMaxWidthMm: 40,
-    codeTopMm: 40,
-    talleTopMm: 47,
-    priceTopMm: 55,
+    codeTopMm: 38,
+    talleTopMm: 44.5,
+    varianteTopMm: 51,
+    priceTopMm: 57.5,
     lineFontSizePt: 9,
     priceFontSizePt: 16,
     unicaTopMm: 68,
@@ -137,9 +141,10 @@ export const PRENDA_LABEL_LAYOUTS: Record<PrendaLabelSize, PrendaLabelLayout> = 
     brandTopMm: 19.5,
     brandFontSizePt: 12,
     brandMaxWidthMm: 28,
-    codeTopMm: 29,
-    talleTopMm: 34.5,
-    priceTopMm: 41,
+    codeTopMm: 28.5,
+    talleTopMm: 33.5,
+    varianteTopMm: 38.5,
+    priceTopMm: 43.5,
     lineFontSizePt: 7,
     priceFontSizePt: 12,
     unicaTopMm: 50,
@@ -147,6 +152,32 @@ export const PRENDA_LABEL_LAYOUTS: Record<PrendaLabelSize, PrendaLabelLayout> = 
     contentPaddingMm: 2,
   }),
 };
+
+/** Borde superior de cada línea de texto, en mm desde el borde de la etiqueta. */
+export interface PrendaTextTops {
+  code: number;
+  talle: number;
+  /** `null` cuando la combinación no tiene variante: esa línea no se dibuja. */
+  variante: number | null;
+  price: number;
+}
+
+/**
+ * Apilado de las líneas según haya variante o no. Sin variante el precio sube un
+ * renglón (el que ocupaba la variante): si no, quedaría un hueco entre Talle y
+ * Precio.
+ */
+export function prendaTextTops(
+  layout: PrendaLabelLayout,
+  hasVariante: boolean
+): PrendaTextTops {
+  return {
+    code: layout.codeTopMm,
+    talle: layout.talleTopMm,
+    variante: hasVariante ? layout.varianteTopMm : null,
+    price: hasVariante ? layout.priceTopMm : layout.varianteTopMm,
+  };
+}
 
 /** Esquina superior izquierda de una etiqueta dentro de su hoja. */
 export interface PrendaLabelSlot {

@@ -9,6 +9,7 @@ import {
   PRENDA_SHEET_WIDTH_MM,
   calculatePrendaLabelSlots,
   calculatePrendaSheetCount,
+  prendaTextTops,
   type PrendaLabelSize,
 } from './label-prenda-layout';
 import { MM_TO_PT } from './label-layout';
@@ -107,9 +108,56 @@ describe('label-prenda-layout.ts — posiciones', () => {
       expect(layout.logoTopMm + layout.logoSizeMm).toBeLessThanOrEqual(layout.brandTopMm);
       expect(layout.brandTopMm).toBeLessThan(layout.codeTopMm);
       expect(layout.codeTopMm).toBeLessThan(layout.talleTopMm);
-      expect(layout.talleTopMm).toBeLessThan(layout.priceTopMm);
+      expect(layout.talleTopMm).toBeLessThan(layout.varianteTopMm);
+      expect(layout.varianteTopMm).toBeLessThan(layout.priceTopMm);
       expect(layout.priceTopMm).toBeLessThan(layout.unicaTopMm);
       expect(layout.unicaTopMm).toBeLessThan(layout.heightMm);
+    }
+  });
+});
+
+describe('label-prenda-layout.ts — la línea de variante', () => {
+  // Alto de tinta de una línea de texto, en mm: lo mínimo que necesita para no
+  // pisar la siguiente.
+  const tinta = (sizePt: number) => sizePt / MM_TO_PT;
+
+  test('la variante entra entre el talle y el precio sin pisar nada, en las dos medidas', () => {
+    for (const layout of [grande, mediana]) {
+      expect(layout.codeTopMm + tinta(layout.lineFontSizePt)).toBeLessThan(layout.talleTopMm);
+      expect(layout.talleTopMm + tinta(layout.lineFontSizePt)).toBeLessThan(
+        layout.varianteTopMm
+      );
+      expect(layout.varianteTopMm + tinta(layout.lineFontSizePt)).toBeLessThan(
+        layout.priceTopMm
+      );
+      expect(layout.priceTopMm + tinta(layout.priceFontSizePt)).toBeLessThan(
+        layout.unicaTopMm
+      );
+      expect(layout.unicaTopMm + tinta(layout.unicaFontSizePt)).toBeLessThan(layout.heightMm);
+    }
+  });
+
+  test('con variante las líneas van en su lugar', () => {
+    for (const layout of [grande, mediana]) {
+      expect(prendaTextTops(layout, true)).toEqual({
+        code: layout.codeTopMm,
+        talle: layout.talleTopMm,
+        variante: layout.varianteTopMm,
+        price: layout.priceTopMm,
+      });
+    }
+  });
+
+  test('sin variante el precio sube un renglón: no queda un hueco entre Talle y Precio', () => {
+    for (const layout of [grande, mediana]) {
+      const tops = prendaTextTops(layout, false);
+
+      expect(tops.variante).toBeNull();
+      // Código y talle no se mueven; el precio ocupa el renglón de la variante.
+      expect(tops.code).toBe(layout.codeTopMm);
+      expect(tops.talle).toBe(layout.talleTopMm);
+      expect(tops.price).toBeCloseTo(layout.varianteTopMm, 6);
+      expect(tops.price + tinta(layout.priceFontSizePt)).toBeLessThan(layout.unicaTopMm);
     }
   });
 });

@@ -463,7 +463,7 @@ export function PrendaForm({ prenda, branches = [], onClose, onSuccess }: Prenda
 
     const elegido = await Swal.fire({
       title: "Tamaño de la etiqueta",
-      text: "Una etiqueta por unidad de cada talle.",
+      text: "Una etiqueta por unidad de cada talle y variante.",
       input: "radio",
       inputOptions: { grande: "Grande 50 × 80 mm", mediana: "Mediana 35 × 58 mm" },
       inputValue: "grande",
@@ -476,11 +476,16 @@ export function PrendaForm({ prenda, branches = [], onClose, onSuccess }: Prenda
     if (!elegido.isConfirmed) return;
 
     const selections = talles
-      .map((fila) => ({
-        productId: prenda!.id,
-        talle: fila.talle.trim(),
-        quantity: esUnica ? 1 : Number(fila.cantidad),
-      }))
+      .map((fila) => {
+        const variante = (fila.variante ?? "").trim();
+        return {
+          productId: prenda!.id,
+          talle: fila.talle.trim(),
+          // Sin variante la clave no viaja: la etiqueta sale con el talle solo.
+          ...(variante !== "" ? { variante } : {}),
+          quantity: esUnica ? 1 : Number(fila.cantidad),
+        };
+      })
       .filter((fila) => fila.talle !== "" && Number.isInteger(fila.quantity) && fila.quantity >= 1);
     if (selections.length === 0) {
       setError("Cargá al menos un talle para imprimir sus etiquetas");

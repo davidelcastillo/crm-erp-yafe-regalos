@@ -748,6 +748,52 @@ describe("PrendaForm: etiquetas de prenda", () => {
     }
   });
 
+  it("manda la variante de cada combinación y la omite cuando no hay", async () => {
+    URL.createObjectURL = jest.fn(() => "blob:test");
+    URL.revokeObjectURL = jest.fn();
+    const originalClick = HTMLAnchorElement.prototype.click;
+    HTMLAnchorElement.prototype.click = jest.fn();
+
+    try {
+      mockGet.mockResolvedValue({
+        success: true,
+        data: {
+          ...prenda,
+          esUnica: false,
+          talles: [
+            { talle: "M", variante: "Color rojo", cantidad: 2, fotoPosition: null },
+            { talle: "M", variante: "Color azul", cantidad: 1, fotoPosition: null },
+            { talle: "S", variante: "", cantidad: 1, fotoPosition: null },
+          ],
+        },
+      } as never);
+      mockSwal.mockResolvedValueOnce({ isConfirmed: true, value: "grande" });
+      mockGeneratePrendaLabels.mockResolvedValue({
+        success: true,
+        data: { pdfBase64: "JVBERi0xLjQ=", filename: "etiquetas-prenda-RPH014-grande.pdf" },
+      } as never);
+
+      render(<PrendaForm prenda={producto} onClose={jest.fn()} onSuccess={jest.fn()} />);
+      await screen.findByDisplayValue("Campera de jean");
+
+      fireEvent.click(screen.getByRole("button", { name: /imprimir etiquetas/i }));
+
+      await waitFor(() =>
+        expect(mockGeneratePrendaLabels).toHaveBeenCalledWith({
+          tamano: "grande",
+          selections: [
+            { productId: 9, talle: "M", variante: "Color rojo", quantity: 2 },
+            { productId: 9, talle: "M", variante: "Color azul", quantity: 1 },
+            // Sin variante la clave no viaja: la etiqueta sale con el talle solo.
+            { productId: 9, talle: "S", quantity: 1 },
+          ],
+        })
+      );
+    } finally {
+      HTMLAnchorElement.prototype.click = originalClick;
+    }
+  });
+
   it("si se cancela el tamaño no genera nada", async () => {
     mockSwal.mockResolvedValueOnce({ isConfirmed: false });
 
