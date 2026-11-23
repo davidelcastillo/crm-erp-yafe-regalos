@@ -25,6 +25,8 @@ const MAX_FILAS = 50;
 type Fila = {
   id: string;
   name: string;
+  /** Descripción de la fila (opcional), igual que el alta individual. */
+  descripcion: string;
   prefix: string;
   price: string;
   /** Categorías de la fila (varias, todas equivalentes); vacío son ninguna. */
@@ -215,6 +217,7 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
     {
       id: "1",
       name: "",
+      descripcion: "",
       prefix: "",
       price: "",
       categorias: [],
@@ -326,6 +329,7 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
     const nueva: Fila = {
       id: String(nextId.current),
       name: "",
+      descripcion: "",
       prefix: filas[filas.length - 1]?.prefix ?? "", // una fila nueva copia el prefijo anterior
       price: "",
       categorias: [],
@@ -404,8 +408,12 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
   const alPresionarEnter = (evento: React.KeyboardEvent<HTMLInputElement>) => {
     if (evento.key !== "Enter") return;
     evento.preventDefault();
+    // Solo inputs: el textarea de descripción queda fuera del recorrido de Enter
+    // (ahí Enter hace salto de línea, no "siguiente campo").
     const inputs = Array.from(
-      cuerpoRef.current?.querySelectorAll<HTMLInputElement>("[data-bulk-field]") ?? []
+      cuerpoRef.current?.querySelectorAll<HTMLInputElement>(
+        "input[data-bulk-field]:not([type=file])"
+      ) ?? []
     );
     const siguiente = inputs[inputs.indexOf(evento.currentTarget) + 1];
     if (siguiente) {
@@ -504,6 +512,7 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
       ...(branchId !== null ? { branchId } : {}),
       rows: filas.map((f) => ({
         name: f.name,
+        ...(f.descripcion.trim() !== "" ? { description: f.descripcion.trim() } : {}),
         prefix: f.prefix,
         price: Number(f.price),
         // Categorías de la fila: varias y todas equivalentes (vacío = ninguna).
@@ -857,6 +866,22 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
                               {mensajeDe("price")}
                             </p>
                           )}
+                        </div>
+
+                        <div>
+                          <label htmlFor={`${base}-descripcion`} className={labelClass}>
+                            Descripción
+                          </label>
+                          <textarea
+                            id={`${base}-descripcion`}
+                            data-bulk-field="descripcion"
+                            value={fila.descripcion}
+                            onChange={(e) => actualizarFila(fila.id, "descripcion", e.target.value)}
+                            rows={2}
+                            maxLength={2000}
+                            placeholder="Ej: Jabón artesanal con avena y miel"
+                            className={inputClass}
+                          />
                         </div>
 
                         {/* Variantes de la fila: con alguna, el stock es su suma y el
