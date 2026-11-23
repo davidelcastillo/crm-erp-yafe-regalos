@@ -53,9 +53,64 @@ export const urlFoto = (productId: number, path: string, tamano: TamanoFoto = "s
 /** Rechaza antes de firmar: el tipo y el peso del ORIGINAL se validan acá. */
 const validarArchivo = (archivo: File): string | null => {
   if (!archivo.type.startsWith("image/")) return `«${archivo.name}» no es una imagen`;
-  if (archivo.size > MAX_BYTES_ORIGEN) return `«${archivo.name}» supera los 25 MB`;
+  // HEIC/HEIF de iPhone: ni el canvas ni el `<img>` los decodifican fuera de Safari.
+  if (/^image\/hei[cf]/i.test(archivo.type) || /\.hei[cf]$/i.test(archivo.name)) {
+    return `«${archivo.name}»: formato HEIC/HEIF no soportado, probá con JPG o PNG`;
+  }
+  if (archivo.size > MAX_BYTES_ORIGEN) return `«${archivo.name}»: supera el tope de 25 MB`;
   return null;
 };
+
+/** Marca un archivo que el navegador no pudo decodificar (corrupto, formato raro). */
+class ErrorFormato extends Error {}
+
+/** Algo dibujable en el canvas, con su tamaño y cómo soltar sus recursos. */
+type Fuente = { imagen: CanvasImageSource; ancho: number; alto: number; liberar: () => void };
+
+/**
+ * Decodifica el archivo con fallback: `createImageBitmap` primero (rápido), y si
+ * el navegador o el formato no pueden, un `<img>` desde un objectURL. Es el
+ * fallo que en producción se veía como «error de decode» con fotos de iPhone.
+ */
+async function decodificar(archivo: File): Promise<Fuente> {
+  if (typeof createImageBitmap === "function") {
+    try {
+      const bitmap = await createImageBitmap(archivo);
+      return {
+        imagen: bitmap,
+        ancho: bitmap.width,
+        alto: bitmap.height,
+        liberar: () => bitmap.close?.(),
+      };
+    } catch {
+      // Se prueba la vía del `<img>` antes de darse por vencido.
+    }
+  }
+
+  const url = URL.createObjectURL(archivo);
+  const img = new Image();
+  img.src = url;
+  try {
+    if (typeof img.decode === "function") {
+      await img.decode();
+    } else {
+      // Navegadores viejos sin `decode()`: se espera el evento de carga.
+      await new Promise<void>((resolver, rechazar) => {
+        img.onload = () => resolver();
+        img.onerror = () => rechazar(new Error("no se pudo leer el archivo"));
+      });
+    }
+  } catch {
+    URL.revokeObjectURL(url);
+    throw new ErrorFormato(`«${archivo.name}» no se pudo decodificar`);
+  }
+  return {
+    imagen: img,
+    ancho: img.naturalWidth,
+    alto: img.naturalHeight,
+    liberar: () => URL.revokeObjectURL(url),
+  };
+}
 
 const aWebp = (lienzo: HTMLCanvasElement, calidad: number) =>
   new Promise<Blob>((resolver, rechazar) =>
@@ -72,15 +127,23 @@ const aWebp = (lienzo: HTMLCanvasElement, calidad: number) =>
  * dimensiones no se tocan: un celular de 8 MB entra igual.
  */
 export async function redimensionar(archivo: File, lado: number): Promise<Blob> {
-  const bitmap = await createImageBitmap(archivo);
-  const escala = Math.min(1, lado / Math.max(bitmap.width, bitmap.height));
+  const fuente = await decodificar(archivo);
+  const mayor = Math.max(fuente.ancho, fuente.alto);
+  if (!(mayor > 0)) {
+    fuente.liberar();
+    throw new ErrorFormato(`«${archivo.name}» no se pudo decodificar`);
+  }
+  const escala = Math.min(1, lado / mayor);
   const lienzo = document.createElement("canvas");
-  lienzo.width = Math.max(1, Math.round(bitmap.width * escala));
-  lienzo.height = Math.max(1, Math.round(bitmap.height * escala));
+  lienzo.width = Math.max(1, Math.round(fuente.ancho * escala));
+  lienzo.height = Math.max(1, Math.round(fuente.alto * escala));
   const contexto = lienzo.getContext("2d");
-  if (!contexto) throw new Error("El navegador no pudo procesar la imagen");
-  contexto.drawImage(bitmap, 0, 0, lienzo.width, lienzo.height);
-  bitmap.close?.();
+  if (!contexto) {
+    fuente.liberar();
+    throw new Error("El navegador no pudo procesar la imagen");
+  }
+  contexto.drawImage(fuente.imagen, 0, 0, lienzo.width, lienzo.height);
+  fuente.liberar();
 
   for (let calidad = CALIDAD_WEBP; calidad >= CALIDAD_MINIMA - 1e-9; calidad -= PASO_CALIDAD) {
     const blob = await aWebp(lienzo, calidad);
@@ -115,6 +178,7 @@ export async function subirFoto(
 ): Promise<SubidaFoto> {
   const invalido = validarArchivo(archivo);
   if (invalido) return { success: false, error: invalido };
+  const nombre = `«${archivo.name}»`;
 
   try {
     const lg = await redimensionar(archivo, LADO_LG);
@@ -122,25 +186,30 @@ export async function subirFoto(
     const hash = await hashDe(lg);
 
     const firmada = await firmarSubidaFoto({ productId, hash, bytes: lg.size });
-    if (!firmada.success) return { success: false, error: firmada.error };
+    if (!firmada.success) return { success: false, error: `${nombre}: ${firmada.error}` };
 
     for (const [tamano, blob] of [
       ["lg", lg],
       ["sm", sm],
     ] as const) {
-      const subida = await fetch(firmada.data.subidas[tamano].signedUrl, {
-        method: "PUT",
-        headers: { "Content-Type": "image/webp" },
-        body: blob,
-      });
+      let subida: Response;
+      try {
+        subida = await fetch(firmada.data.subidas[tamano].signedUrl, {
+          method: "PUT",
+          headers: { "Content-Type": "image/webp" },
+          body: blob,
+        });
+      } catch {
+        return { success: false, error: `${nombre}: fallo de red al subir la foto, revisá la conexión` };
+      }
       if (!subida.ok) {
         // 400/403 = la URL firmada ya no sirve (vence a las 2 h).
         const vencida = subida.status === 400 || subida.status === 403;
         return {
           success: false,
           error: vencida
-            ? `No se pudo subir la foto (HTTP ${subida.status}): el enlace de subida venció, reintentá`
-            : `No se pudo subir la foto (HTTP ${subida.status})`,
+            ? `${nombre}: no se pudo subir (HTTP ${subida.status}): el enlace de subida venció, reintentá`
+            : `${nombre}: no se pudo subir (HTTP ${subida.status})`,
         };
       }
     }
@@ -148,32 +217,41 @@ export async function subirFoto(
     const confirmada = await confirmarFoto({ productId, hash, alt, bytes: lg.size });
     return confirmada.success
       ? { success: true }
-      : { success: false, error: confirmada.error ?? "No se pudo confirmar la foto" };
+      : { success: false, error: `${nombre}: ${confirmada.error ?? "no se pudo confirmar la foto"}` };
   } catch (error) {
     console.error("Error al subir la foto:", error);
+    if (error instanceof ErrorFormato) {
+      return { success: false, error: `${nombre}: formato no soportado (probá con JPG o PNG)` };
+    }
     // Los errores de compresión ya traen un mensaje útil para el usuario.
     const mensaje = error instanceof Error && error.message ? error.message : null;
-    return { success: false, error: mensaje ?? "No se pudo procesar la foto" };
+    return { success: false, error: mensaje ?? `${nombre}: no se pudo procesar la foto` };
   }
 }
 
 /**
- * Sube las fotos pendientes del alta. Devuelve el primer aviso de falla (o
- * `null`): una foto que falla no bloquea a las demás.
+ * Sube las fotos pendientes del alta, de a una para no saturar memoria en el
+ * celular. Devuelve el resumen con el detalle de las que fallaron (o `null`):
+ * una foto que falla no bloquea a las demás.
  */
 export async function subirFotos(
   productId: number,
   archivos: File[]
 ): Promise<string | null> {
-  const resultados = await Promise.all(archivos.map((archivo) => subirFoto(productId, archivo)));
-  const fallas = resultados.flatMap((resultado) => (resultado.success ? [] : [resultado.error]));
-  return fallas.length > 0 ? `${fallas.length} foto(s) no se pudieron subir: ${fallas[0]}` : null;
+  const fallas: string[] = [];
+  for (const archivo of archivos) {
+    const resultado = await subirFoto(productId, archivo);
+    if (!resultado.success) fallas.push(resultado.error);
+  }
+  if (fallas.length === 0) return null;
+  return `Se subieron ${archivos.length - fallas.length} de ${archivos.length} fotos: ${fallas.join(" · ")}`;
 }
 
 export function FotoUploader({ productId, onPendientesChange }: FotoUploaderProps) {
   const [fotos, setFotos] = useState<FotoGuardada[]>([]);
   const [pendientes, setPendientes] = useState<File[]>([]);
   const [subiendo, setSubiendo] = useState(false);
+  const [progreso, setProgreso] = useState<{ hecho: number; total: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -228,13 +306,20 @@ export function FotoUploader({ productId, onPendientesChange }: FotoUploaderProp
     }
 
     setSubiendo(true);
+    setProgreso({ hecho: 0, total: archivos.length });
     const fallas: string[] = [];
-    for (const archivo of archivos) {
+    for (const [indice, archivo] of archivos.entries()) {
+      setProgreso({ hecho: indice, total: archivos.length });
       const resultado = await subirFoto(productId, archivo);
       if (!resultado.success) fallas.push(resultado.error);
     }
+    setProgreso(null);
     setSubiendo(false);
-    setError(fallas.length > 0 ? fallas.join(", ") : null);
+    setError(
+      fallas.length > 0
+        ? `Se subieron ${archivos.length - fallas.length} de ${archivos.length} fotos. ${fallas.join(" · ")}`
+        : null
+    );
     await recargar();
   };
 
@@ -290,7 +375,7 @@ export function FotoUploader({ productId, onPendientesChange }: FotoUploaderProp
 
       {subiendo && (
         <p role="status" className="text-sm text-ink-muted">
-          Procesando fotos…
+          {progreso ? `Subiendo ${progreso.hecho + 1} de ${progreso.total}…` : "Procesando fotos…"}
         </p>
       )}
       {error && (

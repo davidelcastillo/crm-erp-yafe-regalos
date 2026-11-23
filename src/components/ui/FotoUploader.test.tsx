@@ -49,15 +49,27 @@ const elegirArchivos = (input: HTMLInputElement, files: File[]) => {
   fireEvent.change(input);
 };
 
+/** El bitmap simulado de jsdom: 1600×900, que es lo que dibuja el canvas. */
+const bitmapStub = jest.fn(async () => ({ width: 1600, height: 900, close: jest.fn() }));
+
 beforeAll(() => {
   // El navegador de los tests no dibuja: Canvas + bitmap + hash se simulan.
   HTMLCanvasElement.prototype.getContext = jest.fn(() => ({
     drawImage: jest.fn(),
   })) as unknown as HTMLCanvasElement["getContext"];
   HTMLCanvasElement.prototype.toBlob = toBlobStub;
-  (globalThis as { createImageBitmap?: unknown }).createImageBitmap = jest.fn(
-    async () => ({ width: 1600, height: 900, close: jest.fn() })
-  );
+  (globalThis as { createImageBitmap?: unknown }).createImageBitmap = bitmapStub;
+  // El fallback `<img>.decode()` no existe en jsdom: se simula que carga.
+  HTMLImageElement.prototype.decode = jest.fn(async function (this: HTMLImageElement) {
+    Object.defineProperty(this, "naturalWidth", { value: 1600, configurable: true });
+    Object.defineProperty(this, "naturalHeight", { value: 900, configurable: true });
+  }) as unknown as HTMLImageElement["decode"];
+  // El `objectURL` de jsdom no identifica el archivo: acá lleva su nombre.
+  Object.defineProperty(URL, "createObjectURL", {
+    configurable: true,
+    value: jest.fn((blob: Blob) => `blob:${(blob as File).name}`),
+  });
+  Object.defineProperty(URL, "revokeObjectURL", { configurable: true, value: jest.fn() });
   Object.defineProperty(globalThis, "crypto", {
     configurable: true,
     value: { subtle: { digest: jest.fn(async () => new Uint8Array(32).fill(7).buffer) } },
@@ -68,6 +80,11 @@ beforeAll(() => {
 beforeEach(() => {
   jest.clearAllMocks();
   HTMLCanvasElement.prototype.toBlob = toBlobStub;
+  (globalThis as { createImageBitmap?: unknown }).createImageBitmap = bitmapStub;
+  HTMLImageElement.prototype.decode = jest.fn(async function (this: HTMLImageElement) {
+    Object.defineProperty(this, "naturalWidth", { value: 1600, configurable: true });
+    Object.defineProperty(this, "naturalHeight", { value: 900, configurable: true });
+  }) as unknown as HTMLImageElement["decode"];
   (globalThis as { fetch?: unknown }).fetch = jest.fn(async () => ({ ok: true }));
   mockFirmar.mockResolvedValue({
     success: true,
@@ -263,5 +280,140 @@ describe("FotoUploader: helpers de subida", () => {
     const resultado = await subirFoto(7, archivo());
 
     expect(resultado.success === false && resultado.error).toMatch(/venci[oó].*reintent/i);
+  });
+});
+
+describe("FotoUploader: formato no soportado", () => {
+  it("rechaza un HEIC antes de decodificar y nombra el formato", async () => {
+    render(<FotoUploader productId={7} />);
+    const input = screen.getByLabelText(/agregar fotos/i) as HTMLInputElement;
+
+    elegirArchivos(input, [archivo("IMG_0042.HEIC", "image/heic")]);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      /IMG_0042\.HEIC.*HEIC.*JPG o PNG/i
+    );
+    expect((globalThis as unknown as { createImageBitmap: jest.Mock }).createImageBitmap).not.toHaveBeenCalled();
+    expect(mockFirmar).not.toHaveBeenCalled();
+  });
+
+  it("usa el fallback <img> cuando createImageBitmap falla y la sube igual", async () => {
+    (globalThis as { createImageBitmap?: unknown }).createImageBitmap = jest.fn(async () => {
+      throw new Error("The source image could not be decoded.");
+    });
+    const decode = jest.fn(async function (this: HTMLImageElement) {
+      Object.defineProperty(this, "naturalWidth", { value: 1600, configurable: true });
+      Object.defineProperty(this, "naturalHeight", { value: 900, configurable: true });
+    });
+    HTMLImageElement.prototype.decode = decode as unknown as HTMLImageElement["decode"];
+
+    const resultado = await subirFoto(7, archivo("fallback.jpg"));
+
+    expect(decode).toHaveBeenCalled();
+    expect(resultado).toEqual({ success: true });
+    expect(mockConfirmar).toHaveBeenCalled();
+  });
+
+  it("si el bitmap y el <img> fallan, avisa por archivo y no corta las demás", async () => {
+    (globalThis as { createImageBitmap?: unknown }).createImageBitmap = jest.fn(async () => {
+      throw new Error("The source image could not be decoded.");
+    });
+    HTMLImageElement.prototype.decode = jest.fn(async function (this: HTMLImageElement) {
+      if (this.src.includes("rota")) throw new Error("The source image could not be decoded.");
+      Object.defineProperty(this, "naturalWidth", { value: 1600, configurable: true });
+      Object.defineProperty(this, "naturalHeight", { value: 900, configurable: true });
+    }) as unknown as HTMLImageElement["decode"];
+
+    render(<FotoUploader productId={7} />);
+    const input = screen.getByLabelText(/agregar fotos/i) as HTMLInputElement;
+    elegirArchivos(input, [archivo("rota.jpg"), archivo("buena.jpg")]);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      /rota\.jpg.*formato no soportado.*JPG o PNG/i
+    );
+    expect(mockFirmar).toHaveBeenCalledTimes(1);
+    expect(mockConfirmar).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("FotoUploader: errores accionables y progreso", () => {
+  it("el error del PUT nombra el archivo y el status HTTP", async () => {
+    (globalThis as { fetch?: unknown }).fetch = jest.fn(async () => ({ ok: false, status: 500 }));
+
+    const resultado = await subirFoto(7, archivo("pesada.jpg"));
+
+    expect(resultado.success === false && resultado.error).toMatch(/pesada\.jpg.*HTTP 500/);
+  });
+
+  it("sube en serie y el contador «X de N» avanza en orden", async () => {
+    const pendientes: Array<() => void> = [];
+    mockFirmar.mockImplementation(
+      () =>
+        new Promise((resolver) =>
+          pendientes.push(() =>
+            resolver({
+              success: true,
+              data: {
+                subidas: {
+                  lg: { path: `7/${HASH}_lg.webp`, token: "t-lg", signedUrl: "https://storage.test/lg" },
+                  sm: { path: `7/${HASH}_sm.webp`, token: "t-sm", signedUrl: "https://storage.test/sm" },
+                },
+              },
+            } as never)
+          )
+        )
+    );
+
+    render(<FotoUploader productId={7} />);
+    const input = screen.getByLabelText(/agregar fotos/i) as HTMLInputElement;
+    elegirArchivos(input, [archivo("uno.jpg"), archivo("dos.jpg")]);
+
+    await waitFor(() => {
+      expect(screen.getByRole("status")).toHaveTextContent(/subiendo 1 de 2/i);
+      // En serie: la segunda no arranca hasta que termina la primera.
+      expect(pendientes).toHaveLength(1);
+    });
+
+    pendientes.shift()?.();
+    await waitFor(() => {
+      expect(screen.getByRole("status")).toHaveTextContent(/subiendo 2 de 2/i);
+      expect(pendientes).toHaveLength(1);
+    });
+
+    pendientes.shift()?.();
+    await waitFor(() => expect(mockConfirmar).toHaveBeenCalledTimes(2));
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+
+  it("el mensaje final cuenta las subidas y lista la fallida con su motivo", async () => {
+    mockFirmar
+      .mockResolvedValueOnce({ success: false, error: "No se pudo firmar la subida de la foto" } as never)
+      .mockResolvedValue({
+        success: true,
+        data: {
+          subidas: {
+            lg: { path: `7/${HASH}_lg.webp`, token: "t-lg", signedUrl: "https://storage.test/lg" },
+            sm: { path: `7/${HASH}_sm.webp`, token: "t-sm", signedUrl: "https://storage.test/sm" },
+          },
+        },
+      } as never);
+
+    render(<FotoUploader productId={7} />);
+    const input = screen.getByLabelText(/agregar fotos/i) as HTMLInputElement;
+    elegirArchivos(input, [archivo("uno.jpg"), archivo("dos.jpg")]);
+
+    const alerta = await screen.findByRole("alert");
+    expect(alerta).toHaveTextContent(/se subieron 1 de 2 fotos/i);
+    expect(alerta).toHaveTextContent(/uno\.jpg.*no se pudo firmar/i);
+  });
+
+  it("distingue el fallo de red del PUT del rechazo del servidor", async () => {
+    (globalThis as { fetch?: unknown }).fetch = jest.fn(async () => {
+      throw new TypeError("Failed to fetch");
+    });
+
+    const resultado = await subirFoto(7, archivo("sinred.jpg"));
+
+    expect(resultado.success === false && resultado.error).toMatch(/sinred\.jpg.*red/i);
   });
 });
