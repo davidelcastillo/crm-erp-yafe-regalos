@@ -151,12 +151,15 @@ export async function createPrenda(data: unknown) {
         },
       });
 
-      // S1: una fila por talle con su cantidad; el total las suma.
+      // S1: una fila por talle + variante con su cantidad; el total las suma.
+      // La foto se elige en la edición: el alta todavía no tiene fotos.
       await tx.prendaTalle.createMany({
         data: parsed.talles.map((fila) => ({
           productId: product.id,
           talle: fila.talle,
+          variante: fila.variante,
           cantidad: fila.cantidad,
+          fotoPosition: null,
         })),
       });
 
@@ -279,6 +282,25 @@ export async function updatePrenda(data: unknown) {
     const invalida = await taxonomiasInactivas(parsed);
     if (invalida) return { success: false as const, error: invalida };
 
+    // La foto de cada combinación tiene que existir: guarda la `position` de una
+    // foto del propio producto (en el alta se ignora, no hay fotos todavía).
+    if (parsed.talles.some((fila) => fila.fotoPosition !== undefined)) {
+      const posiciones = new Set(
+        (
+          await prisma.productImage.findMany({
+            where: { productId: parsed.id },
+            select: { position: true },
+          })
+        ).map((foto) => foto.position)
+      );
+      const fotoInexistente = parsed.talles.some(
+        (fila) => fila.fotoPosition !== undefined && !posiciones.has(fila.fotoPosition)
+      );
+      if (fotoInexistente) {
+        return { success: false as const, error: "La foto del talle no existe" };
+      }
+    }
+
     const stockTotal = actual.inventory.reduce((total, fila) => total + fila.stock, 0);
     if (parsed.esUnica && !actual.prenda.esUnica && stockTotal > 1) {
       return {
@@ -317,7 +339,9 @@ export async function updatePrenda(data: unknown) {
         data: parsed.talles.map((fila) => ({
           productId: parsed.id,
           talle: fila.talle,
+          variante: fila.variante,
           cantidad: fila.cantidad,
+          fotoPosition: fila.fotoPosition ?? null,
         })),
       });
 
@@ -384,7 +408,7 @@ export async function getPrenda(id: number) {
             costo: true,
             estilos: { select: { estiloId: true } },
             medidas: { select: { medidaTipoId: true, valorCm: true } },
-            talles: { select: { talle: true, cantidad: true } },
+            talles: { select: { talle: true, variante: true, cantidad: true, fotoPosition: true } },
           },
         },
         publicaciones: { select: { canal: true } },
@@ -404,7 +428,9 @@ export async function getPrenda(id: number) {
       condicionId: product.prenda.condicionId,
       talles: product.prenda.talles.map((fila) => ({
         talle: fila.talle,
+        variante: fila.variante,
         cantidad: fila.cantidad,
+        fotoPosition: fila.fotoPosition,
       })),
       detalleCondicion: product.prenda.detalleCondicion ?? "",
       detalleIntervencion: product.prenda.detalleIntervencion ?? "",

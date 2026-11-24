@@ -493,6 +493,15 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
             </div>
           ) : (
             <>
+          {/* Pedido del dueño: las fotos van primero en la ficha. */}
+          <div>
+            <span className={labelClass}>Fotos</span>
+            <FotoUploader
+              productId={isEdit ? product!.id : null}
+              onPendientesChange={setFotosPendientes}
+            />
+          </div>
+
           <div>
             <label htmlFor="product-name" className={labelClass}>Nombre *</label>
             <input
@@ -805,16 +814,6 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
                 </label>
               ))}
             </div>
-          </div>
-
-          {/* T2: en la edición se administran las que ya tiene; en el alta
-              quedan pendientes hasta que el producto exista. */}
-          <div>
-            <span className={labelClass}>Fotos</span>
-            <FotoUploader
-              productId={isEdit ? product!.id : null}
-              onPendientesChange={setFotosPendientes}
-            />
           </div>
 
           {/* Active Toggle (edit mode only) */}

@@ -161,8 +161,8 @@ export function StockMovementReceiptPanel({
           <div className="mt-6">
             <h3 className="text-base font-semibold text-ink">Tamaño de la etiqueta de prenda</h3>
             <p className="mt-1 mb-3 text-sm text-ink-muted">
-              Las prendas del movimiento salen con la etiqueta de ropa, una por talle y por
-              cantidad.
+              Las prendas del movimiento salen con la etiqueta de ropa, una por talle y variante
+              según la cantidad.
             </p>
             <div role="group" aria-label="Tamaño de la etiqueta de prenda" className="space-y-2">
               {TAMANOS_PRENDA.map(({ id, label }) => (

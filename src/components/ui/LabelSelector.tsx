@@ -434,8 +434,8 @@ export function LabelSelector({ isOpen, onClose, branches }: LabelSelectorProps)
               Tamaño de la etiqueta de prenda
             </h3>
             <p className="mb-3 text-sm text-ink-muted">
-              Las prendas salen con la etiqueta de ropa, una por talle y por cantidad. El
-              resto de los productos sigue con la etiqueta de siempre.
+              Las prendas salen con la etiqueta de ropa, una por talle y variante según la
+              cantidad. El resto de los productos sigue con la etiqueta de siempre.
             </p>
 
             <div

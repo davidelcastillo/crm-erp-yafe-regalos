@@ -2,12 +2,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { getVidriera, getVidrieraItem } from "@/app/actions/vidriera";
-import type { VidrieraFicha, VidrieraItem } from "@/app/actions/vidriera";
+import type { VidrieraItem } from "@/app/actions/vidriera";
 import { NOMBRE_GRUPO } from "@/lib/grupos-vidriera";
 import { formatPrice } from "@/lib/label-layout";
 import { EstadoVidrieraBadge } from "../components/EstadoVidrieraBadge";
-import { GaleriaFotos } from "../components/GaleriaFotos";
-import { BotonWhatsApp, SelectorTalle } from "../components/SelectorTalle";
+import { FotoSeleccionadaProvider, GaleriaFotos } from "../components/GaleriaFotos";
+import { SelectorTalle } from "../components/SelectorTalle";
 import { RELACIONADOS, TePuedeInteresar } from "../components/TePuedeInteresar";
 import { TiendaFooter, TiendaHeader } from "../components/TiendaHeader";
 
@@ -83,7 +83,9 @@ export default async function FichaVidrieraPage({
           <span className="text-ink">{item.name}</span>
         </nav>
 
-        <div className="grid gap-6 md:grid-cols-[3fr_2fr] md:gap-12">
+        {/* El provider es lo único cliente: la foto elegida en el selector
+            cambia la galería grande, que es su hermana en el layout. */}
+        <FotoSeleccionadaProvider className="grid gap-6 md:grid-cols-[3fr_2fr] md:gap-12">
           <GaleriaFotos fotos={item.fotos} nombre={item.name} />
 
           <div className="flex min-w-0 flex-col gap-4">
@@ -106,27 +108,14 @@ export default async function FichaVidrieraPage({
 
             {/* Una pieza vendida no se puede comprar: en su lugar, el estado ya
               lo comunica el badge. Lo mismo si está agotada. */}
-            {item.estado === "VENDIDA" || item.estado === "AGOTADO" ? null : item.talles
-                .length > 0 ? (
-              <SelectorTalle nombre={item.name} codigo={item.code} talles={item.talles} />
-            ) : (
-              <BotonWhatsApp nombre={item.name} codigo={item.code} />
-            )}
-
-            {/* Variantes del producto, sin stock exacto: las opciones que publica
-              la ficha, igual que los talles de una prenda. */}
-            {item.variantes && item.variantes.length > 0 && (
-              <div role="group" aria-label="Variantes" className="flex flex-wrap items-center gap-2">
-                <span className="text-[15px] text-ink">Variantes</span>
-                {item.variantes.map((variante) => (
-                  <span
-                    key={variante.nombre}
-                    className="inline-flex min-h-10 items-center rounded-[10px] border-[1.5px] border-hairline-strong bg-surface px-2.5 font-semibold text-ink"
-                  >
-                    {variante.nombre}
-                  </span>
-                ))}
-              </div>
+            {item.estado === "VENDIDA" || item.estado === "AGOTADO" ? null : (
+              <SelectorTalle
+                nombre={item.name}
+                codigo={item.code}
+                talles={item.talles}
+                combinaciones={item.combinaciones}
+                variantes={item.variantes}
+              />
             )}
 
             {item.descripcion && (
@@ -185,7 +174,7 @@ export default async function FichaVidrieraPage({
               ))}
             </div>
           </div>
-        </div>
+        </FotoSeleccionadaProvider>
 
         <TePuedeInteresar items={sugeridos(item, otros)} />
       </main>
@@ -208,7 +197,7 @@ const palabras = (nombre: string) => {
 };
 
 /** Misma categoría si hay, y si no el resto de lo publicado, sin la propia pieza. */
-const sugeridos = (item: VidrieraFicha, otros: VidrieraItem[]) => {
+const sugeridos = (item: VidrieraItem, otros: VidrieraItem[]) => {
   const resto = otros.filter((otro) => otro.id !== item.id);
   const mismaCategoria = item.categoria
     ? resto.filter((otro) => otro.categoria === item.categoria)

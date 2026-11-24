@@ -194,6 +194,16 @@ const FICHA: VidrieraFicha = {
   ...CATALOGO[0],
   name: "Campera de jean intervenida",
   talles: ["M", "S"],
+  // Talle + variante con la foto de cada combinación (`fotoPosition`).
+  combinaciones: [
+    { talle: "M", variante: "", foto: null },
+    {
+      talle: "M",
+      variante: "Color rojo",
+      foto: "https://storage.test/product-images/hash-espalda_lg.webp",
+    },
+    { talle: "S", variante: "", foto: null },
+  ],
   condicion: "Muy bueno",
   detalleCondicion: null,
   descripcion: "Intervenida a mano con encaje.",
@@ -826,6 +836,86 @@ describe("ficha /polkalinas/[id]", () => {
     const consulta = screen.getByRole("link", { name: /lo quiero por whatsapp/i });
     expect(decodeURIComponent(consulta.getAttribute("href") ?? "")).toContain("Talle M");
     expect(consulta.getAttribute("href")).toContain("https://wa.me/5493876360163?text=");
+  });
+
+  it("al elegir talle y variante la galería muestra la foto de esa combinación", async () => {
+    render(await FichaPage({ params: Promise.resolve({ id: "11" }) }));
+
+    // Portada de la prenda: la foto grande arranca en la posición 0.
+    expect(screen.getByAltText("Campera de frente")).toHaveAttribute(
+      "src",
+      "https://storage.test/product-images/hash-portada_lg.webp"
+    );
+
+    const selectorTalle = screen.getByRole("group", { name: /^talle$/i });
+    fireEvent.click(within(selectorTalle).getByRole("button", { name: "M" }));
+    const selectorVariante = screen.getByRole("group", { name: /^variante$/i });
+    fireEvent.click(within(selectorVariante).getByRole("button", { name: "Color rojo" }));
+
+    // La principal pasa a ser la foto de la combinación, sin perder miniaturas.
+    expect(screen.getByAltText("Campera de espalda")).toHaveAttribute(
+      "src",
+      "https://storage.test/product-images/hash-espalda_lg.webp"
+    );
+    expect(screen.getAllByRole("button", { name: /ver foto/i })).toHaveLength(2);
+
+    // Y el mensaje de WhatsApp lleva talle y variante.
+    const consulta = screen.getByRole("link", { name: /lo quiero por whatsapp/i });
+    expect(decodeURIComponent(consulta.getAttribute("href") ?? "")).toContain(
+      "Talle M, Color rojo"
+    );
+  });
+
+  it("una prenda sin variantes ofrece solo el talle y mantiene la portada", async () => {
+    getVidrieraItem.mockResolvedValue({
+      success: true,
+      data: {
+        ...FICHA,
+        combinaciones: [
+          { talle: "M", variante: "", foto: null },
+          { talle: "S", variante: "", foto: null },
+        ],
+      },
+    });
+
+    render(await FichaPage({ params: Promise.resolve({ id: "11" }) }));
+
+    expect(screen.queryByRole("group", { name: /^variante$/i })).toBeNull();
+    fireEvent.click(
+      within(screen.getByRole("group", { name: /^talle$/i })).getByRole("button", { name: "S" })
+    );
+    // Sin foto en la combinación, la galería sigue en la portada.
+    expect(screen.getByAltText("Campera de frente")).toBeInTheDocument();
+    const consulta = screen.getByRole("link", { name: /lo quiero por whatsapp/i });
+    const mensaje = decodeURIComponent(consulta.getAttribute("href") ?? "");
+    expect(mensaje).toContain("Talle S");
+    expect(mensaje).not.toContain("Color");
+  });
+
+  it("en un producto, elegir la variante cambia la foto grande", async () => {
+    getVidrieraItem.mockResolvedValue({
+      success: true,
+      data: {
+        ...FICHA_PRODUCTO,
+        fotos: [
+          { url: "https://storage.test/product-images/hash-perfume_lg.webp", alt: "Perfume floral" },
+          { url: "https://storage.test/product-images/hash-citrico_lg.webp", alt: "Perfume cítrico" },
+        ],
+        variantes: [
+          { nombre: "Floral", foto: null },
+          { nombre: "Cítrico", foto: "https://storage.test/product-images/hash-citrico_lg.webp" },
+        ],
+      },
+    });
+
+    render(await FichaPage({ params: Promise.resolve({ id: "13" }) }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Cítrico" }));
+
+    expect(screen.getByAltText("Perfume cítrico")).toHaveAttribute(
+      "src",
+      "https://storage.test/product-images/hash-citrico_lg.webp"
+    );
   });
 
   it("cambia la foto grande al tocar una miniatura", async () => {

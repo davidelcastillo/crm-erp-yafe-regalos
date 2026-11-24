@@ -77,8 +77,10 @@ import {
   PRENDA_TEXT_COLOR,
   PRENDA_UNICA_COLOR,
   PRENDA_UNICA_TEXT,
+  PRENDA_VARIANTE_PREFIX,
   calculatePrendaLabelSlots,
   calculatePrendaSheetCount,
+  prendaTextTops,
   type PrendaLabelLayout,
   type PrendaLabelSize,
   type PrendaLabelSlot,
@@ -533,7 +535,9 @@ const resolveLabelSheets = async (
     select: {
       id: true,
       kind: true,
-      prenda: { select: { esUnica: true, talles: { select: { talle: true } } } },
+      prenda: {
+        select: { esUnica: true, talles: { select: { talle: true, variante: true } } },
+      },
     },
   });
   const prendasById = new Map(
@@ -554,19 +558,21 @@ const resolveLabelSheets = async (
 
     if (prenda) {
       // Un peluche que además es prenda sigue siendo prenda: la ropa lleva talle.
-      const talles = prenda.prenda?.talles.map((fila) => fila.talle) ?? [];
+      const talles = prenda.prenda?.talles ?? [];
       if (talles.length === 0) {
         return {
           ok: false,
           error: `La prenda ${product.code} no tiene talles cargados`,
         };
       }
-      for (const talle of talles) {
+      // Una etiqueta por combinación (talle + variante) y por unidad.
+      for (const fila of talles) {
         for (let unit = 0; unit < selection.quantity; unit++) {
           resolved.prendas.push({
             code: product.code,
             price: product.price,
-            talle,
+            talle: fila.talle,
+            ...(fila.variante ? { variante: fila.variante } : {}),
             esUnica: prenda.prenda!.esUnica,
           });
         }
@@ -876,11 +882,13 @@ export async function detectPrendaProducts(data: unknown): Promise<DetectPrendaR
   }
 }
 
-// --- Etiquetas de prenda: dos tamaños, una etiqueta por talle (modelo del dueño) ---
+// --- Etiquetas de prenda: dos tamaños, una etiqueta por talle + variante (modelo del dueño) ---
 
 export type PrendaLabelSelection = {
   productId: number;
   talle: string;
+  /** Vacía o ausente = la combinación sin variante de ese talle. */
+  variante?: string;
   quantity: number;
 };
 
@@ -894,6 +902,7 @@ const generatePrendaLabelsSchema = z.object({
       z.object({
         productId: z.number().int().positive('Prenda inválida'),
         talle: z.string().trim().min(1, 'Falta el talle'),
+        variante: z.string().trim().optional(),
         quantity: z
           .number()
           .int()
@@ -909,6 +918,8 @@ const generatePrendaLabelsSchema = z.object({
 type PrendaLabelContent = {
   code: string;
   talle: string;
+  /** Sin variante la línea no se dibuja. */
+  variante?: string;
   price: number;
   esUnica: boolean;
 };
@@ -991,6 +1002,7 @@ const drawPrendaLabel = (
   const centerXMm = slot.x + layout.widthMm / 2;
   const ink = color(PRENDA_TEXT_COLOR);
   const maxWidthPt = mm(layout.widthMm - 2 * layout.contentPaddingMm);
+  const tops = prendaTextTops(layout, Boolean(content.variante));
 
   const text = (topMm: number, value: string, font: PDFFont, sizePt: number) =>
     drawPrendaCenteredText(page, {
@@ -1029,10 +1041,18 @@ const drawPrendaLabel = (
     fill: ink,
   });
 
-  text(slot.y + layout.codeTopMm, PRENDA_CODE_PREFIX + content.code, fonts.regular, layout.lineFontSizePt);
-  text(slot.y + layout.talleTopMm, PRENDA_TALLE_PREFIX + content.talle, fonts.regular, layout.lineFontSizePt);
+  text(slot.y + tops.code, PRENDA_CODE_PREFIX + content.code, fonts.regular, layout.lineFontSizePt);
+  text(slot.y + tops.talle, PRENDA_TALLE_PREFIX + content.talle, fonts.regular, layout.lineFontSizePt);
+  if (tops.variante !== null) {
+    text(
+      slot.y + tops.variante,
+      PRENDA_VARIANTE_PREFIX + content.variante,
+      fonts.regular,
+      layout.lineFontSizePt
+    );
+  }
   text(
-    slot.y + layout.priceTopMm,
+    slot.y + tops.price,
     `${CURRENCY_SYMBOL} ${formatPrice(content.price)}`,
     fonts.bold,
     layout.priceFontSizePt
@@ -1086,7 +1106,8 @@ const renderPrendaLabelsPdf = async (
 
 /**
  * Re-lee las prendas del servidor y arma una etiqueta por unidad pedida. Un
- * talle que no pertenece a la prenda se rechaza: la selección viene del cliente.
+ * talle —o una variante de ese talle— que no pertenece a la prenda se rechaza: la
+ * selección viene del cliente.
  */
 const resolvePrendaLabels = async (
   selections: PrendaLabelSelection[]
@@ -1098,7 +1119,9 @@ const resolvePrendaLabels = async (
       id: true,
       code: true,
       price: true,
-      prenda: { select: { esUnica: true, talles: { select: { talle: true } } } },
+      prenda: {
+        select: { esUnica: true, talles: { select: { talle: true, variante: true } } },
+      },
     },
   });
 
@@ -1110,16 +1133,31 @@ const resolvePrendaLabels = async (
     if (!prenda?.prenda) {
       return { ok: false, error: 'Prenda no encontrada' };
     }
-    if (!prenda.prenda.talles.some((fila) => fila.talle === selection.talle)) {
+
+    const talles = prenda.prenda.talles;
+    if (!talles.some((fila) => fila.talle === selection.talle)) {
       return {
         ok: false,
         error: `El talle «${selection.talle}» no pertenece a la prenda ${prenda.code}`,
       };
     }
 
+    // Sin variante no se exige combinación: la etiqueta sale con el talle solo.
+    const variante = selection.variante?.trim() ?? '';
+    if (
+      variante !== '' &&
+      !talles.some((fila) => fila.talle === selection.talle && fila.variante === variante)
+    ) {
+      return {
+        ok: false,
+        error: `La variante «${variante}» no pertenece al talle «${selection.talle}» de la prenda ${prenda.code}`,
+      };
+    }
+
     const content = {
       code: prenda.code,
       talle: selection.talle,
+      ...(variante !== '' ? { variante } : {}),
       price: Number(prenda.price),
       esUnica: prenda.prenda.esUnica,
     };
@@ -1141,8 +1179,9 @@ const resolvePrendaLabels = async (
  * Etiquetas de prenda para imprimir: hoja A4 vertical con la misma etiqueta
  * repetida, en el tamaño elegido (grande 50 × 80 mm o mediana 35 × 58 mm).
  *
- * Una etiqueta por unidad de cada talle, con los datos re-leídos de la base; un
- * talle que no es de la prenda se rechaza.
+ * Una etiqueta por unidad de cada combinación talle + variante, con los datos
+ * re-leídos de la base; un talle o una variante que no son de la prenda se
+ * rechazan.
  */
 export async function generatePrendaLabels(
   data: unknown

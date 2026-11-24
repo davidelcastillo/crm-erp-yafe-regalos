@@ -10,6 +10,8 @@ import { PDFArray, PDFDocument, PDFStream } from 'pdf-lib';
 import zlib from 'zlib';
 import { requireAdmin } from '@/lib/auth-guard';
 import { readPdfContent } from '@/lib/fonts/pdf-test-reader';
+import { MM_TO_PT } from '@/lib/label-layout';
+import { PRENDA_LABEL_LAYOUTS } from '@/lib/label-prenda-layout';
 import {
   detectPrendaProducts,
   generateEntryReceiptWithLabels,
@@ -75,6 +77,30 @@ const fillOp = (hex: string) =>
 
 const count = (haystack: string, needle: string) => haystack.split(needle).length - 1;
 
+/** Textos WinAnsi dibujados, en orden, con su línea de base en pt. */
+const drawnTexts = (base64: string): Array<{ text: string; y: number }> => {
+  const textos: Array<{ text: string; y: number }> = [];
+  const patron = /1 0 0 1 ([\d.]+) (-?[\d.]+) Tm\s*<([0-9A-Fa-f]+)>\s*Tj/g;
+
+  for (const stream of pageStreams(base64)) {
+    let match: RegExpExecArray | null;
+    while ((match = patron.exec(stream)) !== null) {
+      textos.push({
+        y: Number(match[2]),
+        text: Buffer.from(match[3], 'hex').toString('latin1'),
+      });
+    }
+  }
+
+  return textos;
+};
+
+/** Solo las líneas de la etiqueta (la marca va por glifos de Shrikhand). */
+const prendaLines = (base64: string) =>
+  drawnTexts(base64).filter(
+    (linea) => linea.text.includes('Talle: ') || linea.text.includes('Variante: ') || linea.text.startsWith('$ ')
+  );
+
 const prendaConTalles = {
   id: 7,
   code: 'RPH014',
@@ -87,6 +113,21 @@ const prendaUnica = {
   code: 'RPI003',
   price: 15900,
   prenda: { esUnica: true, talles: [{ talle: 'Único' }] },
+};
+
+/** Dos combinaciones del mismo talle con distinto color, y una sin variante. */
+const prendaConVariantes = {
+  id: 9,
+  code: 'RPH020',
+  price: 18000,
+  prenda: {
+    esUnica: false,
+    talles: [
+      { talle: 'M', variante: 'rojo' },
+      { talle: 'M', variante: 'azul' },
+      { talle: 'S', variante: '' },
+    ],
+  },
 };
 
 beforeEach(() => {
@@ -191,8 +232,95 @@ describe('generatePrendaLabels — la marca y los datos de la prenda', () => {
   });
 });
 
-/** Texto de **una** página del documento: Helvetica no lleva CMap, sus `Tj` son WinAnsi. */
-const winAnsiPage = (doc: PDFDocument, index: number): string => {
+describe('generatePrendaLabels — una etiqueta por talle + variante', () => {
+  beforeEach(() => {
+    mockProductFindMany.mockResolvedValue([prendaConVariantes]);
+  });
+
+  test('M/rojo 1 y M/azul 2 → tres etiquetas, cada una con su variante', async () => {
+    const result = await generatePrendaLabels({
+      selections: [
+        { productId: 9, talle: 'M', variante: 'rojo', quantity: 1 },
+        { productId: 9, talle: 'M', variante: 'azul', quantity: 2 },
+      ],
+      tamano: 'grande',
+    });
+
+    if (!result.success) throw new Error(result.error);
+    const texto = winAnsiText(result.data.pdfBase64);
+
+    // Tres etiquetas: una del talle+variante rojo y dos del azul.
+    expect(count(texto, 'RPH020')).toBe(3);
+    expect(count(texto, 'Talle: M')).toBe(3);
+    expect(count(texto, '18.000,00')).toBe(3);
+    expect(count(texto, 'Variante: rojo')).toBe(1);
+    expect(count(texto, 'Variante: azul')).toBe(2);
+  });
+
+  test('sin variante la línea no se dibuja y el precio sube un renglón', async () => {
+    const result = await generatePrendaLabels({
+      selections: [
+        { productId: 9, talle: 'M', variante: 'rojo', quantity: 1 },
+        { productId: 9, talle: 'S', quantity: 1 },
+      ],
+      tamano: 'mediana',
+    });
+
+    if (!result.success) throw new Error(result.error);
+    // Solo la etiqueta de M/rojo lleva la línea: la del talle sin variante no.
+    expect(count(winAnsiText(result.data.pdfBase64), 'Variante: ')).toBe(1);
+
+    // Orden de dibujo de cada etiqueta: talle, [variante], precio.
+    const lineas = prendaLines(result.data.pdfBase64);
+    const conVariante = lineas.findIndex((linea) => linea.text === 'Talle: M');
+    const sinVariante = lineas.findIndex((linea) => linea.text === 'Talle: S');
+
+    expect(lineas[conVariante + 1].text).toBe('Variante: rojo');
+    expect(lineas[sinVariante + 1].text.startsWith('$ ')).toBe(true);
+    // Sin la línea de variante el precio sube exactamente un renglón: la
+    // separación Talle → Precio se cierra, no queda un hueco en blanco.
+    const conVarianteGap = lineas[conVariante].y - lineas[conVariante + 2].y;
+    const sinVarianteGap = lineas[sinVariante].y - lineas[sinVariante + 1].y;
+    const renglon =
+      (PRENDA_LABEL_LAYOUTS.mediana.varianteTopMm - PRENDA_LABEL_LAYOUTS.mediana.talleTopMm) *
+      MM_TO_PT;
+    expect(conVarianteGap - sinVarianteGap).toBeCloseTo(renglon, 6);
+  });
+
+  test('rechaza una combinación que la prenda no tiene', async () => {
+    const result = await generatePrendaLabels({
+      selections: [{ productId: 9, talle: 'M', variante: 'verde', quantity: 1 }],
+      tamano: 'grande',
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error: 'La variante «verde» no pertenece al talle «M» de la prenda RPH020',
+    });
+  });
+
+  test('el conteo por hoja sigue igual: 20 medianas en una hoja y 21 en dos', async () => {
+    const unaHoja = await generatePrendaLabels({
+      selections: [{ productId: 9, talle: 'M', variante: 'azul', quantity: 20 }],
+      tamano: 'mediana',
+    });
+    const dosHojas = await generatePrendaLabels({
+      selections: [{ productId: 9, talle: 'M', variante: 'azul', quantity: 21 }],
+      tamano: 'mediana',
+    });
+
+    if (!unaHoja.success) throw new Error(unaHoja.error);
+    if (!dosHojas.success) throw new Error(dosHojas.error);
+
+    const pages = async (base64: string) =>
+      (await PDFDocument.load(Buffer.from(base64, 'base64'))).getPageCount();
+
+    await expect(pages(unaHoja.data.pdfBase64)).resolves.toBe(1);
+    await expect(pages(dosHojas.data.pdfBase64)).resolves.toBe(2);
+  });
+});
+
+/** Texto de **una** página del documento: Helvetica no lleva CMap, sus `Tj` son WinAnsi. */const winAnsiPage = (doc: PDFDocument, index: number): string => {
   const contents = doc.getPage(index).node.Contents();
   const refs = contents instanceof PDFArray ? contents.asArray() : [contents!];
   return refs

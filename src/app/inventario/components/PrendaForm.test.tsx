@@ -117,7 +117,7 @@ const prenda = {
   precio: 12000,
   categoriaPrendaId: 1,
   condicionId: 2,
-  talles: [{ talle: "M", cantidad: 1 }],
+  talles: [{ talle: "M", variante: "", cantidad: 1, fotoPosition: null }],
   detalleCondicion: "",
   detalleIntervencion: "",
   costo: 4000,
@@ -445,6 +445,24 @@ describe("PrendaForm: fotos (T2)", () => {
     expect(screen.getByLabelText(/agregar fotos/i)).toBeInTheDocument();
   });
 
+  // Pedido del dueño: «que salga primero para poner las fotos».
+  it("pone el bloque de fotos antes que el nombre, en el alta y en la edición", async () => {
+    const antesDe = (a: HTMLElement, b: HTMLElement) =>
+      (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+
+    const { unmount } = renderAlta();
+    await esperarOpciones();
+    elegirSucursal();
+    await esperarFicha();
+    expect(antesDe(screen.getByText("Fotos"), screen.getByLabelText(/nombre/i))).toBe(true);
+    unmount();
+
+    render(<PrendaForm prenda={producto} onClose={jest.fn()} onSuccess={jest.fn()} />);
+    expect(
+      antesDe(await screen.findByText("Fotos"), await screen.findByLabelText(/nombre/i))
+    ).toBe(true);
+  });
+
   it("en el alta sube las fotos pendientes cuando la prenda ya existe", async () => {
     mockCreate.mockResolvedValue({
       success: true,
@@ -481,6 +499,115 @@ describe("PrendaForm: fotos (T2)", () => {
     expect(await screen.findByText("Portada")).toBeInTheDocument();
     expect(mockGetFotos).toHaveBeenCalledWith({ productId: 9 });
     expect(screen.getByRole("button", { name: /quitar foto 2/i })).toBeInTheDocument();
+  });
+});
+
+describe("PrendaForm: variante y foto por fila", () => {
+  it("cada fila de talle tiene su variante y su selector de foto, sin foto en el alta", async () => {
+    renderAlta();
+    await esperarOpciones();
+    elegirSucursal();
+    await esperarFicha();
+
+    // La categoría con stock apaga «prenda única» y habilita las filas.
+    fireEvent.change(screen.getByLabelText(/categoría de prenda/i), { target: { value: "2" } });
+
+    expect(screen.getByLabelText("Variante del talle 1")).toBeInTheDocument();
+
+    const foto = screen.getByLabelText("Foto del talle 1");
+    expect(foto).toBeDisabled();
+    expect(within(foto).getByRole("option", { name: /sin foto/i })).toBeInTheDocument();
+    // El alta todavía no tiene fotos: se eligen en la edición.
+    expect(screen.getByText(/se asocian cuando la prenda ya existe/i)).toBeInTheDocument();
+  });
+
+  it("en el alta manda la variante de cada fila", async () => {
+    mockCreate.mockResolvedValue({ success: true, data: { product: {}, receipt: null } } as never);
+    renderAlta();
+    await esperarOpciones();
+    elegirSucursal();
+    await esperarFicha();
+
+    fireEvent.change(screen.getByLabelText(/categoría de prenda/i), { target: { value: "2" } });
+    fireEvent.change(screen.getByLabelText(/^talle/i), { target: { value: "M" } });
+    fireEvent.change(screen.getByLabelText("Variante del talle 1"), {
+      target: { value: "Color rojo" },
+    });
+    fireEvent.change(screen.getByLabelText("Cantidad del talle 1"), { target: { value: "2" } });
+
+    fireEvent.click(screen.getByRole("button", { name: /agregar talle/i }));
+    fireEvent.change(screen.getByLabelText("Talle 2"), { target: { value: "L" } });
+
+    fireEvent.change(screen.getByLabelText(/^nombre/i), { target: { value: "Campera" } });
+    fireEvent.change(screen.getByLabelText(/precio de venta/i), { target: { value: "100" } });
+    fireEvent.change(screen.getByLabelText(/^costo/i), { target: { value: "50" } });
+    fireEvent.change(screen.getByLabelText(/^condición/i), { target: { value: "2" } });
+    fireEvent.click(screen.getByRole("button", { name: /crear prenda/i }));
+
+    await waitFor(() =>
+      expect(mockCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          talles: [
+            { talle: "M", variante: "Color rojo", cantidad: 2 },
+            // Sin variante no viaja la clave: el servidor la guarda vacía.
+            { talle: "L", cantidad: 1 },
+          ],
+        })
+      )
+    );
+  });
+
+  it("en la edición carga las fotos y guarda la variante y la foto elegidas", async () => {
+    mockGetFotos.mockResolvedValue({
+      success: true,
+      data: [
+        { position: 0, path: "hash-portada", alt: null, bytes: 10 },
+        { position: 1, path: "hash-segunda", alt: null, bytes: 10 },
+      ],
+    } as never);
+    mockGet.mockResolvedValue({
+      success: true,
+      data: {
+        ...prenda,
+        esUnica: false,
+        talles: [{ talle: "M", variante: "Color rojo", cantidad: 2, fotoPosition: 1 }],
+      },
+    } as never);
+    mockUpdate.mockResolvedValue({ success: true, data: { id: 9 } } as never);
+
+    render(<PrendaForm prenda={producto} onClose={jest.fn()} onSuccess={jest.fn()} />);
+
+    // La ficha trae la variante y la foto de la fila.
+    expect(await screen.findByDisplayValue("Color rojo")).toBeInTheDocument();
+    const foto = screen.getByLabelText("Foto del talle 1");
+    expect(foto).toBeEnabled();
+    expect(foto).toHaveValue("1");
+
+    fireEvent.change(screen.getByLabelText("Variante del talle 1"), {
+      target: { value: "Color azul" },
+    });
+    fireEvent.change(foto, { target: { value: "0" } });
+    fireEvent.click(screen.getByRole("button", { name: /guardar prenda/i }));
+
+    await waitFor(() =>
+      expect(mockUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          talles: [{ talle: "M", variante: "Color azul", cantidad: 2, fotoPosition: 0 }],
+        })
+      )
+    );
+  });
+
+  it("una prenda única no deja cargar variante", async () => {
+    renderAlta();
+    await esperarOpciones();
+    elegirSucursal();
+    await esperarFicha();
+
+    // La categoría única precarga la marca y la fila queda sin variante.
+    fireEvent.change(screen.getByLabelText(/categoría de prenda/i), { target: { value: "1" } });
+
+    expect(screen.queryByLabelText("Variante del talle 1")).not.toBeInTheDocument();
   });
 });
 
@@ -613,6 +740,52 @@ describe("PrendaForm: etiquetas de prenda", () => {
           selections: [
             { productId: 9, talle: "S", quantity: 2 },
             { productId: 9, talle: "M", quantity: 1 },
+          ],
+        })
+      );
+    } finally {
+      HTMLAnchorElement.prototype.click = originalClick;
+    }
+  });
+
+  it("manda la variante de cada combinación y la omite cuando no hay", async () => {
+    URL.createObjectURL = jest.fn(() => "blob:test");
+    URL.revokeObjectURL = jest.fn();
+    const originalClick = HTMLAnchorElement.prototype.click;
+    HTMLAnchorElement.prototype.click = jest.fn();
+
+    try {
+      mockGet.mockResolvedValue({
+        success: true,
+        data: {
+          ...prenda,
+          esUnica: false,
+          talles: [
+            { talle: "M", variante: "Color rojo", cantidad: 2, fotoPosition: null },
+            { talle: "M", variante: "Color azul", cantidad: 1, fotoPosition: null },
+            { talle: "S", variante: "", cantidad: 1, fotoPosition: null },
+          ],
+        },
+      } as never);
+      mockSwal.mockResolvedValueOnce({ isConfirmed: true, value: "grande" });
+      mockGeneratePrendaLabels.mockResolvedValue({
+        success: true,
+        data: { pdfBase64: "JVBERi0xLjQ=", filename: "etiquetas-prenda-RPH014-grande.pdf" },
+      } as never);
+
+      render(<PrendaForm prenda={producto} onClose={jest.fn()} onSuccess={jest.fn()} />);
+      await screen.findByDisplayValue("Campera de jean");
+
+      fireEvent.click(screen.getByRole("button", { name: /imprimir etiquetas/i }));
+
+      await waitFor(() =>
+        expect(mockGeneratePrendaLabels).toHaveBeenCalledWith({
+          tamano: "grande",
+          selections: [
+            { productId: 9, talle: "M", variante: "Color rojo", quantity: 2 },
+            { productId: 9, talle: "M", variante: "Color azul", quantity: 1 },
+            // Sin variante la clave no viaja: la etiqueta sale con el talle solo.
+            { productId: 9, talle: "S", quantity: 1 },
           ],
         })
       );

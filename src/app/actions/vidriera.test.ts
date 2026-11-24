@@ -58,14 +58,15 @@ type Fila = {
   categorias?: { category: { id: number; name: string } }[];
   /** Canales de `PrendaPublicacion`: la vidriera solo muestra «Web». */
   canales: string[];
-  images: { path: string; alt: string | null }[];
-  /** Variantes del producto (opcional): nombre y si tiene foto propia. */
+  images: { position: number; path: string; alt: string | null }[];
+  /** Variantes del producto (opcional): nombre y la posición de su foto. */
   variantes?: { nombre: string; fotoPosition: number | null }[];
   prenda: {
     categoria: { id: number; name: string } | null;
     condicion: { name: string } | null;
     detalleCondicion?: string | null;
-    talles?: { talle: string }[];
+    /** Clave talle + variante, con la foto de la combinación (`ProductImage.position`). */
+    talles?: { talle: string; variante?: string; fotoPosition?: number | null }[];
   } | null;
 };
 
@@ -83,14 +84,18 @@ const CAMPERA: Fila = {
   category: null,
   canales: ["Web"],
   images: [
-    { path: "hash-portada", alt: "Campera de frente" },
-    { path: "hash-espalda", alt: null },
+    { position: 0, path: "hash-portada", alt: "Campera de frente" },
+    { position: 1, path: "hash-espalda", alt: null },
   ],
   prenda: {
     categoria: { id: 7, name: "Camperas" },
     condicion: { name: "Muy bueno" },
     detalleCondicion: "Con marcas en el ruedo",
-    talles: [{ talle: "M" }, { talle: "S" }],
+    talles: [
+      { talle: "M", variante: "", fotoPosition: null },
+      { talle: "M", variante: "Color rojo", fotoPosition: 1 },
+      { talle: "S", variante: "", fotoPosition: null },
+    ],
   },
 };
 
@@ -127,7 +132,7 @@ const PERFUME: Fila = {
   destacado: false,
   category: { id: 9, name: "Perfumes" },
   canales: ["Web"],
-  images: [{ path: "hash-perfume", alt: null }],
+  images: [{ position: 0, path: "hash-perfume", alt: null }],
   variantes: [
     { nombre: "Floral", fotoPosition: null },
     { nombre: "Cítrico", fotoPosition: 0 },
@@ -359,7 +364,8 @@ describe("getVidriera — qué se publica (S2)", () => {
       },
       images: {
         orderBy: { position: "asc" },
-        select: { path: true, alt: true },
+        // `position` es lo que resuelve la foto de una variante o combinación.
+        select: { position: true, path: true, alt: true },
       },
       // Variantes: nombre y si tiene foto propia (nunca la cantidad ni el stock).
       variantes: {
@@ -631,7 +637,18 @@ describe("getVidrieraItem — ficha pública (T5)", () => {
       sucursales: [{ id: 1, name: "Casa central" }],
       condicion: "Muy bueno",
       detalleCondicion: "Con marcas en el ruedo",
+      // Talles únicos, aunque varias combinaciones compartan el talle.
       talles: ["M", "S"],
+      // Cada combinación con la URL de su foto (`fotoPosition`), si tiene.
+      combinaciones: [
+        { talle: "M", variante: "", foto: null },
+        {
+          talle: "M",
+          variante: "Color rojo",
+          foto: expect.stringMatching(/\/product-images\/1\/hash-espalda_lg\.webp$/),
+        },
+        { talle: "S", variante: "", foto: null },
+      ],
       // Una prenda no tiene variantes: la ficha las manda vacías.
       variantes: [],
       estilos: [],
@@ -667,9 +684,10 @@ describe("getVidrieraItem — ficha pública (T5)", () => {
       publicaciones: { some: { canal: "Web" } },
     });
     expect(consulta.select?.images?.orderBy).toEqual({ position: "asc" });
+    // La ficha publica la clave talle + variante y la foto de la combinación.
     expect(consulta.select?.prenda?.select?.talles).toEqual({
       orderBy: { talle: "asc" },
-      select: { talle: true },
+      select: { talle: true, variante: true, fotoPosition: true },
     });
     // Datos públicos que la ficha necesita también para productos normales.
     expect(consulta.select?.description).toBe(true);
@@ -701,11 +719,16 @@ describe("getVidrieraItem — ficha pública (T5)", () => {
       condicion: null,
       detalleCondicion: null,
       talles: [],
+      // Un producto no tiene combinaciones talle + variante: viene vacío.
+      combinaciones: [],
       estilos: [],
-      // Variantes públicas: nombre + si tiene foto propia, sin cantidades.
+      // Variantes públicas: nombre + la URL de su foto, sin cantidades.
       variantes: [
-        { nombre: "Floral", conFoto: false },
-        { nombre: "Cítrico", conFoto: true },
+        { nombre: "Floral", foto: null },
+        {
+          nombre: "Cítrico",
+          foto: expect.stringMatching(/\/product-images\/3\/hash-perfume_lg\.webp$/),
+        },
       ],
       destacado: false,
       fotos: [
@@ -722,8 +745,8 @@ describe("getVidrieraItem — ficha pública (T5)", () => {
 
     if (!resultado.success) throw new Error("la ficha tendría que responder");
     expect(resultado.data.variantes).toEqual([
-      { nombre: "Floral", conFoto: false },
-      { nombre: "Cítrico", conFoto: true },
+      { nombre: "Floral", foto: null },
+      { nombre: "Cítrico", foto: expect.stringMatching(/\/hash-perfume_lg\.webp$/) },
     ]);
     expect(JSON.stringify(resultado.data.variantes)).not.toContain("cantidad");
   });

@@ -37,6 +37,7 @@ jest.mock("@/lib/prisma", () => {
     prendaEstilo: delegate(),
     prendaMedida: delegate(),
     prendaPublicacion: delegate(),
+    productImage: delegate(),
     branchInventory: delegate(),
     branchMovement: delegate(),
   };
@@ -141,7 +142,7 @@ describe("createPrenda: autorización y validación", () => {
     const tres = await createPrenda({ ...alta, talles: [{ talle: "M", cantidad: 3 }] });
     expect(tres).toEqual({
       success: false,
-      error: "Una prenda única lleva un solo talle con cantidad 1",
+      error: "Una prenda única lleva un solo talle sin variante y con cantidad 1",
     });
 
     const dos = await createPrenda({
@@ -153,7 +154,7 @@ describe("createPrenda: autorización y validación", () => {
     });
     expect(dos).toEqual({
       success: false,
-      error: "Una prenda única lleva un solo talle con cantidad 1",
+      error: "Una prenda única lleva un solo talle sin variante y con cantidad 1",
     });
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
@@ -193,6 +194,38 @@ describe("createPrenda: autorización y validación", () => {
       error: "Un tipo de medida no existe o está inactivo",
     });
 
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("rechaza repetir talle + variante y una prenda única con variante", async () => {
+    expect(
+      await createPrenda({
+        ...alta,
+        esUnica: false,
+        talles: [
+          { talle: "M", variante: "Rojo", cantidad: 1 },
+          { talle: "M", variante: "Rojo", cantidad: 2 },
+        ],
+      })
+    ).toEqual({ success: false, error: "Talle y variante repetidos" });
+
+    expect(
+      await createPrenda({ ...alta, talles: [{ talle: "M", variante: "Rojo", cantidad: 1 }] })
+    ).toEqual({
+      success: false,
+      error: "Una prenda única lleva un solo talle sin variante y con cantidad 1",
+    });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("una foto de talle fuera de rango se rechaza antes de la transacción", async () => {
+    const result = await createPrenda({
+      ...alta,
+      esUnica: false,
+      talles: [{ talle: "M", cantidad: 1, fotoPosition: 4 }],
+    });
+
+    expect(result).toEqual({ success: false, error: "La foto del talle es inválida" });
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
@@ -242,7 +275,7 @@ describe("createPrenda: alta completa", () => {
 
     // Talles: una fila por talle con su cantidad (S1).
     expect((prisma.prendaTalle.createMany as jest.Mock).mock.calls[0][0].data).toEqual([
-      { productId: 9, talle: "M", cantidad: 1 },
+      { productId: 9, talle: "M", variante: "", cantidad: 1, fotoPosition: null },
     ]);
 
     expect((prisma.prendaEstilo.createMany as jest.Mock).mock.calls[0][0].data).toEqual([
@@ -325,6 +358,33 @@ describe("createPrenda: alta completa", () => {
       subtotal: 20000,
     });
     expect((prisma.purchase.create as jest.Mock).mock.calls[0][0].data.totalAmount).toBe(20000);
+  });
+
+  it("cada fila es talle + variante: escribe las tres filas y suma el stock", async () => {
+    (prisma.branchInventory.create as jest.Mock).mockResolvedValue({ stock: 4 });
+
+    const result = await createPrenda({
+      ...alta,
+      esUnica: false,
+      talles: [
+        { talle: "M", variante: "Color rojo", cantidad: 1 },
+        { talle: "M", variante: "Color azul", cantidad: 2 },
+        { talle: "L", cantidad: 1 },
+      ],
+    });
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect((prisma.prendaTalle.createMany as jest.Mock).mock.calls[0][0].data).toEqual([
+      { productId: 9, talle: "M", variante: "Color rojo", cantidad: 1, fotoPosition: null },
+      { productId: 9, talle: "M", variante: "Color azul", cantidad: 2, fotoPosition: null },
+      // Sin variante queda el texto vacío, nunca null: es parte de la clave.
+      { productId: 9, talle: "L", variante: "", cantidad: 1, fotoPosition: null },
+    ]);
+    // El stock sigue siendo la suma de las filas (S1).
+    expect((prisma.branchInventory.create as jest.Mock).mock.calls[0][0].data.stock).toBe(4);
+    expect((prisma.branchMovement.create as jest.Mock).mock.calls[0][0].data.quantity).toBe(4);
+    expect(result.data.receipt?.rows[0].quantity).toBe(4);
   });
 
   it("costo 0 no genera compra", async () => {
@@ -428,7 +488,7 @@ describe("updatePrenda", () => {
       where: { productId: 9 },
     });
     expect((prisma.prendaTalle.createMany as jest.Mock).mock.calls[0][0].data).toEqual([
-      { productId: 9, talle: "M", cantidad: 1 },
+      { productId: 9, talle: "M", variante: "", cantidad: 1, fotoPosition: null },
     ]);
 
     // Se reemplazan enteras: borrar primero y volver a crear solo lo elegido.
@@ -474,6 +534,50 @@ describe("updatePrenda", () => {
       error: "No se puede marcar como única: la prenda tiene más de una unidad en stock",
     });
     expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("guarda variante y foto de cada fila y rechaza una foto que no es de la prenda", async () => {
+    (prisma.product.findUnique as jest.Mock).mockResolvedValue({
+      id: 9,
+      kind: "PRENDA",
+      prenda: { esUnica: false },
+      inventory: [{ stock: 3 }],
+    });
+    (prisma.productImage.findMany as jest.Mock).mockResolvedValue([
+      { position: 0 },
+      { position: 1 },
+    ]);
+
+    const result = await updatePrenda({
+      ...alta,
+      id: 9,
+      esUnica: false,
+      talles: [
+        { talle: "M", variante: "Rojo", cantidad: 2, fotoPosition: 1 },
+        { talle: "L", cantidad: 1 },
+      ],
+    });
+
+    expect(result.success).toBe(true);
+    expect(prisma.productImage.findMany).toHaveBeenCalledWith({
+      where: { productId: 9 },
+      select: { position: true },
+    });
+    expect((prisma.prendaTalle.createMany as jest.Mock).mock.calls[0][0].data).toEqual([
+      { productId: 9, talle: "M", variante: "Rojo", cantidad: 2, fotoPosition: 1 },
+      { productId: 9, talle: "L", variante: "", cantidad: 1, fotoPosition: null },
+    ]);
+
+    // Elegir una foto que la prenda no tiene no puede guardarse a medias.
+    const inexistente = await updatePrenda({
+      ...alta,
+      id: 9,
+      esUnica: false,
+      talles: [{ talle: "M", cantidad: 1, fotoPosition: 2 }],
+    });
+
+    expect(inexistente).toEqual({ success: false, error: "La foto del talle no existe" });
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
   });
 
   it("no encuentra una prenda inexistente o que es un producto normal", async () => {
@@ -564,7 +668,7 @@ describe("getPrenda", () => {
         costo: 4000,
         estilos: [{ estiloId: 4 }],
         medidas: [{ medidaTipoId: 6, valorCm: 48.5 }],
-        talles: [{ talle: "M", cantidad: 1 }],
+        talles: [{ talle: "M", variante: "Color rojo", cantidad: 1, fotoPosition: 2 }],
       },
       publicaciones: [{ canal: "Web" }],
     });
@@ -581,7 +685,7 @@ describe("getPrenda", () => {
         precio: 12000,
         categoriaPrendaId: 1,
         condicionId: 2,
-        talles: [{ talle: "M", cantidad: 1 }],
+        talles: [{ talle: "M", variante: "Color rojo", cantidad: 1, fotoPosition: 2 }],
         detalleCondicion: "",
         detalleIntervencion: "",
         costo: 4000,

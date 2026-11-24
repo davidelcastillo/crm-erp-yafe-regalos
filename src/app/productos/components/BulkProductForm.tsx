@@ -788,6 +788,15 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
                           </p>
                         )}
 
+                        {/* Pedido del dueño: las fotos de la fila van primero. */}
+                        <FotosFila
+                          id={`${base}-fotos`}
+                          etiqueta={fila.name.trim() || `Producto ${index + 1}`}
+                          archivos={fila.fotos}
+                          onChange={(fotos) => actualizarFila(fila.id, "fotos", fotos)}
+                          disabled={loading}
+                        />
+
                         <div>
                           <label htmlFor={`${base}-name`} className={labelClass}>
                             Nombre *
@@ -1111,15 +1120,6 @@ export function BulkProductForm({ onClose, onSuccess, branches }: BulkProductFor
                             ))}
                           </div>
                         </div>
-
-                        {/* U2: fotos de la fila, pendientes hasta que el producto exista. */}
-                        <FotosFila
-                          id={`${base}-fotos`}
-                          etiqueta={fila.name.trim() || `Producto ${index + 1}`}
-                          archivos={fila.fotos}
-                          onChange={(fotos) => actualizarFila(fila.id, "fotos", fotos)}
-                          disabled={loading}
-                        />
                       </div>
                     );
                   })}

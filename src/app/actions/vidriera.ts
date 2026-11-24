@@ -50,11 +50,11 @@ export type VidrieraItem = {
   categorias?: string[];
   /** Ids de `categorias`, para que el filtro del catálogo elija por cualquiera. */
   categoriaIds?: number[];
-  /** Talles disponibles de una prenda (vacío en productos normales). */
+  /** Talles disponibles de una prenda (únicos), vacío en productos normales. */
   talles?: string[];
-  /** Variantes del producto (opcional): nombre y si tiene foto propia. Sin
-   * cantidades: el stock exacto no se publica. */
-  variantes?: { nombre: string; conFoto: boolean }[];
+  /** Variantes del producto (opcional): nombre y la URL de su foto, si tiene.
+   * Sin cantidades: el stock exacto no se publica. */
+  variantes?: { nombre: string; foto: string | null }[];
   /** Estilos de la prenda; alimenta el filtro «Estilo» del catálogo. */
   estilos?: string[];
   /** Destacado de la portada (`Product.destacado`): lo elige el dueño desde la
@@ -76,6 +76,10 @@ export type VidrieraFicha = VidrieraItem & {
   condicion: string | null;
   detalleCondicion: string | null;
   talles: string[];
+  /** Combinaciones talle + variante de una prenda (`variante` vacía = sin
+   * variante), cada una con la URL de su foto si la tiene. Opcional en el tipo
+   * por lo mismo que `categoriaId`: no rompe los fixtures de las páginas. */
+  combinaciones?: { talle: string; variante: string; foto: string | null }[];
 };
 
 /** URL pública y estable del bucket (ADR-08). Mismo criterio que `urlFoto`;
@@ -97,9 +101,9 @@ const SELECT_LISTA = {
   categorias: {
     select: { categoryId: true, category: { select: { id: true, name: true } } },
   },
-  images: { orderBy: { position: "asc" }, select: { path: true, alt: true } },
-  // Variantes del producto: la ficha las lista como opciones (nombre + si
-  // tiene foto), nunca con la cantidad.
+  images: { orderBy: { position: "asc" }, select: { position: true, path: true, alt: true } },
+  // Variantes del producto: la ficha las lista como opciones (nombre + la
+  // posición de su foto), nunca con la cantidad.
   variantes: { orderBy: { id: "asc" }, select: { nombre: true, fotoPosition: true } },
   prenda: {
     select: {
@@ -121,7 +125,11 @@ const SELECT_FICHA = {
     select: {
       ...SELECT_LISTA.prenda.select,
       detalleCondicion: true,
-      talles: { orderBy: { talle: "asc" }, select: { talle: true } },
+      // Clave talle + variante, con la foto de la combinación.
+      talles: {
+        orderBy: { talle: "asc" },
+        select: { talle: true, variante: true, fotoPosition: true },
+      },
     },
   },
 } as const;
@@ -133,7 +141,7 @@ type FilaPublica = {
   price: unknown;
   kind: "PRENDA" | "PRODUCT";
   destacado: boolean;
-  images: { path: string; alt: string | null }[];
+  images: { position: number; path: string; alt: string | null }[];
   /** Solo los productos normales tienen variantes; las prendas usan talles. */
   variantes?: { nombre: string; fotoPosition: number | null }[];
   /** Solo lo pide `SELECT_FICHA`. */
@@ -146,7 +154,8 @@ type FilaPublica = {
     categoria: { id: number; name: string } | null;
     condicion: { name: string } | null;
     detalleCondicion?: string | null;
-    talles?: { talle: string }[];
+    /** `variante` y `fotoPosition` solo vienen en la ficha. */
+    talles?: { talle: string; variante?: string; fotoPosition?: number | null }[];
     estilos?: { estilo: { name: string } }[];
   } | null;
 };
@@ -182,6 +191,15 @@ const categoriasDelItem = (fila: FilaPublica) => {
   );
 };
 
+/** Foto pública de una variante o combinación: `fotoPosition` es la
+ * `ProductImage.position` del mismo producto. Sin foto queda `null`. */
+const fotoEnPosicion = (fila: FilaPublica, posicion: number | null | undefined) => {
+  const imagen = posicion === null || posicion === undefined
+    ? undefined
+    : fila.images.find((foto) => foto.position === posicion);
+  return imagen ? urlFoto(fila.id, imagen.path, "lg") : null;
+};
+
 const aPublico = (
   fila: FilaPublica,
   stock: number,
@@ -208,12 +226,13 @@ const aPublico = (
     categoriaId: categorias[0]?.id ?? null,
     categorias: categorias.map((categoria) => categoria.name),
     categoriaIds: categorias.map((categoria) => categoria.id),
-    // Talles disponibles (solo prendas): la card los muestra en lugar del código.
-    talles: fila.prenda?.talles?.map((filaTalle) => filaTalle.talle) ?? [],
-    // Variantes (solo productos): nombre y si tiene foto propia.
+    // Talles disponibles (solo prendas), únicos: varias combinaciones pueden
+    // compartir el talle. La card los muestra en lugar del código.
+    talles: [...new Set(fila.prenda?.talles?.map((filaTalle) => filaTalle.talle) ?? [])],
+    // Variantes (solo productos): nombre y la foto propia, si tiene.
     variantes: (fila.variantes ?? []).map((variante) => ({
       nombre: variante.nombre,
-      conFoto: variante.fotoPosition !== null,
+      foto: fotoEnPosicion(fila, variante.fotoPosition),
     })),
     // Estilos de la prenda (filtro del catálogo).
     estilos: fila.prenda?.estilos?.map((filaEstilo) => filaEstilo.estilo.name) ?? [],
@@ -396,7 +415,12 @@ export async function getVidrieraItem(data: unknown) {
         })),
         condicion: fila.prenda?.condicion?.name ?? null,
         detalleCondicion: fila.prenda?.detalleCondicion ?? null,
-        talles: fila.prenda?.talles?.map((talle) => talle.talle) ?? [],
+        // Combinaciones talle + variante, cada una con la foto de su posición.
+        combinaciones: (fila.prenda?.talles ?? []).map((filaTalle) => ({
+          talle: filaTalle.talle,
+          variante: filaTalle.variante ?? "",
+          foto: fotoEnPosicion(fila, filaTalle.fotoPosition),
+        })),
         descripcion: fila.description === "-" ? "" : (fila.description ?? ""),
         sucursales,
       },

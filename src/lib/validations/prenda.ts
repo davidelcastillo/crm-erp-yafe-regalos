@@ -32,12 +32,28 @@ const medidaSchema = z.object({
     .multipleOf(0.1, "Hasta 1 decimal"),
 });
 
-/** S1: filas «Talle + Cantidad»; el total de la prenda es la suma de las filas. */
+/** S1: filas «Talle + Variante + Cantidad»; el total de la prenda es la suma de las filas. */
 const cantidadSchema = z
   .number({ message: "La cantidad debe ser un número" })
   .int("La cantidad debe ser un número entero")
   .min(1, "La cantidad mínima es 1")
   .max(999, "Máximo 999 unidades");
+
+/** Variante libre de la combinación («Color rojo»): vacía = sin variante. */
+const varianteSchema = z
+  .string()
+  .trim()
+  .max(40, "La variante es muy larga")
+  .optional()
+  .transform((valor) => valor ?? "");
+
+/** Foto de la combinación: la `position` de una foto del propio producto. */
+const fotoPositionSchema = z
+  .number({ message: "La foto del talle es inválida" })
+  .int("La foto del talle es inválida")
+  .min(0, "La foto del talle es inválida")
+  .max(3, "La foto del talle es inválida")
+  .optional();
 
 const talleFilaSchema = z.object({
   talle: z
@@ -45,23 +61,30 @@ const talleFilaSchema = z.object({
     .trim()
     .min(1, "El talle es requerido")
     .max(20, "Máximo 20 caracteres"),
+  variante: varianteSchema,
   cantidad: cantidadSchema,
+  fotoPosition: fotoPositionSchema,
 });
 
 const tallesSchema = z
   .array(talleFilaSchema)
   .min(1, "Cargá al menos un talle")
-  // Un talle repetido no aporta nada: se suman sus cantidades.
-  .transform((filas) => {
-    const porTalle = new Map<string, { talle: string; cantidad: number }>();
-    for (const fila of filas) {
-      const previa = porTalle.get(fila.talle);
-      porTalle.set(fila.talle, {
-        talle: fila.talle,
-        cantidad: (previa?.cantidad ?? 0) + fila.cantidad,
-      });
-    }
-    return [...porTalle.values()];
+  // La clave de la fila es talle + variante (la misma de `PrendaTalle`):
+  // repetirla duplicaría la clave, así que se rechaza en su fila.
+  .superRefine((filas, ctx) => {
+    const vistas = new Set<string>();
+    filas.forEach((fila, indice) => {
+      const clave = JSON.stringify([fila.talle, fila.variante]);
+      if (vistas.has(clave)) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Talle y variante repetidos",
+          path: [indice, "talle"],
+        });
+        return;
+      }
+      vistas.add(clave);
+    });
   });
 
 /** Lo que comparten el alta y la edición: todo menos el stock y el código. */
@@ -108,7 +131,7 @@ const camposPrenda = {
 /**
  * Alta. La sucursal es obligatoria (C5: el mockup no la muestra, el modelo la
  * necesita) y la cantidad total se deriva de las filas de talle (S1): una
- * prenda única lleva un solo talle con cantidad 1.
+ * prenda única lleva un solo talle, sin variante y con cantidad 1.
  */
 export const createPrendaSchema = z
   .object({
@@ -119,11 +142,12 @@ export const createPrendaSchema = z
     // El array vacío ya lo reporta `min(1)`: acá no se duplica.
     if (!data.esUnica || data.talles.length === 0) return;
     const cantidadTotal = data.talles.reduce((suma, fila) => suma + fila.cantidad, 0);
-    if (data.talles.length !== 1 || cantidadTotal !== 1) {
+    // Una prenda única es una sola pieza: sin variante y con una unidad.
+    if (data.talles.length !== 1 || cantidadTotal !== 1 || data.talles[0].variante !== "") {
       ctx.addIssue({
         code: "custom",
         path: ["talles"],
-        message: "Una prenda única lleva un solo talle con cantidad 1",
+        message: "Una prenda única lleva un solo talle sin variante y con cantidad 1",
       });
     }
   });
@@ -155,7 +179,12 @@ export type PrendaEditable = {
   precio: number;
   categoriaPrendaId: number;
   condicionId: number;
-  talles: Array<{ talle: string; cantidad: number }>;
+  talles: Array<{
+    talle: string;
+    variante: string;
+    cantidad: number;
+    fotoPosition: number | null;
+  }>;
   detalleCondicion: string;
   detalleIntervencion: string;
   costo: number;
